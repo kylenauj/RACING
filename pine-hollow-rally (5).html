@@ -1197,6 +1197,7 @@ MAIN.mainFrom = 0; MAIN.mainTo = MAIN.N;
      gorge   (the canyon and its bridge, further down)
    CALM lists the stretches the rough stages keep off: [station, metres]. */
 const CALM = [];
+const PITS = [], SPOTS = [];          // SPOTS: small things jumps keep a little clear of
 const DROP = {on:false};
 if(TRACK.drop){
   const D = TRACK.drop, i = snapTo(MAIN, D.at), p = MAIN.pts[i], t = MAIN.tans[i];
@@ -1263,7 +1264,7 @@ if(TRACK.gallery){
   Object.assign(GALLERY, {on:true, a, b});
   for(let k=a - Math.round(30/MAIN.seg); k<=b + Math.round(30/MAIN.seg); k+=6) CALM.push([wrapIdx(MAIN, k), 25]);
 }
-(TRACK.washes || []).forEach(w=> CALM.push([snapTo(MAIN, w), 45]));
+(TRACK.washes || []).forEach(w=> SPOTS.push([snapTo(MAIN, w), 35]));
 const FLATS = [];
 const LAKE = {on:false};
 const PIT = {on:false};
@@ -1324,6 +1325,39 @@ if(TRACK.river){
   for(let k=a - Math.round(40/MAIN.seg); k<=b + Math.round(40/MAIN.seg); k+=6) CALM.push([wrapIdx(MAIN, k), 30]);
 }
 
+/* More going on round every lap: extra water crossings (dry washes in the
+   desert), and mud pits (sand traps in the desert, slush in the snow),
+   placed on plain road well clear of everything that has to stay put. */
+if(!TRACK.test){
+  const N = MAIN.N, seg = MAIN.seg, R = radiiOf(MAIN);
+  const taken = [[0, 150], [N - 1, 60]];
+  (TRACK.fords || []).forEach(f=> taken.push([snapTo(MAIN, f), 110]));
+  (TRACK.washes || []).forEach(f=> taken.push([snapTo(MAIN, f), 110]));
+  (TRACK.jumps || []).forEach(j=> taken.push([snapTo(MAIN, j[0]), 90]));
+  if(TRACK.gorge) taken.push([snapTo(MAIN, TRACK.gorge.at), TRACK.gorge.span + 80]);
+  CALM.forEach(c=> taken.push([c[0], c[1] + 40]));
+  TRACK.branches.forEach(b=>{ taken.push([snapTo(MAIN, b.a), 90]); taken.push([snapTo(MAIN, b.b), 90]); });
+  const gap = (a, b)=>{ const d = Math.abs(a - b) % N; return Math.min(d, N - d)*seg; };
+  const pick = (reach, minR, clearM)=>{
+    let best = -1, bs = -Infinity;
+    for(let i=0;i<N;i+=4){
+      let ok = true;
+      for(let k=-Math.round(reach/seg); k<=Math.round(reach/seg); k+=3) if(R[((i+k)%N+N)%N] < minR){ ok = false; break; }
+      if(!ok) continue;
+      let c = Infinity; for(const t of taken) c = Math.min(c, gap(i, t[0]) - t[1]);
+      if(c < clearM) continue;
+      const sc = c + Math.random()*40;
+      if(sc > bs){ bs = sc; best = i; }
+    }
+    return best;
+  };
+  const want = DESERT ? 0 : Math.max(0, 2 - (TRACK.fords || []).length);
+  for(let k=0;k<want;k++){ const i = pick(35, 70, 0); if(i < 0) break;
+    const p = MAIN.pts[i]; TRACK.fords = (TRACK.fords || []).concat([[p.x, p.z]]); taken.push([i, 120]); }
+  if(DESERT) for(let k=(TRACK.washes || []).length; k<3; k++){ const i = pick(25, 50, 0); if(i < 0) break;
+    const p = MAIN.pts[i]; TRACK.washes = (TRACK.washes || []).concat([[p.x, p.z]]); taken.push([i, 110]); }
+  for(let k=0;k<3;k++){ const i = pick(18, 35, 0); if(i < 0) break; PITS.push(i); taken.push([i, 120]); SPOTS.push([i, 25]); }
+}
 /* how much ice is under a point: the frozen lake, shore to shore */
 function iceAt(x, z){
   if(!LAKE.on || !LAKE.frozen) return 0;
@@ -1461,31 +1495,33 @@ const AUTO_JUMPS = [];
   busy.push([0, 110]);                                 // the start line and grid
   (TRACK.jumps || []).forEach(j=> busy.push([snapTo(MAIN, j[0]), 90]));
   if(TRACK.bigJump) busy.push([snapTo(MAIN, TRACK.bigJump[0]), 140]);
-  (TRACK.fords || []).forEach(f=> busy.push([snapTo(MAIN, f), 80]));
-  if(TRACK.gorge) busy.push([snapTo(MAIN, TRACK.gorge.at), TRACK.gorge.span + 55]);
-  CALM.forEach(c=> busy.push([c[0], c[1] + 20]));
+  (TRACK.fords || []).forEach(f=> busy.push([snapTo(MAIN, f), 55]));
+  if(TRACK.gorge) busy.push([snapTo(MAIN, TRACK.gorge.at), TRACK.gorge.span + 45]);
+  CALM.forEach(c=> busy.push([c[0], c[1]*0.8 + 8]));
+  SPOTS.forEach(c=> busy.push(c));
   BRANCHES.forEach(P=>{
-    busy.push([P.splitAt, 70]);
-    busy.push([wrapIdx(MAIN, P.mainTo - Math.round(12/seg)), 70]);
+    busy.push([P.splitAt, 50]);
+    busy.push([wrapIdx(MAIN, P.mainTo - Math.round(12/seg)), 50]);
   });
   const gap = (a, b)=>{ const d = Math.abs(a - b) % N; return Math.min(d, N - d)*seg; };
-  (TRACK.kit || []).forEach(type=>{
+  const KIT = (TRACK.kit || []).concat(TRACK.test ? [] : ["kicker","crest","rhythm","double","crest","tabletop"]).slice(0, 9);
+  KIT.forEach(type=>{
     const L = JUMP_LEN[type];
     const back = Math.round(L*0.4/seg), fwd = Math.round((L*0.5 + 20)/seg);
     let best = -1, bestScore = -Infinity;
     for(let i=0; i<N; i+=3){
       // straight enough to fly and to land: no corner tighter than 90m
       let straight = true;
-      for(let k=-back; k<=fwd; k+=2){ if(R[((i+k)%N+N)%N] < 60){ straight = false; break; } }
+      for(let k=-back; k<=fwd; k+=2){ if(R[((i+k)%N+N)%N] < 42){ straight = false; break; } }
       if(!straight) continue;
       let clear = Infinity;
-      for(const b of busy) clear = Math.min(clear, gap(i, b[0]) - b[1] - L*0.5);
+      for(const b of busy) clear = Math.min(clear, gap(i, b[0]) - b[1] - L*0.4);
       if(clear < 0) continue;
       if(clear > bestScore){ bestScore = clear; best = i; }
     }
     if(best < 0) return;                               // nowhere safe: this track goes without
     AUTO_JUMPS.push({type, at:best});
-    busy.push([best, L*0.5 + 40]);
+    busy.push([best, L*0.5 + 22]);
   });
 }
 
@@ -1502,13 +1538,20 @@ const STAGE_TYPES = {
   gravel:   {w:1.14, crest:0.05, wash:0.012, rut:0.035, mud:0.00, bank:0},
   rutted:   {w:0.80, crest:0.10, wash:0.020, rut:0.110, mud:0.12, bank:0},
   washboard:{w:1.00, crest:0.05, wash:0.060, rut:0.035, mud:0.00, bank:0},
-  muddy:    {w:0.90, crest:0.08, wash:0.015, rut:0.120, mud:0.85, bank:0},
+  muddy:    {w:0.90, crest:0.08, wash:0.015, rut:0.120, mud:0.60, bank:0},
   hollow:   {w:0.70, crest:0.06, wash:0.020, rut:0.090, mud:0.35, bank:2.9},
   broken:   {w:0.96, crest:0.24, wash:0.030, rut:0.050, mud:0.04, bank:0},
   // single track: one car wide and a bit, trees right up to the edge
-  single:   {w:0.56, crest:0.08, wash:0.020, rut:0.070, mud:0.08, bank:0}
+  single:   {w:0.56, crest:0.08, wash:0.020, rut:0.070, mud:0.08, bank:0},
+  // moguls: short rolling bumps that hop the car if you carry speed
+  moguls:   {w:0.95, crest:0.04, wash:0.020, rut:0.050, mud:0.00, bank:0, bump:1},
+  // a rocky path: stones set in the road, every one of them felt
+  rocky:    {w:0.88, crest:0.06, wash:0.030, rut:0.040, mud:0.00, bank:0, rock:1},
+  // the old paved road, half broken up: fast where the tar is, sticks all over
+  paved:    {w:1.08, crest:0.03, wash:0.000, rut:0.000, mud:0.00, bank:0, paved:1}
 };
-const STAGE_KEYS = ["crest","wash","rut","mud","bank","w"];
+Object.values(STAGE_TYPES).forEach(T=>{ T.bump = T.bump || 0; T.rock = T.rock || 0; T.paved = T.paved || 0; });
+const STAGE_KEYS = ["crest","wash","rut","mud","bank","w","bump","rock","paved"];
 function seeded(seed){
   let a = seed >>> 0;
   return ()=>{ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
@@ -1521,7 +1564,7 @@ function stagePath(P, rnd, pool, calm, calmBank){
   P.stages = [];
   let i = 0, last = "";
   while(i < N){
-    const len = Math.round((100 + rnd()*140)/P.seg);
+    const len = Math.round((70 + rnd()*100)/P.seg);
     let pick;
     do { pick = pool[Math.floor(rnd()*pool.length)]; } while(pick === last && pool.length > 1);
     last = pick;
@@ -1562,7 +1605,7 @@ function stagePath(P, rnd, pool, calm, calmBank){
 }
 /* a mask that is 1 within `r` metres of any listed station, easing off */
 function calmMask(P, stations, r){
-  const m = new Float64Array(P.N), R = Math.round(r/P.seg), F = Math.round(30/P.seg);
+  const m = new Float64Array(P.N), R = Math.round(r/P.seg), F = Math.round(16/P.seg);
   stations.forEach(st=>{
     for(let k=-R-F;k<=R+F;k++){
       const i = P.closed ? ((st+k)%P.N+P.N)%P.N : st+k;
@@ -1575,13 +1618,18 @@ function calmMask(P, stations, r){
 }
 /* crests along the road, riding on the profile, held back in calm zones */
 function addCrests(P, rnd){
-  const ph1 = rnd()*6.28, ph2 = rnd()*6.28, ph3 = rnd()*6.28;
+  const ph1 = rnd()*6.28, ph2 = rnd()*6.28, ph3 = rnd()*6.28, ph4 = rnd()*6.28, ph5 = rnd()*6.28;
+  // the stones of a rocky stretch: where each one sits and how proud it stands
+  P.rocks = [];
+  for(let s=rnd()*4; s<P.N*P.seg; s+=2.2 + rnd()*4.5) P.rocks.push([s, 0.08 + rnd()*0.13, (rnd() - 0.5)*2]);
+  const rockAt = s=>{ let y = 0; for(const r of P.rocks){ const d = s - r[0]; if(d > 1.4) continue; if(d < -1.4) break; y += r[1]*Math.exp(-d*d/0.35); } return y; };
   for(let i=0;i<P.N;i++){
     const s = i*P.seg;
     const b = 0.55*Math.sin(s*2*Math.PI/17 + ph1) + 0.30*Math.sin(s*2*Math.PI/27 + ph2)
             + 0.15*Math.sin(s*2*Math.PI/11 + ph3);
     const hold = Math.max(P.calmCrest[i], P.share ? Math.min(1, P.share[i]*3) : 0);
-    P.pts[i].y += P.st_crest[i]*b*(1 - hold);
+    const mog = 0.16*Math.sin(s*2*Math.PI/10.5 + ph4) + 0.04*Math.sin(s*2*Math.PI/4.6 + ph5);
+    P.pts[i].y += (P.st_crest[i]*b + P.st_bump[i]*mog + P.st_rock[i]*rockAt(s))*(1 - hold);
   }
 }
 {
@@ -1598,7 +1646,7 @@ function addCrests(P, rnd){
   const Gg = TRACK.gorge ? [snapTo(MAIN, TRACK.gorge.at)] : [];
   const calm = calmMask(MAIN, S, 70);
   const add = (m2)=>{ for(let k=0;k<MAIN.N;k++) calm[k] = Math.max(calm[k], m2[k]); };
-  add(calmMask(MAIN, J, 70)); add(calmMask(MAIN, Fd, 55)); add(calmMask(MAIN, Jn, 90));
+  add(calmMask(MAIN, J, 18)); add(calmMask(MAIN, Fd, 38)); add(calmMask(MAIN, Jn, 16));
   add(calmMask(MAIN, Gg, (TRACK.gorge ? TRACK.gorge.span : 0) + 25));
   CALM.forEach(c=> add(calmMask(MAIN, [c[0]], c[1])));
   const calmBank = calmMask(MAIN, S.concat(J, Fd, Jn, Gg), 85);
@@ -1606,15 +1654,16 @@ function addCrests(P, rnd){
   MAIN.calmCrest = calm;
   stagePath(MAIN, rnd,
     TRACK.test ? ["gravel","rutted","washboard","muddy","hollow","broken"]
-               : ["gravel","gravel","rutted","washboard", DESERT ? "washboard" : "muddy","hollow","broken","broken","single","single"],
+               : ["gravel","rutted","washboard", DESERT ? "washboard" : "muddy","hollow","broken","single",
+                  "moguls","moguls","rocky","rocky","paved","paved"],
     calm, calmBank);
   // branches: rougher, and plain where they meet the main road
   BRANCHES.forEach((P, bi)=>{
     const ends = [0, P.N-1];
     const c = calmMask(P, ends, 60), cb = calmMask(P, ends, 80);
     P.calmCrest = c;
-    stagePath(P, rnd, P.def.fast ? ["gravel","washboard","rutted"]
-                                 : ["rutted", DESERT ? "rutted" : "muddy","hollow","broken","washboard","single","single"], c, cb);
+    stagePath(P, rnd, P.def.fast ? ["gravel","washboard","rutted","moguls","paved"]
+                                 : ["rutted", DESERT ? "rutted" : "muddy","hollow","broken","washboard","single","moguls","rocky"], c, cb);
     /* A branch's mud is not left to chance: it is the one number that sets
        how much a shortcut saves, tuned per branch so each one is a little
        quicker than the road it cuts off, and never a lot. */
@@ -1723,6 +1772,16 @@ if(DROP.on){
   }
   GREAT_JUMP = L;
 }
+/* mud pits: a soft hollow full of the stuff (sand in the desert, slush in the snow) */
+PITS.forEach(at=>{
+  const span = Math.round(15/MAIN.seg);
+  for(let k=-span;k<=span;k++){
+    const i = wrapIdx(MAIN, at + k), t = k/span;
+    MAIN.pts[i].y -= 0.55*0.5*(1 + Math.cos(Math.PI*t));
+    if(Math.abs(t) < 0.8) MAIN.surf[i] = SURF.MUD;
+    MAIN.half[i] += (1 - Math.abs(t))*0.8;
+  }
+});
 /* dry washes: the road dips down through a sandy stream bed and back up */
 (TRACK.washes || []).forEach(w=>{
   const at = snapTo(MAIN, w), span = Math.round(22/MAIN.seg);
@@ -2212,6 +2271,24 @@ paths.forEach(P=>{
   }
 });
 
+/* Banking: every corner leans in a little, so an S-bend throws the car from
+   one bank across to the other. Held off wherever the road must be flat. */
+paths.forEach(P=>{
+  if(TRACK.test) return;
+  const R = P.closed ? radiiOf(P) : radiiOpen(P), N = P.N, W = Math.max(3, Math.round(8/P.seg));
+  const b = new Float64Array(N);
+  for(let i=0;i<N;i++){
+    if(R[i] > 160) continue;
+    const a = P.tans[P.closed ? ((i-W)%N+N)%N : Math.max(0, i-W)], c = P.tans[P.closed ? (i+W)%N : Math.min(N-1, i+W)], t = P.tans[i];
+    const left = (c.x - a.x)*(-t.z) + (c.z - a.z)*t.x;
+    const hold = Math.max(P.calmCrest ? P.calmCrest[i] : 0, P.share ? Math.min(1, P.share[i]*3) : 0, P.deck ? P.deck[i] : 0,
+                          P.noStamp ? P.noStamp[i] : 0, P.wet ? Math.min(1, P.wet[i]*2) : 0);
+    b[i] = -Math.sign(left)*Math.min(0.13, 5.5/Math.max(20, R[i]))*(1 - hold);
+  }
+  const sm = Array.from(b); smoothAlong(sm, P.closed, Math.round(12/P.seg));
+  if(P.bank){ for(let i=0;i<N;i++) if(Math.abs(P.bank[i]) < Math.abs(sm[i])) P.bank[i] = sm[i]; }
+  else P.bank = Float32Array.from(sm);
+});
 const ROUTE = routingTest(MAIN);
 let LAP_TEST = ROUTE;
 
@@ -2238,6 +2315,7 @@ const GL  = new Float32Array(GCELLS);     // signed offset across it
 const GM  = new Float32Array(GCELLS);     // mud
 const GW  = new Float32Array(GCELLS);     // wet
 const GRU = new Float32Array(GCELLS);     // rut depth
+const GPV = new Float32Array(GCELLS);     // how much of the old tar is left
 const GWA = new Float32Array(GCELLS);     // washboard chatter
 const GSM = new Float32Array(GCELLS);     // metres along the road
 const GBK = new Float32Array(GCELLS);     // bank height of a hollow-way
@@ -2333,6 +2411,7 @@ const GFLIP = new Uint8Array(GCELLS);
             GM[g] = P.mud[ia]*(1-f) + P.mud[ib]*f;
             GW[g] = P.wet[ia]*(1-f) + P.wet[ib]*f;
             GRU[g] = P.st_rut[ia]*(1-f) + P.st_rut[ib]*f;
+            GPV[g] = P.st_paved[ia]*(1-f) + P.st_paved[ib]*f;
             GWA[g] = P.st_wash[ia]*(1-f) + P.st_wash[ib]*f;
             GSM[g] = s*P.seg;
             GBK[g] = P.st_bank[ia]*(1-f) + P.st_bank[ib]*f;
@@ -2512,6 +2591,7 @@ function roughY(x, z){
   const wash = GWA[c]*Math.sin(sm*2*Math.PI/1.35);
   return (wash - rut)*on;
 }
+function pavedAt(x, z){ const c = cellAt(x, z); return c >= 0 && GP[c] >= 0 ? GPV[c] : 0; }
 function surfaceInfo(x, z){
   const n = nearest(x, z);
   return {surf: n.surf, dist: n.dist, half: n.half, i: n.i};
@@ -2693,7 +2773,10 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
     .replace("#include <common>", "#include <common>\nattribute vec4 aRoad;\nattribute vec4 aRoad2;\nvarying vec4 vRoad;\nvarying vec4 vRoad2;\nvarying vec2 vXZ;")
     .replace("#include <begin_vertex>", "#include <begin_vertex>\nvRoad = aRoad;\nvRoad2 = aRoad2;\nvXZ = position.xz;");
   sh.fragmentShader = sh.fragmentShader
-    .replace("#include <common>", "#include <common>\nvarying vec4 vRoad;\nvarying vec4 vRoad2;\nvarying vec2 vXZ;")
+    .replace("#include <common>", "#include <common>\nvarying vec4 vRoad;\nvarying vec4 vRoad2;\nvarying vec2 vXZ;\n" +
+      "float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }\n" +
+      "float vnz(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);\n" +
+      "  return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }")
     .replace("#include <map_fragment>", [
       (WINTER || DESERT) ? "vec3 grd = vec3(0.55 + 0.9*dot(texture2D(map, vUv).rgb, vec3(0.3, 0.59, 0.11))) * vColor;"
                          : "vec3 grd = texture2D(map, vUv).rgb * vColor;",
@@ -2726,6 +2809,14 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
       "vec3 col = mix(grd, sandy, verge*0.85);",
       "col = mix(col, gravel, onRoad);",
       "col = mix(col, mudC, mk*max(onRoad, verge*0.7));",
+      // what is left of an old tar road: dark, cracked, broken into islands with gravel between
+      "float pv = vRoad2.w;",
+      "float brk = vnz(vXZ*0.085)*0.6 + vnz(vXZ*0.31 + 7.0)*0.3 + vnz(vXZ*1.3)*0.1;",
+      "float tar = pv*smoothstep(0.46, 0.51, brk)*smoothstep(-0.2, -1.6, e + (n1 - 0.5)*1.4);",
+      "vec3 asph = " + (WINTER ? "vec3(0.36, 0.37, 0.40)" : DESERT ? "vec3(0.33, 0.30, 0.28)" : "vec3(0.24, 0.24, 0.25)") + "*(0.85 + 0.3*n3);",
+      "asph *= 1.0 - 0.5*(1.0 - smoothstep(0.0, 0.02, abs(fract(n1*9.0) - 0.5)))*step(0.5, n3);",
+      "asph = mix(asph, vec3(0.85, 0.8, 0.55), (1.0 - smoothstep(0.05, 0.12, abs(lat)))*step(0.5, fract(vRoad2.z/6.0))*0.6);",
+      "col = mix(col, asph, tar);",
       FROZEN ? "col = mix(col, vec3(0.80, 0.88, 0.95)*(0.9 + 0.12*n3), clamp(wet*1.4, 0.0, 1.0)*max(onRoad, verge)*0.8);"
              : "col = mix(col, col*vec3(0.62, 0.64, 0.66), clamp(wet*1.4, 0.0, 1.0)*max(onRoad, verge));",
       "diffuseColor.rgb *= col;"
@@ -2772,7 +2863,7 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
           road2[v*4] = GP[g] >= 0 ? GRU[g] : 0;
           road2[v*4+1] = GP[g] >= 0 ? GWA[g] : 0;
           road2[v*4+2] = GP[g] >= 0 ? GSM[g] : 0;
-          road2[v*4+3] = GP[g] >= 0 ? GBK[g] : 0;
+          road2[v*4+3] = GP[g] >= 0 ? GPV[g] : 0;
           // dirt near the road, grass beyond; bare earth on steep banks
           const t = smoothstep(1.5, 9, edge);
           const steep = Math.max(smoothstep(0.80, 0.55, n[1]),
@@ -4070,6 +4161,34 @@ function setDown(g, x, z, rotY, shadows){
 }
 /* is a spot clear of every road by at least m metres */
 const clearOf = (x, z, m)=>{ const n = nearest(x, z); return n.dist > n.half + m; };
+
+/* ---- the stones of the rocky stretches, set into the road where the bumps are ---- */
+{
+  const spots = [];
+  paths.forEach(P=>{
+    if(!P.rocks || !P.st_rock) return;
+    for(const r of P.rocks){
+      const i = Math.round(r[0]/P.seg); if(i < 0 || i >= P.N || P.st_rock[i] < 0.45) continue;
+      const t = P.tans[i], p = P.pts[i], hw = P.half[i];
+      for(let n=0;n<2;n++){
+        const lat = (n ? -r[2] : r[2])*hw*0.85 + (Math.random() - 0.5)*1.2, along = (Math.random() - 0.5)*1.2;
+        const x = p.x - t.z*lat + t.x*along, z = p.z + t.x*lat + t.z*along;
+        spots.push([x, z, r[1]*(1.5 + Math.random()*1.2)]);
+      }
+    }
+  });
+  if(spots.length){
+    const rm = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0),
+      new THREE.MeshLambertMaterial({color: DESERT ? 0x9a6a4a : WINTER ? 0x8a8e96 : 0x7c776c, flatShading:true}), spots.length);
+    const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), e3 = new THREE.Euler();
+    spots.forEach((sp, i)=>{
+      const k = sp[2];
+      v3.set(sp[0], surfaceY(sp[0], sp[1]) - k*0.25, sp[1]); s3.set(k*1.3, k*0.7, k);
+      e3.set(Math.random(), Math.random()*6, Math.random()); q4.setFromEuler(e3); m4.compose(v3, q4, s3); rm.setMatrixAt(i, m4);
+    });
+    rm.castShadow = true; rm.receiveShadow = true; scene.add(rm);
+  }
+}
 
 /* ---- the avalanche gallery: a concrete snow shed over the road ---- */
 if(GALLERY.on){
@@ -7184,17 +7303,35 @@ function stepAudio(info, dt){
   const live = !GAME.paused && (state.phase === "racing" || state.phase === "countdown" || state.phase === "done");
   const R = AUD.road;
   if(!muted && live){
-    const rpm = trans.rpm, r = rpm/DRIVE.redline;
-    const load = info.thr ? 1 : 0.15;
-    let vol = (0.10 + load*0.07 + r*0.06)*(1 - trans.cut*0.6);
+    /* On the grid you can rev it: hold the throttle through the countdown
+       and it climbs to the limiter and bounces there. */
+    const onGrid = state.phase === "countdown";
+    const gas = onGrid ? (CTL.thr ? 1 : 0) : info.thr;
+    if(onGrid){
+      AUD.revRpm = AUD.revRpm || DRIVE.idle;
+      AUD.revRpm += gas ? Math.min(9000*dt, (DRIVE.redline*1.02 - AUD.revRpm)) : -Math.min(5000*dt, AUD.revRpm - DRIVE.idle);
+    } else AUD.revRpm = trans.rpm;
+    let rpm = onGrid ? AUD.revRpm : trans.rpm;
+    /* The limiter: at the red line with the throttle down, the ignition cuts
+       and comes back fifteen times a second, and it spits pops. */
+    AUD.limT = (AUD.limT || 0) + dt;
+    let limiting = false;
+    if(gas && rpm >= DRIVE.redline*0.975){
+      limiting = true;
+      if(AUD.limT > 0.065){ AUD.limT = 0; AUD.limOn = !AUD.limOn; if(!AUD.limOn && Math.random() < 0.45) SFX.pop(0.9); }
+      if(!AUD.limOn){ rpm *= 0.94; if(onGrid) AUD.revRpm = DRIVE.redline*0.93; }
+    } else AUD.limOn = true;
+    const r = rpm/DRIVE.redline;
+    const load = gas ? (limiting && !AUD.limOn ? 0.1 : 1) : 0.15;
+    let vol = (0.10 + load*0.07 + r*0.07)*(1 - trans.cut*0.6)*(limiting && !AUD.limOn ? 0.45 : 1);
     if(state.phase === "done") vol *= Math.max(0, 1 - GAME.doneT*0.4);
     setEngine(AUD.eng, rpm, load, vol, now, 0.03);
     // pops: one on every upshift under power, a crackle on the overrun
     if(trans.shiftT > 0 && AUD.shiftPrev <= 0 && info.thr && trans.target > trans.gear) SFX.pop(0.8 + r*0.4);
     AUD.shiftPrev = trans.shiftT;
     AUD.crackleT -= dt;
-    if(!info.thr && rpm > 3400 && AUD.crackleT <= 0){ SFX.crackle(0.6 + r); AUD.crackleT = 0.04 + Math.random()*0.16; }
-    if(!info.thr && rpm > 4200 && Math.random() < dt*1.5) SFX.pop(0.5);
+    if(!gas && rpm > 3400 && AUD.crackleT <= 0){ SFX.crackle(0.6 + r); AUD.crackleT = 0.04 + Math.random()*0.16; }
+    if(!gas && rpm > 4200 && Math.random() < dt*1.5) SFX.pop(0.5);
 
     const sp = info.sp || 0, ground = info.air ? 0 : 1;
     const mud = info.mud || 0, wet = info.wet || 0, ice = info.ice || 0;
@@ -7312,7 +7449,7 @@ const DRIVE = {
   R: 0.40,                                   // rolling radius, metres
   totals: [24.0, 15.5, 10.8, 7.7, 5.5],      // gear ratio x final drive
   idle: 900, redline: 6300,
-  up: 5000, down: 2300,                      // auto shift points, rpm
+  up: 5800, down: 2500,                      // auto shift points: wound out near the top before it changes
   K: 0.62,                                   // torque to acceleration constant
   shiftTime: 0.18,                           // brief, so a change is a blip not a lurch
   lockout: 0.55                              // minimum gap between changes
@@ -7346,6 +7483,7 @@ function stepCar(dt){
   const offRoad = nDist > nHalf - 0.3;
   const deepOff = nDist > nHalf + 3.5;
   const mudAmt = offRoad ? 0 : near0.mud;          // 0 to 1, blended along the road
+  const tarAmt = offRoad ? 0 : pavedAt(pose.x, pose.z);
   /* In the Winter Cup the water is ice: a ford or the creek is not deep and
      draggy but glassy, and the frozen lake is ice from shore to shore. */
   const wet0 = offRoad ? 0 : near0.wet;
@@ -7376,13 +7514,14 @@ function stepCar(dt){
   if(trans.shiftT > 0){
     trans.shiftT -= dt;
     if(trans.shiftT <= DRIVE.shiftTime*0.45) trans.gear = trans.target;
-  } else if(trans.auto && trans.dir > 0){
+  } else if(trans.auto && trans.dir > 0 && state.phase === "racing"){
     const g = trans.gear;
     if(g < DRIVE.totals.length && trans.rpm > (thr ? DRIVE.up : DRIVE.up*0.72)) requestShift(g+1);
     else if(g > 1 && trans.rpm < DRIVE.down && rpmAt(along, g-1) < DRIVE.up*0.90) requestShift(g-1);
   }
   trans.cut += ((trans.shiftT > 0 ? 1 : 0) - trans.cut) * Math.min(1, dt*13);
   trans.rpm += (Math.max(DRIVE.idle, rpmAt(along, trans.gear)) - trans.rpm) * Math.min(1, dt*12);
+  if(state.phase === "countdown" && AUD.revRpm) trans.rpm = AUD.revRpm;      // revving it on the grid: the tach follows
 
   let a = 0;
   const drive = DRIVE.K * torqueCurve(trans.rpm) * DRIVE.totals[trans.gear-1] * traction;
@@ -7398,7 +7537,7 @@ function stepCar(dt){
   // resistance sets top speed instead of a hard clamp
   const sgn = Math.sign(along || 1);
   a -= sgn * (0.0006*along*along + (deepOff ? 1.9 : offRoad ? 1.0 : 0.30 + mudAmt*0.68 + wetAmt*0.34));
-  a -= along * (deepOff ? 0.15 : offRoad ? 0.09 : 0.02 + mudAmt*0.075 + wetAmt*0.035);
+  a -= along * (deepOff ? 0.15 : offRoad ? 0.09 : 0.02 + mudAmt*0.075 + wetAmt*0.035 - tarAmt*0.006);
   if(pose.air) a = -sgn*0.12;                       // no drive in the air
   if(hand && drift.mode !== "slide") a -= along*0.45;   // only a plain handbrake scrubs
 
@@ -7449,6 +7588,7 @@ function stepCar(dt){
   let grip = (hand && !sliding) ? 1.9 : deepOff ? 3.4 : offRoad ? 5.0
            : 8.6 - mudAmt*3.5 - wetAmt*2.3;
   grip *= 1 - iceAmt*0.66;                          // on ice the tail keeps on going
+  grip *= 1 + tarAmt*0.18;                           // and on tar it bites
   if(pose.air) grip = 0.35;                          // barely any yaw authority mid air
   let nfx, nfz;
   if(sliding && !pose.air){
@@ -9430,199 +9570,145 @@ let last = performance.now();
 let info = {sp:0, offRoad:false, thr:0, hand:false, surf:0, air:false};
 
 /* ------------------------------------------------------------------ *
- *  Leaf piles
+ *  Litter on the road
  *
- *  Heaps of leaves raked onto the road here and there, on every circuit.
- *  Drive through one (or let a rival) and it goes up in a burst that
- *  flutters down behind you; the heap builds itself back up a little
- *  while later. The leaves follow the season: green going gold in summer,
- *  red and orange in the fall, dry oak brown in the snow and the desert.
+ *  Loose leaves lying in drifts across the road on the summer and fall
+ *  circuits, and sticks scattered over the old broken tar everywhere. Each
+ *  one is its own piece: a car going by (yours or a rival's) pushes air
+ *  ahead of it and drags a wake behind, and whatever is close enough is
+ *  flung up and out, tumbles, and flutters back down where it lands.
+ *  Nothing is reset during a race, so a lap later the road shows where
+ *  you went.
  * ------------------------------------------------------------------ */
-const PILES = [];
-let PILE_HITS = 0;
-const PILE_KIND = TRACK.season === "winter" || TRACK.season === "desert" ? "dry" : FALL ? "fall" : "summer";
+const PILES = [];                      // (kept for the debug handle)
+const PILE_KIND = TRACK.season === "winter" || TRACK.season === "desert" ? "none" : FALL ? "fall" : "summer";
 function pileColour(c){
   const r = Math.random();
   if(PILE_KIND === "fall") return fallTint(c);
-  if(PILE_KIND === "dry"){
-    if(r < 0.45) return c.setHSL(0.07 + Math.random()*0.03, 0.55, 0.30 + Math.random()*0.10);   // oak brown
-    if(r < 0.80) return c.setHSL(0.10 + Math.random()*0.03, 0.60, 0.42 + Math.random()*0.10);   // tan
-    return c.setHSL(0.02 + Math.random()*0.03, 0.55, 0.32 + Math.random()*0.08);                 // rust
-  }
   // late summer: green going brown and gold
   if(r < 0.45) return c.setHSL(0.22 + Math.random()*0.06, 0.45, 0.34 + Math.random()*0.1);
   if(r < 0.75) return c.setHSL(0.10 + Math.random()*0.04, 0.55, 0.40 + Math.random()*0.1);
   return c.setHSL(0.07, 0.45, 0.28 + Math.random()*0.08);
 }
+const LITTER = { items:[], leaf:null, stick:null, home:[] };
 {
-  // where they may go: on plain road, clear of jumps, water, bridges, forks and the grid
-  const avoid = [];
-  const addAv = (i, m)=> avoid.push([i, m]);
-  addAv(0, 90); addAv(MAIN.N - 1, 40);
-  (TRACK.jumps || []).forEach(j=> addAv(snapTo(MAIN, j[0]), 70));
-  (TRACK.bigJumps || []).forEach(j=> addAv(snapTo(MAIN, j[0]), 90));
-  AUTO_JUMPS.forEach(a=> addAv(a.at, JUMP_LEN[a.type] + 30));
-  if(GREAT_JUMP >= 0) addAv(GREAT_JUMP, 150);
-  FORDS.forEach(F=>{ if(F.path === MAIN) addAv(F.at, 50); });
-  if(GORGE.on) addAv(GORGE.i, GORGE.span + 40);
-  if(WASH.on) addAv(WASH.at, 70);
-  BRANCHES.forEach(P=>{ addAv(P.splitAt, 45); addAv(wrapIdx(MAIN, P.mainTo), 45); });
-  const gapM = (a, b)=>{ const d = Math.abs(a - b) % MAIN.N; return Math.min(d, MAIN.N - d)*MAIN.seg; };
-  const okMain = i => !avoid.some(v=> gapM(i, v[0]) < v[1]) && MAIN.surf[i] !== SURF.WATER && !MAIN.deck[i];
-  const spots = [];
-  const want = 14, step = Math.floor(MAIN.N/want);
-  for(let n=0;n<want;n++){
-    for(let k=0;k<step;k+=3){
-      const i = wrapIdx(MAIN, n*step + Math.round(step*0.5) + (k % 2 ? -k : k)/2);
-      if(okMain(i)){ spots.push([MAIN, i]); break; }
-    }
-  }
-  BRANCHES.forEach(P=>{
-    for(const at of [0.35, 0.68]) for(let tries=0; tries<40; tries++){
-      const i = Math.round(P.N*(at + (Math.random() - 0.5)*0.16));
-      if(P.surf[i] === SURF.WATER) continue;
-      if(P.leapAt && Math.abs(i - P.leapAt) < 100/P.seg) continue;
-      spots.push([P, i]); break;
-    }
-  });
-  const c = new THREE.Color();
-  /* a low heap: a dark bed with loose leaves (or clumps) lying all over it */
-  const mound = r=>{
-    const g = new THREE.Group();
-    const geo = new THREE.SphereGeometry(1, 12, 6, 0, Math.PI*2, 0, Math.PI/2);
-    const p = geo.attributes.position, col = [];
-    for(let i=0;i<p.count;i++){
-      const y = p.getY(i), k = 1 + (Math.random() - 0.5)*0.35*(y > 0.05 ? 1 : 0.4);
-      p.setXYZ(i, p.getX(i)*k, y*(0.8 + Math.random()*0.4), p.getZ(i)*k);
-      pileColour(c); c.multiplyScalar(0.62); col.push(c.r, c.g, c.b);
-    }
-    geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
-    geo.computeVertexNormals();
-    const bed = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({vertexColors:true, flatShading:true}));
-    bed.scale.set(r, r*0.40, r*1.15); g.add(bed);
-    // the loose pieces, one merged mesh
-    const P2 = [], C2 = [], n = 240;
-    for(let k=0;k<n;k++){
-      const a = Math.random()*Math.PI*2, u = Math.sqrt(Math.random())*1.05;
-      const x0 = Math.cos(a)*u*r, z0 = Math.sin(a)*u*r*1.15;
-      const y0 = r*0.40*Math.sqrt(Math.max(0, 1 - u*u)) + 0.02;
-      const L = 0.3 + Math.random()*0.2, W = L*0.55;
-      const h = Math.random()*Math.PI*2, ch = Math.cos(h), sh = Math.sin(h);
-      const tilt = (Math.random() - 0.5)*0.5;
-      const v = [[L,0],[0,W],[-L,0],[0,-W]].map(q=> [x0 + q[0]*ch - q[1]*sh, y0 + q[0]*tilt, z0 + q[0]*sh + q[1]*ch]);
-      [[0,1,2],[0,2,3]].forEach(tri=> tri.forEach(ix=> P2.push(...v[ix])));
-      pileColour(c); for(let q=0;q<6;q++) C2.push(c.r, c.g, c.b);
-    }
-    if(n){
-      const lg = new THREE.BufferGeometry();
-      lg.setAttribute("position", new THREE.Float32BufferAttribute(P2, 3));
-      lg.setAttribute("color", new THREE.Float32BufferAttribute(C2, 3));
-      lg.computeVertexNormals();
-      g.add(new THREE.Mesh(lg, new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide})));
-    }
-    return g;
+  const items = LITTER.items;
+  const put = (kind, x, z)=>{
+    const y = surfaceY(x, z) + 0.02;
+    items.push({kind, x, y, z, vx:0, vy:0, vz:0, yaw:Math.random()*6.28, tilt:(Math.random() - 0.5)*0.3, roll:(Math.random() - 0.5)*0.3,
+                spin:0, air:false, sc: kind ? 0.7 + Math.random()*0.8 : 1.5 + Math.random()*0.9, ph:Math.random()*6.28});
   };
-  spots.forEach(([P, i])=>{
-    const t = P.tans[i], nx = -t.z, nz = t.x;
-    const lat = (Math.random() - 0.5)*Math.max(0, P.half[i]*2 - 4.5);
-    const x = P.pts[i].x + nx*lat, z = P.pts[i].z + nz*lat;
-    const r = 2.6 + Math.random()*0.9;
-    const m = mound(r);
-    m.position.set(x, surfaceY(x, z) - 0.06, z);
-    m.rotation.y = Math.atan2(t.x, t.z);
-    scene.add(m);
-    PILES.push({m, x, z, r, s:1, down:0, h:r*0.40});
-  });
-}
-/* the burst: a pool of flat bits that tumble and flutter */
-const LEAF_N = 1600;
-const leafPos = new Float32Array(LEAF_N*3), leafVel = new Float32Array(LEAF_N*3),
-      leafLife = new Float32Array(LEAF_N), leafCol = new Float32Array(LEAF_N*3), leafPh = new Float32Array(LEAF_N);
-let leafHead = 0;
-const leafGeo = new THREE.BufferGeometry();
-leafGeo.setAttribute("position", new THREE.BufferAttribute(leafPos, 3).setUsage(THREE.DynamicDrawUsage));
-leafGeo.setAttribute("color", new THREE.BufferAttribute(leafCol, 3).setUsage(THREE.DynamicDrawUsage));
-for(let i=0;i<LEAF_N;i++) leafPos[i*3+1] = -9999;
-{
-  const tex = new THREE.CanvasTexture(noiseCanvas(32, 32, (q, w, h)=>{
-    q.fillStyle = "#fff";
-    q.beginPath(); q.moveTo(16, 2); q.quadraticCurveTo(30, 14, 16, 30); q.quadraticCurveTo(2, 14, 16, 2); q.fill();
-  }));
-  const pts = new THREE.Points(leafGeo, new THREE.PointsMaterial({size: 0.7, map:tex,
-                vertexColors:true, transparent:true, alphaTest:0.4, depthWrite:false}));
-  pts.frustumCulled = false; scene.add(pts);
-}
-function burstPile(p, vx, vz, sp){
-  const n = Math.min(380, 170 + Math.round(sp*6));
-  const c = new THREE.Color();
-  for(let k=0;k<n;k++){
-    const i = leafHead = (leafHead + 1) % LEAF_N;
-    const a = Math.random()*Math.PI*2, rr = Math.random()*p.r;
-    leafPos[i*3] = p.x + Math.cos(a)*rr; leafPos[i*3+1] = p.m.position.y + 0.3 + Math.random()*0.4; leafPos[i*3+2] = p.z + Math.sin(a)*rr;
-    const up = 5 + Math.random()*(4 + sp*0.2);            // shot up well over the roof
-    leafVel[i*3]   = vx*(0.25 + Math.random()*0.45) + Math.cos(a)*(1 + Math.random()*3);
-    leafVel[i*3+1] = up;
-    leafVel[i*3+2] = vz*(0.25 + Math.random()*0.45) + Math.sin(a)*(1 + Math.random()*3);
-    leafLife[i] = 2.5 + Math.random()*2.5; leafPh[i] = Math.random()*6.28;
-    pileColour(c); leafCol[i*3] = c.r; leafCol[i*3+1] = c.g; leafCol[i*3+2] = c.b;
-  }
-  leafGeo.attributes.color.needsUpdate = true;
-  p.down = 9 + Math.random()*4;                        // seconds until it is raked back up
-  PILE_HITS++;
-}
-function stepLeafPiles(dt){
-  const who = [[pose.x, pose.z, pose.vx, pose.vz, true]];
-  if(typeof rivals !== "undefined") rivals.forEach(r=>{ if(r.mesh.visible) who.push([r.mesh.position.x, r.mesh.position.z, 0, 0, false, r]); });
-  PILES.forEach(p=>{
-    if(p.down > 0){
-      p.down -= dt;
-      p.s = Math.max(0, p.s - dt*8);
-      if(p.down <= 0) p.down = 0;
-    } else {
-      if(p.s < 1) p.s = Math.min(1, p.s + dt*0.6);
-      if(p.s > 0.6){
-        for(const w of who){
-          if(Math.hypot(w[0] - p.x, w[1] - p.z) > p.r + 1.1) continue;
-          let vx = w[2], vz = w[3];
-          if(!w[4]){ const r = w[5], t = tans[((Math.floor(r.s)%NS)+NS)%NS]; vx = t.x*(r.v || 20); vz = t.z*(r.v || 20); }
-          const sp = Math.hypot(vx, vz);
-          if(sp < 3) continue;
-          burstPile(p, vx, vz, sp);
-          { const dd = Math.hypot(p.x - pose.x, p.z - pose.z); const k = w[4] ? 1 : 0.6/(1 + dd/15); if(k > 0.05) SFX.leaves(k); }
-          if(w[4]){ pose.vx *= 0.975; pose.vz *= 0.975; GAME.shake = Math.max(GAME.shake || 0, 0.06); }
-          break;
-        }
-      }
+  const scatter = (P, i, n, kind, reach)=>{
+    const t = P.tans[i], p = P.pts[i], hw = P.half[i] + 1.2;
+    for(let k=0;k<n;k++){
+      const along = (Math.random() - 0.5)*reach, lat = (Math.random()*2 - 1)*hw*(0.6 + 0.4*Math.random());
+      put(kind, p.x + t.x*along - t.z*lat, p.z + t.z*along + t.x*lat);
     }
-    p.m.visible = p.s > 0.02;
-    p.m.scale.y = Math.max(0.02, p.s);
-    p.m.position.y = surfaceY(p.x, p.z) - 0.06;
-  });
-  // the bits: thrown up, then caught by the air and fluttering down
-  const floatK = 3.2;
-  let any = false;
-  for(let i=0;i<LEAF_N;i++){
-    if(leafLife[i] <= 0) continue;
-    any = true;
-    leafLife[i] -= dt;
-    const j = i*3;
-    leafVel[j+1] -= 9.8*dt;
-    const drag = Math.min(1, dt*floatK);
-    leafVel[j]   -= leafVel[j]*drag;
-    leafVel[j+2] -= leafVel[j+2]*drag;
-    if(leafVel[j+1] < -1.6) leafVel[j+1] += (-1.6 - leafVel[j+1])*Math.min(1, dt*6);   // terminal: they float
-    leafPh[i] += dt*5;
-    leafPos[j]   += (leafVel[j] + Math.sin(leafPh[i])*0.9)*dt;
-    leafPos[j+1] += leafVel[j+1]*dt;
-    leafPos[j+2] += (leafVel[j+2] + Math.cos(leafPh[i]*0.8)*0.9)*dt;
-    const gy = surfaceY(leafPos[j], leafPos[j+2]) + 0.03;
-    if(leafPos[j+1] < gy){ leafPos[j+1] = gy; leafVel[j] *= 0.5; leafVel[j+1] = 0; leafVel[j+2] *= 0.5;
-                           if(leafLife[i] > 1.2) leafLife[i] = 1.2; }
-    if(leafLife[i] <= 0) leafPos[j+1] = -9999;
+  };
+  const clearHere = (P, i)=> P.surf[i] !== SURF.WATER && !(P.deck && P.deck[i]) && !(P.wet && P.wet[i] > 0.3);
+  // drifts of leaves: often, the whole way round
+  if(PILE_KIND !== "none"){
+    const step = Math.round(58/MAIN.seg);
+    for(let i=Math.round(40/MAIN.seg); i<MAIN.N - step*0.4; i+=step + Math.round(Math.random()*30/MAIN.seg)){
+      if(clearHere(MAIN, i)) scatter(MAIN, i, 90 + Math.round(Math.random()*50), 0, 16 + Math.random()*12);
+    }
+    BRANCHES.forEach(P=>{ for(const f of [0.3, 0.55, 0.8]){ const i = Math.round(P.N*f); if(clearHere(P, i)) scatter(P, i, 45, 0, 12); } });
   }
-  if(any || leafGeo.attributes.position.needsUpdate) leafGeo.attributes.position.needsUpdate = true;
+  // sticks: thick over the old tar, a few everywhere in the woods
+  paths.forEach(P=>{
+    for(let i=0;i<P.N;i+=Math.max(1, Math.round(5/P.seg))){
+      const tar = P.st_paved ? P.st_paved[i] : 0;
+      const pr = tar > 0.5 ? 0.9 : (PILE_KIND !== "none" ? 0.08 : 0.03);
+      if(Math.random() < pr && clearHere(P, i)) scatter(P, i, tar > 0.5 ? 3 + Math.floor(Math.random()*3) : 2, 1, 6);
+    }
+  });
+  items.forEach(o=> LITTER.home.push([o.x, o.y, o.z, o.yaw]));
+  // a leaf: a little pointed oval, double sided; a stick: a thin crooked rod
+  const lg = new THREE.BufferGeometry();
+  { const P = [0,0,0.16, 0.07,0,0.05, 0.06,0,-0.08, 0,0,-0.15, -0.06,0,-0.08, -0.07,0,0.05];
+    lg.setAttribute("position", new THREE.Float32BufferAttribute(P, 3));
+    lg.setIndex([0,1,5, 1,2,5, 2,4,5, 2,3,4]); lg.computeVertexNormals(); }
+  const sg = new THREE.CylinderGeometry(0.022, 0.03, 0.9, 5); sg.rotateZ(Math.PI/2);
+  const nL = items.filter(o=> !o.kind).length, nS = items.length - nL;
+  if(nL){ LITTER.leaf = new THREE.InstancedMesh(lg, new THREE.MeshLambertMaterial({side:THREE.DoubleSide}), nL); scene.add(LITTER.leaf); }
+  if(nS){ LITTER.stick = new THREE.InstancedMesh(sg, new THREE.MeshLambertMaterial({color: DESERT ? 0x9a7a52 : 0x5e4630}), nS);
+          LITTER.stick.castShadow = true; scene.add(LITTER.stick); }
+  const c = new THREE.Color();
+  let li = 0, si = 0;
+  items.forEach(o=>{ o.slot = o.kind ? si++ : li++;
+    if(!o.kind){ pileColour(c); LITTER.leaf.setColorAt(o.slot, c); } });
+  if(LITTER.leaf && LITTER.leaf.instanceColor) LITTER.leaf.instanceColor.needsUpdate = true;
+  [LITTER.leaf, LITTER.stick].forEach(m=>{ if(m){ m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); } });
 }
-function resetPiles(){ PILES.forEach(p=>{ p.s = 1; p.down = 0; }); for(let i=0;i<LEAF_N;i++){ leafLife[i] = 0; leafPos[i*3+1] = -9999; } }
+const _lm = new THREE.Matrix4(), _lq = new THREE.Quaternion(), _le = new THREE.Euler(), _lv = new THREE.Vector3(), _ls = new THREE.Vector3();
+function placeLitter(o){
+  _le.set(o.tilt, o.yaw, o.roll, "YXZ"); _lq.setFromEuler(_le);
+  _lv.set(o.x, o.y, o.z); _ls.set(o.sc, o.sc, o.sc); _lm.compose(_lv, _lq, _ls);
+  (o.kind ? LITTER.stick : LITTER.leaf).setMatrixAt(o.slot, _lm);
+}
+LITTER.items.forEach(placeLitter);
+let litterRustle = 0;
+function stepLeafPiles(dt){
+  const items = LITTER.items;
+  if(!items.length) return;
+  // the cars moving the air: where they are, how fast, which way
+  const who = [];
+  const psp = Math.hypot(pose.vx, pose.vz);
+  if(psp > 5) who.push([pose.x, pose.y, pose.z, pose.vx, pose.vz, psp, true]);
+  if(typeof rivals !== "undefined") FIELD.forEach(r=>{
+    if(!r.mesh.visible || (r.v || 0) < 5) return;
+    const t = tans[((Math.floor(r.s)%NS)+NS)%NS];
+    who.push([r.mesh.position.x, r.mesh.position.y, r.mesh.position.z, t.x*r.v, t.z*r.v, r.v, false]);
+  });
+  let kicked = 0, dirtyL = false, dirtyS = false;
+  for(const o of items){
+    if(!o.air){
+      for(const w of who){
+        const dx = o.x - w[0], dz = o.z - w[2], sp = w[5];
+        const R = 1.6 + sp*0.085;                    // faster cars move more air, wider
+        if(dx*dx + dz*dz > R*R || Math.abs(o.y - w[1]) > 2.5) continue;
+        const ux = w[3]/sp, uz = w[4]/sp, d = Math.hypot(dx, dz) || 0.1;
+        const along = dx*ux + dz*uz, lat = dx*-uz + dz*ux;
+        const k = (1 - d/R)*(0.55 + Math.random()*0.7)*(o.kind ? 0.55 : 1);
+        const side = Math.sign(lat) || 1;
+        // out to the side, dragged along in the wake, and lifted
+        o.vx = w[3]*(0.35 + 0.35*(along < 0 ? 1 : 0))*k - uz*side*(2 + sp*0.14)*k + (Math.random() - 0.5)*1.5;
+        o.vz = w[4]*(0.35 + 0.35*(along < 0 ? 1 : 0))*k + ux*side*(2 + sp*0.14)*k + (Math.random() - 0.5)*1.5;
+        o.vy = (1.5 + sp*(o.kind ? 0.09 : 0.16))*k*(0.6 + Math.random()*0.8);
+        o.spin = (Math.random() - 0.5)*(o.kind ? 18 : 12);
+        o.air = true; o.y += 0.05;
+        if(w[6]) kicked++;
+        break;
+      }
+      continue;
+    }
+    // flying: leaves are all drag and flutter, sticks tumble and drop
+    const drag = o.kind ? 0.9 : 3.0;
+    o.vy -= 9.8*dt;
+    o.vx -= o.vx*Math.min(1, dt*drag); o.vz -= o.vz*Math.min(1, dt*drag);
+    if(!o.kind && o.vy < -1.3) o.vy += (-1.3 - o.vy)*Math.min(1, dt*6);
+    o.ph += dt*(o.kind ? 3 : 6);
+    const sway = o.kind ? 0 : 0.9;
+    o.x += (o.vx + Math.sin(o.ph)*sway)*dt; o.y += o.vy*dt; o.z += (o.vz + Math.cos(o.ph*0.8)*sway)*dt;
+    o.yaw += o.spin*dt; o.tilt = o.kind ? o.tilt + o.spin*dt*0.6 : Math.sin(o.ph)*0.9; o.roll = o.kind ? o.roll : Math.cos(o.ph*1.3)*0.8;
+    const gy = surfaceY(o.x, o.z) + 0.02;
+    if(o.y <= gy && o.vy < 0){
+      if(o.kind && o.vy < -3){ o.vy *= -0.3; o.spin *= 0.5; o.y = gy; }
+      else { o.y = gy; o.air = false; o.vx = o.vy = o.vz = 0; o.tilt = (Math.random() - 0.5)*0.3; o.roll = o.kind ? 0 : (Math.random() - 0.5)*0.3; }
+    }
+    placeLitter(o);
+    if(o.kind) dirtyS = true; else dirtyL = true;
+  }
+  if(dirtyL || kicked) LITTER.leaf && (LITTER.leaf.instanceMatrix.needsUpdate = true);
+  if(dirtyS || kicked) LITTER.stick && (LITTER.stick.instanceMatrix.needsUpdate = true);
+  litterRustle -= dt;
+  if(kicked > 3 && litterRustle <= 0 && typeof SFX !== "undefined"){ SFX.leaves(Math.min(1, kicked/25 + 0.2)); litterRustle = 0.35; }
+}
+function resetPiles(){
+  LITTER.items.forEach((o, i)=>{ const h = LITTER.home[i]; o.x = h[0]; o.y = h[1]; o.z = h[2]; o.yaw = h[3];
+    o.air = false; o.vx = o.vy = o.vz = 0; o.tilt = (Math.random() - 0.5)*0.3; o.roll = 0; placeLitter(o); });
+  [LITTER.leaf, LITTER.stick].forEach(m=>{ if(m) m.instanceMatrix.needsUpdate = true; });
+}
 
 function stepDust(dt){
   for(let i=0;i<DUST;i++){
@@ -9737,7 +9823,7 @@ if(/debug/.test(location.hash)){
   window.__R = { THREE, TRACKS, TRACK, TRACK_ID, MAIN, BRANCHES, paths, ROUTE, pose, state, camera, scene, renderer,
                  surfaceY, gridH, nearest, PILES, PIT, GAME, CTL, trans, MAXV, radiiOf, radiiOpen, resetRace, setMode,
                  closeUI, rivals, car, splash, cornerHoldSpeed, stepCar, placeAtStart, drift, AUTO_JUMPS,
-                 __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER };
+                 CALM, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER };
 }
 boot();
 requestAnimationFrame(frame);
