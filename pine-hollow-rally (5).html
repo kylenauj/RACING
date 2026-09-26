@@ -55,6 +55,10 @@
   .screen.on{display:flex;}
   .screen.dim{background:linear-gradient(90deg,rgba(9,20,14,.92) 0%,rgba(9,20,14,.78) 45%,rgba(9,20,14,.35) 100%);}
   .screen.veil{background:rgba(6,14,10,.72);}
+  .screen.garage{background:linear-gradient(90deg,rgba(9,20,14,.9) 0%,rgba(9,20,14,.6) 34%,rgba(9,20,14,0) 55%);}
+  .left.garage .menu{gap:5px;} .left.garage .item{padding:6px 16px 5px;font-size:clamp(14px,1.35vw,18px);}
+  .garnote{margin-top:12px;min-height:3.2em;font-size:15px;line-height:1.4;color:#dbe6d4;max-width:30em;}
+  .garnote p{margin:0;}
 
   /* the logo: cream block letters on a woodgrain plank */
   .logo{font-family:var(--display);line-height:.86;transform:skewX(-9deg);transform-origin:left bottom;}
@@ -5895,16 +5899,25 @@ function buildWagon(opts){
      and the exhaust flames. Units are metres, origin at ground level, +Z
      forward, +X is the driver's (left) side. */
   const opt = opts || {};
+  const acc = opt.acc || null;
+  const cargo = !!(opt.cargo !== undefined ? opt.cargo : (opt.rust || 0) >= 30);
   const o = {
     bodyColor: opt.paint || "#7a3b2e",
     beater: !!opt.beat || (opt.rust || 0) >= 50,   // junkyard door, rust, tape, bare wheel
-    roofCargo: opt.cargo !== undefined ? opt.cargo : (opt.rust || 0) >= 30,
+    sport: opt.model === 1,                        // the low sporty wagon instead of the box
+    fender: opt.fender | 0,                        // 0 stock, 1 flares, 2 wide off-road with flaps
+    rim: opt.rim | 0,                              // 0 steel, 1 five spoke, 2 rally white, 3 gold
+    ws: [0.9, 1, 1.14][opt.wheel === undefined ? 1 : opt.wheel],
+    livery: opt.livery | 0,                        // 0 plain, 1 stripes, 2 rally number
+    acc: acc || { rack: true, spare: cargo, cans: cargo }
   };
+  const A = o.acc;
 
   const g = new THREE.Group();
   g.name = "stationWagon";
   const shell = new THREE.Group();
-  shell.position.y = RIDE;                 // body sits up on its springs
+  const TWR = WHEEL_R*o.ws, LIFT = TWR - WHEEL_R;   // bigger wheels lift the whole body
+  shell.position.y = RIDE + LIFT;          // body sits up on its springs
   g.add(shell);
   // the model is drawn from the ground up; the shell's rest height is RIDE,
   // so everything inside it is offset back down to ground level
@@ -5940,6 +5953,14 @@ function buildWagon(opts){
     sticker: mat(0xd9b43a, { roughness: 0.9 }),
     strap:   mat(0x2b2b2b, { roughness: 1 }),
     jerry:   mat(0x3f5a2a, { roughness: 0.8 }),
+    jerryR:  mat(0xb3261e, { roughness: 0.8 }),
+    plastic: mat(0x1c1c1c, { roughness: 0.95 }),
+    stripe:  mat(0xf2efe6, { roughness: 0.6 }),
+    wood:    mat(0x8a5a34, { roughness: 0.9 }),
+    steelB:  mat(0x6c6f72, { roughness: 0.5, metalness: 0.6 }),
+    rimW:    mat(0xeeeeea, { roughness: 0.5, metalness: 0.2 }),
+    rimG:    mat(0xc9a13a, { roughness: 0.35, metalness: 0.8, envMapIntensity: 1.1 }),
+    rimS:    mat(0xc8c8c4, { roughness: 0.3, metalness: 0.85, envMapIntensity: 1.1 }),
   };
   M.brake = M.tail;                        // third brake light lights with the others
 
@@ -5971,8 +5992,13 @@ function buildWagon(opts){
   // ---- Key dimensions ----
   const WR = WHEEL_R;
   const AXLE_F = WAGON_AXLE_F, AXLE_R = WAGON_AXLE_R;
-  const ARCH = 0.45, SILL = 0.30, BELT = 0.92, L = 2.3;
+  const ARCH = 0.45*Math.max(1, o.ws), SILL = 0.30, L = 2.3;
   const TRACK = WAGON_TRACK, SIDE = 0.905, REAR = -2.345;
+  // the box: a tall glasshouse with an upright tailgate; the sport: low roof,
+  // raked screen, and a hatch that slopes away
+  const BELT = o.sport ? 0.83 : 0.92, ROOF = o.sport ? 1.29 : 1.46;
+  const WSB = o.sport ? 1.08 : 1.18, WST = o.sport ? 0.1 : 0.42;     // windscreen foot and top, along the car
+  const RT = o.sport ? -1.72 : -2.08, RB = o.sport ? -2.26 : -2.22;   // rear window top and foot
 
   // ---- Lower body with chunky low-poly wheel arches ----
   const body = [[-L, SILL]];
@@ -5984,33 +6010,52 @@ function buildWagon(opts){
   };
   arch(AXLE_R);
   arch(AXLE_F);
-  body.push([L, SILL], [L, 0.72], [L - 0.1, 0.84], [1.2, BELT], [-L + 0.05, BELT], [-L, 0.86]);
+  if(o.sport) body.push([L, SILL], [L + 0.04, 0.58], [L - 0.14, 0.73], [WSB, BELT], [-L + 0.05, BELT], [-L, 0.8]);
+  else body.push([L, SILL], [L, 0.72], [L - 0.1, 0.84], [1.2, BELT], [-L + 0.05, BELT], [-L, 0.86]);
   extrude(body, 1.72, M.paint, 0.04);
 
   // ---- Greenhouse ----
-  extrude([[1.18, BELT], [0.42, 1.44], [-2.08, 1.46], [-2.22, BELT]], 1.58, M.glass);
-  box(1.66, 0.06, 2.62, M.paint, 0, 1.47, -0.84);
+  extrude([[WSB, BELT], [WST, ROOF - 0.02], [RT, ROOF], [RB, BELT]], 1.58, M.glass);
+  box(1.66, 0.06, WST - RT + 0.2, M.paint, 0, ROOF + 0.01, (WST + RT)/2);
+  const BP = o.sport ? 0.25 : 0;
   const pillars = [
-    [[1.2, BELT], [1.06, BELT], [0.36, 1.45], [0.48, 1.45]],
-    [[0.08, BELT], [-0.06, BELT], [-0.06, 1.45], [0.08, 1.45]],
-    [[-1.08, BELT], [-1.2, BELT], [-1.2, 1.46], [-1.08, 1.46]],
-    [[-1.9, BELT], [-2.24, BELT], [-2.1, 1.46], [-1.9, 1.46]],
+    [[WSB + 0.02, BELT], [WSB - 0.12, BELT], [WST - 0.06, ROOF - 0.01], [WST + 0.06, ROOF - 0.01]],
+    [[0.08 - BP, BELT], [-0.06 - BP, BELT], [-0.06 - BP, ROOF - 0.01], [0.08 - BP, ROOF - 0.01]],
+    [[-1.08, BELT], [-1.2, BELT], [-1.2, ROOF], [-1.08, ROOF]],
+    [[RB + 0.32, BELT], [RB - 0.02, BELT], [RT, ROOF], [RT + 0.2, ROOF]],
   ];
   for (const s of [1, -1]) for (const p of pillars) extrude(p, 0.05, M.paint, 0, s * 0.805);
 
   // ---- Front ----
-  box(0.95, 0.2, 0.04, M.trim, 0, 0.62, 2.35);
-  for (let i = 0; i < 4; i++) box(0.9, 0.015, 0.02, M.chrome, 0, 0.55 + i * 0.045, 2.37);
-  box(0.3, 0.16, 0.04, M.head, 0.6, 0.64, 2.35);
-  box(0.3, 0.16, 0.04, o.beater ? M.headDim : M.head, -0.6, 0.64, 2.35);
-  box(0.12, 0.08, 0.04, M.amber, 0.8, 0.5, 2.34);
-  box(0.12, 0.08, 0.04, M.amber, -0.8, 0.5, 2.34);
-  box(1.86, 0.14, 0.14, M.chrome, 0, 0.36, 2.38);
+  if(o.sport){
+    box(0.7, 0.14, 0.04, M.plastic, 0, 0.58, L + 0.03);
+    box(0.34, 0.12, 0.05, M.head, 0.58, 0.62, L - 0.02).rotation.y = -0.15;
+    box(0.34, 0.12, 0.05, o.beater ? M.headDim : M.head, -0.58, 0.62, L - 0.02).rotation.y = 0.15;
+    box(0.1, 0.06, 0.04, M.amber, 0.82, 0.5, L + 0.02);
+    box(0.1, 0.06, 0.04, M.amber, -0.82, 0.5, L + 0.02);
+    box(1.84, 0.2, 0.16, M.plastic, 0, 0.36, L + 0.08);
+    box(0.5, 0.08, 0.5, M.paint, 0, BELT - 0.02, 1.62);                    // the hood scoop
+    box(0.42, 0.05, 0.04, M.plastic, 0, BELT, 1.88);
+    for (const s of [1, -1]) cyl(0.07, 0.05, 10, M.head, 'z', s * 0.62, 0.33, L + 0.17);   // fog lamps
+    // black cladding along the sills and a lip under the nose
+    for (const s of [1, -1]) box(0.03, 0.16, 3.4, M.plastic, s * (SIDE + 0.012), 0.36, 0.05);
+    box(1.7, 0.04, 0.22, M.plastic, 0, 0.25, L + 0.12);
+  } else {
+    box(0.95, 0.2, 0.04, M.trim, 0, 0.62, 2.35);
+    for (let i = 0; i < 4; i++) box(0.9, 0.015, 0.02, M.chrome, 0, 0.55 + i * 0.045, 2.37);
+    box(0.3, 0.16, 0.04, M.head, 0.6, 0.64, 2.35);
+    box(0.3, 0.16, 0.04, o.beater ? M.headDim : M.head, -0.6, 0.64, 2.35);
+    box(0.12, 0.08, 0.04, M.amber, 0.8, 0.5, 2.34);
+    box(0.12, 0.08, 0.04, M.amber, -0.8, 0.5, 2.34);
+    box(1.86, 0.14, 0.14, M.chrome, 0, 0.36, 2.38);
+  }
   for (const s of [1, -1]) {
-    cyl(0.085, 0.07, 8, M.trim, 'z', s * 0.38, 0.52, 2.47);
-    cyl(0.07, 0.02, 8, M.head, 'z', s * 0.38, 0.52, 2.51);
-    box(0.012, 0.008, 0.95, M.trim, s * 0.7, 0.93, 1.72).rotation.x = 0.08;
-    box(0.5, 0.02, 0.02, M.trim, s * 0.28, 0.975, 1.13).rotation.y = s * 0.08;
+    if(!o.sport){
+      cyl(0.085, 0.07, 8, M.trim, 'z', s * 0.38, 0.52, 2.47);
+      cyl(0.07, 0.02, 8, M.head, 'z', s * 0.38, 0.52, 2.51);
+      box(0.012, 0.008, 0.95, M.trim, s * 0.7, 0.93, 1.72).rotation.x = 0.08;
+    }
+    box(0.5, 0.02, 0.02, M.trim, s * 0.28, BELT + 0.055, WSB - 0.05).rotation.y = s * 0.08;
   }
 
   // ---- Sides ----
@@ -6019,10 +6064,10 @@ function buildWagon(opts){
     box(0.01, 0.55, 0.015, M.trim, x, 0.62, 0.06);
     box(0.01, 0.55, 0.015, M.trim, x, 0.62, -1.14);
     box(0.02, 0.04, 1.84, M.trim, x, 0.56, 0.02);
-    box(0.02, 0.03, 3.35, M.trim, s * 0.795, 0.935, -0.53);
+    box(0.02, 0.03, WSB - RB, M.trim, s * 0.795, BELT + 0.015, (WSB + RB)/2);
     box(0.03, 0.03, 0.12, M.chrome, s * 0.915, 0.8, -0.1);
     box(0.03, 0.03, 0.12, M.chrome, s * 0.915, 0.8, -1.28);
-    box(0.12, 0.1, 0.06, M.trim, s * 0.97, 1.0, 1.05);
+    box(0.12, 0.1, 0.06, M.trim, s * 0.97, BELT + 0.08, WSB - 0.13);
     box(0.24, 0.22, 0.02, M.trim, s * 0.74, 0.3, -1.88);
     box(0.01, 0.05, 0.1, M.amber, x, 0.6, 2.1);
     box(0.01, 0.05, 0.1, M.tail, x, 0.6, -2.12);
@@ -6052,10 +6097,10 @@ function buildWagon(opts){
   for (let i = 0; i < 6; i++) box(0.035, 0.06, 0.005, M.plateInk, -0.14 + i * 0.056, 0.57, REAR - 0.013);
   box(0.1, 0.02, 0.02, M.reverse, 0, 0.665, REAR - 0.01);
 
-  const RG = Math.hypot(0.14, 0.54);
+  const RG = Math.hypot(RB - RT, ROOF - BELT);
   const hatch = new THREE.Group();
-  hatch.position.set(0, BELT, -2.22);
-  hatch.rotation.x = Math.atan2(0.14, 0.54);
+  hatch.position.set(0, BELT, RB);
+  hatch.rotation.x = Math.atan2(RT - RB, ROOF - BELT);
   car.add(hatch);
   for (const s of [1, -1]) box(0.07, RG, 0.03, M.paint, s * 0.755, RG / 2, -0.01, hatch);
   box(1.58, 0.07, 0.03, M.paint, 0, RG - 0.035, -0.01, hatch);
@@ -6064,12 +6109,18 @@ function buildWagon(opts){
   box(0.05, 0.05, 0.03, M.trim, 0, 0.05, -0.025, hatch);
   box(0.9, 0.02, 0.015, M.trim, 0, 0.08, -0.025, hatch);
 
-  box(1.62, 0.03, 0.2, M.paint, 0, 1.5, -2.2).rotation.x = -0.12;
-  for (const s of [1, -1]) cyl(0.006, 0.8, 4, M.trim, 'y', s * 0.78, 1.9, -2.05).rotation.x = -0.12;
+  if(o.sport){
+    // a proper roof spoiler on two stands
+    box(1.5, 0.05, 0.34, M.paint, 0, ROOF + 0.13, RT - 0.05).rotation.x = -0.1;
+    for (const s of [1, -1]) box(0.05, 0.12, 0.12, M.plastic, s * 0.55, ROOF + 0.06, RT + 0.02);
+  } else {
+    box(1.62, 0.03, 0.2, M.paint, 0, ROOF + 0.04, RT - 0.12).rotation.x = -0.12;
+    for (const s of [1, -1]) cyl(0.006, 0.8, 4, M.trim, 'y', s * 0.78, ROOF + 0.44, RT + 0.03).rotation.x = -0.12;
+  }
 
   const rearBumper = new THREE.Group();
   car.add(rearBumper);
-  box(1.86, 0.14, 0.14, M.chrome, 0, 0.36, -2.38, rearBumper);
+  box(1.86, 0.14, 0.14, o.sport ? M.plastic : M.chrome, 0, 0.36, -2.38, rearBumper);
   box(1.5, 0.025, 0.16, M.trim, 0, 0.44, -2.38, rearBumper);
   for (const s of [1, -1]) box(0.14, 0.14, 0.26, M.chrome, s * 0.86, 0.36, -2.25, rearBumper);
 
@@ -6093,22 +6144,84 @@ function buildWagon(opts){
   cyl(0.045, 1.36, 6, M.under, 'x', 0, 0.25 - WR, 0, rearAxle);
   add(new THREE.SphereGeometry(0.12, 6, 4), M.under, 0, 0.22 - WR, 0, rearAxle).scale.set(1.1, 0.9, 1);
 
-  // ---- Roof rack ----
-  for (const s of [1, -1]) {
-    box(0.05, 0.05, 2.3, M.trim, s * 0.64, 1.56, -0.85);
-    box(0.07, 0.06, 0.1, M.trim, s * 0.64, 1.52, 0.25);
-    box(0.07, 0.06, 0.1, M.trim, s * 0.64, 1.52, -1.95);
+  // ---- Roof rack and what rides on it ----
+  const RY = ROOF + 0.1, RZ0 = WST - 0.2, RZ1 = RT + 0.1, RZM = (RZ0 + RZ1)/2;
+  if (A.rack) {
+    for (const s of [1, -1]) {
+      box(0.05, 0.05, RZ0 - RZ1, M.trim, s * 0.64, RY, RZM);
+      box(0.07, 0.06, 0.1, M.trim, s * 0.64, RY - 0.04, RZ0);
+      box(0.07, 0.06, 0.1, M.trim, s * 0.64, RY - 0.04, RZ1);
+    }
+    for (const f of [0.08, 0.5, 0.92]) box(1.34, 0.04, 0.06, M.trim, 0, RY + 0.04, RZ0 + (RZ1 - RZ0)*f);
   }
-  for (const z of [0.1, -0.75, -1.6]) box(1.34, 0.04, 0.06, M.trim, 0, 1.6, z);
-  if (o.roofCargo) {
-    cyl(0.32, 0.2, 10, M.tire, 'y', -0.1, 1.72, -0.75);
-    cyl(0.19, 0.205, 8, M.rim, 'y', -0.1, 1.72, -0.75);
-    box(0.05, 0.012, 0.66, M.strap, -0.1, 1.826, -0.75);
-    for (const s of [1, -1]) box(0.05, 0.2, 0.012, M.strap, -0.1, 1.72, -0.75 + s * 0.325);
-    box(0.36, 0.2, 0.26, M.jerry, 0.3, 1.72, -1.5);
-    box(0.14, 0.04, 0.03, M.jerry, 0.3, 1.84, -1.5);
-    cyl(0.03, 0.05, 6, M.jerry, 'x', 0.5, 1.76, -1.5);
+  const jerry = (x, y, z, m, rot) => {
+    const j = new THREE.Group(); j.position.set(x, y, z); if(rot) j.rotation.y = rot; car.add(j);
+    box(0.36, 0.2, 0.26, m, 0, 0, 0, j); box(0.14, 0.04, 0.03, m, 0, 0.12, 0, j);
+    cyl(0.03, 0.05, 6, m, 'x', 0.2, 0.04, 0, j);
+    for (const s of [1, -1]) box(0.37, 0.02, 0.012, M.plastic, 0, s * 0.05, 0.132, j);
+  };
+  const spare = (x, y, z, axis) => { cyl(0.32, 0.2, 12, M.tire, axis, x, y, z); cyl(0.19, 0.205, 8, M.rim, axis, x, y, z); };
+  if (A.spare) {
+    if (A.rack) { spare(-0.1, RY + 0.16, RZM, 'y'); box(0.05, 0.012, 0.66, M.strap, -0.1, RY + 0.266, RZM); }
+    else spare(0, 0.62, REAR - 0.16, 'z');                                  // hung on the tailgate
   }
+  if (A.cans) {
+    if (A.rack) { jerry(0.3, RY + 0.16, RZ1 + 0.3, M.jerry); jerry(-0.35, RY + 0.16, RZ1 + 0.3, M.jerryR); }
+    else for (const s of [1, -1]) jerry(s * 0.72, 0.62, REAR - 0.2, s > 0 ? M.jerry : M.jerryR, Math.PI/2);
+  }
+  if (A.shovel) {
+    // strapped along the rack, or down the passenger side
+    const sh = new THREE.Group(); car.add(sh);
+    if (A.rack) sh.position.set(0.52, RY + 0.08, RZM);
+    else { sh.position.set(-0.93, 0.62, -0.2); sh.rotation.y = 0; }
+    cyl(0.025, 1.1, 6, M.wood, 'z', 0, 0, 0.1, sh);
+    box(0.24, 0.02, 0.3, M.steelB, 0, 0, -0.6, sh).rotation.z = A.rack ? 0 : Math.PI/2;
+    box(0.14, 0.03, 0.05, M.plastic, 0, 0, 0.66, sh);
+  }
+  if (A.lights) {
+    // four rally lamps on a bar across the front of the roof
+    const ly = A.rack ? RY + 0.14 : ROOF + 0.12, lz = A.rack ? RZ0 + 0.02 : WST - 0.05;
+    box(1.4, 0.04, 0.04, M.plastic, 0, ly - 0.1, lz);
+    for (const x of [-0.54, -0.18, 0.18, 0.54]) {
+      cyl(0.1, 0.1, 10, M.plastic, 'z', x, ly, lz);
+      cyl(0.085, 0.02, 10, M.head, 'z', x, ly, lz + 0.055);
+    }
+  }
+  if (A.bull) {
+    // a steel push bar in front of the bumper
+    for (const s of [1, -1]) cyl(0.035, 0.5, 6, M.plastic, 'y', s * 0.42, 0.55, L + 0.24);
+    cyl(0.035, 0.9, 6, M.plastic, 'x', 0, 0.78, L + 0.24);
+    cyl(0.035, 1.1, 6, M.plastic, 'x', 0, 0.42, L + 0.28);
+  }
+  // ---- fenders ----
+  if (o.fender > 0 || A.flaps) {
+    const t = o.fender === 2 ? 0.2 : 0.12, out = o.fender === 2 ? 0.13 : 0.07;
+    if (o.fender > 0) for (const cz of [AXLE_R, AXLE_F]) for (const s of [1, -1]) {
+      for (let i = 0; i < 7; i++) {
+        const a0 = Math.PI - (i/7)*Math.PI, a1 = Math.PI - ((i + 1)/7)*Math.PI;
+        const R = ARCH + 0.04;
+        const z0 = cz + R*Math.cos(a0), y0 = WR + R*Math.sin(a0)*0.95, z1 = cz + R*Math.cos(a1), y1 = WR + R*Math.sin(a1)*0.95;
+        const seg = box(t, 0.08, Math.hypot(z1 - z0, y1 - y0) + 0.03, M.plastic, s*(SIDE + out - t/2 + 0.02), (y0 + y1)/2, (z0 + z1)/2);
+        seg.rotation.x = -Math.atan2(y1 - y0, z1 - z0);
+      }
+    }
+    if (o.fender === 2 || A.flaps) for (const cz of [AXLE_R, AXLE_F]) for (const s of [1, -1])
+      box(0.32, 0.34, 0.025, M.plastic, s * (TRACK + 0.02), 0.26, cz - ARCH - 0.08);
+  }
+  // ---- livery ----
+  if (o.livery === 1) {
+    for (const x of [-0.18, 0.18]) {
+      box(0.16, 0.008, 1.1, M.stripe, x, BELT + 0.008, 1.7).rotation.x = 0.08;
+      box(0.16, 0.008, WST - RT + 0.15, M.stripe, x, ROOF + 0.045, (WST + RT)/2);
+    }
+  } else if (o.livery === 2) {
+    for (const s of [1, -1]) {
+      cyl(0.24, 0.012, 16, M.stripe, 'x', s * 0.912, 0.62, -0.5);
+      box(0.013, 0.3, 0.07, M.plastic, s * 0.915, 0.62, -0.5);            // a "1" on the roundel
+      box(0.012, 0.06, 3.9, M.stripe, s * 0.911, 0.42, 0);
+    }
+  }
+
 
   // ---- Beater details ----
   if (o.beater) {
@@ -6129,27 +6242,41 @@ function buildWagon(opts){
   // In the order the game's suspension expects: front pair then rear pair,
   // passenger side first. The pivots belong to the car, not the shell, so
   // the body moves on its springs over them.
-  const tireGeo = new THREE.CylinderGeometry(WR, WR, 0.24, 10);
+  const TW = 0.24*(o.ws > 1.05 ? 1.2 : 1) + (o.fender === 2 ? 0.04 : 0);
+  const tireGeo = new THREE.CylinderGeometry(TWR, TWR, TW, 12);
   tireGeo.rotateZ(Math.PI / 2);
-  const rimGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.25, 8);
+  const rr = 0.2*o.ws*(o.rim ? 1.08 : 1);
+  const rimGeo = new THREE.CylinderGeometry(rr, rr, TW + 0.01, o.rim ? 14 : 8);
   rimGeo.rotateZ(Math.PI / 2);
-  const capGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.26, 6);
+  const capGeo = new THREE.CylinderGeometry(0.08, 0.08, TW + 0.02, 6);
   capGeo.rotateZ(Math.PI / 2);
   const lugGeo = new THREE.BoxGeometry(0.255, 0.025, 0.025);
+  const rimMat = [M.rim, M.rimS, M.rimW, M.rimG][o.rim];
   const wheels = [];
   [[-TRACK, AXLE_F, true, true], [TRACK, AXLE_F, true, true],
    [-TRACK, AXLE_R, false, !o.beater], [TRACK, AXLE_R, false, true]].forEach(w=>{
     const pivot = new THREE.Group();
-    pivot.position.set(w[0], WR, w[1]);
+    pivot.position.set(w[0] * (o.fender === 2 ? 1.06 : 1), TWR, w[1]);
     g.add(pivot);
     const spin = new THREE.Group();
     pivot.add(spin);
     add(tireGeo, M.tire, 0, 0, 0, spin);
-    add(rimGeo, M.rim, 0, 0, 0, spin);
-    if (w[3]) add(capGeo, M.chrome, 0, 0, 0, spin);
-    else for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * Math.PI * 2;
-      add(lugGeo, M.trim, 0, Math.cos(a) * 0.09, Math.sin(a) * 0.09, spin);
+    add(rimGeo, rimMat, 0, 0, 0, spin);
+    if (o.rim === 0) {
+      if (w[3]) add(capGeo, M.chrome, 0, 0, 0, spin);
+      else for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2;
+        add(lugGeo, M.trim, 0, Math.cos(a) * 0.09, Math.sin(a) * 0.09, spin);
+      }
+    } else {
+      // spokes: dark windows between them so the pattern reads as it turns
+      const n = o.rim === 1 ? 5 : o.rim === 2 ? 8 : 6;
+      const hole = new THREE.CylinderGeometry(rr*0.2, rr*0.2, TW + 0.03, 8); hole.rotateZ(Math.PI/2);
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + Math.PI/n;
+        add(hole, M.plastic, 0, Math.cos(a)*rr*0.6, Math.sin(a)*rr*0.6, spin);
+      }
+      add(capGeo, o.rim === 3 ? M.rimG : M.chrome, 0, 0, 0, spin).scale.set(1, 0.7, 0.7);
     }
     mergeStatic(spin);
     wheels.push({pivot, mesh: spin, steer: w[2]});
@@ -6189,6 +6316,7 @@ function buildWagon(opts){
   g.userData.flame = flame;
   g.userData.flameCore = flameCore;
   g.userData.rearAxle = rearAxle;
+  g.userData.wr = TWR; g.userData.lift = LIFT;
   mergeStatic(car);
   return g;
 }
@@ -6210,7 +6338,7 @@ const PAINTS = [
   {name:"Chocolate",     hex:"#4a2f22"},
   {name:"Plum",          hex:"#5e3553"}
 ];
-const car = buildWagon({paint:PAINTS[0].hex, rust:38, beat:true, cargo:true});
+let car = buildWagon({paint:PAINTS[0].hex, rust:38, beat:true, cargo:true});   // rebuilt from the garage once the save is read
 /* the body panels and the junkyard door (same paint, but faded toward grey
    as it always was) take the new colour; the rust stays where it is */
 function paintCar(hex){
@@ -7797,7 +7925,7 @@ function stepCar(dt){
   if(trans.cut < 0.3) pose.accLP += (netA - pose.accLP) * Math.min(1, dt*3.5);
   // (pitch and roll are set with the suspension, below)
   pose.steerVis += (pose.steerIn*0.42 - pose.steerVis) * Math.min(1, dt*10);
-  pose.wheelSpin += newAlong*dt/WHEEL_R;
+  pose.wheelSpin += newAlong*dt/(car.userData.wr || WHEEL_R);
 
   /* ---- chassis and body -------------------------------------------
      Two layers, the way a real car is built.
@@ -7908,7 +8036,7 @@ function stepCar(dt){
     w.sv += (-300*(w.sy - target) - 24*w.sv)*dt;
     w.sy += w.sv*dt;
     w.sy = Math.max(-0.15, Math.min(0.19, w.sy));    // droop and bump stops
-    w.pivot.position.y = WHEEL_R + w.sy;
+    w.pivot.position.y = (car.userData.wr || WHEEL_R) + w.sy;
     if(wi < 2) syF += w.sy*0.5; else syR += w.sy*0.5;
     if(wX[wi] > 0) syL += w.sy*0.5; else syRt += w.sy*0.5;
   });
@@ -8019,11 +8147,11 @@ function stepCar(dt){
   const axleObj = car.userData.rearAxle;
   if(axleObj){
     const lw = car.userData.wheels[2].sy || 0, rw = car.userData.wheels[3].sy || 0;
-    axleObj.position.y = WHEEL_R + (lw + rw)*0.5;
+    axleObj.position.y = (car.userData.wr || WHEEL_R) + (lw + rw)*0.5;
     axleObj.rotation.z = Math.atan2(rw - lw, WAGON_TRACK*2);
   }
   const shellObj = car.userData.shell;
-  shellObj.position.y = RIDE + pose.bH;
+  shellObj.position.y = RIDE + (car.userData.lift || 0) + pose.bH;
   shellObj.rotation.x = pose.bP;                          // squat, dive, landings
   shellObj.rotation.z = pose.bR;                          // lean and bumps
 
@@ -8512,12 +8640,16 @@ const SAVE_KEY = "pinehollow.save.v1";
 const BOOT_KEY = "pinehollow.boot";
 const SAVE = (()=>{
   const def = { settings:{ master:0.1, music:0.5, sfx:0.9, vol10:true, cam:0, auto:true, filter:true,
-                           res:1, hud:1, diff:1, units:1, gfx:0, look:0, paint:0 },
+                           res:1, hud:1, diff:1, units:1, gfx:0, look:0, paint:0,
+                           car:{ model:0, fender:0, rim:0, wheel:1, livery:0, beat:1,
+                                 rack:1, spare:1, cans:1, shovel:0, lights:0, flaps:0, bull:0 } },
                 records:{}, champ:null };
   try{
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
     if(s){
+      const carDef = def.settings.car;
       Object.assign(def.settings, s.settings || {});
+      def.settings.car = Object.assign({}, carDef, (s.settings && s.settings.car) || {});
       if(!(s.settings && s.settings.vol10)){ def.settings.master = 0.1; def.settings.vol10 = true; }   // start quiet, once
       def.records = s.records || {};
       def.champ = s.champ || null;
@@ -8528,8 +8660,27 @@ const SAVE = (()=>{
 function persist(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(SAVE)); }catch(e){} }
 function recordFor(){ return SAVE.records[TRACK.name] || (SAVE.records[TRACK.name] = {}); }
 
+/* the garage build, as buildWagon wants it */
+function carOpts(){
+  const S = SAVE.settings, C = S.car;
+  return { paint: PAINTS[Math.max(0, Math.min(PAINTS.length-1, S.paint|0))].hex, beat: !!C.beat, rust: C.beat ? 38 : 0,
+           model: C.model, fender: C.fender, rim: C.rim, wheel: C.wheel, livery: C.livery,
+           acc: { rack: !!C.rack, spare: !!C.spare, cans: !!C.cans, shovel: !!C.shovel, lights: !!C.lights, flaps: !!C.flaps, bull: !!C.bull } };
+}
+let carBuilt = "";
+function rebuildCar(){
+  const key = JSON.stringify(SAVE.settings.car);
+  if(key === carBuilt) return;
+  carBuilt = key;
+  const vis = car.visible, p = car.position.clone(), r = car.rotation.clone();
+  scene.remove(car);
+  car = buildWagon(carOpts());
+  car.visible = vis; car.position.copy(p); car.rotation.copy(r);
+  scene.add(car);
+}
 function applySettings(){
   const S = SAVE.settings;
+  rebuildCar();
   camMode = S.cam;
   trans.auto = S.auto;
   const fast = S.gfx === 1;
@@ -9224,7 +9375,34 @@ const OPTS = [
   {key:"gfx",    label:"Graphics", vals:["Full","Fast"],
    desc:"Full has soft shadows and multisampled edges. Fast turns both off and renders at standard resolution, for older laptops."}
 ];
+/* ---- the garage: what you drive, and what you bolt on it ---- */
+const onoff = ["Off", "On"];
+const carKey = (k, label, vals, desc)=> ({ key:"car_" + k, label, vals, desc,
+  get: ()=> SAVE.settings.car[k] | 0, set: v=>{ SAVE.settings.car[k] = v; } });
+const GOPTS = [
+  carKey("model",  "Wagon", ["Box wagon", "Sport wagon"],
+         "The box: a tall, square Swedish estate, all glass and chrome. The sport: low and raked, a hood scoop, a roof spoiler and fog lamps. They drive the same; pick the one you like."),
+  { key:"paint", label:"Paint", vals:PAINTS.map(p=>p.name), swatch:true, desc:"Factory colours, faded the way they would be after fifty winters.",
+    get: ()=> SAVE.settings.paint | 0, set: v=>{ SAVE.settings.paint = v; } },
+  carKey("livery", "Livery", ["Plain", "Stripes", "Rally number"], "Twin stripes over the hood and roof, or a roundel on the doors and a stripe down the sills."),
+  carKey("fender", "Fenders", ["Stock", "Box flares", "Wide off-road"], "Black plastic arches. The wide set pushes the wheels out and hangs mud flaps behind them."),
+  carKey("rim",    "Rims", ["Steel", "Five spoke", "Rally white", "Gold"], "What the tyres are wrapped round."),
+  carKey("wheel",  "Wheel size", ["Small", "Stock", "Big"], "Big wheels lift the whole car on its springs."),
+  carKey("beat",   "Condition", ["Clean", "Patina"], "Patina is how it came from the lot: a junkyard door, rust, taped lights, one hubcap gone."),
+  carKey("rack",   "Roof rack", onoff, "Bars on the roof. Without them the spare and the cans ride on the back."),
+  carKey("spare",  "Spare tyre", onoff, "Strapped on the rack, or hung on the tailgate."),
+  carKey("cans",   "Fuel cans", onoff, "A green can and a red one."),
+  carKey("shovel", "Shovel", onoff, "For the day it gets stuck."),
+  carKey("lights", "Rally lights", onoff, "Four spot lamps on a bar across the roof."),
+  carKey("flaps",  "Mud flaps", onoff, "Behind every wheel."),
+  carKey("bull",   "Bull bar", onoff, "A push bar across the front.")
+];
 function optValue(O){
+  if(O.get){
+    const idx = O.get();
+    const sw = O.swatch ? '<span class="swatch" style="background:' + PAINTS[idx].hex + '"></span>' : '';
+    return '<i>\u2039</i>' + sw + '<b>' + esc(O.vals[idx]) + '</b><i>\u203A</i>';
+  }
   const v = SAVE.settings[O.key];
   if(O.bar) return '<span class="bar"><span style="width:calc(' + Math.round(v*100) + '% - 2px)"></span></span>';
   const idx = O.bool ? (v ? 1 : 0) : v;
@@ -9232,8 +9410,17 @@ function optValue(O){
   return '<i>\u2039</i>' + sw + '<b>' + esc(O.vals[idx]) + '</b><i>\u203A</i>';
 }
 function adjustOpt(el, d, wrap){
-  const O = OPTS.find(o => o.key === el.dataset.opt);
+  const O = OPTS.find(o => o.key === el.dataset.opt) || GOPTS.find(o => o.key === el.dataset.opt);
   const S = SAVE.settings;
+  if(O.get){
+    const n = O.vals.length;
+    let v = O.get() + d;
+    v = wrap ? (v + n)%n : Math.max(0, Math.min(n - 1, v));
+    O.set(v); persist(); applySettings();
+    el.querySelector(".val").innerHTML = optValue(O);
+    SFX.adjust();
+    return;
+  }
   if(O.bar){
     let v = Math.round((S[O.key] + d*0.1)*10)/10;
     if(wrap && v > 1) v = 0;
@@ -9351,9 +9538,9 @@ function showMain(sel){
     '</div></div><div class="right"><div class="note detail" id="mainNote"></div></div></div>',
     { sel: sel || 0, back: showTitle,
       onSel: el => { const n = document.getElementById("mainNote"); if(n) n.innerHTML = '<p>' + DESC[el.dataset.k] + '</p>'; },
-      acts:{ champ:()=>{ SFX.ok(); showChamp(); },
-             race:()=>{ SFX.ok(); showTracks("race"); },
-             trial:()=>{ SFX.ok(); showTracks("trial"); },
+      acts:{ champ:()=>{ SFX.ok(); showGarage(()=> showChamp(), ()=> showMain(0)); },
+             race:()=>{ SFX.ok(); showGarage(()=> showTracks("race"), ()=> showMain(1)); },
+             trial:()=>{ SFX.ok(); showGarage(()=> showTracks("trial"), ()=> showMain(2)); },
              opts:()=>{ SFX.ok(); showOptions(()=> showMain(3)); },
              help:()=>{ SFX.ok(); showHelp(()=> showMain(4)); } } });
   MENU.onSel(MENU.items[MENU.sel]);
@@ -9478,6 +9665,40 @@ function showOptions(back){
   MENU.onSel(MENU.items[0]);
 }
 
+function showGarage(next, back){
+  GAME.garage = true;
+  // park it down the road, clear of the start gate, for the photographs
+  { const i = wrapIdx(MAIN, Math.round(45/MAIN.seg)), p = MAIN.pts[i], t = MAIN.tans[i];
+    pose.x = p.x; pose.z = p.z; pose.h = Math.atan2(t.x, t.z); pose.vx = pose.vz = 0;
+    pose.y = pose.lastGy = surfaceY(p.x, p.z); }
+  const leave = fn => ()=>{ GAME.garage = false; placeAtStart(); car.visible = !rivals.length;
+                           rivals.forEach(r=>{ r.mesh.visible = true; r.shadow.visible = true; }); fn(); };
+  openScreen("scGarage",
+    '<div class="cols"><div class="left garage"><h2 class="head">Garage</h2><div class="menu">' +
+    GOPTS.map(O => '<button class="item opt" data-opt="' + O.key + '"><span>' + esc(O.label) +
+                   '</span><span class="val">' + optValue(O) + '</span></button>').join("") +
+    '<button class="item" data-act="go"><span>DONE: CHOOSE A CIRCUIT</span></button>' +
+    '<button class="item back" data-act="back"><span>BACK</span></button></div>' +
+    '<div class="garnote" id="garNote"></div>' +
+    '<div class="hint"><kbd>\u2191</kbd><kbd>\u2193</kbd> pick &nbsp; <kbd>\u2190</kbd><kbd>\u2192</kbd> change &nbsp; <kbd>Enter</kbd> done</div></div>' +
+    '<div class="right"></div></div>',
+    { cls:"garage", back: leave(back),
+      onSel: el => { const O = GOPTS.find(o => o.key === el.dataset.opt);
+                     const n = document.getElementById("garNote"); if(n) n.innerHTML = O ? '<p>' + O.desc + '</p>' : ''; },
+      acts:{ go: ()=>{ SFX.ok(); leave(next)(); }, back: ()=>{ SFX.back(); leave(back)(); } } });
+  MENU.onSel(MENU.items[0]);
+}
+/* the garage camera: a slow turn round your car, parked on the grid */
+function garageCam(dt){
+  GAME.garageA = (GAME.garageA || 0.6) + dt*0.22;
+  car.visible = true; carShadow.visible = true;
+  rivals.forEach(r=>{ r.mesh.visible = false; r.shadow.visible = false; });
+  const a = GAME.garageA, cx = pose.x, cz = pose.z, cy = car.position.y;
+  camera.position.set(cx + Math.sin(a)*7.6, cy + 1.7, cz + Math.cos(a)*7.6);
+  // aim a little to the left of the car so it sits to the right of the menu
+  const rx = Math.cos(a), rz = -Math.sin(a);
+  camera.lookAt(cx - rx*2.4, cy + 0.65, cz - rz*2.4);
+}
 function showHelp(back){
   const K = [["W / \u2191","Throttle"],["S / \u2193","Brake, then reverse"],["A D / \u2190 \u2192","Steer"],
              ["Space","Drift"],["E / Q","Shift up and down"],["T","Back to automatic"],
@@ -9810,7 +10031,7 @@ function frame(now){
 
     stepDust(dt);
 
-    if(state.phase === "menu") attractCam(dt);
+    if(state.phase === "menu") (GAME.garage ? garageCam(dt) : attractCam(dt));
     else if(state.phase === "done" && GAME.doneT > 1.4) finishCam(dt);
     else stepCamera(dt, info.sp);
     if(GAME.shake > 0){
