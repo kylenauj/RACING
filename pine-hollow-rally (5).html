@@ -535,10 +535,11 @@ const TRACKS = [
     pit:{at:[0,0], r:145, depth:30, benches:5, floor:0.55},
     bigJumps:[[[58,-55],2.6]],
     branches:[
-      // the chute: off the spiral, straight down one steady ramp across the
-      // benches with a kicker on the way, and a long sweep onto the floor
-      {a:[-5,137], b:[40,-68], via:[[-50,85],[-62,20],[-50,-38]],
-       half:5.6, jumps:[[0.42, 26, 7, 1.8, 40, true]], jumpKeep:40, tune:0.1, even:true},
+      // the low bench: a second way down, one bench inside the main spiral,
+      // on one steady grade instead of stepping down with the benches.
+      // About the same length and time: pick the one you like the look of
+      {a:[-5,137], b:[50,-62], via:[[-62,108],[-88,60],[-92,0],[-66,-48],[-12,-66]],
+       half:5.4, jumps:[[0.5,24,7,1.6,40]], tune:0.5, even:true, fast:true},
       // the inside line across the north of the tips, over the spoil
       {a:[528,95], b:[255,242], via:[[470,170],[360,215]],
        half:4.9, jumps:[[0.5,24,7,2.0,42]], tune:0},
@@ -1212,49 +1213,73 @@ if(TRACK.dunes) Object.assign(DUNE, {on:true, x:TRACK.dunes.at[0], z:TRACK.dunes
    of the land itself, so they are drawn, shaded and stood on like any hill;
    the car is kept off them the way the bridge parapets keep it on the deck. */
 const CANYON = {on:false};
+/* Slot Canyon: a tableland of layered red rock, 20m high, with eroded
+   ragged edges, and the road cut down through it in a slot. The slot is
+   carved along the road a long way either side, so where the tableland
+   thins out at each end the road runs out through a proper canyon mouth
+   instead of meeting a wall. */
 if(TRACK.canyon){
   let a = snapTo(MAIN, TRACK.canyon.from), b = snapTo(MAIN, TRACK.canyon.to);
   if(b < a) b += MAIN.N;
+  const ext = Math.round(170/MAIN.seg), step = Math.max(1, Math.round(3/MAIN.seg));
   const pl = [];
-  for(let k=a; k<=b; k+=Math.max(1, Math.round(3/MAIN.seg))){ const p = MAIN.pts[wrapIdx(MAIN, k)]; pl.push([p.x, p.z]); }
+  let coreA = -1, coreB = -1;
+  for(let k=a - ext; k<=b + ext; k+=step){
+    if(coreA < 0 && k >= a) coreA = pl.length;
+    if(k <= b) coreB = pl.length;
+    const p = MAIN.pts[wrapIdx(MAIN, k)]; pl.push([p.x, p.z]);
+  }
   let x0=Infinity, x1=-Infinity, z0=Infinity, z1=-Infinity;
   pl.forEach(p=>{ x0=Math.min(x0,p[0]); x1=Math.max(x1,p[0]); z0=Math.min(z0,p[1]); z1=Math.max(z1,p[1]); });
-  const len = (b - a)*MAIN.seg;
-  Object.assign(CANYON, {on:true, a, b, pl, H:TRACK.canyon.height || 20, len, box:[x0 - 80, x1 + 80, z0 - 80, z1 + 80]});
-  for(let k=a - Math.round(40/MAIN.seg); k<=b + Math.round(40/MAIN.seg); k+=6) CALM.push([wrapIdx(MAIN, k), 25]);
+  Object.assign(CANYON, {on:true, a, b, pl, coreA, coreB, H:TRACK.canyon.height || 20, len:(b - a)*MAIN.seg,
+                         box:[x0 - 150, x1 + 150, z0 - 150, z1 + 150]});
+  for(let k=a - Math.round(60/MAIN.seg); k<=b + Math.round(60/MAIN.seg); k+=6) CALM.push([wrapIdx(MAIN, k), 25]);
 }
 /* where a point is against the canyon: [distance from the road's line,
-   metres along the canyon], or null well outside it */
+   metres along the canyon's core, distance from the core], or null */
 function canyonUV(x, z){
   const B = CANYON.box;
   if(x < B[0] || x > B[1] || z < B[2] || z > B[3]) return null;
   const pl = CANYON.pl;
-  let best = Infinity, along = 0, run = 0;
+  let best = Infinity, bestCore = Infinity, along = 0, run = 0;
   for(let k=0;k<pl.length-1;k++){
     const ax = pl[k][0], az = pl[k][1], ex = pl[k+1][0] - ax, ez = pl[k+1][1] - az, L2 = ex*ex + ez*ez, L = Math.sqrt(L2);
     let t = L2 ? ((x - ax)*ex + (z - az)*ez)/L2 : 0; t = Math.max(0, Math.min(1, t));
     const d = (x - ax - ex*t)**2 + (z - az - ez*t)**2;
-    if(d < best){ best = d; along = run + t*L; }
-    run += L;
+    if(d < best) best = d;
+    if(k >= CANYON.coreA && k < CANYON.coreB && d < bestCore){ bestCore = d; along = run - 0 + t*L; }
+    if(k >= CANYON.coreA) run += L;
   }
-  return [Math.sqrt(best), along];
+  return [Math.sqrt(best), along, Math.sqrt(bestCore)];
+}
+/* how much tableland stands here, 0 to 1, with a ragged eroded rim */
+function canyonPlateau(x, z, uv){
+  const rim = 95 + 28*Math.sin(x*0.021 + z*0.013) + 16*Math.sin(x*0.057 - z*0.049 + 1.7) + 8*Math.sin(z*0.11 + x*0.03);
+  return 1 - smoothstep(rim - 22, rim, uv[2]);
 }
 function canyonWall(x, z){
   const uv = canyonUV(x, z);
   if(!uv) return 0;
+  const plat = canyonPlateau(x, z, uv);
+  if(plat <= 0) return 0;
   const d = uv[0], s = uv[1];
-  const ends = smoothstep(0, 45, s)*smoothstep(0, 45, CANYON.len - s);          // walls rise in from each end
-  const W0 = 8.2 + Math.sin(s*0.05)*0.8;                                          // the foot of the wall
-  const rise = smoothstep(W0, W0 + 3.2, d)*(1 - smoothstep(W0 + 18, W0 + 60, d));
-  const ledges = 0.08*Math.sin(d*0.9 + s*0.07) + 0.05*Math.sin(s*0.23);
-  return CANYON.H*ends*rise*(1 + ledges);
+  const W0 = 8.0 + Math.sin(s*0.05)*0.8 + Math.sin(s*0.013 + 1)*0.6;              // the foot of the wall
+  // the slot: a sheer lower wall, a ledge, then the upper wall back to the top
+  const slot = 0.62*smoothstep(W0, W0 + 2.6, d) + 0.38*smoothstep(W0 + 5, W0 + 8.5, d);
+  let h = CANYON.H*plat*slot;
+  // the rock lies in beds: the rim steps down in terraces as it erodes
+  const bed = 4.2, q = h/bed, f = q - Math.floor(q);
+  h = (Math.floor(q) + smoothstep(0.55, 0.95, f))*bed;
+  // weathered, uneven tops
+  h += plat*slot*(0.6*Math.sin(x*0.09 + z*0.07) + 0.4*Math.sin(x*0.23 - z*0.19));
+  return h;
 }
-/* 1 in the part of the canyon where the walls stand */
+/* 1 in the slot, where the walls stand close either side of the road */
 function canyonAt(x, z){
   if(!CANYON.on) return 0;
   const uv = canyonUV(x, z);
   if(!uv) return 0;
-  return smoothstep(10, 40, uv[1])*smoothstep(10, 40, CANYON.len - uv[1])*(1 - smoothstep(20, 40, uv[0]));
+  return canyonPlateau(x, z, uv)*(1 - smoothstep(22, 40, uv[0]));
 }
 /* The avalanche gallery: a roofed stretch of road along the mountainside */
 const GALLERY = {on:false};
@@ -2206,7 +2231,7 @@ function carveWater(y, x, z){
 /* ground nothing grows on: the open dunes, the canyon's walls */
 function barren(x, z){
   if(DUNE.on && Math.hypot(x - DUNE.x, z - DUNE.z) < DUNE.r*0.88) return true;
-  if(CANYON.on){ const uv = canyonUV(x, z); if(uv && uv[0] < 55 && uv[1] > 5 && uv[1] < CANYON.len - 5) return true; }
+  if(CANYON.on){ const uv = canyonUV(x, z); if(uv && uv[0] < 30 && canyonPlateau(x, z, uv) > 0.2) return true; }
   return false;
 }
 function inWaterway(x, z){
@@ -2877,6 +2902,14 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
             const r0 = Math.random(), band = Math.sin(GH[g]*0.85) + 0.5*Math.sin(GH[g]*2.3 + 1.1);
             c.setHSL(0.065 + r0*0.025 - steep*0.025 + band*0.008*steep, 0.42 + t*0.1 + steep*0.08,
                      0.46 + t*0.06 + r0*0.04 - steep*0.10 + band*0.05*steep);
+            // the canyon's tableland: bare red slickrock, a little sand drifted on the flats
+            if(CANYON.on){
+              const cw = canyonWall(x, z);
+              if(cw > 1.5){
+                const k = smoothstep(1.5, 6, cw), sandy = smoothstep(0.85, 1, n[1])*0.35;
+                c.lerp(new THREE.Color().setHSL(0.03 + r0*0.015 + Math.sin(GH[g]*0.9)*0.008, 0.52, 0.40 + r0*0.05 + Math.sin(GH[g]*0.9)*0.04), k*(1 - sandy));
+              }
+            }
             if(DUNE.on && t > 0.5){
               const dd = Math.hypot(x - DUNE.x, z - DUNE.z);
               if(dd < DUNE.r) c.lerp(new THREE.Color().setHSL(0.095, 0.55, 0.62 + r0*0.04), 0.8*(1 - smoothstep(DUNE.r*0.7, DUNE.r, dd)));
@@ -4286,25 +4319,33 @@ if(DROP.on && TRACK.skijump){
   mergeStatic(g); scene.add(g);
 }
 
-/* ---- the slot canyon's stone arch ---- */
+/* ---- the slot canyon's stone arch: a natural bridge from rim to rim ---- */
 if(CANYON.on){
-  const s0 = CANYON.len*0.62, k = CANYON.a + Math.round(s0/MAIN.seg);
-  const i = wrapIdx(MAIN, k), p = MAIN.pts[i], t = MAIN.tans[i];
-  const span = 13, geo = new THREE.TorusGeometry(span, 3.4, 7, 22, Math.PI);
+  // put it where the tableland is fullest over the road
+  let bi = CANYON.a, bh = -1;
+  for(let k=CANYON.a; k<=CANYON.b; k+=4){
+    const i = wrapIdx(MAIN, k), p = MAIN.pts[i], t = MAIN.tans[i];
+    const hL = gradedY(p.x - t.z*17, p.z + t.x*17), hR = gradedY(p.x + t.z*17, p.z - t.x*17);
+    const h = Math.min(hL, hR) - MAIN.pts[i].y;
+    if(h > bh){ bh = h; bi = k; }
+  }
+  const i = wrapIdx(MAIN, bi), p = MAIN.pts[i], t = MAIN.tans[i];
+  const span = 16, geo = new THREE.TorusGeometry(span, 3.2, 8, 26, Math.PI);
   const pa = geo.attributes.position;
-  for(let v=0; v<pa.count; v++){                       // weathered: lumpy and thicker at the feet
+  for(let v=0; v<pa.count; v++){
     const x = pa.getX(v), y = pa.getY(v), zz = pa.getZ(v);
     const n = 1 + 0.18*Math.sin(x*1.3 + y*0.7) + 0.12*Math.sin(zz*2.1 + x*0.4);
-    const foot = 1 + 0.6*(1 - Math.min(1, y/span));
-    pa.setXYZ(v, x*(1 + 0.02*n), y*0.72, zz*n*foot);
+    const foot = 1 + 0.9*(1 - Math.min(1, y/span));                 // it thickens where it meets the rock
+    pa.setXYZ(v, x*(1 + 0.02*n), y*0.55, zz*n*foot);
   }
   geo.computeVertexNormals();
   const arch = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({color:0xb4623e, map:rockTex, flatShading:true}));
-  arch.position.set(p.x, MAIN.pts[i].y + CANYON.H*0.72, p.z);
-  arch.rotation.y = Math.atan2(t.x, t.z) + Math.PI/2;
+  const hL = gradedY(p.x - t.z*span, p.z + t.x*span), hR = gradedY(p.x + t.z*span, p.z - t.x*span);
+  arch.position.set(p.x, Math.min(hL, hR) - 3.5, p.z);            // feet sunk into the rim on both sides
+  arch.rotation.y = Math.atan2(t.x, t.z);                          // the torus spans its local x: across the road
   arch.castShadow = true; arch.receiveShadow = true;
   scene.add(arch);
-  roadSign(CANYON.a - Math.round(60/MAIN.seg), 1, ["SLOT CANYON", "no way out but through"], "#b4623e", "#f7e7c0");
+  roadSign(CANYON.a - Math.round(90/MAIN.seg), 1, ["SLOT CANYON", "no way out but through"], "#b4623e", "#f7e7c0");
 }
 
 /* ---- the oasis: date palms round the water ---- */
