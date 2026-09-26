@@ -6995,53 +6995,67 @@ function startAudio(){
   AUD.seqNext = actx.currentTime + 0.1;
   setLevels();
 }
-/* An inline six: two slightly detuned saws at the firing rate and a sub an
-   octave down, pushed through a soft clipper that growls harder under load,
-   a low pass that opens with the revs, and a chuff of amplitude modulation
-   at half the firing rate for the uneven beat of the exhaust. Exhaust rasp
-   is band passed noise tracking the harmonics. */
+/* A big, tired straight six, deep and lumpy rather than smooth. The voice
+   sits an octave under the firing rate: two detuned saws and a sub saw
+   through an asymmetric clipper (even harmonics, the growl), a heavy boost
+   around 100Hz for the chest, and a low pass that never opens far, so
+   nothing whines. On top, the combustion itself: low passed noise chopped
+   by the same pulse that beats the exhaust, which is what stops it
+   sounding like a synthesiser. The pitch wanders a little, the way a real
+   engine never quite holds a note. */
 function makeEngine(dest, full){
   const e = {};
   e.out = actx.createGain(); e.out.gain.value = 0; e.out.connect(dest);
-  e.lp = actx.createBiquadFilter(); e.lp.type = "lowpass"; e.lp.frequency.value = 700; e.lp.Q.value = 1.4;
-  e.body = actx.createBiquadFilter(); e.body.type = "peaking"; e.body.frequency.value = 180; e.body.Q.value = 1.2; e.body.gain.value = 7;
+  e.lp = actx.createBiquadFilter(); e.lp.type = "lowpass"; e.lp.frequency.value = 400; e.lp.Q.value = 0.8;
+  e.lp2 = actx.createBiquadFilter(); e.lp2.type = "lowpass"; e.lp2.frequency.value = 1400; e.lp2.Q.value = 0.5;
+  e.body = actx.createBiquadFilter(); e.body.type = "peaking"; e.body.frequency.value = 95; e.body.Q.value = 0.9; e.body.gain.value = 5;
   e.shaper = actx.createWaveShaper();
-  const curve = new Float32Array(1024);
-  for(let i=0;i<1024;i++){ const x = i/511.5 - 1; curve[i] = Math.tanh(x*2.6)/Math.tanh(2.6); }
-  e.shaper.curve = curve; e.shaper.oversample = "2x";
-  e.drive = actx.createGain(); e.drive.gain.value = 0.6;
-  e.chuff = actx.createGain(); e.chuff.gain.value = 0.75;
-  e.drive.connect(e.shaper); e.shaper.connect(e.chuff); e.chuff.connect(e.body); e.body.connect(e.lp); e.lp.connect(e.out);
-  const osc = (type, g)=>{ const o = actx.createOscillator(); o.type = type; const gg = actx.createGain(); gg.gain.value = g;
-                          o.connect(gg); gg.connect(e.drive); o.start(); return o; };
-  e.a = osc("sawtooth", 0.5); e.b = osc("sawtooth", 0.4); e.sub = osc("sine", 0.7);
-  if(full){ e.c = osc("square", 0.12); }
-  // the beat of the exhaust
-  e.lfo = actx.createOscillator(); e.lfo.type = "sine";
-  e.lfoG = actx.createGain(); e.lfoG.gain.value = 0.28;
+  const curve = new Float32Array(2048);
+  for(let i=0;i<2048;i++){ const x = i/1023.5 - 1; const y = x > 0 ? Math.tanh(x*3.2) : Math.tanh(x*1.8)*0.8; curve[i] = y; }
+  e.shaper.curve = curve; e.shaper.oversample = "4x";
+  e.drive = actx.createGain(); e.drive.gain.value = 0.8;
+  e.chuff = actx.createGain(); e.chuff.gain.value = 0.6;
+  // the clipper is lopsided on purpose, so take off the DC and the subsonics it leaves
+  e.hp = actx.createBiquadFilter(); e.hp.type = "highpass"; e.hp.frequency.value = 38; e.hp.Q.value = 0.7;
+  // and a growl band small speakers can actually play
+  e.growl = actx.createBiquadFilter(); e.growl.type = "peaking"; e.growl.frequency.value = 260; e.growl.Q.value = 1.0; e.growl.gain.value = 8;
+  e.drive.connect(e.shaper); e.shaper.connect(e.chuff); e.chuff.connect(e.hp); e.hp.connect(e.body); e.body.connect(e.growl);
+  e.growl.connect(e.lp); e.lp.connect(e.lp2); e.lp2.connect(e.out);
+  const osc = (type, g, det)=>{ const o = actx.createOscillator(); o.type = type; if(det) o.detune.value = det;
+                               const gg = actx.createGain(); gg.gain.value = g; o.connect(gg); gg.connect(e.drive); o.start(); return o; };
+  e.a = osc("sawtooth", 0.45, -7); e.b = osc("sawtooth", 0.4, 9); e.sub = osc("sawtooth", 0.55); e.deep = osc("sine", 0.6);
+  // the exhaust pulse: a lumpy beat at the firing rate over the whole voice
+  e.lfo = actx.createOscillator(); e.lfo.type = "sawtooth";
+  e.lfoG = actx.createGain(); e.lfoG.gain.value = 0.45;
   e.lfo.connect(e.lfoG); e.lfoG.connect(e.chuff.gain); e.lfo.start();
-  if(full){
-    const src = actx.createBufferSource(); src.buffer = AUD.noise; src.loop = true;
-    e.rasp = actx.createBiquadFilter(); e.rasp.type = "bandpass"; e.rasp.frequency.value = 400; e.rasp.Q.value = 2.2;
-    e.raspG = actx.createGain(); e.raspG.gain.value = 0;
-    src.connect(e.rasp); e.rasp.connect(e.raspG); e.raspG.connect(e.out); src.start();
-  }
+  // combustion: noise chopped by the same pulse
+  const src = actx.createBufferSource(); src.buffer = AUD.noise; src.loop = true;
+  e.burn = actx.createBiquadFilter(); e.burn.type = "lowpass"; e.burn.frequency.value = 300; e.burn.Q.value = 0.7;
+  e.burnG = actx.createGain(); e.burnG.gain.value = 0;
+  e.burnAM = actx.createGain(); e.burnAM.gain.value = 0.5;
+  const amD = actx.createGain(); amD.gain.value = 0.5; e.lfo.connect(amD); amD.connect(e.burnAM.gain);
+  src.connect(e.burn); e.burn.connect(e.burnAM); e.burnAM.connect(e.burnG); e.burnG.connect(e.body); src.start(0, Math.random()*1.5);
+  e.full = full;
   return e;
 }
 function setEngine(e, rpm, load, vol, now, lag){
-  const f = Math.max(28, rpm/20);                  // six cylinders: three firings a turn
+  const fire = Math.max(24, rpm/20);               // six cylinders: three firings a turn
+  const f = fire*0.5*(1 + (Math.random() - 0.5)*0.018);   // the voice, an octave down, never quite steady
   const r = Math.min(1.1, rpm/DRIVE.redline);
   e.a.frequency.setTargetAtTime(f, now, lag);
-  e.b.frequency.setTargetAtTime(f*1.006, now, lag);
+  e.b.frequency.setTargetAtTime(f, now, lag);
   e.sub.frequency.setTargetAtTime(f*0.5, now, lag);
-  if(e.c) e.c.frequency.setTargetAtTime(f*1.5, now, lag);
-  e.lfo.frequency.setTargetAtTime(f*0.5, now, lag);
-  e.lfoG.gain.setTargetAtTime(0.32 - r*0.18, now, 0.1);
-  e.lp.frequency.setTargetAtTime(380 + r*1300 + load*900, now, 0.06);
-  e.body.frequency.setTargetAtTime(140 + r*220, now, 0.1);
-  e.drive.gain.setTargetAtTime(0.45 + load*0.9, now, 0.06);
-  if(e.raspG){ e.rasp.frequency.setTargetAtTime(f*3.2, now, lag); e.raspG.gain.setTargetAtTime(vol*(0.25 + load*0.9)*r, now, 0.06); }
-  e.out.gain.setTargetAtTime(vol, now, 0.05);
+  e.deep.frequency.setTargetAtTime(f*0.5, now, lag);
+  e.lfo.frequency.setTargetAtTime(fire*0.5, now, lag);
+  e.lfoG.gain.setTargetAtTime(0.5 - r*0.2, now, 0.1);
+  e.lp.frequency.setTargetAtTime(300 + r*520 + load*380, now, 0.07);
+  e.growl.frequency.setTargetAtTime(200 + r*180, now, 0.1);
+  e.lp2.frequency.setTargetAtTime(700 + r*700, now, 0.1);
+  e.body.frequency.setTargetAtTime(80 + r*70, now, 0.1);
+  e.drive.gain.setTargetAtTime(0.6 + load*1.4, now, 0.06);
+  e.burn.frequency.setTargetAtTime(160 + fire*1.8, now, lag);
+  e.burnG.gain.setTargetAtTime((0.35 + load*0.9)*(e.full ? 1 : 0.6), now, 0.06);
+  e.out.gain.setTargetAtTime(vol*1.6, now, 0.05);
 }
 function setLevels(){
   if(!actx) return;
@@ -7208,7 +7222,6 @@ function stepAudio(info, dt){
     AUD.wind.f.frequency.setTargetAtTime(300 + sp*28, now, 0.1);
   } else {
     AUD.eng.out.gain.setTargetAtTime(0, now, 0.05);
-    if(AUD.eng.raspG) AUD.eng.raspG.gain.setTargetAtTime(0, now, 0.05);
     for(const k in R) R[k].g.gain.setTargetAtTime(0, now, 0.05);
     AUD.wind.g.gain.setTargetAtTime(0, now, 0.05);
   }
@@ -8317,13 +8330,14 @@ function drawHUD(dt, alongNow){
 const SAVE_KEY = "pinehollow.save.v1";
 const BOOT_KEY = "pinehollow.boot";
 const SAVE = (()=>{
-  const def = { settings:{ master:0.8, music:0.5, sfx:0.9, cam:0, auto:true, filter:true,
+  const def = { settings:{ master:0.1, music:0.5, sfx:0.9, vol10:true, cam:0, auto:true, filter:true,
                            res:1, hud:1, diff:1, units:1, gfx:0, look:0, paint:0 },
                 records:{}, champ:null };
   try{
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
     if(s){
       Object.assign(def.settings, s.settings || {});
+      if(!(s.settings && s.settings.vol10)){ def.settings.master = 0.1; def.settings.vol10 = true; }   // start quiet, once
       def.records = s.records || {};
       def.champ = s.champ || null;
     }
