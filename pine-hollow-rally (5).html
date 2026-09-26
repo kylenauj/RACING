@@ -357,7 +357,7 @@ const TRACKS = [
     ctrl:[[0,-330],[0,-260],[0,-140],[40,-60],[10,20],[-45,85],[-25,165],[35,220],
           [140,260],[260,270],[360,240],[420,170],[440,70],[430,-40],[400,-120],
           [340,-150],[300,-110],[300,-40],[250,0],[190,-30],[180,-110],[220,-200],
-          [240,-290],[200,-370],[120,-420],[40,-420]],
+          [240,-290],[245,-400],[160,-480],[40,-460]],
     hills:[[250,-60,190,16],[-160,220,220,-10],[260,420,200,12]],
     jumps:[], fords:[[430,-40]],
     mud:[[[150,262],[300,262]]],
@@ -365,13 +365,14 @@ const TRACKS = [
     branches:[
       // the trident, south line: through the middle of the fork
       {a:[-46,103], b:[440,59], via:[[49,148],[199,147],[348,120]],
-       half:4.7, jumps:[], tune:0.66},
+       half:4.7, jumps:[], tune:0.5},
       // the trident, north line: a touch longer, with a crest
       {a:[-38,138], b:[438,95], via:[[65,179],[208,179],[349,154]],
        half:5.0, jumps:[[0.55, 26, 8, 2.2, 44]], tune:0.61},
-      // through the switchback on a line of its own: much shorter, and it makes you work
-      {a:[401,-119], b:[240,-288], via:[[375,-200],[330,-172],[310,-222],[352,-258],[305,-290],[268,-245]],
-       half:4.4, jumps:[[0.5, 22, 7, 2.4, 42]], tune:0.79}
+      // the mill lane: an inside line across the south-west corner, over a
+      // crest, while the road swings out round the mill
+      {a:[238,-300], b:[8,-392], via:[[200,-360],[140,-405],[65,-425]],
+       half:5.2, jumps:[[0.45, 22, 7, 1.8, 42]], tune:0, fast:true}
     ]},
 
   { name:"BEAR CREEK", after:"Spa", relief:1.7,
@@ -388,11 +389,11 @@ const TRACKS = [
     mud:[[[440,-205],[380,-290]]],
     branches:[
       // over the top of the dip
-      {a:[180,60], b:[468,30], via:[[250,52],[325,45],[400,38]],
-       half:4.8, jumps:[[0.5, 24, 7, 2.2, 42]], tune:0},
+      {a:[180,60], b:[505,75], via:[[250,52],[330,42],[420,32]],
+       half:5.0, jumps:[], tune:0, fast:true},
       // inside the east bend, with its own water
       {a:[574,110], b:[480,-174], via:[[617,74],[599,-1],[553,-89]],
-       half:4.7, jumps:[], fords:[0.5], tune:0.27},
+       half:4.7, jumps:[], fords:[0.5], tune:0.1},
       // across the south sweep
       {a:[414,-237], b:[44,-343], via:[[333,-291],[230,-332],[127,-356]],
        half:4.6, jumps:[[0.3, 24, 7, 2.3, 44]], tune:0.44}
@@ -412,14 +413,14 @@ const TRACKS = [
     drop:{at:[-118,42], height:34, top:45, back:240, width:75},
     fords:[], mud:[[[230,-130],[320,-110]]],
     branches:[
-      // across the infield, over the hump
-      {a:[3,-60], b:[198,-100], via:[[42,-32],[78,-2],[118,-42],[150,-12],[172,-62]],
-       half:4.6, jumps:[[0.3,24,7,2.6,44],[0.62,24,7,2.9,48]], tune:1},
+      // across the infield in one long sweep, over the hump twice
+      {a:[3,-60], b:[198,-100], via:[[40,-15],[110,0],[170,-45]],
+       half:4.6, jumps:[[0.3,24,7,2.6,44],[0.62,24,7,2.9,48]], fords:[0.46], tune:1},
       // inside the east loop
       {a:[218,-121], b:[247,200], via:[[271,-91],[295,9],[295,122]],
-       half:4.8, jumps:[[0.72,22,7,2.3,40]], tune:0.64},
+       half:4.8, jumps:[[0.72,22,7,2.3,40]], tune:0.15},
       // across the north-west shoulder, rejoining on the ramp up to the edge
-      {a:[40,200], b:[-148,118], via:[[-7,183],[-54,165],[-101,145]],
+      {a:[92,176], b:[-148,118], via:[[22,178],[-54,160],[-101,145]],
        half:4.7, jumps:[[0.4,24,7,2.6,44]], tune:0}
     ]},
 
@@ -443,9 +444,9 @@ const TRACKS = [
     kit:["crest","tabletop","double"],
     shape:"THE TOWN — switchbacks up, jumps down",
     feature:"hairpins up to a hilltop village, and big jumps down the far side",
-    ctrl:[[0,-300],[0,-150],[5,-20],[-5,110],[-12,190],[40,165],[110,128],[160,104],[186,104],
+    ctrl:[[0,-300],[-10,-180],[-62,-90],[-72,0],[-40,85],[-12,190],[40,165],[110,128],[160,104],[186,104],
           [178,132],[168,178],[152,220],[140,248],[160,262],[198,250],[232,254],[254,278],
-          [280,300],[320,312],[362,306],[405,280],[440,240],[462,190],[462,135],[440,80],
+          [280,300],[320,312],[362,306],[410,285],[458,245],[488,190],[485,130],[450,75],
           [390,20],[400,-80],[470,-160],[450,-270],[360,-330],[240,-310],[160,-360],[80,-400]],
     hills:[[262,292,205,47],[120,-420,180,-8]],
     jumps:[], fords:[],
@@ -453,12 +454,13 @@ const TRACKS = [
     town:{at:[285,302], r:78},
     bigJumps:[[[428,258],3.4],[[462,180],4.0],[[452,108],4.6]],
     branches:[
-      // through the trees on the way to the foot of the climb
-      {a:[0,-150], b:[-8,150], via:[[-45,-80],[-58,10],[-48,90]],
-       half:4.8, jumps:[[0.5,24,7,2.3,42]], tune:0.2},
+      // the forest track, straight to the foot of the climb while the road
+      // swings out round the trees
+      {a:[-10,-180], b:[-28,135], via:[[2,-60],[-3,35]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true},
       // a steeper, straighter line down the east face
-      {a:[378,298], b:[420,55], via:[[392,250],[405,180],[410,110]],
-       half:4.8, jumps:[[0.35,26,8,3.2,46],[0.7,26,8,3.6,46]], tune:0.25},
+      {a:[340,310], b:[395,20], via:[[398,262],[416,185],[418,105]],
+       half:4.8, jumps:[[0.45,26,8,2.4,46]], tune:0.3, fast:true},
       // across the south shoulder
       {a:[425,-109], b:[228,-314], via:[[437,-171],[391,-222],[320,-269]],
        half:4.6, jumps:[[0.3,24,7,2.6,44]], tune:0.55}
@@ -470,24 +472,25 @@ const TRACKS = [
     kit:["crest","tabletop","rhythm","kicker"],
     shape:"THE BOWL — a banked carousel",
     feature:"a 270 degree banked turn around the fairground ferris wheel",
-    ctrl:[[0,-250],[0,-130],[25,-10],[70,80],[120,125],[158,141],[162,188],[191,214],[238,210],
-          [266,170],[254,122],[222,104],[170,70],[165,10],[230,-60],[330,-100],[380,-180],
-          [330,-280],[200,-330],[80,-340],[15,-310]],
+    ctrl:[[0,-250],[-35,-160],[-50,-60],[-20,25],[70,80],[120,125],[158,141],[162,188],[191,214],[238,210],
+          [266,170],[254,122],[222,104],[170,70],[178,0],[260,5],[352,-30],[425,-100],[412,-195],
+          [330,-280],[200,-330],[80,-345],[15,-310]],
     hills:[[260,-220,180,9],[-120,60,160,-6]],
     jumps:[], fords:[[330,-280]],
-    mud:[[[165,10],[230,-60]]],
+    mud:[[[330,-280],[200,-330]]],
     bowl:{at:[210,160], r:55, bank:0.34},
     flats:[[210,160,118]],
     branches:[
-      // through the orchard, west of the fair road
-      {a:[0,-200], b:[45,40], via:[[-45,-120],[-45,-30],[-10,30]],
-       half:4.7, jumps:[[0.5,24,7,2.3,42]], tune:0.4},
-      // round the back of the pumpkin fields
-      {a:[165,10], b:[380,-180], via:[[245,15],[330,-25],[405,-95]],
-       half:4.8, jumps:[], tune:0.5},
-      // the farm lane, inside the south loop
-      {a:[330,-280], b:[15,-310], via:[[250,-245],[150,-270],[70,-275]],
-       half:4.6, jumps:[[0.45,24,7,2.5,44]], tune:0.45}
+      // the old fair road, straight up past the orchard while the main road
+      // swings out through it
+      {a:[-12,-225], b:[35,62], via:[[0,-130],[18,-40]],
+       half:4.7, jumps:[[0.5,24,7,2.2,42]], tune:0.2},
+      // the muddy cart track straight past the pumpkin fields
+      {a:[172,35], b:[414,-178], via:[[205,-55],[320,-108]],
+       half:4.8, jumps:[], tune:0, fast:true},
+      // the farm lane, straight across inside the south loop
+      {a:[330,-280], b:[40,-335], via:[[240,-288],[135,-315]],
+       half:4.6, jumps:[[0.45,24,7,2.2,44]], tune:0.15}
     ]},
 
   { name:"COPPER LAKE", after:"a reservoir", relief:1.1, season:"fall", cup:1,
@@ -495,52 +498,256 @@ const TRACKS = [
     kit:["crest","double","tabletop","crest"],
     shape:"THE CAUSEWAY — 300m across the lake",
     feature:"a causeway across the lake with a washout to jump",
-    ctrl:[[-160,-170],[-160,-80],[-110,-8],[-30,0],[60,-4],[150,6],[240,-4],[330,2],[410,40],
-          [450,130],[400,210],[290,240],[170,232],[60,226],[-40,205],[-130,160],[-205,90],
-          [-235,-10],[-235,-130],[-205,-230],[-165,-250]],
+    ctrl:[[-160,-170],[-160,-80],[-110,-8],[-30,0],[60,-4],[150,6],[240,-4],[330,2],[400,-28],
+          [470,40],[460,135],[400,215],[290,255],[170,260],[60,250],[-40,215],[-130,160],[-205,90],
+          [-280,15],[-292,-100],[-255,-205],[-205,-240],[-165,-250]],
     hills:[[150,300,200,10],[-250,-180,160,8]],
     jumps:[], fords:[],
     mud:[[[-130,160],[-205,90]]],
     lake:{at:[150,0], rx:175, rz:115},
     washout:{at:[112,2]},
     branches:[
-      // along the east shore
-      {a:[330,2], b:[450,130], via:[[395,-35],[470,35]],
-       half:4.7, jumps:[], tune:0.4},
+      // along the east shore, cutting inside the bend
+      {a:[330,2], b:[458,140], via:[[410,40]],
+       half:4.7, jumps:[], tune:0.3},
       // the lakeshore lane, down by the water
-      {a:[400,210], b:[-40,205], via:[[300,175],[170,168],[50,168]],
-       half:4.8, jumps:[[0.5,24,7,2.3,42]], tune:0.45},
-      // out through the birches on the west side
-      {a:[-205,90], b:[-205,-230], via:[[-285,20],[-295,-100],[-265,-200]],
-       half:4.6, jumps:[[0.4,24,7,2.5,44]], tune:0.45}
+      {a:[400,215], b:[-40,215], via:[[290,222],[170,222],[60,218]],
+       half:4.8, jumps:[[0.5,24,7,2.2,42]], tune:0.2},
+      // straight through the birches while the road swings out west
+      {a:[-205,90], b:[-205,-240], via:[[-235,-10],[-235,-130]],
+       half:4.6, jumps:[[0.4,24,7,2.3,44]], tune:0.3}
     ]},
 
-  { name:"IRON QUARRY", after:"an open pit mine", relief:1.0, season:"fall", cup:1, minR:38,
-    blurb:"spiral down the benches of a 35m deep quarry, leap off a bench on the chute, jump the gravel pile on the floor, and climb out up the haul road",
+  { name:"IRON QUARRY", after:"an open pit mine", relief:1.0, season:"fall", cup:1, minR:52,
+    blurb:"sweep down the benches of a 30m deep quarry flat out, fly the chute ramp, jump the gravel pile on the floor, and climb out up the haul road",
     kit:["crest","tabletop","double"],
-    shape:"THE PIT \u2014 35m down and back out",
-    feature:"a spiral descent into an open pit quarry and a haul road back out",
-    ctrl:[[300,-150],[300,-40],[220,18],[140,5],[102,72],[38,105],[-25,95],[-63,53],[-63,11],
-          [-25,-12],[20,-22],[48,-30],[48,-52],[24,-80],[-26,-97],[-83,-83],[-130,-47],
-          [-200,-60],[-245,-150],[-185,-245],[-60,-275],[80,-265],[150,-318],[240,-300],[285,-205]],
-    hills:[[-300,150,200,10],[300,200,180,8]],
+    shape:"THE PIT \u2014 30m down and back out",
+    feature:"a sweeping spiral into an open pit quarry and a haul road back out",
+    /* Down three quarters of a turn round the benches, every one of them a
+       wide sweeper, across the floor and straight up the haul road. No
+       hairpin anywhere: the lap loops out east through the spoil tips. */
+    ctrl:[[205,220],[160,195],[75,135],[-23,136],[-95,80],[-110,0],[-78,-68],[-15,-88],[50,-62],
+          [100,-20],[150,15],[230,25],[300,-15],[365,-95],[435,-155],[510,-150],[545,-80],[535,-10],
+          [528,95],[505,200],[430,265],[330,278],[255,245]],
+    hills:[[300,380,220,10],[330,-320,200,8]],
     jumps:[], fords:[],
-    mud:[[[-200,-60],[-245,-150]]],
-    pit:{at:[0,0], r:138, depth:35, benches:5},
-    bigJumps:[[[18,-22],2.8]],
+    mud:[[[300,-15],[365,-95]]],
+    pit:{at:[0,0], r:145, depth:30, benches:5, floor:0.55},
+    bigJumps:[[[58,-55],2.6]],
     branches:[
-      // the chute: straight off the spiral, a leap off the bench edge, and
-      // down a landing slope to the floor
-      {a:[38,105], b:[-38,-5], via:[[0,86],[-26,62],[-40,34],[-50,14]],
-       half:4.8, jumps:[], tune:0.15, leap:{at:40, v:22}},
-      // the inside line across the south-west corner, over the spoil
-      {a:[-200,-60], b:[-60,-275], via:[[-218,-140],[-170,-212],[-115,-252]],
-       half:4.8, jumps:[[0.5,24,7,2.4,44]], tune:0.45},
-      // the tip road: straight along the spoil heaps while the haul road
-      // swings out round the tip
-      {a:[80,-265], b:[285,-205], via:[[150,-262],[222,-240]],
-       half:4.6, jumps:[[0.5,24,7,2.3,42]], tune:0.35}
+      // the chute: off the spiral, straight down one steady ramp across the
+      // benches with a kicker on the way, and a long sweep onto the floor
+      {a:[-5,137], b:[40,-68], via:[[-50,85],[-62,20],[-50,-38]],
+       half:5.6, jumps:[[0.42, 26, 7, 1.8, 40, true]], jumpKeep:40, tune:0.1, even:true},
+      // the inside line across the north of the tips, over the spoil
+      {a:[528,95], b:[255,242], via:[[470,170],[360,215]],
+       half:4.9, jumps:[[0.5,24,7,2.0,42]], tune:0},
+      // the tip road: dead straight along the spoil heaps while the haul
+      // road swings a long way out round the tip
+      {a:[330,-50], b:[537,15], via:[[400,-90],[470,-100],[515,-55]],
+       half:5.0, jumps:[[0.4,24,7,1.8,40]], tune:0.7}
+    ]},
+  /* ---- THE WINTER CUP: four circuits on snow and ice ---- */
+  { name:"FROSTBITE LAKE", after:"an ice road in the north woods", relief:0.8, season:"winter", cup:2,
+    blurb:"straight across the frozen lake on the ice road, past the fishing huts, where the tail never quite stops sliding",
+    kit:["crest","tabletop","rhythm"],
+    shape:"THE ICE ROAD \u2014 400m across a frozen lake",
+    feature:"an ice road across a frozen lake",
+    ctrl:[[-280,-20],[-140,-8],[-20,2],[100,8],[220,22],[330,70],[375,170],[345,250],[275,288],
+          [243,392],[181,450],[113,414],[70,318],[10,300],[-45,357],[-109,397],[-170,363],[-205,305],
+          [-280,300],[-345,230],[-461,201],[-501,118],[-455,34],[-380,-8],[-330,-28]],
+    hills:[[0,420,260,12],[-420,240,200,9],[420,300,200,8]],
+    jumps:[], fords:[],
+    mud:[],
+    lake:{at:[0,0], rx:205, rz:115, frozen:true},
+    branches:[
+      // the plowed track under the ridge
+      {a:[275,288], b:[70,318], via:[[210,300],[175,305],[140,310]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true},
+      // straight through the spruce
+      {a:[10,300], b:[-205,305], via:[[-65,302],[-95,303],[-130,304]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true},
+      // the logging road
+      {a:[-345,230], b:[-380,-8], via:[[-365,150],[-373,100],[-378,50]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true}
+    ]},
+
+  { name:"AVALANCHE PASS", after:"an alpine pass", relief:1.3, season:"winter", cup:2,
+    blurb:"climb under the avalanche gallery along the mountainside, cross the frozen gorge on the high bridge, and fly the cornice back down",
+    kit:["crest","double","tabletop"],
+    shape:"THE GALLERY \u2014 under the snow shed",
+    feature:"an avalanche gallery and a bridge over a frozen gorge",
+    ctrl:[[0,-330],[5,-200],[-65,-142],[-113,-63],[-81,18],[-15,50],[60,100],[160,135],[250,158],
+          [310,168],[351,244],[422,302],[481,263],[520,160],[560,60],[565,-40],[560,-140],[515,-230],
+          [450,-262],[445,-372],[382,-437],[270,-372],[180,-400],[90,-430],[20,-420]],
+    hills:[[230,330,190,42],[330,-130,170,-8]],
+    jumps:[], fords:[],
+    mud:[],
+    gorge:{at:[562,-60], depth:22, reach:160, wall:34, span:40},
+    gallery:{from:[60,100], to:[250,158]},
+    branches:[
+      // the old road under the cliffs
+      {a:[5,-200], b:[-15,50], via:[[0,-110],[-4,-60],[-9,-10]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true},
+      // the snowcat track
+      {a:[310,168], b:[520,160], via:[[380,167],[415,166],[450,164]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true},
+      // straight down the gully
+      {a:[450,-262], b:[270,-372], via:[[395,-296],[360,-317],[325,-338]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true}
+    ]},
+
+  { name:"POWDER PEAK", after:"a ski jump", relief:1.1, season:"winter", cup:2,
+    blurb:"up the in-run of the old ski jump and off the take-off table: 110ft down the landing hill past the judges' tower",
+    kit:["crest","rhythm","tabletop"],
+    shape:"THE SKI JUMP \u2014 110ft off the table",
+    feature:"a 34m launch off the ski jump",
+    ctrl:[[0,-330],[0,-190],[-81,-124],[-103,-34],[-40,40],[20,60],[90,70],[147,145],[214,219],
+          [296,192],[340,110],[400,90],[436,20],[440,-100],[440,-235],[435,-363],[400,-440],[331,-478],
+          [275,-575],[195,-570],[140,-480],[60,-470],[10,-420]],
+    hills:[[200,-220,160,6],[-110,-110,170,-6]],
+    jumps:[], fords:[[165,-495]],
+    mud:[],
+    drop:{at:[439,-235], height:34, top:40, back:230, width:80},
+    skijump:true,
+    branches:[
+      // the cross-country trail
+      {a:[0,-190], b:[-40,40], via:[[-10,-110],[-18,-75],[-25,-35]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true},
+      // the chairlift service road
+      {a:[90,70], b:[340,110], via:[[165,82],[215,90],[265,98]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true},
+      // through the frozen marsh
+      {a:[400,-440], b:[140,-480], via:[[310,-454],[270,-460],[230,-466]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true}
+    ]},
+
+  { name:"ICEFALL CREEK", after:"a frozen creek", relief:1.5, season:"winter", cup:2,
+    blurb:"turn off the road and up the frozen creek bed, 200m of glare ice stepping up its frozen falls",
+    kit:["crest","kicker","tabletop","crest"],
+    shape:"THE FROZEN CREEK \u2014 200m up the ice",
+    feature:"a 200m run up a frozen creek, over its frozen falls",
+    ctrl:[[0,-286],[0,-187],[22,-110],[28,-22],[31,66],[20,140],[50,220],[120,260],[159,371],[229,418],
+          [299,354],[340,265],[410,240],[440,150],[445,10],[518,-51],[543,-131],[440,-190],[370,-200],
+          [324,-256],[306,-355],[235,-394],[150,-340],[100,-320],[40,-320]],
+    hills:[[220,-30,180,-9],[66,130,120,6],[420,290,190,10]],
+    jumps:[], fords:[[430,190],[140,-330]],
+    river:{from:[22,-104], to:[30,74], pools:5, down:70, up:62, downDir:[0.5,-1], upDir:[0.4,1]},
+    mud:[],
+    branches:[
+      // over the beaver dam
+      {a:[120,260], b:[340,265], via:[[195,262],[230,263],[265,264]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true},
+      // the trapper's trail
+      {a:[445,10], b:[440,-190], via:[[444,-60],[443,-90],[442,-120]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true},
+      // down the frozen side creek
+      {a:[370,-200], b:[150,-340], via:[[290,-251],[260,-270],[230,-289]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true}
+    ]},
+
+  /* ---- THE DESERT CUP: four circuits in the red rock ---- */
+  { name:"MESA LEAP", after:"a mesa in the badlands", relief:1.0, season:"desert", cup:3,
+    blurb:"run the long ramp up the mesa and launch off its rim: 130ft down to the desert floor, then flat out through the washes",
+    kit:["crest","double","tabletop","kicker"],
+    shape:"THE MESA \u2014 130ft off the rim",
+    feature:"a 40m (130ft) leap off a mesa",
+    ctrl:[[0,-352],[10,-230],[-58,-162],[-82,-83],[-20,-10],[40,20],[120,40],[173,126],[252,167],
+          [340,140],[420,160],[490,110],[490,20],[486,-60],[484,-150],[480,-250],[470,-330],[420,-400],
+          [341,-436],[306,-533],[226,-541],[160,-450],[80,-450],[20,-420]],
+    hills:[[230,-150,180,-5]],
+    jumps:[], fords:[],
+    washes:[[80,-450],[420,160]],
+    mud:[],
+    drop:{at:[484,-150], height:40, top:50, back:250, width:90},
+    buttes:true,
+    branches:[
+      // the stock trail
+      {a:[10,-230], b:[-20,-10], via:[[0,-150],[-4,-120],[-9,-90]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true},
+      // along the dry wash
+      {a:[120,40], b:[340,140], via:[[197,75],[230,90],[263,105]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true},
+      // the old stage road
+      {a:[420,-400], b:[160,-450], via:[[329,-418],[290,-425],[251,-433]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true}
+    ]},
+
+  { name:"SLOT CANYON", after:"a slot canyon", relief:0.9, season:"desert", cup:3,
+    blurb:"into the slot canyon between walls 20m high, under the stone arch, and out across the dry washes",
+    kit:["crest","rhythm","tabletop","double"],
+    shape:"THE SLOT \u2014 between 20m walls",
+    feature:"a slot canyon with sheer walls and a natural arch",
+    ctrl:[[0,-375],[-10,-250],[-81,-181],[-101,-91],[-20,-20],[40,20],[112,44],[275,100],[440,80],
+          [520,20],[659,-52],[667,-152],[550,-230],[500,-300],[438,-395],[341,-398],[280,-420],
+          [150,-450],[60,-440]],
+    hills:[[300,-190,200,-4]],
+    jumps:[], fords:[],
+    washes:[[150,-450],[600,-160]],
+    mud:[],
+    canyon:{from:[112,44], to:[440,80], height:20},
+    buttes:true,
+    branches:[
+      // the cut to the canyon mouth
+      {a:[-10,-250], b:[-20,-20], via:[[-13,-170],[-15,-135],[-17,-100]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true},
+      // across the slickrock
+      {a:[520,20], b:[550,-230], via:[[530,-67],[535,-105],[540,-143]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true},
+      // the cattle track
+      {a:[500,-300], b:[280,-420], via:[[423,-342],[390,-360],[357,-378]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true}
+    ]},
+
+  { name:"DUNE SEA", after:"a sand sea", relief:0.8, season:"desert", cup:3,
+    blurb:"out over the dunes, cresting one after another, and down past the palms of the oasis",
+    kit:["crest","kicker","tabletop"],
+    shape:"THE DUNES \u2014 a sea of sand",
+    feature:"a run over the dunes and past an oasis",
+    ctrl:[[0,-384],[0,-260],[-70,-191],[-89,-102],[-15,-40],[60,0],[168,24],[260,40],[336,36],[420,20],
+          [541,64],[606,-12],[596,-114],[552,-200],[504,-336],[396,-360],[334,-238],[216,-288],
+          [192,-432],[84,-504],[30,-450]],
+    hills:[],
+    jumps:[], fords:[[168,24]],
+    mud:[],
+    dunes:{at:[380,-240], r:270, amp:9, wave:90},
+    lake:{at:[345,125], rx:58, rz:40},
+    oasis:true,
+    buttes:true,
+    branches:[
+      // the caravan trail
+      {a:[0,-260], b:[-15,-40], via:[[-5,-183],[-8,-150],[-10,-117]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true},
+      // along the hardpan
+      {a:[420,20], b:[552,-200], via:[[466,-57],[486,-90],[506,-123]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true},
+      // straight over the big dune
+      {a:[396,-360], b:[216,-288], via:[[333,-335],[306,-324],[279,-313]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true}
+    ]},
+
+  { name:"SILVER GULCH", after:"a ghost town", relief:1.0, season:"desert", cup:3,
+    blurb:"down the main street of the Silver Gulch ghost town, over the old railroad trestle, and back up the gulch",
+    kit:["crest","double","tabletop"],
+    shape:"THE GHOST TOWN \u2014 and the trestle",
+    feature:"a ghost town main street and a railroad trestle over the gulch",
+    ctrl:[[0,-375],[0,-230],[-68,-162],[-85,-62],[-30,20],[40,55],[138,75],[275,102],[412,75],[500,-25],
+          [515,-175],[480,-270],[420,-301],[389,-390],[308,-418],[240,-380],[160,-440],[60,-440]],
+    hills:[[275,125,190,24]],
+    jumps:[], fords:[],
+    mud:[],
+    town:{at:[275,103], r:80, name:"SILVER GULCH", western:true},
+    gorge:{at:[511,-110], depth:24, reach:160, wall:34, span:40, trestle:true},
+    buttes:true,
+    branches:[
+      // the old mine road
+      {a:[0,-230], b:[-30,20], via:[[-10,-143],[-15,-105],[-20,-68]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true},
+      // along the rail bed
+      {a:[480,-270], b:[240,-380], via:[[396,-308],[360,-325],[324,-341]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true}
     ]}
+
 ];
 
 /* ---- paths -------------------------------------------------------- */
@@ -856,9 +1063,10 @@ RELIEF = TRACK.relief;
 if(FALL){ scene.fog.color.set(0xd8cdb4); }
 /* the winter and desert circuits: their own air, light and ground */
 const WINTER = TRACK.season === "winter", DESERT = TRACK.season === "desert";
+const FROZEN = WINTER;               // in the Winter Cup every ford, creek and lake is ice
 if(WINTER){
   scene.fog.color.set(0xdfe6ee); SKY.set(0xd2dfeb); scene.fog.near = 180; scene.fog.far = 950;
-  hemi.color.set(0xe4eefa); hemi.groundColor.set(0x9aa4b0); hemi.intensity = 1.0;
+  hemi.color.set(0xdce8f8); hemi.groundColor.set(0x8a94a2); hemi.intensity = 0.9;
   sun.color.set(0xfff2e2); sun.intensity = 1.05;
 }
 if(DESERT){
@@ -873,6 +1081,7 @@ if(DESERT){
   TRACK.ctrl.forEach(p=>{ x0=Math.min(x0,p[0]); x1=Math.max(x1,p[0]); z0=Math.min(z0,p[1]); z1=Math.max(z1,p[1]); });
   TRACK.branches.forEach(b=> b.via.forEach(p=>{ x0=Math.min(x0,p[0]); x1=Math.max(x1,p[0]); z0=Math.min(z0,p[1]); z1=Math.max(z1,p[1]); }));
   const ox = Math.round((x0+x1)/2), oz = Math.round((z0+z1)/2);
+  TRACK._ox = ox; TRACK._oz = oz;
   const mv = p=> [p[0]-ox, p[1]-oz];
   TRACK.ctrl = TRACK.ctrl.map(mv);
   TRACK.hills = TRACK.hills.map(h=> [h[0]-ox, h[1]-oz, h[2], h[3]]);
@@ -885,7 +1094,9 @@ if(DESERT){
   if(TRACK.town)  TRACK.town  = Object.assign({}, TRACK.town,  {at: mv(TRACK.town.at)});
   if(TRACK.river) TRACK.river = Object.assign({}, TRACK.river, {from: mv(TRACK.river.from), to: mv(TRACK.river.to)});
   TRACK.bigJumps = (TRACK.bigJumps||[]).map(j=> [mv(j[0]), j[1]]);
-  ["bowl","lake","washout","pit"].forEach(k=>{ if(TRACK[k]) TRACK[k] = Object.assign({}, TRACK[k], {at: mv(TRACK[k].at)}); });
+  ["bowl","lake","washout","pit","dunes"].forEach(k=>{ if(TRACK[k]) TRACK[k] = Object.assign({}, TRACK[k], {at: mv(TRACK[k].at)}); });
+  ["canyon","gallery"].forEach(k=>{ if(TRACK[k]) TRACK[k] = Object.assign({}, TRACK[k], {from: mv(TRACK[k].from), to: mv(TRACK[k].to)}); });
+  TRACK.washes = (TRACK.washes||[]).map(mv);
   TRACK.flats = (TRACK.flats||[]).map(f=> mv([f[0], f[1]]).concat([f[2]]));
   TRACK.branches = TRACK.branches.map(b=> Object.assign({}, b, {a: mv(b.a), b: mv(b.b), via: b.via.map(mv)}));
 }
@@ -918,14 +1129,15 @@ function macro(x, z){
     const e = Math.hypot((x - LAKE.x)/LAKE.rx, (z - LAKE.z)/LAKE.rz);
     if(e < 1.1){
       const w = 1 - smoothstep(0.72, 1.02, e + Math.sin(x*0.03 + z*0.05)*0.03);
-      h = Math.min(h, h*(1 - w) + (LAKE.level - 4.5)*w);
+      /* frozen, the lake is a flat sheet of ice you can drive anywhere on */
+      h = Math.min(h, h*(1 - w) + (LAKE.frozen ? LAKE.level : LAKE.level - 4.5)*w);
     }
   }
   /* the quarry: benches cut down into the ground, a flat floor at the bottom */
   if(PIT.on){
     const d = Math.hypot(x - PIT.x, z - PIT.z);
     if(d < PIT.r*1.08){
-      const f = Math.max(0, Math.min(1, (1 - d/PIT.r)/0.72));
+      const f = Math.max(0, Math.min(1, (1 - d/PIT.r)/PIT.span));
       const n = PIT.benches, sN = f*n, k = Math.floor(sN), fr = sN - k;
       const cut = PIT.depth*Math.min(1, (k + smoothstep(0.55, 0.95, fr))/n);
       /* The lip starts at the land's own height and only settles onto the
@@ -937,6 +1149,21 @@ function macro(x, z){
       h = h*(1 - w) + (base - cut)*w;
     }
   }
+  /* the dune sea: long ridges with a steep lee face, running across the
+     wind, swelling in from the edge of the field */
+  if(DUNE.on){
+    const dx = x - DUNE.x, dz = z - DUNE.z, d = Math.hypot(dx, dz);
+    if(d < DUNE.r){
+      const m = 1 - smoothstep(DUNE.r*0.62, DUNE.r, d);
+      const u = x*0.8 + z*0.6, v = -x*0.6 + z*0.8;
+      const ph = u*2*Math.PI/DUNE.wave + Math.sin(v*0.013)*1.3 + Math.sin(v*0.031 + 2)*0.5;
+      const f = ph/(2*Math.PI) - Math.floor(ph/(2*Math.PI));          // 0..1 along one dune
+      const ridge = f < 0.72 ? smoothstep(0, 0.72, f) : 1 - smoothstep(0.72, 1, f);   // long windward, short lee
+      h += DUNE.amp*m*(ridge - 0.45) + DUNE.amp*0.12*m*Math.sin(v*0.05 + u*0.02);
+    }
+  }
+  /* the slot canyon: walls standing up either side of the road through it */
+  if(CANYON.on) h += canyonWall(x, z);
   /* the hilltop the village sits on, levelled to the summit */
   if(TOWN.on){
     const d = Math.hypot(x - TOWN.x, z - TOWN.z);
@@ -978,6 +1205,65 @@ if(TRACK.drop){
   CALM.push([i, 80], [wrapIdx(MAIN, i + Math.round(70/MAIN.seg)), 80], [wrapIdx(MAIN, i - Math.round(60/MAIN.seg)), 40]);
 }
 const TOWN = {on:false, top:null};
+const DUNE = {on:false};
+if(TRACK.dunes) Object.assign(DUNE, {on:true, x:TRACK.dunes.at[0], z:TRACK.dunes.at[1], r:TRACK.dunes.r, amp:TRACK.dunes.amp, wave:TRACK.dunes.wave});
+/* The slot canyon follows the road between two stations. The walls are part
+   of the land itself, so they are drawn, shaded and stood on like any hill;
+   the car is kept off them the way the bridge parapets keep it on the deck. */
+const CANYON = {on:false};
+if(TRACK.canyon){
+  let a = snapTo(MAIN, TRACK.canyon.from), b = snapTo(MAIN, TRACK.canyon.to);
+  if(b < a) b += MAIN.N;
+  const pl = [];
+  for(let k=a; k<=b; k+=Math.max(1, Math.round(3/MAIN.seg))){ const p = MAIN.pts[wrapIdx(MAIN, k)]; pl.push([p.x, p.z]); }
+  let x0=Infinity, x1=-Infinity, z0=Infinity, z1=-Infinity;
+  pl.forEach(p=>{ x0=Math.min(x0,p[0]); x1=Math.max(x1,p[0]); z0=Math.min(z0,p[1]); z1=Math.max(z1,p[1]); });
+  const len = (b - a)*MAIN.seg;
+  Object.assign(CANYON, {on:true, a, b, pl, H:TRACK.canyon.height || 20, len, box:[x0 - 80, x1 + 80, z0 - 80, z1 + 80]});
+  for(let k=a - Math.round(40/MAIN.seg); k<=b + Math.round(40/MAIN.seg); k+=6) CALM.push([wrapIdx(MAIN, k), 25]);
+}
+/* where a point is against the canyon: [distance from the road's line,
+   metres along the canyon], or null well outside it */
+function canyonUV(x, z){
+  const B = CANYON.box;
+  if(x < B[0] || x > B[1] || z < B[2] || z > B[3]) return null;
+  const pl = CANYON.pl;
+  let best = Infinity, along = 0, run = 0;
+  for(let k=0;k<pl.length-1;k++){
+    const ax = pl[k][0], az = pl[k][1], ex = pl[k+1][0] - ax, ez = pl[k+1][1] - az, L2 = ex*ex + ez*ez, L = Math.sqrt(L2);
+    let t = L2 ? ((x - ax)*ex + (z - az)*ez)/L2 : 0; t = Math.max(0, Math.min(1, t));
+    const d = (x - ax - ex*t)**2 + (z - az - ez*t)**2;
+    if(d < best){ best = d; along = run + t*L; }
+    run += L;
+  }
+  return [Math.sqrt(best), along];
+}
+function canyonWall(x, z){
+  const uv = canyonUV(x, z);
+  if(!uv) return 0;
+  const d = uv[0], s = uv[1];
+  const ends = smoothstep(0, 45, s)*smoothstep(0, 45, CANYON.len - s);          // walls rise in from each end
+  const W0 = 8.2 + Math.sin(s*0.05)*0.8;                                          // the foot of the wall
+  const rise = smoothstep(W0, W0 + 3.2, d)*(1 - smoothstep(W0 + 18, W0 + 60, d));
+  const ledges = 0.08*Math.sin(d*0.9 + s*0.07) + 0.05*Math.sin(s*0.23);
+  return CANYON.H*ends*rise*(1 + ledges);
+}
+/* 1 in the part of the canyon where the walls stand */
+function canyonAt(x, z){
+  if(!CANYON.on) return 0;
+  const uv = canyonUV(x, z);
+  if(!uv) return 0;
+  return smoothstep(10, 40, uv[1])*smoothstep(10, 40, CANYON.len - uv[1])*(1 - smoothstep(20, 40, uv[0]));
+}
+/* The avalanche gallery: a roofed stretch of road along the mountainside */
+const GALLERY = {on:false};
+if(TRACK.gallery){
+  let a = snapTo(MAIN, TRACK.gallery.from), b = snapTo(MAIN, TRACK.gallery.to);
+  if(b < a) b += MAIN.N;
+  Object.assign(GALLERY, {on:true, a, b});
+  for(let k=a - Math.round(30/MAIN.seg); k<=b + Math.round(30/MAIN.seg); k+=6) CALM.push([wrapIdx(MAIN, k), 25]);
+}
+(TRACK.washes || []).forEach(w=> CALM.push([snapTo(MAIN, w), 45]));
 const FLATS = [];
 const LAKE = {on:false};
 const PIT = {on:false};
@@ -992,11 +1278,12 @@ if(TRACK.lake){
     lo = Math.min(lo, macro(LAKE.x + Math.cos(a)*LAKE.rx*1.06, LAKE.z + Math.sin(a)*LAKE.rz*1.06));
   }
   LAKE.level = lo - 0.6;
+  LAKE.frozen = !!(L.frozen && FROZEN);
   LAKE.on = true;
 }
 if(TRACK.pit){
   const Q = TRACK.pit;
-  Object.assign(PIT, {x:Q.at[0], z:Q.at[1], r:Q.r, depth:Q.depth, benches:Q.benches});
+  Object.assign(PIT, {x:Q.at[0], z:Q.at[1], r:Q.r, depth:Q.depth, benches:Q.benches, span:1 - (Q.floor || 0.28)});
   let sum = 0;
   for(let k=0;k<24;k++){ const a = k/24*Math.PI*2; sum += macro(PIT.x + Math.cos(a)*PIT.r, PIT.z + Math.sin(a)*PIT.r); }
   PIT.top = sum/24;
@@ -1021,7 +1308,8 @@ if(TRACK.lake){
   }
 }
 if(TRACK.town){
-  Object.assign(TOWN, {x:TRACK.town.at[0], z:TRACK.town.at[1], r:TRACK.town.r});
+  Object.assign(TOWN, {x:TRACK.town.at[0], z:TRACK.town.at[1], r:TRACK.town.r,
+                       name:TRACK.town.name || "ASH RIDGE", western:!!TRACK.town.western});
   TOWN.top = macro(TOWN.x, TOWN.z);          // the summit, before it is levelled
   TOWN.on = true;
   for(let i=0;i<MAIN.N;i+=4){
@@ -1036,6 +1324,12 @@ if(TRACK.river){
   for(let k=a - Math.round(40/MAIN.seg); k<=b + Math.round(40/MAIN.seg); k+=6) CALM.push([wrapIdx(MAIN, k), 30]);
 }
 
+/* how much ice is under a point: the frozen lake, shore to shore */
+function iceAt(x, z){
+  if(!LAKE.on || !LAKE.frozen) return 0;
+  const e = Math.hypot((x - LAKE.x)/LAKE.rx, (z - LAKE.z)/LAKE.rz);
+  return 1 - smoothstep(0.93, 1.0, e);
+}
 /* the road follows the land, smoothed so it climbs at a grade a road would */
 function profileFromLand(P){
   const y = P.pts.map(p=> macro(p.x, p.z));
@@ -1045,7 +1339,7 @@ function profileFromLand(P){
 profileFromLand(MAIN);
 /* the causeway: across the lake the road is held a metre over the water */
 function causeway(P){
-  if(!LAKE.on) return;
+  if(!LAKE.on || LAKE.frozen) return;
   const lift = new Float64Array(P.N);
   for(let i=0;i<P.N;i++){
     const p = P.pts[i], e = Math.hypot((p.x - LAKE.x)/LAKE.rx, (p.z - LAKE.z)/LAKE.rz);
@@ -1312,14 +1606,15 @@ function addCrests(P, rnd){
   MAIN.calmCrest = calm;
   stagePath(MAIN, rnd,
     TRACK.test ? ["gravel","rutted","washboard","muddy","hollow","broken"]
-               : ["gravel","gravel","rutted","washboard","muddy","hollow","broken","broken","single","single"],
+               : ["gravel","gravel","rutted","washboard", DESERT ? "washboard" : "muddy","hollow","broken","broken","single","single"],
     calm, calmBank);
   // branches: rougher, and plain where they meet the main road
   BRANCHES.forEach((P, bi)=>{
     const ends = [0, P.N-1];
     const c = calmMask(P, ends, 60), cb = calmMask(P, ends, 80);
     P.calmCrest = c;
-    stagePath(P, rnd, ["rutted","muddy","hollow","broken","washboard","single","single"], c, cb);
+    stagePath(P, rnd, P.def.fast ? ["gravel","washboard","rutted"]
+                                 : ["rutted", DESERT ? "rutted" : "muddy","hollow","broken","washboard","single","single"], c, cb);
     /* A branch's mud is not left to chance: it is the one number that sets
        how much a shortcut saves, tuned per branch so each one is a little
        quicker than the road it cuts off, and never a lot. */
@@ -1428,6 +1723,15 @@ if(DROP.on){
   }
   GREAT_JUMP = L;
 }
+/* dry washes: the road dips down through a sandy stream bed and back up */
+(TRACK.washes || []).forEach(w=>{
+  const at = snapTo(MAIN, w), span = Math.round(22/MAIN.seg);
+  for(let k=-span;k<=span;k++){
+    const i = wrapIdx(MAIN, at + k), t = k/span;
+    MAIN.pts[i].y -= 1.7*0.5*(1 + Math.cos(Math.PI*t));
+    MAIN.half[i] += (1 - Math.abs(t))*1.2;
+  }
+});
 (TRACK.mud || []).forEach(m=>{
   let a = snapTo(MAIN, m[0]), b = snapTo(MAIN, m[1]);
   if(b < a) b += MAIN.N;
@@ -1795,11 +2099,11 @@ BRANCHES.forEach(P=>{
   const d = P.def;
   // keep every jump, landing included, clear of the stretch where the branch
   // runs alongside the main road at either end
-  const keep = Math.round(75/P.seg);
+  const keep = Math.round((d.jumpKeep || 75)/P.seg);
   (d.jumps || []).forEach(j=>{
     const lo = keep + j[1], hi = P.N - 1 - keep - j[2] - j[4];
     if(hi <= lo) return;
-    ramp(P, Math.max(lo, Math.min(hi, Math.round(P.N*j[0]))), j[1], j[2], j[3], j[4]);
+    ramp(P, Math.max(lo, Math.min(hi, Math.round(P.N*j[0]))), j[1], j[2], j[3], j[4], j[5]);
   });
   // (a branch's mud is its tuned amount, set with its stages)
 });
@@ -1839,6 +2143,12 @@ function carveWater(y, x, z){
     y = y*(1-w) + shape*w;
   }
   return y;
+}
+/* ground nothing grows on: the open dunes, the canyon's walls */
+function barren(x, z){
+  if(DUNE.on && Math.hypot(x - DUNE.x, z - DUNE.z) < DUNE.r*0.88) return true;
+  if(CANYON.on){ const uv = canyonUV(x, z); if(uv && uv[0] < 55 && uv[1] > 5 && uv[1] < CANYON.len - 5) return true; }
+  return false;
 }
 function inWaterway(x, z){
   if(RIVER.on){ const r = riverAt(x, z); if(r && r[0] < RIVER_BANK + 1) return true; }
@@ -1917,7 +2227,7 @@ const GN = Math.round(2*GHALF/GSTEP) + 1;
 const GCELLS = GN*GN;
 /* natural ground: the land, its small roll, the channels */
 function naturalY(x, z){
-  return carveGorge(carveWater(macro(x, z) + vergeRoll(x, z), x, z), x, z);
+  return carveGorge(carveWater(macro(x, z) + vergeRoll(x, z)*(1 - iceAt(x, z)), x, z), x, z);
 }
 const GH  = new Float32Array(GCELLS);     // the finished surface
 const GD  = new Float32Array(GCELLS).fill(1e9);   // distance to the nearest road centreline
@@ -1931,6 +2241,18 @@ const GRU = new Float32Array(GCELLS);     // rut depth
 const GWA = new Float32Array(GCELLS);     // washboard chatter
 const GSM = new Float32Array(GCELLS);     // metres along the road
 const GBK = new Float32Array(GCELLS);     // bank height of a hollow-way
+/* The runner up: the next closest stretch of road to each cell (another
+   road at a fork, or the same road coming back past itself). Where two
+   roads overlap, taking every value from whichever happened to be nearest
+   flipped from one grid point to the next, and the ruts, the mud line and
+   the crown were drawn as a saw edge across the road. */
+const GD2 = new Float32Array(GCELLS).fill(1e9), GHW2 = new Float32Array(GCELLS);
+const GM2 = new Float32Array(GCELLS), GW2 = new Float32Array(GCELLS);
+const GX  = new Float32Array(GCELLS);     // how much two roads overlap here, 0 to 1
+/* Each grid square is cut into two triangles along whichever diagonal joins
+   the closer heights, so a steep bank that runs across the grid at an angle
+   is drawn as a clean face instead of a row of saw teeth. */
+const GFLIP = new Uint8Array(GCELLS);
 {
   const NAT = new Float32Array(GCELLS);
   for(let b=0;b<GN;b++) for(let a=0;a<GN;a++){
@@ -2004,7 +2326,9 @@ const GBK = new Float32Array(GCELLS);     // bank height of a hollow-way
           const ib = P.closed ? (i0+1)%P.N : Math.min(i0+1, P.N-1);
           const half = P.half[ia]*(1-f) + P.half[ib]*f;
           const g = b*GN + a;
+          const mudHere = P.mud[ia]*(1-f) + P.mud[ib]*f, wetHere = P.wet[ia]*(1-f) + P.wet[ib]*f;
           if(d < GD[g]){
+            if(GD[g] < 1e8){ GD2[g] = GD[g]; GHW2[g] = GHW[g]; GM2[g] = GM[g]; GW2[g] = GW[g]; }
             GD[g] = d; GP[g] = pi; GS[g] = s; GHW[g] = half; GL[g] = tL[k];
             GM[g] = P.mud[ia]*(1-f) + P.mud[ib]*f;
             GW[g] = P.wet[ia]*(1-f) + P.wet[ib]*f;
@@ -2012,6 +2336,8 @@ const GBK = new Float32Array(GCELLS);     // bank height of a hollow-way
             GWA[g] = P.st_wash[ia]*(1-f) + P.st_wash[ib]*f;
             GSM[g] = s*P.seg;
             GBK[g] = P.st_bank[ia]*(1-f) + P.st_bank[ib]*f;
+          } else if(d < GD2[g]){
+            GD2[g] = d; GHW2[g] = half; GM2[g] = mudHere; GW2[g] = wetHere;
           }
           if(P.noStamp[ia] || P.noStamp[ib]) continue;   // the bridge carries it
           let y = P.pts[ia].y*(1-f) + P.pts[ib].y*f + BED;
@@ -2045,7 +2371,9 @@ const GBK = new Float32Array(GCELLS);     // bank height of a hollow-way
              (which is what drew the zig zag wedges between the shelves). */
           const inPit = PIT.on ? 1 - smoothstep(PIT.r*0.9, PIT.r*1.05,
                           Math.hypot(-GHALF + a*GSTEP - PIT.x, -GHALF + b*GSTEP - PIT.z)) : 0;
-          const E = Math.max(3, Math.min(RMAX - half - 2 - top, 4 + (1.8 - 1.3*inPit)*Math.abs(y + Math.max(bank, berm) - nat)));
+          // in the slot canyon the rock stands straight up off the verge
+          const inCan = CANYON.on && P === MAIN ? canyonAt(-GHALF + a*GSTEP, -GHALF + b*GSTEP) : 0;
+          const E = Math.max(3, Math.min(RMAX - half - 2 - top, 4 + (1.8 - 1.3*inPit - 1.75*inCan)*Math.abs(y + Math.max(bank, berm) - nat)));
           const w = 1 - smoothstep(top, top + E, r);
           if(w <= 0) continue;
           // where two roads overlap at a fork the main road has the say, so a
@@ -2060,6 +2388,23 @@ const GBK = new Float32Array(GCELLS);     // bank height of a hollow-way
   for(let g=0; g<GCELLS; g++){
     GH[g] = WMX[g] > 0 ? (SWY[g]/SW[g])*WMX[g] + NAT[g]*(1-WMX[g]) : NAT[g];
   }
+  /* overlaps: blend the mud and water of both roads, and note how much the
+     two compete so the ruts and the crown can fade out where they cross */
+  for(let g=0; g<GCELLS; g++){
+    if(GD2[g] > 1e8 || GD[g] > 1e8) continue;
+    const e1 = GD[g] - GHW[g], e2 = GD2[g] - GHW2[g];
+    if(e2 > 8 || e1 > 14) continue;
+    const c = 1 - smoothstep(0, 5, e2 - e1);
+    GX[g] = c;
+    const h = c*0.5;
+    GM[g] = GM[g]*(1 - h) + GM2[g]*h;
+    GW[g] = GW[g]*(1 - h) + GW2[g]*h;
+    GRU[g] *= 1 - c; GWA[g] *= 1 - c;
+  }
+  for(let b=0;b<GN-1;b++) for(let a=0;a<GN-1;a++){
+    const k = b*GN + a;
+    GFLIP[k] = Math.abs(GH[k] - GH[k+GN+1]) > Math.abs(GH[k+1] - GH[k+GN]) + 0.02 ? 1 : 0;
+  }
 }
 
 /* The surface between grid points, cut into the same two triangles the
@@ -2070,6 +2415,8 @@ function gridH(x, z){
   if(a < 0 || b < 0 || a >= GN-1 || b >= GN-1) return naturalY(x, z);
   const u = fx - a, v = fz - b, k = b*GN + a;
   const ha = GH[k], hb = GH[k+1], hc = GH[k+GN], hd = GH[k+GN+1];
+  if(GFLIP[k]) return u + v <= 1 ? ha + (hb-ha)*u + (hc-ha)*v
+                                 : hd + (hc-hd)*(1-u) + (hb-hd)*(1-v);
   return u >= v ? ha + (hb-ha)*u + (hd-hb)*v
                 : ha + (hc-ha)*v + (hd-hc)*u;
 }
@@ -2359,7 +2706,7 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
       "float onRoad = 1.0 - smoothstep(-0.25, 0.35, e);",
       "float verge  = 1.0 - smoothstep(0.2, 2.2, e);",
       // gravel: grey-brown, lighter on the crown, wheel tracks worn darker
-      "vec3 gravel = " + (WINTER ? "vec3(0.70, 0.73, 0.78)" : DESERT ? "vec3(0.62, 0.48, 0.36)" : "vec3(0.43, 0.395, 0.34)") +
+      "vec3 gravel = " + (WINTER ? "vec3(0.47, 0.46, 0.46)" : DESERT ? "vec3(0.62, 0.48, 0.36)" : "vec3(0.43, 0.395, 0.34)") +
         " * (0.80 + 0.28*n3) * (0.90 + 0.16*n2);",
       "float rut = exp(-pow((abs(lat) - 1.65)/0.55, 2.0));",
       // deeper ruts are darker and wetter, with a pale ridge of loose stone between
@@ -2369,17 +2716,18 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
       // washboard: ripples across the road, only where it is chattering
       "float ripple = 0.5 + 0.5*sin(vRoad2.z*6.2832/1.35);",
       "gravel *= 1.0 - clamp(vRoad2.y*2.4, 0.0, 0.2)*ripple;",
-      "gravel = mix(gravel, " + (WINTER ? "vec3(0.84, 0.87, 0.91)" : DESERT ? "vec3(0.72, 0.58, 0.44)" : "vec3(0.50, 0.46, 0.39)") +
+      "gravel = mix(gravel, " + (WINTER ? "vec3(0.66, 0.68, 0.72)" : DESERT ? "vec3(0.72, 0.58, 0.44)" : "vec3(0.50, 0.46, 0.39)") +
         "*(0.85+0.2*n3), (1.0 - smoothstep(0.0, 0.9, abs(lat)))*0.35);",
-      "vec3 sandy = " + (WINTER ? "vec3(0.62, 0.62, 0.64)" : DESERT ? "vec3(0.66, 0.50, 0.34)" : "vec3(0.42, 0.35, 0.25)") +
+      "vec3 sandy = " + (WINTER ? "vec3(0.70, 0.74, 0.80)" : DESERT ? "vec3(0.66, 0.50, 0.34)" : "vec3(0.42, 0.35, 0.25)") +
         " * (0.82 + 0.3*n3);",
       // mud comes in from the verges first
       "float mk = clamp((mud - 0.42 + 0.30*smoothstep(-3.5, 0.0, edge))/0.28, 0.0, 1.0);",
-      "vec3 mudC = vec3(0.29, 0.21, 0.14) * (0.8 + 0.35*n3);",
+      "vec3 mudC = " + (WINTER ? "vec3(0.40, 0.41, 0.44)" : DESERT ? "vec3(0.55, 0.40, 0.28)" : "vec3(0.29, 0.21, 0.14)") + " * (0.8 + 0.35*n3);",
       "vec3 col = mix(grd, sandy, verge*0.85);",
       "col = mix(col, gravel, onRoad);",
       "col = mix(col, mudC, mk*max(onRoad, verge*0.7));",
-      "col = mix(col, col*vec3(0.62, 0.64, 0.66), clamp(wet*1.4, 0.0, 1.0)*max(onRoad, verge));",
+      FROZEN ? "col = mix(col, vec3(0.80, 0.88, 0.95)*(0.9 + 0.12*n3), clamp(wet*1.4, 0.0, 1.0)*max(onRoad, verge)*0.8);"
+             : "col = mix(col, col*vec3(0.62, 0.64, 0.66), clamp(wet*1.4, 0.0, 1.0)*max(onRoad, verge));",
       "diffuseColor.rgb *= col;"
     ].join("\n"))
     .replace("#include <color_fragment>", "");
@@ -2416,7 +2764,9 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
           const d = GD[g] > 1e8 ? 99 : GD[g];
           const edge = Math.min(40, d - hw);
           road[v*4] = edge;
-          road[v*4+1] = Math.max(-12, Math.min(12, GL[g]));
+          // where two roads overlap the offset across belongs to neither:
+          // push it out past the ruts and the crown so neither is drawn
+          road[v*4+1] = Math.max(-12, Math.min(12, GL[g]))*(1 - GX[g]) + 6*GX[g];
           road[v*4+2] = GP[g] >= 0 ? GM[g] : 0;
           road[v*4+3] = GP[g] >= 0 ? GW[g] : 0;
           road2[v*4] = GP[g] >= 0 ? GRU[g] : 0;
@@ -2430,11 +2780,16 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
           if(WINTER){
             // snow, blue in the hollows, a little trodden to slush by the verge
             const r0 = Math.random();
-            c.setHSL(0.58 + r0*0.03, 0.16 + (1 - t)*0.06, 0.70 + t*0.14 + r0*0.03 - steep*0.10);
+            c.setHSL(0.58 + r0*0.03, 0.24 + (1 - t)*0.06, 0.64 + t*0.12 + r0*0.03 - steep*0.12);
           } else if(DESERT){
-            // sand and hardpan, ochre to red, darker on the steep rock
-            const r0 = Math.random();
-            c.setHSL(0.065 + r0*0.025 - steep*0.02, 0.42 + t*0.1, 0.46 + t*0.06 + r0*0.04 - steep*0.12);
+            // sand and hardpan, ochre to red; the steep rock banded in layers of sandstone
+            const r0 = Math.random(), band = Math.sin(GH[g]*0.85) + 0.5*Math.sin(GH[g]*2.3 + 1.1);
+            c.setHSL(0.065 + r0*0.025 - steep*0.025 + band*0.008*steep, 0.42 + t*0.1 + steep*0.08,
+                     0.46 + t*0.06 + r0*0.04 - steep*0.10 + band*0.05*steep);
+            if(DUNE.on && t > 0.5){
+              const dd = Math.hypot(x - DUNE.x, z - DUNE.z);
+              if(dd < DUNE.r) c.lerp(new THREE.Color().setHSL(0.095, 0.55, 0.62 + r0*0.04), 0.8*(1 - smoothstep(DUNE.r*0.7, DUNE.r, dd)));
+            }
           } else if(FALL){
             // dry gold grass, and fallen leaves drifted up against the verges
             const leaf = Math.random() < 0.18 + 0.25*(1 - smoothstep(2, 14, edge));
@@ -2456,7 +2811,7 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
                        0.30 + band + Math.random()*0.04 - smoothstep(0.6, 0.35, n[1])*0.09);
             }
           }
-          if(LAKE.on && t > 0.3){
+          if(LAKE.on && !LAKE.frozen && t > 0.3){
             const dy = GH[g] - LAKE.level;
             if(dy < 0.9 && dy > -1.5) c.setHSL(0.10, 0.28, 0.42 + Math.random()*0.04);
           }
@@ -2468,7 +2823,8 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
       for(let r=0;r<rows-1;r++){
         for(let q=0;q<cols-1;q++){
           const A = r*cols + q, B = A + 1, C = A + cols, D = C + 1;
-          idx.push(A, C, D, A, D, B);          // diagonal A-D, same as gridH
+          if(GFLIP[(tb + r)*GN + ta + q]) idx.push(A, C, B, B, C, D);   // diagonal B-C, as gridH
+          else idx.push(A, C, D, A, D, B);                               // diagonal A-D, same as gridH
         }
       }
       const gg = new THREE.BufferGeometry();
@@ -2498,6 +2854,8 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
       pos.push(x, macro(x, z) - 0.6, z);
       uv.push(x/17.33, z/17.33);
       if(FALL) c.setHSL(0.10 + Math.random()*0.03, 0.36, 0.30 + Math.random()*0.03);
+      else if(WINTER) c.setHSL(0.58 + Math.random()*0.02, 0.16, 0.80 + Math.random()*0.04);
+      else if(DESERT) c.setHSL(0.065 + Math.random()*0.02, 0.44, 0.48 + Math.random()*0.04);
       else c.setHSL(0.25 + Math.random()*0.012, 0.33, 0.28 + Math.random()*0.03);
       col.push(c.r, c.g, c.b);
     }
@@ -2950,6 +3308,20 @@ function waterMaterial(){
       "  col = mix(col, vec3(0.70, 0.82, 0.90), fres*0.75);",
       "  float spec = pow(max(dot(reflect(-uSun, N), V), 0.0), 90.0);",
       "  col += vec3(1.0, 0.93, 0.78)*spec*1.4;",
+      FROZEN ? [
+      // ice: still, milky blue, cracked, with the sun glaring off it
+      "  float ck = texture2D(tRipple, p*0.035).r, ck2 = texture2D(tRipple, p*0.11 + 0.3).r;",
+      "  float crack = (1.0 - smoothstep(0.0, 0.018, abs(ck - 0.5)))*0.8 + (1.0 - smoothstep(0.0, 0.012, abs(ck2 - 0.5)))*0.4;",
+      "  vec3 ice = mix(vec3(0.46, 0.60, 0.68), vec3(0.30, 0.44, 0.55), clamp(0.5 + (ck - 0.5)*1.6, 0.0, 1.0));",
+      "  ice = mix(ice, vec3(0.90, 0.94, 0.98), smoothstep(0.60, 0.78, ck2)*0.7);",
+      "  ice = mix(ice, vec3(0.92, 0.95, 1.0), crack*0.7);",
+      "  vec3 Ni = normalize(vec3((ck - 0.5)*0.08, 1.0, (ck2 - 0.5)*0.08));",
+      "  float specI = pow(max(dot(reflect(-uSun, Ni), V), 0.0), 60.0);",
+      "  ice += vec3(1.0, 0.97, 0.9)*specI*0.9 + vec3(0.75, 0.85, 0.95)*fres*0.35;",
+      "  float fdI = length(cameraPosition - vWorld);",
+      "  ice = mix(ice, fogColor, smoothstep(fogNear, fogFar, fdI));",
+      "  gl_FragColor = vec4(ice, smoothstep(0.0, 0.03, vDepth)*0.94);",
+      "  return;"].join("\n") : "",
       "  float foam = (1.0 - smoothstep(0.0, 0.10, vDepth))*smoothstep(0.45, 0.62, rip);",
       "  foam = max(foam, vFoam*smoothstep(0.30, 0.55, rip + vFoam*0.2));",
       "  col = mix(col, vec3(0.86, 0.88, 0.84), foam*0.7);",
@@ -3094,7 +3466,16 @@ if(GORGE.depth > 0.5){
     }
   }));
   stoneTex.wrapS = stoneTex.wrapT = THREE.RepeatWrapping;
-  const stone = new THREE.MeshLambertMaterial({map:stoneTex, side:THREE.DoubleSide});
+  const TRESTLE = !!(TRACK.gorge && TRACK.gorge.trestle);
+  const woodTex = TRESTLE ? new THREE.CanvasTexture(noiseCanvas(128, 128, (g,w,h)=>{
+    g.fillStyle = "#7a5634"; g.fillRect(0, 0, w, h);
+    for(let y=0;y<h;y+=16){ g.fillStyle = "rgba(40,24,12,.55)"; g.fillRect(0, y, w, 2);
+      for(let i=0;i<30;i++){ g.fillStyle = "rgba(" + (110 + Math.random()*40|0) + "," + (80 + Math.random()*30|0) + ",50,.35)"; g.fillRect(Math.random()*w, y + 2 + Math.random()*12, 10 + Math.random()*30, 1); } }
+  })) : null;
+  if(woodTex) woodTex.wrapS = woodTex.wrapT = THREE.RepeatWrapping;
+  const stone = TRESTLE ? new THREE.MeshLambertMaterial({map:woodTex, side:THREE.DoubleSide})
+                        : new THREE.MeshLambertMaterial({map:stoneTex, side:THREE.DoubleSide,
+                            color: DESERT ? 0xe8b894 : WINTER ? 0xe6ecf2 : 0xffffff});
   const steel = new THREE.MeshLambertMaterial({color:0x8f5f4a, side:THREE.DoubleSide});
   const bridge = new THREE.Group();
   const S = GORGE.samples;
@@ -3220,8 +3601,29 @@ if(GORGE.depth > 0.5){
     bridge.add(wall);
   });
 
+  // on the trestle, a timber bent every few metres, cross braced, down to the floor
+  if(TRESTLE){
+    const beam = new THREE.MeshLambertMaterial({map:woodTex});
+    for(let k=-S+2; k<=S-2; k+=Math.max(2, Math.round(6/MAIN.seg))){
+      const i = idx(k), p = MAIN.pts[i], t = MAIN.tans[i], nx = -t.z, nz = t.x, hw = MAIN.half[i] + 0.6;
+      const floor = Math.min(gradedY(p.x + nx*hw, p.z + nz*hw), gradedY(p.x - nx*hw, p.z - nz*hw)) - 0.5;
+      const top = botY(i), hgt = Math.max(1, top - floor), rot = Math.atan2(t.x, t.z);
+      if(hgt < 1.2) continue;
+      for(const sd of [-1, 1]){
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.5, hgt + 1, 0.5), beam);
+        post.position.set(p.x + nx*sd*hw*(0.8 + 0.25*0), floor + hgt/2, p.z + nz*sd*hw*0.8);
+        post.rotation.set(0, rot, sd*0.06); bridge.add(post);
+      }
+      for(let y=floor + 4; y<top - 1; y+=5){
+        const tie = new THREE.Mesh(new THREE.BoxGeometry(hw*2, 0.3, 0.3), beam);
+        tie.position.set(p.x, y, p.z); tie.rotation.y = rot; bridge.add(tie);
+        const br = new THREE.Mesh(new THREE.BoxGeometry(Math.hypot(hw*1.6, 5), 0.22, 0.22), beam);
+        br.position.set(p.x, y + 2.5, p.z); br.rotation.set(0, rot, Math.atan2(5, hw*1.6)*((Math.round(y) % 2) ? 1 : -1)); bridge.add(br);
+      }
+    }
+  }
   // piers into the floor of the ravine
-  [-0.62, -0.2, 0.2, 0.62].forEach(f=>{
+  (TRESTLE ? [] : [-0.62, -0.2, 0.2, 0.62]).forEach(f=>{
     const i = idx(Math.round(f*S));
     const p = MAIN.pts[i], t = MAIN.tans[i], nx=-t.z, nz=t.x;
     [-1, 1].forEach(sd=>{
@@ -3397,8 +3799,9 @@ if(TOWN.on){
   const L = c => cache[c] || (cache[c] = new THREE.MeshLambertMaterial({color:c}));
   const glass = new THREE.MeshLambertMaterial({color:0x223038, emissive:0x0c1418});
   const lit   = new THREE.MeshLambertMaterial({color:0xf6d99a, emissive:0x8a6a2a});
-  const WALLS = [0xece6d6, 0xd9c79c, 0xa04e3c, 0x7593a2, 0xd8bf72, 0x8ea07c, 0xe6d6c4, 0xb9b3a4, 0x9b6b4c];
-  const ROOFS = [0x3b3b3e, 0x5b3a2e, 0x4a5662, 0x6e3b2b, 0x33402f];
+  const WALLS = TOWN.western ? [0x8a6a4a, 0x7a5a3e, 0x9c7c58, 0x6e5a48, 0xa88a64, 0xb9a07a, 0x8f7f6a]
+                             : [0xece6d6, 0xd9c79c, 0xa04e3c, 0x7593a2, 0xd8bf72, 0x8ea07c, 0xe6d6c4, 0xb9b3a4, 0x9b6b4c];
+  const ROOFS = TOWN.western ? [0x5a4a3a, 0x6a5a48, 0x7a3a2a, 0x4a4238] : [0x3b3b3e, 0x5b3a2e, 0x4a5662, 0x6e3b2b, 0x33402f];
   const pick = a => a[Math.floor(rnd()*a.length)];
   const box = (g, w, h, d, m, x, y, z)=>{
     const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
@@ -3418,7 +3821,27 @@ if(TOWN.on){
   };
 
   /* each builder draws facing +z, the road side, standing on y = 0 */
-  const house = ()=>{
+  /* a weathered plank building with a false front, boarded windows and a
+     sagging porch: what is left of a mining town */
+  const shack = ()=>{
+    const g = new THREE.Group();
+    const w = 6 + rnd()*3, d = 8 + rnd()*3, h = 3.4 + rnd()*1.2, wall = L(pick(WALLS));
+    box(g, w, h, d, wall, 0, h/2, 0);
+    const roof = box(g, w + 0.4, 0.25, d + 0.4, L(pick(ROOFS)), 0, h + 0.3, 0); roof.rotation.x = 0.08 + rnd()*0.08;
+    if(rnd() < 0.7){ box(g, w, 1.8, 0.3, wall, 0, h + 0.9, d/2); box(g, w + 0.3, 0.2, 0.45, L(0x5a4a3a), 0, h + 1.85, d/2); }
+    const f = d/2 + 0.2;
+    box(g, 1.1, 2.2, 0.1, L(0x3a2a20), -w*0.22, 1.1, f);
+    // boarded up windows
+    const ww = 1.1, wh = 1.0;
+    box(g, ww, wh, 0.08, L(0x2a221c), w*0.22, 1.7, f);
+    for(let b=0;b<2;b++){ const pl = box(g, ww + 0.3, 0.16, 0.12, L(0x9a8a6a), w*0.22, 1.5 + b*0.4, f + 0.06); pl.rotation.z = (rnd() - 0.5)*0.5; }
+    // a porch, some of its posts gone
+    box(g, w, 0.18, 2.0, L(0x7a6a52), 0, 0.12, f + 1.0);
+    const pr = box(g, w, 0.14, 2.1, L(0x6a5a44), 0, 2.7, f + 1.0); pr.rotation.x = -0.1; pr.rotation.z = (rnd() - 0.5)*0.12;
+    for(const sx of [-0.45, 0.45]) if(rnd() < 0.8) box(g, 0.16, 2.6, 0.16, L(0x6a5a44), sx*w, 1.35, f + 1.9);
+    return {g, w, d};
+  };
+  const house = TOWN.western ? shack : ()=>{
     const g = new THREE.Group();
     const w = 6.5 + rnd()*2.5, d = 7.5 + rnd()*3, two = rnd() < 0.45, h = two ? 5.6 : 3.2;
     const wall = L(pick(WALLS)), roof = L(pick(ROOFS));
@@ -3480,7 +3903,7 @@ if(TOWN.on){
     return {g, w, d: d + 3};
   };
   const tower = ()=>{
-    const g = new THREE.Group(), steel = L(0x8a8f8c), tank = L(0xb9c2c0);
+    const g = new THREE.Group(), steel = L(TOWN.western ? 0x6a4a30 : 0x8a8f8c), tank = L(TOWN.western ? 0x8a6a4a : 0xb9c2c0);
     for(const a of [0, 1, 2, 3]){
       const ang = a*Math.PI/2 + Math.PI/4;
       const leg = box(g, 0.3, 13, 0.3, steel, Math.cos(ang)*2.6, 6.5, Math.sin(ang)*2.6);
@@ -3489,7 +3912,8 @@ if(TOWN.on){
       box(g, a ? 0.12 : 5.3, 0.12, a ? 5.3 : 0.12, steel, 0, y, 0);
     }
     const drum = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.4, 4.6, 16, 1, false),
-      [new THREE.MeshLambertMaterial({map:boardTex(["ASH RIDGE"], "#b9c2c0", "#2c3a4a", 512, 96)}), tank, tank]);
+      [new THREE.MeshLambertMaterial({map:TOWN.western ? boardTex([TOWN.name], "#8a6a4a", "#f2e6c8", 512, 96)
+                                                       : boardTex([TOWN.name], "#b9c2c0", "#2c3a4a", 512, 96)}), tank, tank]);
     drum.position.y = 15.2; g.add(drum);
     const cap = new THREE.Mesh(new THREE.ConeGeometry(3.6, 2, 16), tank); cap.position.y = 18.5; g.add(cap);
     return {g, w: 7, d: 7};
@@ -3545,8 +3969,11 @@ if(TOWN.on){
     const p = MAIN.pts[i];
     if(Math.hypot(p.x - TOWN.x, p.z - TOWN.z) < TOWN.r*0.8) lots.push(i);
   }
-  const specials = [church, ()=>store("GENERAL STORE"), pumps, ()=>store("RIDGE DINER"),
-                    ()=>store("HARDWARE"), ()=>store("POST OFFICE")];
+  const specials = TOWN.western
+    ? [()=>store("SALOON"), ()=>store("ASSAY OFFICE"), church, ()=>store("SHERIFF"), ()=>store("DRY GOODS"),
+       ()=>store("BANK"), ()=>store("LIVERY"), ()=>store("HOTEL")]
+    : [church, ()=>store("GENERAL STORE"), pumps, ()=>store("RIDGE DINER"),
+       ()=>store("HARDWARE"), ()=>store("POST OFFICE")];
   let made = 0, sp = 0;
   const step = Math.max(1, Math.round(4/MAIN.seg));
   for(const side of [1, -1]){
@@ -3573,8 +4000,8 @@ if(TOWN.on){
     if(!fits(x, z, b.w, b.d, fx/fl, fz/fl)) continue;
     place(b, x, z, fx/fl, fz/fl); k++;
   }
-  // street lamps
-  const pole = L(0x2e2e2e);
+  // street lamps (in the ghost town, old telegraph poles)
+  const pole = L(TOWN.western ? 0x5a4430 : 0x2e2e2e);
   for(let q=0; q<lots.length; q+=Math.round(22/MAIN.seg)){
     const i = lots[q], p = MAIN.pts[i], t = MAIN.tans[i], side = (q/Math.round(22/MAIN.seg))%2 ? 1 : -1;
     const off = MAIN.half[i] + 1.6, x = p.x - t.z*side*off, z = p.z + t.x*side*off;
@@ -3588,15 +4015,22 @@ if(TOWN.on){
   }
   // the signs at either end of the village
   if(lots.length){
-    roadSign(lots[0] - Math.round(12/MAIN.seg), 1, ["ASH RIDGE", "pop. 212   elev. 1,480 ft"], "#2f5a3a", "#f2efe6");
-    roadSign(lots[lots.length-1] + Math.round(12/MAIN.seg), 1, ["ASH RIDGE", "drive slow, jumps ahead"], "#2f5a3a", "#f2efe6", true);
+    if(TOWN.western){
+      roadSign(lots[0] - Math.round(12/MAIN.seg), 1, [TOWN.name, "pop. 0   founded 1871"], "#6a4a30", "#f2e6c8");
+      roadSign(lots[lots.length-1] + Math.round(12/MAIN.seg), 1, [TOWN.name, "trestle ahead"], "#6a4a30", "#f2e6c8", true);
+    } else {
+      roadSign(lots[0] - Math.round(12/MAIN.seg), 1, [TOWN.name, "pop. 212   elev. 1,480 ft"], "#2f5a3a", "#f2efe6");
+      roadSign(lots[lots.length-1] + Math.round(12/MAIN.seg), 1, [TOWN.name, "drive slow, jumps ahead"], "#2f5a3a", "#f2efe6", true);
+    }
   }
 }
 
 /* ---- the edge of the escarpment ---- */
 if(DROP.on){
-  roadSign(DROP.i - Math.round(90/MAIN.seg), 1, ["100 FT DROP", "keep it pinned"], "#e2b21e", "#1f1f1f");
-  roadSign(DROP.i - Math.round(90/MAIN.seg), -1, ["100 FT DROP", "keep it pinned"], "#e2b21e", "#1f1f1f");
+  const ft = Math.round(DROP.h*3.28/10)*10 + " FT";
+  const words = TRACK.skijump ? ["SKI JUMP", ft + ", hold it flat"] : DESERT ? ["MESA RIM", ft + " drop, keep it pinned"] : [ft + " DROP", "keep it pinned"];
+  roadSign(DROP.i - Math.round(90/MAIN.seg), 1, words, "#e2b21e", "#1f1f1f");
+  roadSign(DROP.i - Math.round(90/MAIN.seg), -1, words, "#e2b21e", "#1f1f1f");
   const stripe = new THREE.MeshLambertMaterial({map:new THREE.CanvasTexture(noiseCanvas(32, 128, (g,w,h)=>{
     for(let y=0;y<h;y+=32){ g.fillStyle="#e8e2d0"; g.fillRect(0,y,w,16); g.fillStyle="#c23a22"; g.fillRect(0,y+16,w,16); }
   }))});
@@ -3636,6 +4070,220 @@ function setDown(g, x, z, rotY, shadows){
 }
 /* is a spot clear of every road by at least m metres */
 const clearOf = (x, z, m)=>{ const n = nearest(x, z); return n.dist > n.half + m; };
+
+/* ---- the avalanche gallery: a concrete snow shed over the road ---- */
+if(GALLERY.on){
+  const P = MAIN, g = new THREE.Group();
+  const conc = new THREE.MeshLambertMaterial({color:0xa9a59c}), dark = new THREE.MeshLambertMaterial({color:0x7c7870});
+  const snow = new THREE.MeshLambertMaterial({color:0xf3f7fb});
+  const lamp = new THREE.MeshLambertMaterial({color:0xffe6a8, emissive:0xb89040});
+  const step = Math.max(1, Math.round(4/P.seg));
+  // which side the mountain is on, decided once for the whole shed
+  let hill = 0;
+  for(let k=GALLERY.a; k<=GALLERY.b; k+=step){
+    const i = wrapIdx(P, k), p = P.pts[i], t = P.tans[i], o = P.half[i] + 9;
+    hill += gradedY(p.x - t.z*o, p.z + t.x*o) - gradedY(p.x + t.z*o, p.z - t.x*o);
+  }
+  const hs = hill >= 0 ? 1 : -1;                      // +1: the mountain is on the +normal side
+  let n = 0;
+  for(let k=GALLERY.a; k<=GALLERY.b; k+=step, n++){
+    const i = wrapIdx(P, k), p = P.pts[i], t = P.tans[i], nx = -t.z, nz = t.x, hw = P.half[i];
+    const y = P.pts[i].y + BED, rot = Math.atan2(t.x, t.z), W = hw*2 + 3.2, L = P.seg*step + 0.25;
+    const put = (m, w, h, d, lat, yy)=>{ const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+      o.position.set(p.x + nx*lat, y + yy, p.z + nz*lat); o.rotation.y = rot; g.add(o); return o; };
+    put(conc, W + 1.2, 0.8, L, 0, 5.9);                                   // the roof slab
+    put(snow, W + 1.6, 0.9, L, 0, 6.7);                                   // snow lying on it
+    put(conc, 1.0, 7.5, L, hs*(hw + 2.1), 2.4);                           // the back wall, against the mountain
+    if(n % 2 === 0){
+      put(conc, 0.9, 5.6, 0.9, -hs*(hw + 1.6), 2.8);                      // pillars on the open side
+      put(dark, 1.3, 0.5, 1.3, -hs*(hw + 1.6), 0.1);
+    }
+    if(n % 3 === 1) put(lamp, 0.8, 0.12, 0.35, 0, 5.45);                 // lights under the roof
+  }
+  // portals at each end
+  for(const k of [GALLERY.a, GALLERY.b]){
+    const i = wrapIdx(P, k), p = P.pts[i], t = P.tans[i], hw = P.half[i];
+    const o = new THREE.Mesh(new THREE.BoxGeometry(hw*2 + 5, 1.6, 1.2), conc);
+    o.position.set(p.x, P.pts[i].y + BED + 6.2, p.z); o.rotation.y = Math.atan2(t.x, t.z); g.add(o);
+  }
+  g.traverse(o=>{ if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+  mergeStatic(g); scene.add(g);
+  roadSign(GALLERY.a - Math.round(70/P.seg), 1, ["AVALANCHE GALLERY", "keep inside the pillars"], "#e2b21e", "#1f1f1f");
+}
+
+/* ---- the ski jump: rails up the in-run, flags and a judges' tower ---- */
+if(DROP.on && TRACK.skijump){
+  const P = MAIN, g = new THREE.Group();
+  const wood = new THREE.MeshLambertMaterial({color:0x8a5a34}), white = new THREE.MeshLambertMaterial({color:0xf2efe6});
+  const red = new THREE.MeshLambertMaterial({color:0xc2382a}), blue = new THREE.MeshLambertMaterial({color:0x2f6fa8});
+  const glass = new THREE.MeshLambertMaterial({color:0x223038, emissive:0x0c1418});
+  const at = m => wrapIdx(P, DROP.i + Math.round(m/P.seg));
+  // the in-run: timber rails either side over the last 90m to the table
+  for(let m=-90; m<=-2; m+=3){
+    const i = at(m), p = P.pts[i], t = P.tans[i], nx = -t.z, nz = t.x, hw = P.half[i] + 1.3;
+    for(const sd of [-1, 1]){
+      const x = p.x + nx*sd*hw, z = p.z + nz*sd*hw, y = P.pts[i].y + BED;
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.3, 0.2), wood); post.position.set(x, y + 0.6, z); g.add(post);
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 3.2), sd > 0 ? red : blue);
+      rail.position.set(x, y + 1.2, z); rail.rotation.y = Math.atan2(t.x, t.z); g.add(rail);
+    }
+  }
+  // flags down both sides of the landing hill, and the K line across it
+  for(let m=12; m<=110; m+=12){
+    const i = at(m), p = P.pts[i], t = P.tans[i], nx = -t.z, nz = t.x, hw = P.half[i] + 3;
+    for(const sd of [-1, 1]){
+      const x = p.x + nx*sd*hw, z = p.z + nz*sd*hw, y = gradedY(x, z);
+      const pole = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.6, 0.08), white); pole.position.set(x, y + 1.3, z); g.add(pole);
+      const f = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.6, 0.9), (m/12)%2 ? red : blue);
+      f.position.set(x, y + 2.3, z + 0.45); g.add(f);
+    }
+  }
+  {
+    const i = at(72), p = P.pts[i], t = P.tans[i], nx = -t.z, nz = t.x, hw = P.half[i];
+    const pos = [], ix = [];
+    for(let c=0;c<=8;c++){
+      const u = -hw + 2*hw*c/8;
+      for(const dz of [-0.35, 0.35]){ const x = p.x + nx*u + t.x*dz, z = p.z + nz*u + t.z*dz; pos.push(x, surfaceY(x, z) + 0.04, z); }
+      if(c < 8){ const a = c*2; ix.push(a, a + 1, a + 3, a, a + 3, a + 2); }
+    }
+    const gg = new THREE.BufferGeometry(); gg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); gg.setIndex(ix); gg.computeVertexNormals();
+    const line = new THREE.Mesh(gg, new THREE.MeshBasicMaterial({color:0xd8302a, side:THREE.DoubleSide})); line.renderOrder = 2; scene.add(line);
+  }
+  // the judges' tower beside the landing hill
+  {
+    const i = at(55), p = P.pts[i], t = P.tans[i], nx = -t.z, nz = t.x, off = P.half[i] + 26;
+    const x = p.x + nx*off, z = p.z + nz*off, tw = new THREE.Group();
+    for(const a of [0, 1, 2, 3]){ const ang = a*Math.PI/2 + Math.PI/4;
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.4, 12, 0.4), wood); leg.position.set(Math.cos(ang)*2.4, 6, Math.sin(ang)*2.4); tw.add(leg); }
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(6.5, 3.2, 5), white); cab.position.y = 13.6; tw.add(cab);
+    const win = new THREE.Mesh(new THREE.BoxGeometry(6.6, 1.4, 5.1), glass); win.position.y = 13.9; tw.add(win);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(7.4, 0.4, 5.8), red); roof.position.y = 15.4; tw.add(roof);
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(6.4, 1.1, 0.12), new THREE.MeshLambertMaterial({map:boardTex([TRACK.name], "#c2382a", "#f2efe6", 512, 96)}));
+    sign.position.set(0, 16.3, 0); tw.add(sign);
+    tw.position.set(x, gradedY(x, z), z); tw.rotation.y = Math.atan2(-nx, -nz);
+    tw.traverse(o=>{ if(o.isMesh) o.castShadow = true; }); scene.add(tw);
+  }
+  g.traverse(o=>{ if(o.isMesh) o.castShadow = true; });
+  mergeStatic(g); scene.add(g);
+}
+
+/* ---- the slot canyon's stone arch ---- */
+if(CANYON.on){
+  const s0 = CANYON.len*0.62, k = CANYON.a + Math.round(s0/MAIN.seg);
+  const i = wrapIdx(MAIN, k), p = MAIN.pts[i], t = MAIN.tans[i];
+  const span = 13, geo = new THREE.TorusGeometry(span, 3.4, 7, 22, Math.PI);
+  const pa = geo.attributes.position;
+  for(let v=0; v<pa.count; v++){                       // weathered: lumpy and thicker at the feet
+    const x = pa.getX(v), y = pa.getY(v), zz = pa.getZ(v);
+    const n = 1 + 0.18*Math.sin(x*1.3 + y*0.7) + 0.12*Math.sin(zz*2.1 + x*0.4);
+    const foot = 1 + 0.6*(1 - Math.min(1, y/span));
+    pa.setXYZ(v, x*(1 + 0.02*n), y*0.72, zz*n*foot);
+  }
+  geo.computeVertexNormals();
+  const arch = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({color:0xb4623e, map:rockTex, flatShading:true}));
+  arch.position.set(p.x, MAIN.pts[i].y + CANYON.H*0.72, p.z);
+  arch.rotation.y = Math.atan2(t.x, t.z) + Math.PI/2;
+  arch.castShadow = true; arch.receiveShadow = true;
+  scene.add(arch);
+  roadSign(CANYON.a - Math.round(60/MAIN.seg), 1, ["SLOT CANYON", "no way out but through"], "#b4623e", "#f7e7c0");
+}
+
+/* ---- the oasis: date palms round the water ---- */
+function palmGeometry(h, lean){
+  const parts = [];
+  const trunk = new THREE.CylinderGeometry(0.22, 0.34, h, 7, 6);
+  const tp = trunk.attributes.position;
+  for(let v=0; v<tp.count; v++){ const y = tp.getY(v) + h/2, f = y/h; tp.setX(v, tp.getX(v) + lean*f*f*h*0.35); tp.setY(v, y); }
+  parts.push([trunk, 0x7a5a3a]);
+  const topX = lean*h*0.35;
+  for(let k=0;k<8;k++){
+    const a = k/8*Math.PI*2 + Math.random()*0.3, L = 2.6 + Math.random()*1.2;
+    const fr = new THREE.ConeGeometry(0.45, L, 4, 1);
+    fr.scale(1, 1, 0.18); fr.translate(0, L/2, 0); fr.rotateZ(-(1.15 + Math.random()*0.35)); fr.rotateY(a); fr.translate(topX, h, 0);
+    parts.push([fr, k % 2 ? 0x3f7a34 : 0x55913e]);
+  }
+  // merge with vertex colours
+  let n = 0; parts.forEach(pp=>{ pp[0] = pp[0].toNonIndexed(); n += pp[0].attributes.position.count; });
+  const pos = new Float32Array(n*3), col = new Float32Array(n*3), c = new THREE.Color(); let o = 0;
+  parts.forEach(([gg, hex])=>{ pos.set(gg.attributes.position.array, o*3); c.setHex(hex);
+    for(let v=0; v<gg.attributes.position.count; v++){ col[(o+v)*3] = c.r; col[(o+v)*3+1] = c.g; col[(o+v)*3+2] = c.b; }
+    o += gg.attributes.position.count; });
+  const out = new THREE.BufferGeometry();
+  out.setAttribute("position", new THREE.BufferAttribute(pos, 3)); out.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  out.computeVertexNormals();
+  return out;
+}
+if(TRACK.oasis && LAKE.on){
+  const mat = new THREE.MeshLambertMaterial({vertexColors:true, flatShading:true});
+  let made = 0;
+  for(let tries=0; tries<600 && made<34; tries++){
+    const a = Math.random()*Math.PI*2, e = 1.02 + Math.random()*0.7;
+    const x = LAKE.x + Math.cos(a)*LAKE.rx*e, z = LAKE.z + Math.sin(a)*LAKE.rz*e;
+    if(!clearOf(x, z, 4)) continue;
+    const m = new THREE.Mesh(palmGeometry(7 + Math.random()*5, (Math.random() - 0.5)*0.6), mat);
+    m.position.set(x, gradedY(x, z) - 0.2, z); m.rotation.y = Math.random()*6.28; m.castShadow = true;
+    scene.add(m); made++;
+  }
+  // a ring of green round the water
+  const reeds = new THREE.MeshLambertMaterial({color:0x6a8a3a});
+  for(let k=0;k<90;k++){
+    const a = Math.random()*Math.PI*2, e = 0.98 + Math.random()*0.12;
+    const x = LAKE.x + Math.cos(a)*LAKE.rx*e, z = LAKE.z + Math.sin(a)*LAKE.rz*e;
+    const r = new THREE.Mesh(new THREE.ConeGeometry(0.5 + Math.random()*0.5, 1.4 + Math.random(), 5), reeds);
+    r.position.set(x, gradedY(x, z) + 0.5, z); scene.add(r);
+  }
+}
+
+/* ---- the desert's buttes and mesas out on the horizon ---- */
+if(TRACK.buttes){
+  const mat = new THREE.MeshLambertMaterial({color:0xb35a38, map:rockTex, flatShading:true});
+  const cap = new THREE.MeshLambertMaterial({color:0xc98a5a, flatShading:true});
+  const rnd = seeded(4242 + TRACK_ID);
+  for(let k=0;k<11;k++){
+    const a = k/11*Math.PI*2 + rnd()*0.4, d = FAR + 220 + rnd()*480;
+    const x = Math.cos(a)*d, z = Math.sin(a)*d;
+    const r = 35 + rnd()*70, h = 45 + rnd()*95, g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(r*0.82, r, h, 9, 3), mat);
+    const bp = body.geometry.attributes.position;
+    for(let v=0; v<bp.count; v++){ const q = 1 + 0.1*Math.sin(bp.getY(v)*0.2 + v) ; bp.setX(v, bp.getX(v)*q); bp.setZ(v, bp.getZ(v)*q); }
+    body.geometry.computeVertexNormals();
+    body.position.y = h/2; g.add(body);
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(r*0.86, r*0.84, 4, 9), cap); top.position.y = h + 1.5; g.add(top);
+    const talus = new THREE.Mesh(new THREE.ConeGeometry(r*1.9, h*0.45, 11, 1, true), mat); talus.position.y = h*0.2; g.add(talus);
+    g.position.set(x, macro(x, z) - 4, z); g.rotation.y = rnd()*6;
+    scene.add(g);
+  }
+}
+
+/* ---- tumbleweeds bowling across the desert roads ---- */
+if(DESERT){
+  const mat = new THREE.MeshLambertMaterial({color:0x9a7a4a, wireframe:true});
+  const weeds = [];
+  for(let k=0;k<7;k++){
+    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7 + Math.random()*0.4, 1), mat);
+    scene.add(m);
+    weeds.push({m, t: -k*3.5 - Math.random()*4, i: 0, side: 1});
+  }
+  let last = 0;
+  ANIMS.push(t=>{
+    const dt = Math.max(0, Math.min(0.1, t - last)); last = t;
+    weeds.forEach(w=>{
+      w.t -= dt;
+      if(w.t < 0){                                    // start another roll somewhere ahead of the player
+        const base = state.idx;
+        w.i = wrapIdx(MAIN, base + Math.round((60 + Math.random()*260)/MAIN.seg));
+        w.side = Math.random() < 0.5 ? 1 : -1; w.u = -26; w.t = 7 + Math.random()*6;
+        w.sp = 3.5 + Math.random()*3;
+      }
+      const p = MAIN.pts[w.i], tn = MAIN.tans[w.i];
+      w.u += w.sp*dt;
+      const x = p.x - tn.z*w.side*w.u, z = p.z + tn.x*w.side*w.u;
+      const bounce = Math.abs(Math.sin(t*3.2 + w.i))*0.8;
+      w.m.position.set(x, gradedY(x, z) + 0.7 + bounce, z);
+      w.m.rotation.x += dt*w.sp*1.4; w.m.rotation.z += dt*w.sp*0.6;
+    });
+  });
+}
 
 /* ---- Maple Fair: the ferris wheel in the infield, grandstands, tents, bales ---- */
 if(BOWL.on){
@@ -3757,8 +4405,9 @@ if(LAKE.on){
   for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
     const x = LAKE.x - AX + c*STEP, z = LAKE.z - AZ + r*STEP;
     const e = Math.hypot((x - LAKE.x)/LAKE.rx, (z - LAKE.z)/LAKE.rz);
-    pos.push(x, LAKE.level, z); uv.push(x, z);
-    dep.push(e > 1.12 ? -1 : Math.max(-1, Math.min(3, LAKE.level - surfaceY(x, z))));
+    const top = LAKE.frozen ? LAKE.level + 0.05 : LAKE.level;     // ice lies on the flat floor
+    pos.push(x, top, z); uv.push(x, z);
+    dep.push(e > 1.12 ? -1 : Math.max(-1, Math.min(3, top - surfaceY(x, z) + (LAKE.frozen ? 0.02 : 0))));
   }
   for(let r=0;r<rows-1;r++) for(let c=0;c<cols-1;c++){
     const a = r*cols + c, b = a + 1, d2 = a + cols, e = d2 + 1;
@@ -3771,6 +4420,7 @@ if(LAKE.on){
   g.setAttribute("aDepth", new THREE.Float32BufferAttribute(dep,1));
   g.setIndex(idx);
   const wm = new THREE.Mesh(g, waterMaterial()); wm.renderOrder = 3; wm.frustumCulled = false; scene.add(wm);
+  if(!LAKE.frozen){
   // riprap along the waterline of the causeway
   const rockMat = new THREE.MeshLambertMaterial({map:rockTex});
   const P = MAIN;
@@ -3828,6 +4478,56 @@ if(LAKE.on){
     b.rotation.y = toward; scene.add(b);
     break;
   }
+  }
+  /* on the ice: a camp of fishing huts well off the road, marker poles
+     either side of the plowed road, and the snow it was plowed into */
+  if(LAKE.frozen){
+    const P = MAIN, pole = new THREE.MeshLambertMaterial({color:0xff6a1a}), snow = new THREE.MeshLambertMaterial({color:0xf2f6fa});
+    const hutCols = [0xc2382a, 0x2f6fa8, 0xe0a21e, 0x3f8a4a, 0x7a4a8a];
+    for(let i=0;i<P.N;i+=Math.round(16/P.seg)){
+      const p = P.pts[i], t = P.tans[i];
+      if(iceAt(p.x, p.z) < 0.5) continue;
+      for(const sd of [-1, 1]){
+        const off = P.half[i] + 2.2, x = p.x - t.z*sd*off, z = p.z + t.x*sd*off;
+        const m = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.8, 5), pole);
+        m.position.set(x, gradedY(x, z) + 0.9, z); scene.add(m);
+      }
+    }
+    // plowed snowbanks along the ice road, one merged mesh
+    const bank = new THREE.Group();
+    for(let i=0;i<P.N;i+=Math.round(3/P.seg)){
+      const p = P.pts[i], t = P.tans[i];
+      if(iceAt(p.x, p.z) < 0.6) continue;
+      for(const sd of [-1, 1]){
+        const off = P.half[i] + 3.4 + Math.random()*0.6, x = p.x - t.z*sd*off, z = p.z + t.x*sd*off;
+        const m = new THREE.Mesh(new THREE.SphereGeometry(1, 7, 4, 0, Math.PI*2, 0, Math.PI/2), snow);
+        m.scale.set(1.3 + Math.random()*0.6, 0.45 + Math.random()*0.3, 2.2);
+        m.position.set(x, gradedY(x, z) - 0.05, z); m.rotation.y = Math.atan2(t.x, t.z); bank.add(m);
+      }
+    }
+    mergeStatic(bank); scene.add(bank);
+    let huts = 0;
+    for(let tries=0; tries<400 && huts<14; tries++){
+      const a = Math.random()*Math.PI*2, e = 0.2 + Math.random()*0.65;
+      const x = LAKE.x + Math.cos(a)*LAKE.rx*e, z = LAKE.z + Math.sin(a)*LAKE.rz*e;
+      if(!clearOf(x, z, 14)) continue;
+      const g = new THREE.Group(), c = hutCols[huts % hutCols.length];
+      pbox(g, 2.4, 2.1, 3.0, c, 0, 1.05, 0);
+      const roof = pbox(g, 2.8, 0.2, 3.4, 0x3b3b3e, 0, 2.3, 0); roof.rotation.z = 0.12;
+      pbox(g, 0.8, 1.6, 0.06, 0x2a2a2a, 0, 0.8, 1.53);
+      pbox(g, 0.12, 0.9, 0.12, 0x8a8f8c, 0.7, 2.6, -0.8);                       // stovepipe
+      pbox(g, 2.6, 0.12, 3.2, 0xf2f6fa, 0, 2.45, 0).rotation.z = 0.12;         // snow on the roof
+      if(huts % 3 === 0){                                                      // a pickup parked by it
+        pbox(g, 1.9, 0.9, 4.6, 0x5a6a7a, 3.2, 0.75, 0.4);
+        pbox(g, 1.8, 0.8, 1.8, 0x5a6a7a, 3.2, 1.55, 1.0);
+        pbox(g, 1.7, 0.6, 0.06, 0x223038, 3.2, 1.6, 1.92);
+      }
+      setDown(g, x, z, Math.random()*6);
+      huts++;
+    }
+    const i0 = snapTo(MAIN, [LAKE.x - LAKE.rx - 30, LAKE.z]);
+    roadSign(i0, 1, ["ICE ROAD", "ice 60cm, drive at own risk"], "#2f6fa8", "#f2efe6");
+  }
   if(WASH.on){
     roadSign(WASH.at - Math.round(110/MAIN.seg), 1, ["WASHOUT AHEAD", "jump it or wade it"], "#e2b21e", "#1f1f1f");
     roadSign(WASH.at - Math.round(110/MAIN.seg), -1, ["WASHOUT AHEAD", "jump it or wade it"], "#e2b21e", "#1f1f1f");
@@ -3842,7 +4542,22 @@ if(PIT.on){
     const t = pcyl(g, r, r, w, 14, black, x, y, z); t.rotation.z = Math.PI/2;
     const hub = pcyl(g, r*0.45, r*0.45, w + 0.06, 10, yellow, x, y, z); hub.rotation.z = Math.PI/2;
     const nut = pcyl(g, r*0.16, r*0.16, w + 0.12, 6, dark, x, y, z); nut.rotation.z = Math.PI/2;
+    // chunky tread blocks round the tyre, and a caked-on rim of quarry dust
+    for(let k=0;k<14;k++){
+      const a = k/14*Math.PI*2, b = pbox(g, w*0.92, 0.16, 0.34, 0x121212, x, y + Math.cos(a)*(r + 0.03), z + Math.sin(a)*(r + 0.03));
+      b.rotation.x = -a;
+    }
+    const dust = pcyl(g, r*0.62, r*0.62, w + 0.03, 12, 0x8f8370, x, y, z); dust.rotation.z = Math.PI/2;
   };
+  /* amber beacons that turn, on every machine, the way the real ones do */
+  const beaconMats = [];
+  const beacon = (g, x, y, z)=>{
+    const m = new THREE.MeshLambertMaterial({color:0xffa11a, emissive:0xff8a00, emissiveIntensity:0.4});
+    beaconMats.push([m, Math.random()*6]);
+    pcyl(g, 0.2, 0.22, 0.12, 8, dark, x, y, z);
+    pcyl(g, 0.16, 0.18, 0.28, 8, m, x, y + 0.2, z);
+  };
+  ANIMS.push(t=> beaconMats.forEach(([m, ph])=>{ const k = Math.sin(t*7 + ph); m.emissiveIntensity = k > 0.35 ? 2.4 : 0.35; }));
   /* a rigid haul truck: canopy over the cab, a tipped body with ribs,
      ladder up the front, exhaust stacks, lamps and mirrors */
   const truck = ()=>{
@@ -3872,6 +4587,12 @@ if(PIT.on){
     pbox(g, 0.06, 1.9, 0.06, grey, 0.85, 2.6, 4.05); pbox(g, 0.06, 1.9, 0.06, grey, 1.55, 2.6, 4.05);
     pbox(g, 3.2, 0.12, 0.3, red, 0, 1.6, -3.95);                           // rear reflector bar
     for(const z of [2.6, -2.2]) for(const x of [-1.65, 1.65]) wheel(g, 1.25, 0.95, x, 1.25, z);
+    // hand rails round the engine deck, a walkway to the cab, beacons on the canopy
+    pbox(g, 3.7, 0.06, 0.06, 0xe8e2d4, 0, 3.75, 4.0);
+    for(const x of [-1.8, -0.6, 0.6, 1.8]) pbox(g, 0.06, 0.6, 0.06, 0xe8e2d4, x, 3.45, 4.0);
+    pbox(g, 0.9, 0.08, 2.2, grey, 1.25, 3.18, 2.9);
+    beacon(g, 1.5, 4.42, 2.6); beacon(g, -1.5, 4.42, 2.6);
+    pbox(g, 3.02, 0.35, 7.6, 0x6f6557, 0, 1.05, 0);                        // mud caked on the frame
     return g;
   };
   /* a tracked excavator: running gear with rollers, a turning house with
@@ -3899,24 +4620,66 @@ if(PIT.on){
     pbox(bucket, 1.6, 1.0, 1.1, dark, 0, 0, 0);
     for(let k=-2;k<=2;k++) pbox(bucket, 0.14, 0.14, 0.35, chrome, k*0.34, -0.45, 0.62);
     bucket.position.set(0.7, 1.3, 6.8); bucket.rotation.x = 0.5; house.add(bucket);
+    pbox(house, 0.14, 0.9, 0.14, 0xe8e2d4, -1.6, 2.35, -0.6);              // grab rail by the door
+    beacon(house, -1.0, 3.5, 0.9);
     house.position.y = 0.95; house.rotation.y = (Math.random() - 0.5)*1.4; g.add(house);
+    // it works: the house swings between the face and the truck, the arm with it
+    house.userData.noMerge = true;
+    const h0 = house.rotation.y, ph = Math.random()*6;
+    ANIMS.push(t=>{ const c = Math.sin(t*0.45 + ph); house.rotation.y = h0 + Math.sign(c)*Math.pow(Math.abs(c), 0.6)*0.9;
+                     bucket.rotation.x = 0.5 + 0.35*Math.sin(t*0.9 + ph); });
     return g;
   };
-  /* A heap of gravel sits in the ground: it is built reaching well below
-     its foot, so on a slope the low side is buried rather than floating. */
-  const cone = (h, c)=>{
+  /* A heap of gravel laid over the ground itself. Every vertex is set from
+     the land under it, so on a slope or on the edge of a bench the heap's
+     skirt runs down with the ground instead of hanging a flat bottom in the
+     air. Toward the top it settles level, the way a tipped load does. */
+  const cone = (h, c, x0, z0)=>{
     const g = new THREE.Group();
-    const sink = h*0.9;
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(h*0.12, h*1.5 + sink*1.5, h + sink, 12, 2), PM(c));
-    const p = m.geometry.attributes.position;          // a lumpy, uneven heap
-    for(let i=0;i<p.count;i++){
-      const y = p.getY(i); if(y > (h + sink)/2 - 0.01) continue;
-      const k = 1 + (Math.random() - 0.5)*0.18;
-      p.setX(i, p.getX(i)*k); p.setZ(i, p.getZ(i)*k);
+    const R = h*1.9, RINGS = 9, SEG = 20;
+    const gc = gradedY(x0, z0);
+    const pos = [], col = [], idx = [];
+    const base = new THREE.Color(c), cc = new THREE.Color();
+    const ph = Math.random()*6.28;
+    pos.push(0, h + 0.05, 0); cc.copy(base).multiplyScalar(1.06); col.push(cc.r, cc.g, cc.b);
+    for(let r=1;r<=RINGS+1;r++){
+      const q = Math.min(1.08, r/RINGS);
+      for(let k=0;k<SEG;k++){
+        const a = k/SEG*Math.PI*2;
+        const wob = 1 + 0.10*Math.sin(a*3 + ph) + 0.06*Math.sin(a*5 + ph*2) + (Math.random() - 0.5)*0.06;
+        const lx = Math.cos(a)*R*q*wob, lz = Math.sin(a)*R*q*wob;
+        const ground = gradedY(x0 + lx, z0 + lz) - gc;
+        const qq = Math.min(1, q);
+        const prof = h*Math.pow(1 - qq, 1.25)*(1 - 0.12*Math.exp(-qq*qq*30));   // a rounded peak
+        const settle = Math.pow(1 - qq, 0.6);                                       // level at the top
+        let y = ground*(1 - settle) + Math.min(ground, 0)*settle*0.35 + prof;
+        if(q > 1) y = ground - 0.35;                                                 // the skirt, tucked in
+        y = Math.max(y, ground + (q > 1 ? -0.35 : 0.04*(1 - qq)));
+        pos.push(lx, y, lz);
+        cc.copy(base).multiplyScalar(0.84 + 0.2*(1 - qq) + (Math.random() - 0.5)*0.08); col.push(cc.r, cc.g, cc.b);
+      }
     }
-    m.geometry.computeVertexNormals();
-    m.position.y = (h + sink)/2 - sink; g.add(m);
-    g.userData.foot = h*1.5;
+    for(let k=0;k<SEG;k++) idx.push(0, 1 + (k+1)%SEG, 1 + k);
+    for(let r=0;r<RINGS;r++) for(let k=0;k<SEG;k++){
+      const A = 1 + r*SEG + k, B = 1 + r*SEG + (k+1)%SEG, C = A + SEG, D = B + SEG;
+      idx.push(A, B, D, A, D, C);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+    geo.setIndex(idx); geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({vertexColors:true, flatShading:true}));
+    m.receiveShadow = true; g.add(m);
+    // a few boulders rolled down to the foot
+    for(let k=0;k<4;k++){
+      const a = Math.random()*Math.PI*2, d = R*(0.8 + Math.random()*0.3), sc = 0.25 + Math.random()*0.35;
+      const lx = Math.cos(a)*d, lz = Math.sin(a)*d;
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 0), PM(0x6a6258));
+      rock.scale.set(sc, sc*0.7, sc); rock.position.set(lx, gradedY(x0 + lx, z0 + lz) - gc + sc*0.3, lz);
+      rock.rotation.set(Math.random(), Math.random()*6, Math.random()); g.add(rock);
+    }
+    g.userData.draped = true;
+    g.userData.noMerge = true;            // merging would drop the vertex colours
     return g;
   };
   /* only on ground that is near enough level for the footprint, and set at
@@ -3939,17 +4702,20 @@ if(PIT.on){
       if(taken.some(t=> Math.hypot(t[0] - x, t[1] - z) < t[2] + foot + 1.5)) continue;
       const F = footing(x, z, foot);
       if(F.range > tol) continue;
-      const g = setDown(make(), x, z, Math.random()*6);
-      g.position.y = F.lo - 0.05;
+      const obj = make(x, z);
+      if(obj.userData.draped){ setDown(obj, x, z, 0); }            // shaped to the ground where it lies
+      else { const g = setDown(obj, x, z, Math.random()*6); g.position.y = F.lo - 0.05; }
       taken.push([x, z, foot]);
       k++;
     }
   };
-  place(truck, 5, 36, 2, 6, 4.2, 0.5);
-  place(digger, 5, 36, 1, 7, 4.0, 0.5);
-  place(()=>cone(3 + Math.random()*3, [0x6e655a, 0x7a6f60, 0x5c564e][Math.floor(Math.random()*3)]), 5, 40, 6, 6, 5, 1.2);
-  place(truck, 50, 125, 2, 6, 4.2, 0.6);
-  place(()=>cone(2 + Math.random()*2, 0x6a6258), 40, 128, 10, 4, 3.5, 1.2);
+  const floorR = PIT.r*(1 - PIT.span);
+  const sand = [0xb89a6a, 0xa88c62, 0x8a7c6a, 0x7a6f60];
+  place(truck, 5, floorR - 8, 2, 6, 4.2, 0.6);
+  place(digger, 5, floorR - 8, 1, 7, 4.0, 0.6);
+  place((x, z)=>cone(3 + Math.random()*3, sand[Math.floor(Math.random()*sand.length)], x, z), 5, floorR, 6, 6, 5, 2.5);
+  place(truck, floorR + 10, PIT.r - 8, 2, 6, 4.2, 0.8);
+  place((x, z)=>cone(2 + Math.random()*2, sand[Math.floor(Math.random()*sand.length)], x, z), floorR, PIT.r - 5, 10, 4, 3.5, 2.5);
   // floodlight masts on the rim
   for(let k=0;k<6;k++){
     const a = k/6*Math.PI*2 + 0.3, x = PIT.x + Math.cos(a)*(PIT.r + 8), z = PIT.z + Math.sin(a)*(PIT.r + 8);
@@ -4347,7 +5113,7 @@ function bushGeometry(seed){
       const z = P.pts[i].z + nz*side*off + t.z*jit;
       if(nearest(x,z).dist < 9.4) return false;
       if(Math.hypot(x,z) > 620) return false;
-      if(inWaterway(x,z)) return false;          // trees do not grow in the river
+      if(inWaterway(x,z) || barren(x,z)) return false;          // trees do not grow in the river
       if(DESERT && Math.random() > 0.2) return false;        // the desert is open country
       const kind = FALL ? (Math.random() < 0.22 ? 0 : (Math.random() < 0.55 ? 1 : 2))
                  : DESERT ? (Math.random() < 0.6 ? 0 : (Math.random() < 0.6 ? 1 : 2))
@@ -4405,7 +5171,7 @@ function bushGeometry(seed){
       const off = 7.6 + Math.pow(Math.random(), 0.6)*46;
       const x = P.pts[i].x + nx*side*off + t.x*(Math.random()-0.5)*18;
       const z = P.pts[i].z + nz*side*off + t.z*(Math.random()-0.5)*18;
-      if(inWaterway(x,z)) return false;
+      if(inWaterway(x,z) || barren(x,z)) return false;
       if(nearest(x,z).dist < 7.4) return false;
       const s = 0.28 + Math.pow(Math.random(), 2.1)*3.3;   // mostly small, a few big
       rockSpots[(Math.random()*3)|0].push([x, gradedY(x,z) - s*0.28, z, s]);
@@ -4445,7 +5211,7 @@ function bushGeometry(seed){
       const x = P.pts[i].x + nx*side*off + t.x*(Math.random()-0.5)*14;
       const z = P.pts[i].z + nz*side*off + t.z*(Math.random()-0.5)*14;
       if(nearest(x,z).dist < 6.9) return false;
-      if(inWaterway(x,z)) return false;
+      if(inWaterway(x,z) || barren(x,z)) return false;
       const s = 0.10 + Math.pow(Math.random(), 2.4)*0.5;
       pebbleSpots[(Math.random()*3)|0].push([x, gradedY(x,z) - s*0.35, z, s]);
       return true;
@@ -4491,7 +5257,7 @@ function bushGeometry(seed){
         const x = P.pts[i].x + nx*side*off + t.x*(Math.random()-0.5)*14;
         const z = P.pts[i].z + nz*side*off + t.z*(Math.random()-0.5)*14;
         if(nearest(x,z).dist < P.half[i] + 0.3) continue;
-        if(inWaterway(x,z)) continue;
+        if(inWaterway(x,z) || barren(x,z)) continue;
         const s2 = 0.10 + Math.pow(Math.random(), 2.4)*0.55;
         spots[(Math.random()*3)|0].push([x, gradedY(x,z) - s2*0.30, z, s2]);
         n++;
@@ -4529,7 +5295,7 @@ function bushGeometry(seed){
       const off = 6.8 + Math.pow(Math.random(), 0.7)*30;
       const x = P.pts[i].x + nx*side*off + t.x*(Math.random()-0.5)*16;
       const z = P.pts[i].z + nz*side*off + t.z*(Math.random()-0.5)*16;
-      if(inWaterway(x,z)) return false;
+      if(inWaterway(x,z) || barren(x,z)) return false;
       if(nearest(x,z).dist < 6.6) return false;
       bushSpots[(Math.random()*3)|0].push([x, gradedY(x,z)-0.15, z, 0.9 + Math.random()*1.9]);
       return true;
@@ -4622,7 +5388,7 @@ function bushGeometry(seed){
       const x = P.pts[i].x + nx*side*off + t.x*(Math.random()-0.5)*16;
       const z = P.pts[i].z + nz*side*off + t.z*(Math.random()-0.5)*16;
       if(nearest(x,z).dist < 6.2) continue;
-      if(inWaterway(x,z)) continue;
+      if(inWaterway(x,z) || barren(x,z)) continue;
       const h = 0.75 + Math.random()*1.5;
       pos.push(x, gradedY(x,z) - 0.05, z);
       scale.push(h*(1.1 + Math.random()*0.5), h);
@@ -5652,6 +6418,8 @@ dustGeo.setAttribute("position", new THREE.BufferAttribute(dustPos,3));
 const dustAlpha = new Float32Array(DUST);
 const dustSize  = new Float32Array(DUST);
 const dustCol   = new Float32Array(DUST*3);
+const dustGrav  = new Float32Array(DUST).fill(5.2);   // water falls, smoke and dust hang
+const dustGrow  = new Float32Array(DUST).fill(2.2);
 dustGeo.setAttribute("aAlpha", new THREE.BufferAttribute(dustAlpha,1).setUsage(THREE.DynamicDrawUsage));
 dustGeo.setAttribute("aSize",  new THREE.BufferAttribute(dustSize,1).setUsage(THREE.DynamicDrawUsage));
 dustGeo.setAttribute("aCol",   new THREE.BufferAttribute(dustCol,3).setUsage(THREE.DynamicDrawUsage));
@@ -5691,6 +6459,7 @@ function spawnDust(x,y,z,sandy,force,vx,vz,lift){
   dustVel[i*3+2]=(vz||0) + (Math.random()-0.5)*2.6;
   dustLife[i]=0.8+Math.random()*0.7 + force*0.4;
   dustSize[i]=0.8+Math.random()*1.3 + force*0.6;
+  dustGrav[i]=5.2; dustGrow[i]=2.2;
   const j=i*3;
   if(Array.isArray(sandy)){                       // drift sparks carry their tier colour
     dustCol[j]=sandy[0]; dustCol[j+1]=sandy[1]; dustCol[j+2]=sandy[2];
@@ -5704,14 +6473,31 @@ function spawnDust(x,y,z,sandy,force,vx,vz,lift){
     dustCol[j+2] = Math.min(1, (g2*(1-m) + c[2]*m)*b);
     dustSize[i]*=1.7; dustLife[i]*=1.3;
   }
+  else if(sandy === 4){                           // powder snow
+    const g2 = 0.9 + Math.random()*0.1;
+    dustCol[j]=g2*0.95; dustCol[j+1]=g2*0.97; dustCol[j+2]=g2;
+    dustSize[i]*=0.9; dustLife[i]*=0.9; dustGrav[i]=2.2;
+  }
   else if(sandy === 3){                           // tyre smoke
     const g2 = 0.72 + Math.random()*0.16;
     dustCol[j]=g2; dustCol[j+1]=g2; dustCol[j+2]=g2*0.98;
     dustSize[i]*=1.45; dustLife[i]*=1.05;
   }
-  else if(sandy === 2){ dustCol[j]=0.86; dustCol[j+1]=0.93; dustCol[j+2]=0.97; dustSize[i]*=1.5; }
-  else if(sandy){  dustCol[j]=0.52; dustCol[j+1]=0.41; dustCol[j+2]=0.27; dustSize[i]*=0.7; dustLife[i]*=0.8; }
-  else {           dustCol[j]=0.55; dustCol[j+1]=0.55; dustCol[j+2]=0.53; dustSize[i]*=0.7; dustLife[i]*=0.8; }
+  else if(sandy === 2){
+    /* water: a spray of drops thrown back off the tyre that falls again,
+       not a cloud that climbs and swells over the car */
+    dustCol[j]=0.80; dustCol[j+1]=0.89; dustCol[j+2]=0.95;
+    dustVel[i*3+1] = (lift===undefined?0.8:lift)*(0.6+Math.random()*0.8) + force*0.12;
+    dustSize[i] = 0.6 + Math.random()*0.6; dustLife[i] = 0.5 + Math.random()*0.35;
+    dustGrav[i] = 13; dustGrow[i] = 0.5;
+  }
+  else if(sandy){
+    if(WINTER){ dustCol[j]=0.86; dustCol[j+1]=0.89; dustCol[j+2]=0.93; }
+    else if(DESERT){ dustCol[j]=0.74; dustCol[j+1]=0.55; dustCol[j+2]=0.38; }
+    else { dustCol[j]=0.52; dustCol[j+1]=0.41; dustCol[j+2]=0.27; }
+    dustSize[i]*=0.55; dustLife[i]*=0.65; dustGrow[i]=1.5;
+  }
+  else {           dustCol[j]=0.55; dustCol[j+1]=0.55; dustCol[j+2]=0.53; dustSize[i]*=0.55; dustLife[i]*=0.65; dustGrow[i]=1.5; }
 }
 
 /* ------------------------------------------------------------------ *
@@ -5779,6 +6565,8 @@ const postMat = new THREE.ShaderMaterial({
     uFxaa:    {value: 0},
     tDepth:   {value: null},
     uPrint:   {value: 1},
+    uStock:   {value: WINTER ? new THREE.Vector3(0.90, 0.95, 1.0) : new THREE.Vector3(0.98, 0.93, 0.80)},
+    uWarm:    {value: WINTER ? new THREE.Vector3(0.97, 1.0, 1.04) : new THREE.Vector3(1.04, 1.00, 0.90)},
     uNear:    {value: camera.near},
     uFar:     {value: camera.far},
     uInk:     {value: 1}
@@ -5788,7 +6576,7 @@ const postMat = new THREE.ShaderMaterial({
     "uniform sampler2D tDiffuse, tBloom;",
     "uniform vec2 uRes, uSunPos;",
     "uniform float uAspect, uSpeed, uSunVis, uFlash, uTime, uFxaa;",
-    "uniform sampler2D tDepth; uniform float uPrint, uNear, uFar, uInk;",
+    "uniform sampler2D tDepth; uniform float uPrint, uNear, uFar, uInk; uniform vec3 uStock, uWarm;",
     "float linZ(float d){ float z = d*2.0 - 1.0; return 2.0*uNear*uFar/(uFar + uNear - z*(uFar - uNear)); }",
     "varying vec2 vUv;",
 
@@ -5885,12 +6673,12 @@ const postMat = new THREE.ShaderMaterial({
     // two inks and the stock: teal in the shadows, cream where it is light
     "    float l1 = dot(col, vec3(0.2126, 0.7152, 0.0722));",
     "    vec3 pal = l1 < 0.5 ? mix(vec3(0.07, 0.17, 0.21), vec3(0.52, 0.50, 0.33), l1*2.0)",
-    "                        : mix(vec3(0.52, 0.50, 0.33), vec3(0.98, 0.93, 0.80), l1*2.0 - 1.0);",
+    "                        : mix(vec3(0.52, 0.50, 0.33), uStock, l1*2.0 - 1.0);",
     "    col = mix(col, pal, 0.30);",
     // greens drift toward olive and teal, as a two-ink press would print them
     "    float gsh = clamp((col.g - max(col.r, col.b))*3.0, 0.0, 1.0);",
     "    col = mix(col, vec3(col.g*0.62, col.g*0.86, col.g*0.62 + col.b*0.25), gsh*0.35);",
-    "    col = mix(col, col*vec3(1.04, 1.00, 0.90), smoothstep(0.55, 0.95, l1));",
+    "    col = mix(col, col*uWarm, smoothstep(0.55, 0.95, l1));",
     // halftone: a 45 degree dot screen that only prints in the shadows
     "    float cellPx = 4.5*uInk;",
     "    vec2 hp = mat2(0.7071, -0.7071, 0.7071, 0.7071)*gl_FragCoord.xy/cellPx;",
@@ -6419,7 +7207,11 @@ function stepCar(dt){
   const offRoad = nDist > nHalf - 0.3;
   const deepOff = nDist > nHalf + 3.5;
   const mudAmt = offRoad ? 0 : near0.mud;          // 0 to 1, blended along the road
-  const wetAmt = offRoad ? 0 : near0.wet;
+  /* In the Winter Cup the water is ice: a ford or the creek is not deep and
+     draggy but glassy, and the frozen lake is ice from shore to shore. */
+  const wet0 = offRoad ? 0 : near0.wet;
+  const iceAmt = FROZEN ? Math.max(wet0, iceAt(pose.x, pose.z)) : 0;
+  const wetAmt = FROZEN ? 0 : wet0;
   const inMud   = mudAmt > 0.25;
   const inWater = wetAmt > 0.30;
 
@@ -6432,7 +7224,7 @@ function stepCar(dt){
   // ---- drivetrain -------------------------------------------------
   const sp0 = Math.abs(along);
   // dirt off the road costs grip and some speed, not the whole run
-  const traction = deepOff ? 0.60 : offRoad ? 0.74 : 1 - mudAmt*0.20 - wetAmt*0.08;
+  const traction = (deepOff ? 0.60 : offRoad ? 0.74 : 1 - mudAmt*0.20 - wetAmt*0.08) * (1 - iceAmt*0.28);
 
   // engage forward or reverse from a near stop
   if(sp0 < 0.6){
@@ -6517,6 +7309,7 @@ function stepCar(dt){
 
   let grip = (hand && !sliding) ? 1.9 : deepOff ? 3.4 : offRoad ? 5.0
            : 8.6 - mudAmt*3.5 - wetAmt*2.3;
+  grip *= 1 - iceAmt*0.66;                          // on ice the tail keeps on going
   if(pose.air) grip = 0.35;                          // barely any yaw authority mid air
   let nfx, nfz;
   if(sliding && !pose.air){
@@ -6567,6 +7360,30 @@ function stepCar(dt){
         pose.x -= nx2*push; pose.z -= nz2*push;
         const vn = pose.vx*nx2 + pose.vz*nz2;
         pose.vx -= nx2*vn*1.35; pose.vz -= nz2*vn*1.35;   // scrub along the stone
+      }
+    }
+  }
+
+  /* The gallery's pillars and the canyon's walls are solid: running wide
+     there scrapes along them instead of climbing the rock. */
+  if(GALLERY.on || CANYON.on){
+    const nW = nearest(pose.x, pose.z);
+    if(nW.path === MAIN){
+      const inGal = GALLERY.on && ((nW.pi - GALLERY.a)%MAIN.N + MAIN.N)%MAIN.N <= GALLERY.b - GALLERY.a;
+      const inCan = !inGal && canyonAt(pose.x, pose.z) > 0.35;
+      if(inGal || inCan){
+        const pW = MAIN.pts[nW.pi], tW = MAIN.tans[nW.pi];
+        const nx2 = -tW.z, nz2 = tW.x;
+        const lat = (pose.x - pW.x)*nx2 + (pose.z - pW.z)*nz2;
+        const lim = nW.half + (inGal ? 1.0 : 1.7);
+        if(Math.abs(lat) > lim){
+          const push = (Math.abs(lat) - lim)*Math.sign(lat);
+          pose.x -= nx2*push; pose.z -= nz2*push;
+          const vn = pose.vx*nx2 + pose.vz*nz2;
+          if(vn*Math.sign(lat) > 0){ pose.vx -= nx2*vn*1.3; pose.vz -= nz2*vn*1.3; }
+          pose.vx *= 0.995; pose.vz *= 0.995;
+          if(Math.abs(vn) > 4) GAME.shake = Math.max(GAME.shake || 0, 0.12);
+        }
       }
     }
   }
@@ -6980,14 +7797,15 @@ function stepCar(dt){
     const kind = inWater ? 2 : (inMud || offRoad) ? 1 : 0;
     // the wheel throws material back along its own contact patch: opposite the
     // way the car is travelling, plus a sideways kick when the tail steps out
-    const dirScale = (inWater ? 1.05 : 0.68) * Math.min(1, sp/12);
+    const dirScale = (inWater ? 0.62 : 0.45) * Math.min(1, sp/12);
     const backX = -pose.vx*dirScale, backZ = -pose.vz*dirScale;
     const sideKick = -slip*0.45;
-    const lift = inWater ? 0.75 : 0.9;           // thrown back along the ground, not up
-    const wheels = wading
-      ? [[ 1.73, 0.80], [ 1.73,-0.80], [-1.22, 0.80], [-1.22,-0.80]]   // all four
-      : [[-1.22, 0.80], [-1.22,-0.80]];                                // driven axle
-    const perWheel = inWater ? 2 : (wading || slid > 2.2 || hand) ? 1 : (Math.random() < 0.45 ? 1 : 0);
+    const lift = inWater ? 2.2 : 0.6;            // thrown back along the ground, not up
+    // the rear tyres throw it: the fronts used to as well, and in water that
+    // stood a column of spray straight up in front of the camera
+    const wheels = [[-1.22, 0.80], [-1.22,-0.80]];
+    const perWheel = inWater ? 3 : (wading || slid > 2.2 || hand) ? (Math.random() < 0.6 ? 1 : 0)
+                   : (Math.random() < 0.2 ? 1 : 0);
     wheels.forEach(w=>{
       const wx = pose.x + nfx*w[0] + rx*w[1];
       const wz = pose.z + nfz*w[0] + rz*w[1];
@@ -7002,8 +7820,8 @@ function stepCar(dt){
                   lift);
       }
     });
-    if(inWater) splash.water = Math.min(1, splash.water + sp*dt*0.28);
-    if(inMud)   splash.mud   = Math.min(1, splash.mud   + sp*dt*0.05);   // mud only; running wide no longer muddies the lens
+    if(inWater) splash.water = Math.min(1, splash.water + sp*dt*0.10);
+    if(inMud)   splash.mud   = Math.min(1, splash.mud   + sp*dt*0.025);  // mud only; running wide no longer muddies the lens
   }
   // dirt off the outside pair while the body is leaning on them
   if(hardTurn){
@@ -7014,7 +7832,7 @@ function stepCar(dt){
     [[1.73, 0.80*outSide], [-1.22, 0.80*outSide]].forEach((o, wi)=>{
       const wx = pose.x + nfx*o[0] + rx*o[1];
       const wz = pose.z + nfz*o[0] + rz*o[1];
-      const n2 = wi ? 1 : 0;                           // rear throws, front barely
+      const n2 = wi && Math.random() < 0.5 ? 1 : 0;    // rear throws, front barely
       for(let k=0;k<n2;k++){
         spawnDust(wx + (Math.random()-0.5)*0.45,
                   pose.y + 0.13,
@@ -7027,7 +7845,14 @@ function stepCar(dt){
     });
   }
 
-  if(!offRoad && !pose.air && wetAmt < 0.4 && sp > 3 && (slid > 1.8 || sliding)){
+  if(iceAmt > 0.3 && !pose.air && sp > 6 && (slid > 1.2 || sliding || Math.random() < 0.3)){
+    // loose snow blown off the ice
+    for(const o of [[-1.22, 0.80], [-1.22,-0.80]]){
+      spawnDust(pose.x + nfx*o[0] + rx*o[1], pose.y + 0.1, pose.z + nfz*o[0] + rz*o[1], 4, 0.4 + slid*0.1,
+                -pose.vx*0.25 + rx*(Math.random() - 0.5)*2, -pose.vz*0.25 + rz*(Math.random() - 0.5)*2, 0.5);
+    }
+  }
+  if(!offRoad && !pose.air && wetAmt < 0.4 && iceAmt < 0.4 && sp > 3 && (slid > 1.8 || sliding)){
     layMark(0, pose.x - nfx*1.22 + rx*0.80, pose.y + 0.035, pose.z - nfz*1.22 + rz*0.80, rx, rz);
     layMark(1, pose.x - nfx*1.22 - rx*0.80, pose.y + 0.035, pose.z - nfz*1.22 - rz*0.80, rx, rz);
   } else {
@@ -7409,7 +8234,9 @@ const MODES = {
   trial: { laps:3, rivals:false, label:"Time trial", ghost:true }
 };
 const CUPS = [ {name:"Summer Cup", rounds:[0, 1, 2, 4]},       // every summer circuit but the test yard
-               {name:"Fall Cup",   rounds:[5, 6, 7]} ];
+               {name:"Fall Cup",   rounds:[5, 6, 7]},
+               {name:"Winter Cup", rounds:[8, 9, 10, 11]},
+               {name:"Desert Cup", rounds:[12, 13, 14, 15]} ];
 let CHAMP_ROUNDS = CUPS[0].rounds;
 function setCup(k){ CHAMP_ROUNDS = CUPS[k || 0].rounds; }
 if(SAVE.champ && SAVE.champ.cup) setCup(SAVE.champ.cup);
@@ -7550,7 +8377,8 @@ function stepRivals(dt){
         target *= 1 - Math.max(-1, Math.min(1, gap/240))*0.07;
       }
       const q = nearest(r.mesh.position.x, r.mesh.position.z);
-      target *= 1 - (q.wet||0)*0.32 - (q.mud||0)*0.12;
+      target *= FROZEN ? 1 - Math.max(q.wet||0, iceAt(r.mesh.position.x, r.mesh.position.z))*0.12 - (q.mud||0)*0.12
+                       : 1 - (q.wet||0)*0.32 - (q.mud||0)*0.12;
 
       // traffic: anything close ahead in the same lane
       let blocked = false;
@@ -8182,7 +9010,7 @@ function showMain(sel){
   const C = SAVE.champ;
   const champSub = C && !C.done ? CUPS[C.cup || 0].name + ", round " + (C.round+1) + " of " + CHAMP_ROUNDS.length : "";
   const DESC = {
-    champ:"Two cups: the Summer Cup over four rounds, and the Fall Cup over three in the maples. Three laps a round against the same three drivers, points 10, 6, 4 and 3, saved between sessions.",
+    champ:"Four cups: the Summer Cup over four rounds, the Fall Cup over three in the maples, the Winter Cup over four on snow and ice, and the Desert Cup over four in the red rock. Three laps a round against the same three drivers, points 10, 6, 4 and 3, saved between sessions.",
     race:"Any circuit, five laps, the full field.",
     trial:"Three laps with the road to yourself. Your best lap on each circuit is saved and comes back as a ghost to chase.",
     opts:"Rival pace, sound, camera, gearbox and the arcade filter.",
@@ -8274,6 +9102,8 @@ function showChamp(){
          esc(TRACKS[CHAMP_ROUNDS[C.round]].name) + '</small></button>' : '') +
     '<button class="item" data-act="summer" data-k="0"><span>' + (C ? 'NEW ' : 'START ') + 'SUMMER CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds') + '</small></button>' +
     '<button class="item" data-act="fall" data-k="1"><span>' + (C ? 'NEW ' : 'START ') + 'FALL CUP</span><small>' + (C ? 'Clears your points' : 'Three rounds in the maples') + '</small></button>' +
+    '<button class="item" data-act="winter" data-k="2"><span>' + (C ? 'NEW ' : 'START ') + 'WINTER CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds on snow and ice') + '</small></button>' +
+    '<button class="item" data-act="desert" data-k="3"><span>' + (C ? 'NEW ' : 'START ') + 'DESERT CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds in the red rock') + '</small></button>' +
     '<button class="item back" data-act="back"><span>BACK</span></button></div></div>' +
     '<div class="right"><div id="cupNote"></div>' +
     (C ? standingsTable() : '<div class="note"><p>Three laps a round. Finish first for 10 points, then 6, 4 and 3. Most points at the end takes the cup.</p></div>') +
@@ -8287,6 +9117,8 @@ function showChamp(){
       acts:{ cont:()=>{ SFX.ok(); champRound(); },
              summer:()=> start(0),
              fall:()=> start(1),
+             winter:()=> start(2),
+             desert:()=> start(3),
              back:()=>{ SFX.back(); showMain(0); } } });
   MENU.onSel(MENU.items[MENU.sel]);
 }
@@ -8459,19 +9291,23 @@ let info = {sp:0, offRoad:false, thr:0, hand:false, surf:0, air:false};
 /* ------------------------------------------------------------------ *
  *  Leaf piles
  *
- *  Heaps raked onto the road here and there. Drive through one (or let a
- *  rival) and it goes up in a burst that flutters down behind you; the
- *  heap builds itself back up a little while later. What the heap is made
- *  of follows the season: leaves, snow, or dry brush in the desert.
+ *  Heaps of leaves raked onto the road here and there, on every circuit.
+ *  Drive through one (or let a rival) and it goes up in a burst that
+ *  flutters down behind you; the heap builds itself back up a little
+ *  while later. The leaves follow the season: green going gold in summer,
+ *  red and orange in the fall, dry oak brown in the snow and the desert.
  * ------------------------------------------------------------------ */
 const PILES = [];
 let PILE_HITS = 0;
-const PILE_KIND = TRACK.season === "winter" ? "snow" : TRACK.season === "desert" ? "brush" : FALL ? "fall" : "summer";
+const PILE_KIND = TRACK.season === "winter" || TRACK.season === "desert" ? "dry" : FALL ? "fall" : "summer";
 function pileColour(c){
   const r = Math.random();
   if(PILE_KIND === "fall") return fallTint(c);
-  if(PILE_KIND === "snow") return c.setHSL(0.58, 0.18 + r*0.1, 0.86 + r*0.1);
-  if(PILE_KIND === "brush") return c.setHSL(0.08 + r*0.04, 0.35 + r*0.15, 0.36 + r*0.16);
+  if(PILE_KIND === "dry"){
+    if(r < 0.45) return c.setHSL(0.07 + Math.random()*0.03, 0.55, 0.30 + Math.random()*0.10);   // oak brown
+    if(r < 0.80) return c.setHSL(0.10 + Math.random()*0.03, 0.60, 0.42 + Math.random()*0.10);   // tan
+    return c.setHSL(0.02 + Math.random()*0.03, 0.55, 0.32 + Math.random()*0.08);                 // rust
+  }
   // late summer: green going brown and gold
   if(r < 0.45) return c.setHSL(0.22 + Math.random()*0.06, 0.45, 0.34 + Math.random()*0.1);
   if(r < 0.75) return c.setHSL(0.10 + Math.random()*0.04, 0.55, 0.40 + Math.random()*0.1);
@@ -8493,7 +9329,7 @@ function pileColour(c){
   const gapM = (a, b)=>{ const d = Math.abs(a - b) % MAIN.N; return Math.min(d, MAIN.N - d)*MAIN.seg; };
   const okMain = i => !avoid.some(v=> gapM(i, v[0]) < v[1]) && MAIN.surf[i] !== SURF.WATER && !MAIN.deck[i];
   const spots = [];
-  const want = 9, step = Math.floor(MAIN.N/want);
+  const want = 14, step = Math.floor(MAIN.N/want);
   for(let n=0;n<want;n++){
     for(let k=0;k<step;k+=3){
       const i = wrapIdx(MAIN, n*step + Math.round(step*0.5) + (k % 2 ? -k : k)/2);
@@ -8501,8 +9337,8 @@ function pileColour(c){
     }
   }
   BRANCHES.forEach(P=>{
-    for(let tries=0; tries<40; tries++){
-      const i = Math.round(P.N*(0.3 + Math.random()*0.4));
+    for(const at of [0.35, 0.68]) for(let tries=0; tries<40; tries++){
+      const i = Math.round(P.N*(at + (Math.random() - 0.5)*0.16));
       if(P.surf[i] === SURF.WATER) continue;
       if(P.leapAt && Math.abs(i - P.leapAt) < 100/P.seg) continue;
       spots.push([P, i]); break;
@@ -8522,14 +9358,14 @@ function pileColour(c){
     geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
     geo.computeVertexNormals();
     const bed = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({vertexColors:true, flatShading:true}));
-    bed.scale.set(r, r*0.34, r*1.15); g.add(bed);
+    bed.scale.set(r, r*0.40, r*1.15); g.add(bed);
     // the loose pieces, one merged mesh
-    const P2 = [], C2 = [], n = PILE_KIND === "snow" ? 0 : 150;
+    const P2 = [], C2 = [], n = 240;
     for(let k=0;k<n;k++){
       const a = Math.random()*Math.PI*2, u = Math.sqrt(Math.random())*1.05;
       const x0 = Math.cos(a)*u*r, z0 = Math.sin(a)*u*r*1.15;
-      const y0 = r*0.34*Math.sqrt(Math.max(0, 1 - u*u)) + 0.02;
-      const L = (PILE_KIND === "brush" ? 0.5 : 0.28) + Math.random()*0.18, W = L*(PILE_KIND === "brush" ? 0.18 : 0.55);
+      const y0 = r*0.40*Math.sqrt(Math.max(0, 1 - u*u)) + 0.02;
+      const L = 0.3 + Math.random()*0.2, W = L*0.55;
       const h = Math.random()*Math.PI*2, ch = Math.cos(h), sh = Math.sin(h);
       const tilt = (Math.random() - 0.5)*0.5;
       const v = [[L,0],[0,W],[-L,0],[0,-W]].map(q=> [x0 + q[0]*ch - q[1]*sh, y0 + q[0]*tilt, z0 + q[0]*sh + q[1]*ch]);
@@ -8549,16 +9385,16 @@ function pileColour(c){
     const t = P.tans[i], nx = -t.z, nz = t.x;
     const lat = (Math.random() - 0.5)*Math.max(0, P.half[i]*2 - 4.5);
     const x = P.pts[i].x + nx*lat, z = P.pts[i].z + nz*lat;
-    const r = 2.1 + Math.random()*0.7;
+    const r = 2.6 + Math.random()*0.9;
     const m = mound(r);
     m.position.set(x, surfaceY(x, z) - 0.06, z);
     m.rotation.y = Math.atan2(t.x, t.z);
     scene.add(m);
-    PILES.push({m, x, z, r, s:1, down:0, h:r*0.34});
+    PILES.push({m, x, z, r, s:1, down:0, h:r*0.40});
   });
 }
 /* the burst: a pool of flat bits that tumble and flutter */
-const LEAF_N = 900;
+const LEAF_N = 1600;
 const leafPos = new Float32Array(LEAF_N*3), leafVel = new Float32Array(LEAF_N*3),
       leafLife = new Float32Array(LEAF_N), leafCol = new Float32Array(LEAF_N*3), leafPh = new Float32Array(LEAF_N);
 let leafHead = 0;
@@ -8569,23 +9405,20 @@ for(let i=0;i<LEAF_N;i++) leafPos[i*3+1] = -9999;
 {
   const tex = new THREE.CanvasTexture(noiseCanvas(32, 32, (q, w, h)=>{
     q.fillStyle = "#fff";
-    if(PILE_KIND === "snow"){ q.beginPath(); q.arc(16, 16, 12, 0, 7); q.fill(); }
-    else if(PILE_KIND === "brush"){ q.lineWidth = 3; q.strokeStyle = "#fff";
-      for(let k=0;k<5;k++){ q.beginPath(); q.moveTo(16, 16); q.lineTo(16 + Math.cos(k*1.3)*14, 16 + Math.sin(k*1.3)*14); q.stroke(); } }
-    else { q.beginPath(); q.moveTo(16, 2); q.quadraticCurveTo(30, 14, 16, 30); q.quadraticCurveTo(2, 14, 16, 2); q.fill(); }
+    q.beginPath(); q.moveTo(16, 2); q.quadraticCurveTo(30, 14, 16, 30); q.quadraticCurveTo(2, 14, 16, 2); q.fill();
   }));
-  const pts = new THREE.Points(leafGeo, new THREE.PointsMaterial({size: PILE_KIND === "snow" ? 0.5 : 0.62, map:tex,
+  const pts = new THREE.Points(leafGeo, new THREE.PointsMaterial({size: 0.7, map:tex,
                 vertexColors:true, transparent:true, alphaTest:0.4, depthWrite:false}));
   pts.frustumCulled = false; scene.add(pts);
 }
 function burstPile(p, vx, vz, sp){
-  const n = Math.min(240, 110 + Math.round(sp*4));
+  const n = Math.min(380, 170 + Math.round(sp*6));
   const c = new THREE.Color();
   for(let k=0;k<n;k++){
     const i = leafHead = (leafHead + 1) % LEAF_N;
     const a = Math.random()*Math.PI*2, rr = Math.random()*p.r;
     leafPos[i*3] = p.x + Math.cos(a)*rr; leafPos[i*3+1] = p.m.position.y + 0.3 + Math.random()*0.4; leafPos[i*3+2] = p.z + Math.sin(a)*rr;
-    const up = (PILE_KIND === "snow" ? 3 : 4) + Math.random()*(3 + sp*0.14);
+    const up = 5 + Math.random()*(4 + sp*0.2);            // shot up well over the roof
     leafVel[i*3]   = vx*(0.25 + Math.random()*0.45) + Math.cos(a)*(1 + Math.random()*3);
     leafVel[i*3+1] = up;
     leafVel[i*3+2] = vz*(0.25 + Math.random()*0.45) + Math.sin(a)*(1 + Math.random()*3);
@@ -8624,7 +9457,7 @@ function stepLeafPiles(dt){
     p.m.position.y = surfaceY(p.x, p.z) - 0.06;
   });
   // the bits: thrown up, then caught by the air and fluttering down
-  const floatK = PILE_KIND === "brush" ? 1.8 : PILE_KIND === "snow" ? 2.2 : 3.2;
+  const floatK = 3.2;
   let any = false;
   for(let i=0;i<LEAF_N;i++){
     if(leafLife[i] <= 0) continue;
@@ -8648,6 +9481,27 @@ function stepLeafPiles(dt){
   if(any || leafGeo.attributes.position.needsUpdate) leafGeo.attributes.position.needsUpdate = true;
 }
 function resetPiles(){ PILES.forEach(p=>{ p.s = 1; p.down = 0; }); for(let i=0;i<LEAF_N;i++){ leafLife[i] = 0; leafPos[i*3+1] = -9999; } }
+
+function stepDust(dt){
+  for(let i=0;i<DUST;i++){
+    if(dustLife[i] > 0){
+      dustLife[i] -= dt;
+      dustPos[i*3]   += dustVel[i*3]*dt;
+      dustPos[i*3+1] += dustVel[i*3+1]*dt;
+      dustPos[i*3+2] += dustVel[i*3+2]*dt;
+      dustVel[i*3]   *= (1 - dt*1.9);
+      dustVel[i*3+2] *= (1 - dt*1.9);
+      dustVel[i*3+1] -= dustGrav[i]*dt;
+      dustSize[i]    += dt*dustGrow[i];
+      dustAlpha[i]    = Math.max(0, Math.min(1, dustLife[i]))*0.85;
+      if(dustLife[i] <= 0){ dustPos[i*3+1] = -999; dustAlpha[i] = 0; }
+    }
+  }
+  dustGeo.attributes.position.needsUpdate = true;
+  dustGeo.attributes.aAlpha.needsUpdate = true;
+  dustGeo.attributes.aSize.needsUpdate = true;
+  dustGeo.attributes.aCol.needsUpdate = true;
+}
 
 function frame(now){
   requestAnimationFrame(frame);
@@ -8685,24 +9539,7 @@ function frame(now){
     stepRaceEvents(dt, info);
     stepGhost();
 
-    for(let i=0;i<DUST;i++){
-      if(dustLife[i] > 0){
-        dustLife[i] -= dt;
-        dustPos[i*3]   += dustVel[i*3]*dt;
-        dustPos[i*3+1] += dustVel[i*3+1]*dt;
-        dustPos[i*3+2] += dustVel[i*3+2]*dt;
-        dustVel[i*3]   *= (1 - dt*1.9);
-        dustVel[i*3+2] *= (1 - dt*1.9);
-        dustVel[i*3+1] -= 5.2*dt;
-        dustSize[i]    += dt*2.2;
-        dustAlpha[i]    = Math.max(0, Math.min(1, dustLife[i]))*0.85;
-        if(dustLife[i] <= 0){ dustPos[i*3+1] = -999; dustAlpha[i] = 0; }
-      }
-    }
-    dustGeo.attributes.position.needsUpdate = true;
-    dustGeo.attributes.aAlpha.needsUpdate = true;
-    dustGeo.attributes.aSize.needsUpdate = true;
-    dustGeo.attributes.aCol.needsUpdate = true;
+    stepDust(dt);
 
     if(state.phase === "menu") attractCam(dt);
     else if(state.phase === "done" && GAME.doneT > 1.4) finishCam(dt);
@@ -8730,8 +9567,8 @@ function frame(now){
     splash.water = Math.max(0, splash.water - dt*0.75);
   }
   const lens = state.phase === "menu" ? 0 : 1;
-  elSplatMud.style.opacity   = (splash.mud*0.22*lens).toFixed(3);
-  elSplatWater.style.opacity = (splash.water*0.30*lens).toFixed(3);
+  elSplatMud.style.opacity   = (splash.mud*0.10*lens).toFixed(3);
+  elSplatWater.style.opacity = (splash.water*0.16*lens).toFixed(3);
 
   const clock = state.phase === "menu" ? GAME.attractT : state.t;
   ANIMS.forEach(f=> f(clock));
@@ -8752,6 +9589,13 @@ function frame(now){
 
   followShadow();
   renderView(now*0.001);
+}
+/* #debug: a handle on the world for testing tools */
+if(/debug/.test(location.hash)){
+  window.__R = { THREE, TRACKS, TRACK, TRACK_ID, MAIN, BRANCHES, paths, ROUTE, pose, state, camera, scene, renderer,
+                 surfaceY, gridH, nearest, PILES, PIT, GAME, CTL, trans, MAXV, radiiOf, radiiOpen, resetRace, setMode,
+                 closeUI, rivals, car, splash, cornerHoldSpeed, stepCar, placeAtStart, drift, AUTO_JUMPS,
+                 __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER };
 }
 boot();
 requestAnimationFrame(frame);
