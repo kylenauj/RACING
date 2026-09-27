@@ -6149,6 +6149,8 @@ function buildWagon(opts){
     strap:   mat(0x2b2b2b, { roughness: 1 }),
     jerry:   mat(0x3f5a2a, { roughness: 0.8 }),
     jerryR:  mat(0xb3261e, { roughness: 0.8 }),
+    jerryX:  mat(0x55733a, { roughness: 0.7 }),
+    jerryRX: mat(0xcf3a2c, { roughness: 0.7 }),
     plastic: mat(0x1c1c1c, { roughness: 0.95 }),
     stripe:  mat(0xf2efe6, { roughness: 0.6 }),
     wood:    mat(0x8a5a34, { roughness: 0.9 }),
@@ -6310,7 +6312,6 @@ function buildWagon(opts){
     for (const s of [1, -1]) box(0.05, 0.12, 0.12, M.plastic, s * 0.55, ROOF + 0.06, RT + 0.02);
   } else {
     box(1.62, 0.03, 0.2, M.paint, 0, ROOF + 0.04, RT - 0.12).rotation.x = -0.12;
-    for (const s of [1, -1]) cyl(0.006, 0.8, 4, M.trim, 'y', s * 0.78, ROOF + 0.44, RT + 0.03).rotation.x = -0.12;
   }
 
   const rearBumper = new THREE.Group();
@@ -6349,11 +6350,35 @@ function buildWagon(opts){
     }
     for (const f of [0.08, 0.5, 0.92]) box(1.34, 0.04, 0.06, M.trim, 0, RY + 0.04, RZ0 + (RZ1 - RZ0)*f);
   }
+  /* A proper jerry can, standing up: the tall flat body with the X pressed
+     into both faces, the welded seam round its edge, three carry handles
+     across the top and the spout with its cam lever on the front corner.
+     Origin at the middle of its base, the wide faces front and back. */
   const jerry = (x, y, z, m, rot) => {
     const j = new THREE.Group(); j.position.set(x, y, z); if(rot) j.rotation.y = rot; car.add(j);
-    box(0.36, 0.2, 0.26, m, 0, 0, 0, j); box(0.14, 0.04, 0.03, m, 0, 0.12, 0, j);
-    cyl(0.03, 0.05, 6, m, 'x', 0.2, 0.04, 0, j);
-    for (const s of [1, -1]) box(0.37, 0.02, 0.012, M.plastic, 0, s * 0.05, 0.132, j);
+    const W = 0.34, H = 0.46, D = 0.165;
+    box(W, H - 0.02, D, m, 0, H/2 - 0.01, 0, j);
+    box(W - 0.04, 0.02, D - 0.03, m, 0, H - 0.01, 0, j);                       // the shoulder, stepped in
+    box(W + 0.012, 0.018, D + 0.012, m, 0, 0.012, 0, j);                         // the seam round the foot
+    for (const s of [1, -1]) {
+      box(0.012, H - 0.03, D + 0.012, m, s * (W/2 - 0.003), H/2 - 0.01, 0, j);  // the seam up each side
+      // the X, pressed into each wide face
+      const L = Math.hypot(W - 0.07, H - 0.1), a = Math.atan2(H - 0.1, W - 0.07);
+      for (const k of [1, -1]) {
+        const x1 = box(L, 0.038, 0.02, (m === M.jerry ? M.jerryX : M.jerryRX), 0, H/2 - 0.02, s * (D/2 + 0.008), j);
+        x1.rotation.z = k * a;
+      }
+      box(W - 0.05, 0.02, 0.012, m, 0, H - 0.07, s * (D/2 + 0.004), j);        // the rib under the shoulder
+    }
+    // three handles across the top
+    for (const hx of [-0.09, 0, 0.09]) {
+      box(0.022, 0.012, D * 0.72, M.plastic, hx, H + 0.045, 0, j);
+      for (const hz of [1, -1]) box(0.022, 0.045, 0.014, m, hx, H + 0.02, hz * D * 0.3, j);
+    }
+    // the spout, angled out at the front corner, and its lever
+    const sp = cyl(0.028, 0.06, 8, m, 'y', W/2 - 0.055, H + 0.02, 0, j); sp.rotation.z = -0.45;
+    cyl(0.032, 0.02, 8, M.plastic, 'y', W/2 - 0.04, H + 0.045, 0, j).rotation.z = -0.45;
+    box(0.07, 0.012, 0.03, M.chrome, W/2 - 0.1, H + 0.012, 0.03, j);
   };
   const spare = (x, y, z, axis) => { cyl(0.32, 0.2, 12, M.tire, axis, x, y, z); cyl(0.19, 0.205, 8, M.rim, axis, x, y, z); };
   if (A.spare) {
@@ -6361,16 +6386,29 @@ function buildWagon(opts){
     else spare(0, 0.62, REAR - 0.16, 'z');                                  // hung on the tailgate
   }
   if (A.cans) {
-    if (A.rack) { jerry(0.3, RY + 0.16, RZ1 + 0.3, M.jerry); jerry(-0.35, RY + 0.16, RZ1 + 0.3, M.jerryR); }
-    else for (const s of [1, -1]) jerry(s * 0.72, 0.62, REAR - 0.2, s > 0 ? M.jerry : M.jerryR, Math.PI/2);
+    if (A.rack) {
+      // stood side by side in a tray at the back of the rack, strapped in
+      const cz = RZ1 + 0.2;
+      box(0.84, 0.02, 0.24, M.trim, 0, RY + 0.07, cz);
+      jerry(0.2, RY + 0.08, cz, M.jerry); jerry(-0.2, RY + 0.08, cz, M.jerryR);
+      box(0.86, 0.03, 0.012, M.strap, 0, RY + 0.33, cz - 0.09);
+    } else for (const s of [1, -1]) {
+      // standing on the rear bumper either side of the tailgate, in a bracket
+      jerry(s * 0.49, 0.435, REAR - 0.11, s > 0 ? M.jerry : M.jerryR);
+      box(0.36, 0.03, 0.012, M.strap, s * 0.49, 0.72, REAR - 0.2);
+      box(0.02, 0.36, 0.02, M.trim, s * 0.67, 0.62, REAR - 0.05);
+    }
   }
   if (A.shovel) {
     // strapped along the rack, or down the passenger side
     const sh = new THREE.Group(); car.add(sh);
     if (A.rack) sh.position.set(0.52, RY + 0.08, RZM);
-    else { sh.position.set(-0.93, 0.62, -0.2); sh.rotation.y = 0; }
+    else {
+      sh.position.set(0.5, ROOF + 0.06, (WST + RT)/2);
+      for (const dz of [-0.35, 0.3]) box(0.08, 0.04, 0.05, M.plastic, 0.5, ROOF + 0.03, (WST + RT)/2 + dz);
+    }
     cyl(0.025, 1.1, 6, M.wood, 'z', 0, 0, 0.1, sh);
-    box(0.24, 0.02, 0.3, M.steelB, 0, 0, -0.6, sh).rotation.z = A.rack ? 0 : Math.PI/2;
+    box(0.24, 0.02, 0.3, M.steelB, 0, 0, -0.6, sh);
     box(0.14, 0.03, 0.05, M.plastic, 0, 0, 0.66, sh);
   }
   if (A.lights) {
@@ -10349,7 +10387,7 @@ if(/debug/.test(location.hash)){
   window.__R = { THREE, TRACKS, TRACK, TRACK_ID, MAIN, BRANCHES, paths, ROUTE, pose, state, camera, scene, renderer,
                  surfaceY, gridH, nearest, PILES, PIT, GAME, CTL, trans, MAXV, radiiOf, radiiOpen, resetRace, setMode,
                  closeUI, rivals, car, splash, cornerHoldSpeed, stepCar, placeAtStart, drift, AUTO_JUMPS,
-                 CALM, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car };
+                 CALM, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon };
 }
 boot();
 requestAnimationFrame(frame);
