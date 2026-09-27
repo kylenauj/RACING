@@ -280,7 +280,8 @@
     "<b>Tip</b> — Land a jump straight and on the throttle, and the springs keep you moving.",
     "<b>Tip</b> — Time trial shows your best lap as a ghost, and the gap to it under your lap time.",
     "<b>Tip</b> — C cycles the camera: chase, bonnet, and a far chase for the big jumps.",
-    "<b>Tip</b> — On ice the tail never quite stops sliding. Be gentle with the throttle."];
+    "<b>Tip</b> — On ice the tail never quite stops sliding. Be gentle with the throttle.",
+    "<b>Tip</b> — Hit the throttle as the 1 comes up for a perfect start. Too early and the wheels just spin."];
   try{
     var n = sessionStorage.getItem("pinehollow.loadname");
     if(n) document.getElementById("lname").textContent = "LOADING · " + n;
@@ -2819,6 +2820,11 @@ const NOTES = (()=>{
   RIDGES.forEach(R0=> add(R0.at - Math.round(18/seg), "ridge"));
   FORDS.forEach(F=>{ if(F.path === P) add(F.at - Math.round(20/seg), "water"); });
   if(RIVER.on) add(RIVER.a - Math.round(24/seg), "creek");
+  BRANCHES.forEach(B=>{
+    const m = P.pts[B.splitAt], t = P.tans[B.splitAt], look = B.pts[Math.min(B.N - 1, Math.round(14/B.seg))];
+    const sd = (look.x - m.x)*(-t.z) + (look.z - m.z)*t.x > 0 ? 1 : -1;       // + is the right
+    out.push({at: wrapIdx(P, B.splitAt - Math.round(30/seg)), kind:"fork", dir: -sd, mods:[]});
+  });
   PITS.forEach(at=> add(at - Math.round(15/seg), "mud"));
   CROSSES.forEach(c=>{ for(let i=0;i<N;i++){ const p = P.pts[i]; if(Math.hypot(p.x - c[0], p.z - c[1]) < 2.5){ add(i - Math.round(25/seg), "crossing"); i += Math.round(60/seg); } } });
   if(LAKE.on && LAKE.frozen){
@@ -2844,6 +2850,7 @@ const NOTES = (()=>{
 const NOTE_WORDS = { jump:"jump", bigjump:"big jump, keep straight", ridge:"ice ridge, jump", water:"water", creek:"into the creek",
                      mud:"mud", crossing:"crossing", ice:"onto ice", crest:"over crest", bumps:"bumps" };
 function noteSay(n){
+  if(n.kind === "fork") return "shortcut " + (n.dir > 0 ? "left" : "right");
   if(n.kind !== "corner") return NOTE_WORDS[n.kind] || n.kind;
   const d = n.dir > 0 ? "left" : "right";
   return (n.sev === 0 ? "hairpin " + d : d + " " + ["", "one", "two", "three", "four", "five", "six"][n.sev]) + (n.mods.length ? " " + n.mods.join(" ") : "");
@@ -5988,6 +5995,60 @@ paths.forEach(P=>{
     new THREE.MeshLambertMaterial({color:0x6b5335}));
   post.position.set(board.position.x, m.y + 1.1, board.position.z);
   scene.add(post);
+  P.side = side;
+  /* and the big boards: one well before the split so there is time to pick
+     the line, one at the mouth, and one on the branch where it rejoins */
+  const big = (i0, sd, text, sub, arrow, path)=>{
+    const Q = path || MAIN, i = wrapIdx(Q, i0), p = Q.pts[i], tt = Q.tans[i];
+    const off = Q.half[i] + 3.2, x = p.x - tt.z*sd*off, z = p.z + tt.x*sd*off, y = gradedY(x, z);
+    const g = new THREE.Group();
+    const tex = new THREE.CanvasTexture(noiseCanvas(512, 256, (c, W, H)=>{
+      c.fillStyle = "#ffd23d"; c.fillRect(0, 0, W, H);
+      c.fillStyle = "#111"; c.fillRect(0, 0, W, 16); c.fillRect(0, H - 16, W, 16);
+      for(let k=0;k<W;k+=48){ c.fillStyle = "#ffd23d"; c.fillRect(k, 0, 24, 16); c.fillRect(k + 24, H - 16, 24, 16); }
+      // the arrow
+      c.save(); c.translate(arrow < 0 ? W*0.14 : W*0.86, H*0.5); c.scale(0.85, 0.85);
+      if(arrow < 0) c.scale(-1, 1);
+      if(arrow === 0) c.rotate(-Math.PI/2);
+      c.fillStyle = "#111"; c.beginPath();
+      c.moveTo(-62, -22); c.lineTo(10, -22); c.lineTo(10, -58); c.lineTo(72, 0); c.lineTo(10, 58); c.lineTo(10, 22); c.lineTo(-62, 22); c.closePath(); c.fill();
+      c.restore();
+      c.fillStyle = "#111"; c.textAlign = "center"; c.textBaseline = "middle";
+      const tx = arrow < 0 ? W*0.6 : W*0.4;
+      c.font = "bold 54px Georgia, serif"; c.fillText(text, tx, sub ? H*0.42 : H*0.5);
+      if(sub){ c.font = "bold 30px Georgia, serif"; c.fillText(sub, tx, H*0.72); }
+    }));
+    const face = new THREE.MeshLambertMaterial({map:tex}), edge = new THREE.MeshLambertMaterial({color:0x1b1b1b});
+    const b = new THREE.Mesh(new THREE.BoxGeometry(4.6, 2.3, 0.14), [edge, edge, edge, edge, face, edge]);
+    b.position.y = 3.6; g.add(b);
+    for(const q of [-1.7, 1.7]){ const po = new THREE.Mesh(new THREE.BoxGeometry(0.18, 4.8, 0.18), edge); po.position.set(q, 2.4, -0.1); g.add(po); }
+    g.position.set(x, y, z); g.rotation.y = Math.atan2(-tt.x, -tt.z);       // facing the driver coming up the road
+    g.traverse(o=>{ if(o.isMesh) o.castShadow = true; });
+    scene.add(g);
+  };
+  const turnWord = side > 0 ? "RIGHT" : "LEFT";          // +n is the driver's right
+  big(A - Math.round(70/MAIN.seg), side, "SHORTCUT", turnWord + " IN 70m", side > 0 ? 1 : -1);
+  big(A - Math.round(8/MAIN.seg), side, "SHORTCUT", "", side > 0 ? 1 : -1);
+  // marker poles, red and white with a flag, down both sides of the mouth
+  const poleM = new THREE.MeshLambertMaterial({color:0xf2efe6}), redM = new THREE.MeshLambertMaterial({color:0xd8302a});
+  const flagM = new THREE.MeshLambertMaterial({color:0xffd23d, side:THREE.DoubleSide});
+  const pg = new THREE.Group();
+  for(let d=4; d<=40; d+=6){
+    const i = Math.min(P.N - 1, Math.round(d/P.seg)), p = P.pts[i], tt = P.tans[i];
+    for(const sd of [-1, 1]){
+      const off = P.half[i] + 1.1, x = p.x - tt.z*sd*off, z = p.z + tt.x*sd*off, y = gradedY(x, z);
+      const a = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.9, 0.1), poleM); a.position.set(x, y + 0.45, z); pg.add(a);
+      const r = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.9, 0.11), redM); r.position.set(x, y + 1.35, z); pg.add(r);
+      const fl = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.38), flagM); fl.position.set(x + tt.x*0.3, y + 1.6, z + tt.z*0.3);
+      fl.rotation.y = Math.atan2(tt.x, tt.z) + Math.PI/2; pg.add(fl);
+    }
+  }
+  mergeStatic(pg); scene.add(pg);
+  // where it comes back: tell the driver which way the main road runs
+  const endM = P.pts[P.N - 1], endT = P.tans[P.N - 1];
+  const onto = (MAIN.tans[wrapIdx(MAIN, P.mainTo)]);
+  const crossZ = endT.x*onto.z - endT.z*onto.x;
+  big(P.N - 1 - Math.round(45/P.seg), crossZ > 0 ? 1 : -1, "REJOIN", "main road", 0, P);
 })
 
 /* --- conifer geometry, built whorl by whorl ---------------------------
@@ -6916,6 +6977,34 @@ function mergeStatic(root, keep){
   return root;
 }
 
+/* Muck on the car: it builds up through the race, mud and dust low on the
+   body and flung up the sides, packed snow in the arches, and a wade through
+   a ford washes some of it off again. Only the player's wagon carries it. */
+const CAR_DIRT = { uDirt:{value:0}, uSnow:{value:0}, uGround:{value:0}, uDirtCol:{value:new THREE.Color(0x4a3524)} };
+function dirtify(m){
+  m.onBeforeCompile = sh=>{
+    Object.assign(sh.uniforms, CAR_DIRT);
+    sh.vertexShader = sh.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec3 vDW; varying vec3 vDL;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvDL = transformed; vDW = (modelMatrix*vec4(transformed, 1.0)).xyz;");
+    sh.fragmentShader = sh.fragmentShader
+      .replace("#include <common>", "#include <common>\nvarying vec3 vDW; varying vec3 vDL; uniform float uDirt, uSnow, uGround; uniform vec3 uDirtCol;")
+      .replace("#include <color_fragment>", [
+        "#include <color_fragment>",
+        "{",
+        "  float hgt = vDW.y - uGround;",
+        "  float low = 1.0 - smoothstep(0.30, 1.35, hgt);",
+        "  vec2 q = floor(vDL.xz*7.0 + vDL.y*4.0);",
+        "  float n = fract(sin(dot(q, vec2(12.9898, 78.233)))*43758.5453);",
+        "  float n2 = fract(sin(dot(floor(vDL.zy*3.0 + vDL.x*2.0), vec2(39.3, 11.7)))*24634.63);",
+        "  float cover = clamp(uDirt*(0.35 + low*1.1) - 0.25*(n2 - 0.5), 0.0, 1.0);",
+        "  float splat = smoothstep(1.0 - cover*1.4, 1.05 - cover*1.4, n*0.6 + low*0.45);",
+        "  diffuseColor.rgb = mix(diffuseColor.rgb, uDirtCol*(0.85 + 0.3*n2), clamp(cover*0.75 + splat*uDirt*0.5, 0.0, 0.88));",
+        "  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.95, 0.99), clamp(uSnow*low*1.3 + uSnow*0.15*n, 0.0, 0.85));",
+        "}"].join("\n"));
+  };
+  m.customProgramCacheKey = ()=> "dirt";
+}
 function buildWagon(opts){
   /* The boxy station wagon, built the way the game needs it: a body shell
      that rides on its springs, four wheel pivots and a live rear axle that
@@ -6989,6 +7078,8 @@ function buildWagon(opts){
     rimS:    mat(0xc8c8c4, { roughness: 0.3, metalness: 0.85, envMapIntensity: 1.1 }),
   };
   M.brake = M.tail;                        // third brake light lights with the others
+  if(opt.dirt) ["paint","door","rust","trim","under","plastic","stripe","wood","tire","rim","rimW","rimG","rimS","steelB","chrome","jerry","jerryR","jerryX","jerryRX","plate","strap"]
+    .forEach(k=>{ if(M[k]) dirtify(M[k]); });
 
   const add = (geo, material, x = 0, y = 0, z = 0, parent = car) => {
     const m = new THREE.Mesh(geo, material);
@@ -8840,7 +8931,7 @@ function stepCar(dt){
      a point on the road ahead, ease off for the corners the routing test
      says to brake for. */
   const auto = state.phase === "done" ? autoDrive() : null;
-  const thr = auto ? auto.thr : driving && CTL.thr ? 1 : 0;
+  const thr = (auto ? auto.thr : driving && CTL.thr ? 1 : 0)*((GAME.stallT || 0) > 0 ? 0.15 : 1);
   const brk = auto ? auto.brk : driving && CTL.brk ? 1 : 0;
   const hand = auto ? false : driving && CTL.hand;
   const steer = auto ? auto.steer : driving ? CTL.steer : 0;
@@ -9856,7 +9947,7 @@ function drawNoteTile(sh, cx, y, s, alpha){
     hud.fillStyle = col; hud.fill(); hud.lineWidth = 1.6*k; hud.strokeStyle = "#000"; hud.stroke();
     hudText(n.sev === 0 ? "H" : String(n.sev), x + w*0.8, y + h*0.62, UI.value*0.8*s, col, "center");
   } else {
-    const label = {jump:"JUMP", bigjump:"BIG JUMP", ridge:"RIDGE", water:"WATER", creek:"CREEK", mud:"MUD", crossing:"CROSS", ice:"ICE", crest:"CREST", bumps:"BUMPS"}[n.kind] || n.kind.toUpperCase();
+    const label = n.kind === "fork" ? (n.dir > 0 ? "\u2190 SHORT" : "SHORT \u2192") : {jump:"JUMP", bigjump:"BIG JUMP", ridge:"RIDGE", water:"WATER", creek:"CREEK", mud:"MUD", crossing:"CROSS", ice:"ICE", crest:"CREST", bumps:"BUMPS"}[n.kind] || n.kind.toUpperCase();
     // a warning triangle
     const tx = x + w/2, ty = y + h*0.12, ts = h*0.44;
     hud.beginPath(); hud.moveTo(tx, ty); hud.lineTo(tx + ts*0.62, ty + ts); hud.lineTo(tx - ts*0.62, ty + ts); hud.closePath();
@@ -10056,7 +10147,7 @@ function recordFor(){ return SAVE.records[TRACK.name] || (SAVE.records[TRACK.nam
 /* the garage build, as buildWagon wants it */
 function carOpts(){
   const S = SAVE.settings, C = S.car;
-  return { paint: PAINTS[Math.max(0, Math.min(PAINTS.length-1, S.paint|0))].hex, beat: !!C.beat, rust: C.beat ? 38 : 0,
+  return { dirt: true, paint: PAINTS[Math.max(0, Math.min(PAINTS.length-1, S.paint|0))].hex, beat: !!C.beat, rust: C.beat ? 38 : 0,
            model: C.model, fender: C.fender, rim: C.rim, wheel: C.wheel, livery: C.livery,
            acc: { rack: !!C.rack, spare: !!C.spare, cans: !!C.cans, shovel: !!C.shovel, lights: !!C.lights, flaps: !!C.flaps, bull: !!C.bull } };
 }
@@ -10532,8 +10623,31 @@ function traceDelta(){
   if(B[b] == null || TRACE.cur[b] === undefined || b < 3) return null;
   return TRACE.cur[b] - B[b];
 }
+/* how dirty the car is getting: mud and wet going off road, dust at speed,
+   snow in the winter, and water washing it off again */
+function stepDirt(dt, info){
+  const D = CAR_DIRT;
+  D.uGround.value = surfaceY(pose.x, pose.z);
+  if(state.phase === "menu"){ D.uDirt.value = 0; D.uSnow.value = 0; return; }
+  if(state.phase !== "racing" || !info || pose.air) return;
+  const v = Math.min(1, info.sp/30), mud = info.mud || 0, wet = info.wet || 0;
+  let d = D.uDirt.value, sn = D.uSnow.value;
+  d += dt*v*(0.0035*(DESERT ? 2.2 : 1) + mud*0.07 + (info.offRoad ? 0.012 : 0));
+  if(WINTER) sn += dt*v*(0.004 + (info.offRoad ? 0.025 : 0) + (info.ice || 0)*0.002);
+  if(wet > 0.3 && !WINTER){ d -= dt*wet*0.12; }                  // a wade rinses the worst of it off
+  D.uDirt.value = Math.max(0, Math.min(1, d)); D.uSnow.value = Math.max(0, Math.min(1, sn));
+}
 function stepRaceEvents(dt, info){
   GAME.goT = Math.max(0, GAME.goT - dt);
+  stepDirt(dt, info);
+  if(GAME.stallT > 0){
+    // the rear tyres spinning on the line: smoke and a lot of noise for nothing
+    GAME.stallT -= dt;
+    const fx = Math.sin(pose.h), fz = Math.cos(pose.h), rx = fz, rz = -fx;
+    for(const sd of [-1, 1]) spawnDust(pose.x - fx*1.3 + rx*sd*0.8, pose.y + 0.2, pose.z - fz*1.3 + rz*sd*0.8, 4, 0.6,
+                                       -fx*2 + (Math.random() - 0.5)*2, -fz*2 + (Math.random() - 0.5)*2, 1.2);
+    trans.spin = Math.max(trans.spin || 0, 2600);
+  }
   GAME.shake = Math.max(0, GAME.shake - dt*1.6);
   GAME.bumpCool = Math.max(0, (GAME.bumpCool||0) - dt);
   GAME.resetFlash = Math.max(0, GAME.resetFlash - dt*2);
@@ -10756,11 +10870,15 @@ function resetRace(){
   state.lap = 1; state.lapTimes = []; state.lapStart = 0; state.best = null;
   placeAtStart();
   if(typeof resetPiles === "function") resetPiles();
+  resetCritters();
   EXP.camps.forEach(c=> c.reached = false); EXP.last = -1; EXP.resets = 0;
   car.visible = true; carShadow.visible = true;
   camH = pose.h;
   camera.position.set(pose.x - Math.sin(pose.h)*9.2, pose.y + 3.55, pose.z - Math.cos(pose.h)*9.2);
   GAME.paused = false; GAME.doneT = 0; GAME.resultsShown = false; GAME.goT = 0;
+  GAME.startAt = null; GAME.stallT = 0;
+  CAR_DIRT.uDirt.value = 0; CAR_DIRT.uSnow.value = 0;
+  CAR_DIRT.uDirtCol.value.set(DESERT ? 0x9a7650 : WINTER ? 0x6a6a70 : FALL ? 0x4e3622 : 0x4a3524);
   GAME.wrongT = 0; GAME.stuckT = 0; GAME.placePrev = 0; GAME.placeT = 0;
   GAME.lapRecord = false; GAME.raceRecord = false; GAME.orbitA = 0;
   BANNER.dur = 0; SPLIT.t = 0; GHOST.rec = [];
@@ -11294,6 +11412,7 @@ function showHelp(back){
     '<div class="cols" style="align-items:flex-start"><div class="left"><h2 class="head">How to drive</h2>' +
     '<div class="note"><p>Tap drift going into a corner and the wagon hops into a slide. Steer through it and hold on: the charge bar goes blue, then orange, then violet.</p>' +
     '<p>Let go to cash the charge in as a turbo. The longer the slide, the bigger the push.</p>' +
+    '<p>On the grid, hit the throttle as the 1 comes up for a perfect start. Hold it from before the 2 and the wheels just spin.</p>' +
     '<p>Water and mud cost you grip and speed. Most circuits have alternate routes; some are quicker, some just look it.</p>' +
     '<p>Your co-driver reads the road ahead: every corner by direction and how tight (6 nearly flat, 1 a crawl, H a hairpin), and a warning for jumps, crests, water, ice and mud. Turn the voice off in Options.</p>' +
     '<p>On a phone or tablet, the pads on the left steer; gas, brake and drift are on the right.</p></div>' +
@@ -11568,6 +11687,139 @@ function resetPiles(){
   [LITTER.leaf, LITTER.stick].forEach(m=>{ if(m) m.instanceMatrix.needsUpdate = true; });
 }
 
+/* ---- things that live by the road ----------------------------------
+   Flocks of small birds sit on the road and the verges, pecking, and burst
+   up and away when a car comes at them (crows, in the snow). In the desert,
+   tumbleweeds roll across the road on the wind, and come apart if you hit
+   one. */
+const CRIT = { birds:[], weeds:[], wind:[0.8, 0.35] };
+{
+  const wl = Math.hypot(CRIT.wind[0], CRIT.wind[1]); CRIT.wind = [CRIT.wind[0]/wl, CRIT.wind[1]/wl];
+  if(!DESERT && !TRACK.test && !EXP.on){
+    const col = WINTER ? 0x17171a : FALL ? 0x5a3a24 : 0x6a4a30, belly = WINTER ? 0x2a2a30 : 0xb99a72;
+    const bodyM = new THREE.MeshLambertMaterial({color:col}), bellyM = new THREE.MeshLambertMaterial({color:belly});
+    const wingM = new THREE.MeshLambertMaterial({color:col, side:THREE.DoubleSide});
+    const bodyG = new THREE.BoxGeometry(0.13, 0.11, 0.24), headG = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+    const wingG = new THREE.PlaneGeometry(0.26, 0.13); wingG.translate(0.13, 0, 0);
+    const sc = WINTER ? 1.9 : 1.45;
+    const flocks = 6, rnd = seeded(515 + TRACK_ID*31);
+    for(let f=0; f<flocks; f++){
+      const at = Math.floor((f + 0.3 + rnd()*0.4)/flocks*MAIN.N), p = MAIN.pts[at], t = MAIN.tans[at];
+      const lat = (rnd() - 0.5)*MAIN.half[at]*1.6;
+      const cx = p.x - t.z*lat, cz = p.z + t.x*lat;
+      const n = 6 + Math.floor(rnd()*6);
+      for(let k=0;k<n;k++){
+        const g = new THREE.Group();
+        const b = new THREE.Mesh(bodyG, bodyM); g.add(b);
+        const bl = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.04, 0.2), bellyM); bl.position.y = -0.05; g.add(bl);
+        const h = new THREE.Mesh(headG, bodyM); h.position.set(0, 0.06, 0.14); g.add(h);
+        const wl2 = new THREE.Mesh(wingG, wingM), wr = new THREE.Mesh(wingG, wingM);
+        wl2.rotation.x = -Math.PI/2; wr.rotation.x = -Math.PI/2; wr.rotation.y = Math.PI;
+        wl2.position.y = wr.position.y = 0.03; g.add(wl2); g.add(wr);
+        g.scale.setScalar(sc);
+        const hx = cx + (rnd() - 0.5)*5, hz = cz + (rnd() - 0.5)*5;
+        const o = {g, wl:wl2, wr, home:[hx, hz], x:hx, z:hz, y:0, vx:0, vy:0, vz:0, fly:false, t:rnd()*5, peck:rnd()*3, flock:f};
+        o.y = surfaceY(hx, hz) + 0.06*sc;
+        g.position.set(o.x, o.y, o.z); g.rotation.y = rnd()*6.28;
+        scene.add(g); CRIT.birds.push(o);
+      }
+    }
+  }
+  if(DESERT && !TRACK.test){
+    const twig = new THREE.MeshBasicMaterial({color:0x9c7a4a, wireframe:true});
+    const core = new THREE.MeshLambertMaterial({color:0x8a6a3c, transparent:true, opacity:0.55});
+    for(let k=0;k<7;k++){
+      const r = 0.45 + Math.random()*0.35, g = new THREE.Group();
+      g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(r, 2), twig));
+      const g2 = new THREE.Mesh(new THREE.IcosahedronGeometry(r*0.82, 1), twig); g2.rotation.set(1, 2, 0.5); g.add(g2);
+      g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(r*0.6, 0), core));
+      scene.add(g);
+      CRIT.weeds.push({g, r, x:0, y:-100, z:0, vy:0, sp:2.5 + Math.random()*2.5, live:false, t:0});
+    }
+  }
+}
+function stepCritters(dt){
+  if(!CRIT.birds.length && !CRIT.weeds.length) return;
+  const cars = [[pose.x, pose.z, Math.hypot(pose.vx, pose.vz), true]];
+  FIELD.forEach(r=>{ if(r.mesh.visible) cars.push([r.mesh.position.x, r.mesh.position.z, r.v || 0, false]); });
+  let scattered = null;
+  for(const o of CRIT.birds){
+    o.t += dt;
+    if(!o.fly){
+      // pecking about: a hop and a turn now and then
+      o.peck -= dt;
+      if(o.peck < 0){ o.peck = 0.6 + Math.random()*2.4; o.g.rotation.y += (Math.random() - 0.5)*1.6; o.hop = 0.15; }
+      if(o.hop > 0){ o.hop -= dt; o.g.position.y = o.y + Math.sin((0.15 - o.hop)/0.15*Math.PI)*0.06; }
+      for(const c of cars){
+        const dx = o.x - c[0], dz = o.z - c[1], d2 = dx*dx + dz*dz;
+        if(c[2] > 2 && d2 < (14 + c[2]*0.6)**2){
+          const d = Math.sqrt(d2) || 1;
+          o.fly = true; o.t = 0;
+          const away = 3 + Math.random()*3;
+          o.vx = dx/d*away + (Math.random() - 0.5)*3; o.vz = dz/d*away + (Math.random() - 0.5)*3; o.vy = 3.5 + Math.random()*2.5;
+          o.g.rotation.y = Math.atan2(o.vx, o.vz);
+          if(c[3]) scattered = o;
+          // the rest of the flock goes with it
+          CRIT.birds.forEach(q=>{ if(q.flock === o.flock && !q.fly){ q.fly = true; q.t = -Math.random()*0.25;
+            q.vx = o.vx + (Math.random() - 0.5)*3; q.vz = o.vz + (Math.random() - 0.5)*3; q.vy = 3 + Math.random()*3;
+            q.g.rotation.y = Math.atan2(q.vx, q.vz); } });
+          break;
+        }
+      }
+    } else {
+      if(o.t < 0) continue;
+      o.vy = Math.max(1.2, o.vy - dt*0.8);
+      o.x += o.vx*dt; o.z += o.vz*dt; o.y += o.vy*dt;
+      const flap = Math.sin(o.t*34 + o.home[0])*0.9;
+      o.wl.rotation.z = flap; o.wr.rotation.z = -flap;
+      o.g.position.set(o.x, o.y, o.z);
+      // gone: come back to the same spot once the cars are well away
+      if(o.t > 7){
+        let near = false;
+        for(const c of cars) if((o.home[0] - c[0])**2 + (o.home[1] - c[1])**2 < 90*90) near = true;
+        if(!near){ o.fly = false; o.x = o.home[0]; o.z = o.home[1]; o.y = surfaceY(o.x, o.z) + 0.06*o.g.scale.x;
+          o.wl.rotation.z = o.wr.rotation.z = 0; o.g.position.set(o.x, o.y, o.z); }
+        else o.g.position.y = -500;
+      }
+    }
+  }
+  if(scattered && actx){
+    // a flurry of wings and a couple of alarm calls
+    for(let k=0;k<7;k++) burst(0.05, "bandpass", 900 + Math.random()*700, 0.05, 2, k*0.035);
+    if(!WINTER) for(let k=0;k<3;k++) tone(3200 + Math.random()*900, 0.07, "sine", 0.03, 2400, 0.05 + k*0.11);
+    else { burst(0.2, "bandpass", 850, 0.06, 3, 0.05, 600); tone(480, 0.18, "sawtooth", 0.012, 360, 0.05); }
+  }
+  // tumbleweeds: kept rolling across the road somewhere ahead of the player
+  for(const w of CRIT.weeds){
+    if(!w.live){
+      if(Math.random() > dt*0.5 || state.phase === "menu") continue;
+      const ahead = wrapIdx(MAIN, state.idx + Math.round((50 + Math.random()*80)/MAIN.seg)), p = MAIN.pts[ahead];
+      const up = 25 + Math.random()*30;
+      w.x = p.x - CRIT.wind[0]*up; w.z = p.z - CRIT.wind[1]*up; w.y = surfaceY(w.x, w.z) + w.r; w.vy = 0; w.live = true; w.t = 0;
+      continue;
+    }
+    w.t += dt;
+    const gust = 1 + 0.4*Math.sin(w.t*1.3 + w.r*10);
+    w.x += CRIT.wind[0]*w.sp*gust*dt; w.z += CRIT.wind[1]*w.sp*gust*dt;
+    const gy = surfaceY(w.x, w.z) + w.r;
+    w.vy -= 14*dt; w.y += w.vy*dt;
+    if(w.y < gy){ w.y = gy; w.vy = Math.random() < 0.08 ? 2 + Math.random()*2.5 : Math.abs(w.vy)*0.25; }
+    w.g.position.set(w.x, w.y, w.z);
+    w.g.rotation.x += CRIT.wind[1]*w.sp*gust*dt/w.r; w.g.rotation.z -= CRIT.wind[0]*w.sp*gust*dt/w.r;
+    // hit it and it comes apart
+    const dx = w.x - pose.x, dz = w.z - pose.z;
+    if(dx*dx + dz*dz < (w.r + 1.5)**2 && Math.abs(w.y - pose.y) < 2){
+      for(let k=0;k<22;k++) spawnDust(w.x, w.y, w.z, 1, 0.4, pose.vx*0.3 + (Math.random() - 0.5)*6, pose.vz*0.3 + (Math.random() - 0.5)*6, 2 + Math.random()*3);
+      if(actx){ burst(0.12, "highpass", 2500, 0.1, 1, 0); burst(0.2, "bandpass", 1200, 0.06, 2, 0.02); }
+      w.live = false; w.g.position.y = -500;
+    } else if(w.t > 40 || (w.x - pose.x)**2 + (w.z - pose.z)**2 > 260*260){ w.live = false; w.g.position.y = -500; }
+  }
+}
+function resetCritters(){
+  CRIT.birds.forEach(o=>{ o.fly = false; o.x = o.home[0]; o.z = o.home[1]; o.y = surfaceY(o.x, o.z) + 0.06*o.g.scale.x;
+    o.wl.rotation.z = o.wr.rotation.z = 0; o.g.position.set(o.x, o.y, o.z); });
+  CRIT.weeds.forEach(w=>{ w.live = false; w.g.position.y = -500; });
+}
 function stepDust(dt){
   for(let i=0;i<DUST;i++){
     if(dustLife[i] > 0){
@@ -11604,12 +11856,28 @@ function frame(now){
       state.countdown -= dt;
       const after = Math.ceil(state.countdown);
       if(after !== before && after >= 1 && after <= 3) SFX.beep();
+      /* the launch: when you first went for the throttle, and whether you held it */
+      if(CTL.thr){ if(GAME.startAt === null || GAME.startAt === undefined) GAME.startAt = state.countdown; }
+      else GAME.startAt = null;
       if(state.countdown <= 0){
         state.phase = "racing";
         postMat.uniforms.uFlash.value = 0.35;
         state.t = 0; state.lapStart = 0;
         GAME.goT = 1.3; GHOST.rec = [];
         SFX.go();
+        if(!TRACK.test && !EXP.on && GAME.startAt !== null && GAME.startAt !== undefined){
+          if(GAME.startAt <= 1.15){
+            // on it just as the 1 came up: a perfect start
+            drift.boostT = 1.35; drift.boostPower = 7.4; drift.boostTier = 1; drift.flash = 1;
+            postMat.uniforms.uFlash.value = 0.5;
+            banner("PERFECT START", "#5cf07a", 1.6);
+          } else if(GAME.startAt > 1.9){
+            // flat out since before the 2: it sits there and spins
+            GAME.stallT = 1.0;
+            banner("TOO EARLY", "#ff6a4a", 1.4, "wheelspin");
+          }
+        }
+        GAME.startAt = null;
       }
     } else if(state.phase === "racing"){
       state.t += dt;
@@ -11621,6 +11889,7 @@ function frame(now){
     info = stepCar(dt);
     stepRivals(dt);
     stepLeafPiles(dt);
+    stepCritters(dt);
     if(state.phase === "racing" || state.phase === "done") state.place = computePlace();
     stepRaceEvents(dt, info);
     stepGhost();
@@ -11683,7 +11952,7 @@ if(/debug/.test(location.hash)){
   window.__R = { THREE, TRACKS, TRACK, TRACK_ID, MAIN, BRANCHES, paths, ROUTE, pose, state, camera, scene, renderer,
                  surfaceY, gridH, nearest, PILES, PIT, GAME, CTL, trans, MAXV, radiiOf, radiiOpen, resetRace, setMode,
                  closeUI, rivals, car, splash, cornerHoldSpeed, stepCar, placeAtStart, drift, AUTO_JUMPS,
-                 CALM, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults, trans, GIANT, RIDGES, CROSSES, NOTES, noteSay, PACE, TRACE, stepNotes, stepTrace, UI:{showTitle, showMain, showTracks, showReady, showOptions, showGarage, showHelp, showPause, showChamp}, dustLive: ()=>{ let n=0; for(let i=0;i<DUST;i++) if(dustLife[i]>0) n++; return n; } };
+                 CALM, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults, trans, GIANT, RIDGES, CROSSES, NOTES, noteSay, PACE, TRACE, stepNotes, stepTrace, stepCritters, stepDirt, CRIT, CAR_DIRT, UI:{showTitle, showMain, showTracks, showReady, showOptions, showGarage, showHelp, showPause, showChamp}, dustLive: ()=>{ let n=0; for(let i=0;i<DUST;i++) if(dustLife[i]>0) n++; return n; } };
 }
 boot();
 requestAnimationFrame(frame);
