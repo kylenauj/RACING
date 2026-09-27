@@ -2806,7 +2806,7 @@ const NOTES = (()=>{
       const mods = [];
       if(len > 45 && (minAt - k) > (j - k)*0.62) mods.push("tightens");
       else if(len > 110) mods.push("long");
-      out.push({at: i, kind:"corner", dir: hand, sev: sev(minR), mods, len});
+      out.push({at: i, kind:"corner", dir: hand, sev: sev(minR), mods, len, hold: cornerHoldSpeed(minR)});
     }
     k = j;
   }
@@ -5996,39 +5996,6 @@ paths.forEach(P=>{
   post.position.set(board.position.x, m.y + 1.1, board.position.z);
   scene.add(post);
   P.side = side;
-  /* and the big boards: one well before the split so there is time to pick
-     the line, one at the mouth, and one on the branch where it rejoins */
-  const big = (i0, sd, text, sub, arrow, path)=>{
-    const Q = path || MAIN, i = wrapIdx(Q, i0), p = Q.pts[i], tt = Q.tans[i];
-    const off = Q.half[i] + 3.2, x = p.x - tt.z*sd*off, z = p.z + tt.x*sd*off, y = gradedY(x, z);
-    const g = new THREE.Group();
-    const tex = new THREE.CanvasTexture(noiseCanvas(512, 256, (c, W, H)=>{
-      c.fillStyle = "#ffd23d"; c.fillRect(0, 0, W, H);
-      c.fillStyle = "#111"; c.fillRect(0, 0, W, 16); c.fillRect(0, H - 16, W, 16);
-      for(let k=0;k<W;k+=48){ c.fillStyle = "#ffd23d"; c.fillRect(k, 0, 24, 16); c.fillRect(k + 24, H - 16, 24, 16); }
-      // the arrow
-      c.save(); c.translate(arrow < 0 ? W*0.14 : W*0.86, H*0.5); c.scale(0.85, 0.85);
-      if(arrow < 0) c.scale(-1, 1);
-      if(arrow === 0) c.rotate(-Math.PI/2);
-      c.fillStyle = "#111"; c.beginPath();
-      c.moveTo(-62, -22); c.lineTo(10, -22); c.lineTo(10, -58); c.lineTo(72, 0); c.lineTo(10, 58); c.lineTo(10, 22); c.lineTo(-62, 22); c.closePath(); c.fill();
-      c.restore();
-      c.fillStyle = "#111"; c.textAlign = "center"; c.textBaseline = "middle";
-      const tx = arrow < 0 ? W*0.6 : W*0.4;
-      c.font = "bold 54px Georgia, serif"; c.fillText(text, tx, sub ? H*0.42 : H*0.5);
-      if(sub){ c.font = "bold 30px Georgia, serif"; c.fillText(sub, tx, H*0.72); }
-    }));
-    const face = new THREE.MeshLambertMaterial({map:tex}), edge = new THREE.MeshLambertMaterial({color:0x1b1b1b});
-    const b = new THREE.Mesh(new THREE.BoxGeometry(4.6, 2.3, 0.14), [edge, edge, edge, edge, face, edge]);
-    b.position.y = 3.6; g.add(b);
-    for(const q of [-1.7, 1.7]){ const po = new THREE.Mesh(new THREE.BoxGeometry(0.18, 4.8, 0.18), edge); po.position.set(q, 2.4, -0.1); g.add(po); }
-    g.position.set(x, y, z); g.rotation.y = Math.atan2(-tt.x, -tt.z);       // facing the driver coming up the road
-    g.traverse(o=>{ if(o.isMesh) o.castShadow = true; });
-    scene.add(g);
-  };
-  const turnWord = side > 0 ? "RIGHT" : "LEFT";          // +n is the driver's right
-  big(A - Math.round(70/MAIN.seg), side, "SHORTCUT", turnWord + " IN 70m", side > 0 ? 1 : -1);
-  big(A - Math.round(8/MAIN.seg), side, "SHORTCUT", "", side > 0 ? 1 : -1);
   // marker poles, red and white with a flag, down both sides of the mouth
   const poleM = new THREE.MeshLambertMaterial({color:0xf2efe6}), redM = new THREE.MeshLambertMaterial({color:0xd8302a});
   const flagM = new THREE.MeshLambertMaterial({color:0xffd23d, side:THREE.DoubleSide});
@@ -6044,11 +6011,6 @@ paths.forEach(P=>{
     }
   }
   mergeStatic(pg); scene.add(pg);
-  // where it comes back: tell the driver which way the main road runs
-  const endM = P.pts[P.N - 1], endT = P.tans[P.N - 1];
-  const onto = (MAIN.tans[wrapIdx(MAIN, P.mainTo)]);
-  const crossZ = endT.x*onto.z - endT.z*onto.x;
-  big(P.N - 1 - Math.round(45/P.seg), crossZ > 0 ? 1 : -1, "REJOIN", "main road", 0, P);
 })
 
 /* --- conifer geometry, built whorl by whorl ---------------------------
@@ -9015,7 +8977,12 @@ function stepCar(dt){
   const sp = Math.abs(newAlong);
   const auth = Math.min(1, sp/7) * (1 - Math.min(0.5, sp/MAXV*0.55)) * (offRoad?0.86:1);
   const rate = 2.05 * auth * (hand?1.25:1);
-  pose.steerIn += (steer - pose.steerIn) * Math.min(1, dt*8);
+  // Turn in at the old rate, but let go and flick across much faster: on a
+  // keyboard the wheel is all or nothing, and a slow return made catching a
+  // slide or a quick left-right feel like steering through syrup.
+  const across = steer*pose.steerIn < 0;
+  const easing = !across && Math.abs(steer) < Math.abs(pose.steerIn);
+  pose.steerIn += (steer - pose.steerIn) * Math.min(1, dt*(across ? 18 : easing ? 14 : 8));
   pose.h += pose.steerIn * rate * dt * Math.sign(newAlong || 1);
 
   // grip: lateral velocity bleeds off, slower on mud and under handbrake
@@ -9924,12 +9891,21 @@ function drawExpHUD(W, H, k){
 }
 /* the pace notes: the next call big under the lap counter, the one after
    small beside it, each with a bar running down to the corner */
-function drawNoteTile(sh, cx, y, s, alpha){
+function drawNoteTile(sh, cx, y, s, alpha, warn){
   const n = sh.n, k = HK, w = 58*k*s, h = 46*k*s, x = cx - w/2;
+  const hazard = n.kind !== "corner";
+  // Coming in faster than the corner can be held on grip: the tile throbs
+  // red and says so, early enough to get on the brakes.
+  const hot = warn && !hazard && n.hold && sh.ahead < sh.look && PACE.sp > n.hold*1.08;
+  if(hot) alpha = 1;
   hud.save(); hud.globalAlpha = alpha;
   hud.fillStyle = "rgba(12,20,16,.78)"; hud.fillRect(x, y, w, h);
   hud.strokeStyle = "#000"; hud.lineWidth = 2.5*k; hud.strokeRect(x, y, w, h);
-  const hazard = n.kind !== "corner";
+  if(hot){
+    const pulse = 0.55 + 0.45*Math.sin(performance.now()*0.018);
+    hud.strokeStyle = "rgba(255,58,40," + pulse.toFixed(3) + ")"; hud.lineWidth = 3.5*k;
+    hud.strokeRect(x - 2*k, y - 2*k, w + 4*k, h + 4*k);
+  }
   const col = hazard ? (n.kind === "bigjump" || n.kind === "ridge" ? "#ff6a2a" : "#ffd23d") : (n.sev <= 1 ? "#ff6a2a" : n.sev <= 3 ? "#ffd23d" : "#f3e6c4");
   if(!hazard){
     // a bent arrow: the tighter the corner, the harder it bends
@@ -9956,7 +9932,8 @@ function drawNoteTile(sh, cx, y, s, alpha){
     hudText(label, tx, y + h*0.86, UI.label*s*(label.length > 6 ? 0.85 : 1), "#fff", "center");
   }
   const sub = (n.into ? "into" : "") || (n.mods && n.mods[0]) || "";
-  if(sub && !hazard) hudText(sub.toUpperCase(), x + w/2, y + h + 11*k*s, UI.label*0.85*s, UI.dim, "center");
+  if(hot) hudText("BRAKE", x + w/2, y + h + 13*k*s, UI.small*s, "#ff3a28", "center");
+  else if(sub && !hazard) hudText(sub.toUpperCase(), x + w/2, y + h + 11*k*s, UI.label*0.85*s, UI.dim, "center");
   // distance to it
   const f = Math.max(0, Math.min(1, sh.ahead/(sh.look*1.5)));
   hud.fillStyle = col; hud.fillRect(x + 2*k, y + h - 4*k, (w - 4*k)*f, 2.5*k);
@@ -9965,7 +9942,7 @@ function drawNoteTile(sh, cx, y, s, alpha){
 function drawNotes(W, k){
   if(!PACE.shown.length) return;
   const a = PACE.shown[0];
-  drawNoteTile(a, W/2, 66*k, 1, Math.min(1, 0.35 + (1 - a.ahead/(a.look*1.5))*1.4));
+  drawNoteTile(a, W/2, 66*k, 1, Math.min(1, 0.35 + (1 - a.ahead/(a.look*1.5))*1.4), true);
   if(PACE.shown[1]) drawNoteTile(PACE.shown[1], W/2 + 52*k, 70*k, 0.66, 0.75);
 }
 function drawHUD(dt, alongNow){
@@ -10562,7 +10539,7 @@ function onLap(lt, prevBest){
   }
 }
 
-const PACE = { shown:[], voice:null };
+const PACE = { shown:[], voice:null, sp:0 };
 function paceVoice(){
   if(PACE.voice !== null) return PACE.voice;
   try{
@@ -10587,6 +10564,7 @@ function paceSpeak(text){
 function stepNotes(info){
   const S = SAVE.settings;
   PACE.shown.length = 0;
+  PACE.sp = info ? info.sp : 0;
   if(!NOTES.length || (S.notes|0) === 0 || EXP.on || !(state.phase === "racing" || state.phase === "countdown")) return;
   const N = NS, idx = state.idx, sp = Math.max(8, info ? info.sp : 0);
   const look = Math.max(70, Math.min(170, sp*3.3));
@@ -10715,6 +10693,10 @@ function stepRaceEvents(dt, info){
   const off = nearest(pose.x, pose.z).dist > HALF + 3;
   if((off && info.sp < 3) || GAME.wrongT > 3) GAME.stuckT += dt;
   else GAME.stuckT = Math.max(0, GAME.stuckT - dt*2);
+  // remember how fast you were going while things were going well, so a
+  // reset can hand some of it back; and don't leave anyone sat in a ditch
+  if(!off && !pose.air && fwd > 0.5 && info.sp > 4) GAME.goodSp = info.sp;
+  if(GAME.stuckT > 5 && !EXP.on) resetCar();
 }
 
 /* put the car back on the road, pointing the right way */
@@ -10723,11 +10705,18 @@ function resetCar(){
   const i = state.idx, p = pts[i], t = tans[i];
   pose.x = p.x; pose.z = p.z; pose.h = Math.atan2(t.x, t.z);
   pose.y = surfaceY(p.x, p.z); pose.lastGy = pose.y;
-  pose.vx = pose.vz = 0; pose.vy = 0; pose.air = false; pose.airT = 0;
+  // a rolling restart: back on the road at half the speed you had, in the
+  // gear that speed wants, so a mistake costs seconds rather than the run
+  const roll = EXP.on ? 0 : Math.max(8, Math.min(24, (GAME.goodSp || 0)*0.5));
+  pose.vx = Math.sin(pose.h)*roll; pose.vz = Math.cos(pose.h)*roll;
+  pose.vy = 0; pose.air = false; pose.airT = 0;
   pose.yawVis = 0; pose.steerIn = 0; pose.steerVis = 0; pose.roll = pose.pitch = 0;
   pose.spring = pose.springV = 0; pose.artPitch = pose.artRoll = pose.artBase = 0; pose.bH = pose.bHv = pose.bP = pose.bPv = pose.bR = pose.bRv = 0;
   drift.mode = "off"; drift.on = false; drift.t = 0; drift.tier = -1; drift.boostT = 0;
-  trans.gear = 1; trans.target = 1; trans.dir = 1; trans.shiftT = 0; trans.cut = 0;
+  let g = 1;
+  while(g < DRIVE.totals.length && rpmAt(roll, g) > DRIVE.up*0.8) g++;
+  trans.gear = g; trans.target = g; trans.dir = 1; trans.shiftT = 0; trans.cut = 0;
+  trans.rpm = Math.max(DRIVE.idle, rpmAt(roll, g));
   camH = pose.h;
   camera.position.set(pose.x - Math.sin(pose.h)*9, pose.y + 3.6, pose.z - Math.cos(pose.h)*9);
   GAME.stuckT = 0; GAME.wrongT = 0; GAME.resetFlash = 1;
@@ -10793,7 +10782,7 @@ function drawOverlay(dt){
     if(GAME.wrongT > 1 && Math.floor(state.t*3) % 2 === 0)
       drawBig("WRONG WAY", H*0.5, UI.value*1.2, "#ff5a36", 1, 1);
     if(GAME.stuckT > 2.2)
-      drawBig("PRESS X TO RESET", H*0.58, UI.small*1.1, UI.ink, 1, Math.min(1, GAME.stuckT-2.2));
+      drawBig(GAME.stuckT > 3.5 ? "RESETTING IN " + Math.ceil(5 - GAME.stuckT) : "PRESS X TO RESET", H*0.58, UI.small*1.1, UI.ink, 1, Math.min(1, GAME.stuckT-2.2));
     if(GAME.placeT > 0 && FIELD.length){
       const up = GAME.placeUp > 0;
       const a = Math.min(1, GAME.placeT*2);
@@ -10879,7 +10868,7 @@ function resetRace(){
   GAME.startAt = null; GAME.stallT = 0;
   CAR_DIRT.uDirt.value = 0; CAR_DIRT.uSnow.value = 0;
   CAR_DIRT.uDirtCol.value.set(DESERT ? 0x9a7650 : WINTER ? 0x6a6a70 : FALL ? 0x4e3622 : 0x4a3524);
-  GAME.wrongT = 0; GAME.stuckT = 0; GAME.placePrev = 0; GAME.placeT = 0;
+  GAME.wrongT = 0; GAME.stuckT = 0; GAME.goodSp = 0; GAME.placePrev = 0; GAME.placeT = 0;
   GAME.lapRecord = false; GAME.raceRecord = false; GAME.orbitA = 0;
   BANNER.dur = 0; SPLIT.t = 0; GHOST.rec = [];
   if(MODE === "trial") GHOST.data = recordFor().ghost || null;
