@@ -912,6 +912,32 @@ const TRACKS = [
       // the leaf chute: straight down through the maples
       {a:[150,-50], b:[160,-360], via:[[120,-150],[115,-260]],
        half:4.4, jumps:[[0.45,24,7,2.2,44]], tune:0.55}
+    ]},
+
+  /* ---- SPECIAL: a volcano under the ice ---- */
+  { name:"EMBER GLACIER", special:true, after:"a volcano under the ice", relief:1.7, season:"winter", rollers:1.2,
+    blurb:"a long lap of a volcano buried in a glacier: switchbacks up out of the valley, then pick your line \u2014 the high route over log trestles above lava crevasses, or the low route across the lava streams on log bridges \u2014 and a long drop past the lava lake home",
+    kit:["crest","kicker","tabletop"],
+    shape:"FIRE AND ICE \u2014 the high route or the low",
+    feature:"log bridges over lava: a high route across deep crevasses and a low route over the lava streams",
+    ctrl:[[0,-520],[160,-540],[320,-500],[450,-420],[520,-310],[470,-230],[360,-200],[330,-120],[430,-70],[560,-40],[620,60],[580,170],
+          [470,250],[340,300],[200,290],[60,320],[-80,300],[-220,320],[-360,290],[-470,220],
+          [-560,120],[-520,20],[-600,-80],[-560,-190],[-620,-300],[-520,-420],[-360,-490],[-180,-520]],
+    hills:[[60,380,440,78],[600,-160,240,40],[-600,-40,230,34],[0,40,250,-24],[0,-250,300,-14]],
+    jumps:[], fords:[],
+    mud:[],
+    lake:{at:[0,-250], rx:230, rz:125, lava:true},
+    /* the log bridges: [x, z], which road (-1 the main, 0 the low route), half length, depth of the gap, half width of it, how far it runs */
+    spans:[ {at:[270,296], road:-1, span:30, depth:30, wall:22, reach:110},
+            {at:[-10,312], road:-1, span:32, depth:34, wall:24, reach:110},
+            {at:[-290,306], road:-1, span:30, depth:28, wall:22, reach:110},
+            {at:[250,20],  road:0,  span:17, depth:3.2, wall:11, reach:170},
+            {at:[0,10],    road:0,  span:17, depth:3.2, wall:11, reach:170},
+            {at:[-250,20], road:0,  span:17, depth:3.2, wall:11, reach:170} ],
+    branches:[
+      // the low route: down through the lava valley, over the streams on log bridges
+      {a:[580,170], b:[-470,220], via:[[480,120],[380,60],[250,20],[120,40],[0,10],[-120,40],[-250,20],[-360,60],[-440,130]],
+       half:5.0, jumps:[], tune:0.6, label:"LOW ROUTE", mainLabel:"HIGH ROUTE"}
     ]}
 ];
 
@@ -1270,6 +1296,7 @@ if(DESERT){
     downPts: TRACK.river.downPts && TRACK.river.downPts.map(mv), upPts: TRACK.river.upPts && TRACK.river.upPts.map(mv)});
   TRACK.bigJumps = (TRACK.bigJumps||[]).map(j=> [mv(j[0]), j[1]]);
   TRACK.ridges = (TRACK.ridges||[]).map(r=> mv(r).concat(r.slice(2)));
+  TRACK.spans = (TRACK.spans||[]).map(sp=> Object.assign({}, sp, {at: mv(sp.at)}));
   ["bowl","lake","washout","pit","dunes","swamp","giantTree"].forEach(k=>{ if(TRACK[k]) TRACK[k] = Object.assign({}, TRACK[k], {at: mv(TRACK[k].at)}); });
   ["canyon","gallery"].forEach(k=>{ if(TRACK[k]) TRACK[k] = Object.assign({}, TRACK[k], {from: mv(TRACK[k].from), to: mv(TRACK[k].to)}); });
   TRACK.washes = (TRACK.washes||[]).map(mv);
@@ -1507,7 +1534,8 @@ if(TRACK.lake){
     lo = Math.min(lo, macro(LAKE.x + Math.cos(a)*LAKE.rx*1.06, LAKE.z + Math.sin(a)*LAKE.rz*1.06));
   }
   LAKE.level = lo - 0.6;
-  LAKE.frozen = !!(L.frozen && FROZEN);
+  LAKE.lava = !!L.lava;
+  LAKE.frozen = !!(L.frozen && FROZEN) && !LAKE.lava;
   LAKE.on = true;
 }
 /* the swamp: a low flat of black water and tussocks the trail wades across */
@@ -1556,6 +1584,7 @@ if(TRACK.bowl){
     if(Math.hypot(p.x - BOWL.x, p.z - BOWL.z) < BOWL.r + 40) CALM.push([i, 30]);
   }
 }
+(TRACK.spans || []).forEach(d=>{ if(d.road < 0) CALM.push([snapTo(MAIN, d.at), d.span + 30]); });
 if(TRACK.lake){
   for(let i=0;i<MAIN.N;i+=5){
     const p = MAIN.pts[i];
@@ -1844,6 +1873,7 @@ const AUTO_JUMPS = [];
   (TRACK.jumps || []).forEach(j=> busy.push([snapTo(MAIN, j[0]), 90]));
   if(TRACK.bigJump) busy.push([snapTo(MAIN, TRACK.bigJump[0]), 140]);
   RIDGES.forEach(R=> busy.push([R.at, 90]));
+  (TRACK.spans || []).forEach(d=>{ if(d.road < 0) busy.push([snapTo(MAIN, d.at), d.span + 70]); });
   CROSSES.forEach(c=> busy.push([snapTo(MAIN, c), 60]));
   (TRACK.fords || []).forEach(f=> busy.push([snapTo(MAIN, f), 55]));
   if(TRACK.gorge) busy.push([snapTo(MAIN, TRACK.gorge.at), TRACK.gorge.span + 45]);
@@ -2193,6 +2223,7 @@ if(GIANT.on){
 });
 /* ---- the ravine and its bridge ---- */
 const GORGE = { on:false, i:0, depth:0, span:35, samples:0, reach:0, wall:26 };
+let SPANS = [];                        // the log bridges over lava, built once the roads have their heights
 if(TRACK.gorge){
   const G = TRACK.gorge;
   GORGE.on = true;
@@ -2619,6 +2650,98 @@ BRANCHES.forEach(P=>{
 
 BRANCHES.forEach(P=> (P.def.fords || []).forEach(f=> addFord(P, Math.round(P.N*f))));
 
+/* ---- log bridges over lava ----
+   Each one: the road runs straight and level-ish between its abutments, a
+   gap is cut across under it (a crevasse forty metres deep, or a shallow
+   channel on the valley floor) with lava lying in the bottom, and the
+   stretch over the gap is left out of the ground so the deck is all that
+   holds the car up. Works on the main road or a branch. */
+(TRACK.spans || []).forEach(d=>{
+  const P = d.road >= 0 ? BRANCHES[d.road] : MAIN;
+  if(!P) return;
+  const seg = P.seg, i = snapTo(P, d.at);
+  const S = Math.round(d.span/seg), E = S + Math.round(8/seg), R = Math.round(30/seg);
+  const ia = wrapIdx(P, i - E), ib = wrapIdx(P, i + E);
+  const ya = P.pts[ia].y, yb = P.pts[ib].y;
+  for(let k=-E;k<=E;k++) P.pts[wrapIdx(P, i + k)].y = ya + (yb - ya)*(k + E)/(2*E);
+  // the road eases onto the deck's grade either side instead of kinking at the abutment
+  const g = (yb - ya)/(2*E*seg);
+  for(let k=1;k<=R;k++){
+    const w = smoothstep(0, 1, k/R);
+    const a = wrapIdx(P, i - E - k), b = wrapIdx(P, i + E + k);
+    P.pts[a].y = (ya - g*k*seg)*(1 - w) + P.pts[a].y*w;
+    P.pts[b].y = (yb + g*k*seg)*(1 - w) + P.pts[b].y*w;
+  }
+  const p = P.pts[i], t = P.tans[i];
+  const sp = {P, i, S, x:p.x, z:p.z, y:p.y, tx:t.x, tz:t.z, grade:g, span:d.span, depth:d.depth,
+              wall:d.wall, reach:d.reach, low:d.depth < 8, ph: SPANS.length*1.7};
+  sp.floor = sp.y + BED - sp.depth;
+  sp.lava = sp.floor + (sp.low ? 1.0 : 1.6);
+  for(let k=-S;k<=S;k++) P.deck[wrapIdx(P, i + k)] = 1;
+  const W = Math.round((d.wall - 1)/seg);
+  for(let k=-W;k<=W;k++) P.noStamp[wrapIdx(P, i + k)] = 1;
+  SPANS.push(sp);
+});
+/* a gap's own frame: u along the road, v along the gap, which wanders away from the bridge */
+function spanUV(sp, x, z){
+  const dx = x - sp.x, dz = z - sp.z, v = -dx*sp.tz + dz*sp.tx;
+  const u = dx*sp.tx + dz*sp.tz - (Math.sin(v*0.03 + sp.ph)*4 + Math.sin(v*0.011 + sp.ph*2)*7)*smoothstep(20, 60, Math.abs(v));
+  return [u, v];
+}
+function carveSpans(y, x, z){
+  for(let n=0;n<SPANS.length;n++){
+    const sp = SPANS[n], uv = spanUV(sp, x, z), au = Math.abs(uv[0]), av = Math.abs(uv[1]);
+    if(au > sp.wall + 8 || av > sp.reach) continue;
+    const wu = sp.wall - 1;
+    const lip = sp.y + BED + sp.grade*uv[0] - 0.35;
+    // sheer ice walls on a crevasse, a shelving bank on a stream
+    const across = (lip - sp.floor)*smoothstep(wu*(sp.low ? 0.45 : 0.25), wu, au + Math.sin(uv[1]*0.2 + sp.ph)*0.8) + Math.max(0, au - wu)*2.2;
+    const ends = (sp.depth + 24)*smoothstep(sp.reach*0.72, sp.reach, av);
+    y = Math.min(y, sp.floor + Math.max(across, ends));
+  }
+  return y;
+}
+/* where on a bridge a point is: [span, station on its road, distance off the centreline] */
+function spanFind(x, z, tol){
+  for(let n=0;n<SPANS.length;n++){
+    const sp = SPANS[n], dx = x - sp.x, dz = z - sp.z;
+    if(Math.abs(dx*sp.tx + dz*sp.tz) > sp.span + 8 || Math.abs(-dx*sp.tz + dz*sp.tx) > 16) continue;
+    const P = sp.P;
+    let best = Infinity, bs = 0;
+    for(let k=-sp.S-2;k<sp.S+2;k++){
+      const A = P.pts[wrapIdx(P, sp.i + k)], B = P.pts[wrapIdx(P, sp.i + k + 1)];
+      const ex = B.x - A.x, ez = B.z - A.z, L2 = ex*ex + ez*ez;
+      let t = L2 ? ((x - A.x)*ex + (z - A.z)*ez)/L2 : 0; t = Math.max(0, Math.min(1, t));
+      const d2 = (x - A.x - ex*t)**2 + (z - A.z - ez*t)**2;
+      if(d2 < best){ best = d2; bs = k + t; }
+    }
+    if(Math.abs(bs) > sp.S) continue;
+    const d = Math.sqrt(best), half = P.half[wrapIdx(P, sp.i + Math.round(bs))];
+    if(d <= half + tol) return [sp, sp.i + bs, d, half];
+  }
+  return null;
+}
+/* how deep in lava a point is: the level there, or null if there is none */
+function lavaLevelAt(x, z){
+  for(let n=0;n<SPANS.length;n++){
+    const sp = SPANS[n], uv = spanUV(sp, x, z);
+    if(Math.abs(uv[0]) < sp.wall && Math.abs(uv[1]) < sp.reach*0.95) return sp.lava;
+  }
+  if(LAKE.on && LAKE.lava && Math.hypot((x - LAKE.x)/LAKE.rx, (z - LAKE.z)/LAKE.rz) < 1.05) return LAKE.level;
+  return null;
+}
+/* 0 to 1: how near a point is to the lava, for scorching the snow off the ground */
+function lavaNear(x, z){
+  let k = 0;
+  for(let n=0;n<SPANS.length;n++){
+    const sp = SPANS[n], uv = spanUV(sp, x, z);
+    if(Math.abs(uv[1]) > sp.reach + 10) continue;
+    k = Math.max(k, (1 - smoothstep(sp.wall - 2, sp.wall + (sp.low ? 9 : 5), Math.abs(uv[0])))*(1 - smoothstep(sp.reach*0.8, sp.reach + 10, Math.abs(uv[1]))));
+  }
+  if(LAKE.on && LAKE.lava) k = Math.max(k, 1 - smoothstep(0.95, 1.25, Math.hypot((x - LAKE.x)/LAKE.rx, (z - LAKE.z)/LAKE.rz)));
+  return k;
+}
+
 /* [how far from the stream's middle, how far along it from the road].
    The stream is not ruled across the map: away from the road it wanders,
    and toward its ends it narrows to a trickle and runs out under the
@@ -2680,6 +2803,7 @@ function carveWater(y, x, z){
 /* ground nothing grows on: the open dunes, the canyon's walls */
 function barren(x, z){
   if(GIANT.on && Math.hypot(x - GIANT.x, z - GIANT.z) < GIANT.ring - 7) return true;   // the oak's own ground
+  if(SPANS.length && lavaNear(x, z) > 0.2) return true;                                   // nothing grows by the lava
   if(DUNE.on && Math.hypot(x - DUNE.x, z - DUNE.z) < DUNE.r*0.88) return true;
   if(CANYON.on){ const uv = canyonUV(x, z); if(uv && uv[0] < 30 && canyonPlateau(x, z, uv) > 0.2) return true; }
   return false;
@@ -2820,10 +2944,11 @@ const NOTES = (()=>{
   RIDGES.forEach(R0=> add(R0.at - Math.round(18/seg), "ridge"));
   FORDS.forEach(F=>{ if(F.path === P) add(F.at - Math.round(20/seg), "water"); });
   if(RIVER.on) add(RIVER.a - Math.round(24/seg), "creek");
+  SPANS.forEach(sp=>{ if(sp.P === P) add(sp.i - sp.S - Math.round(25/seg), "bridge"); });
   BRANCHES.forEach(B=>{
     const m = P.pts[B.splitAt], t = P.tans[B.splitAt], look = B.pts[Math.min(B.N - 1, Math.round(14/B.seg))];
     const sd = (look.x - m.x)*(-t.z) + (look.z - m.z)*t.x > 0 ? 1 : -1;       // + is the right
-    out.push({at: wrapIdx(P, B.splitAt - Math.round(30/seg)), kind:"fork", dir: -sd, mods:[]});
+    out.push({at: wrapIdx(P, B.splitAt - Math.round(30/seg)), kind:"fork", dir: -sd, mods:[], label: B.def.label});
   });
   PITS.forEach(at=> add(at - Math.round(15/seg), "mud"));
   CROSSES.forEach(c=>{ for(let i=0;i<N;i++){ const p = P.pts[i]; if(Math.hypot(p.x - c[0], p.z - c[1]) < 2.5){ add(i - Math.round(25/seg), "crossing"); i += Math.round(60/seg); } } });
@@ -2847,10 +2972,10 @@ const NOTES = (()=>{
   }
   return out;
 })();
-const NOTE_WORDS = { jump:"jump", bigjump:"big jump, keep straight", ridge:"ice ridge, jump", water:"water", creek:"into the creek",
+const NOTE_WORDS = { bridge:"log bridge, lava below", jump:"jump", bigjump:"big jump, keep straight", ridge:"ice ridge, jump", water:"water", creek:"into the creek",
                      mud:"mud", crossing:"crossing", ice:"onto ice", crest:"over crest", bumps:"bumps" };
 function noteSay(n){
-  if(n.kind === "fork") return "shortcut " + (n.dir > 0 ? "left" : "right");
+  if(n.kind === "fork") return (n.label ? n.label.toLowerCase() : "shortcut") + " " + (n.dir > 0 ? "left" : "right");
   if(n.kind !== "corner") return NOTE_WORDS[n.kind] || n.kind;
   const d = n.dir > 0 ? "left" : "right";
   return (n.sev === 0 ? "hairpin " + d : d + " " + ["", "one", "two", "three", "four", "five", "six"][n.sev]) + (n.mods.length ? " " + n.mods.join(" ") : "");
@@ -2869,7 +2994,8 @@ const GN = Math.round(2*GHALF/GSTEP) + 1;
 const GCELLS = GN*GN;
 /* natural ground: the land, its small roll, the channels */
 function naturalY(x, z){
-  return carveGorge(carveWater(macro(x, z) + vergeRoll(x, z)*(1 - iceAt(x, z)) + ridgeAt(x, z), x, z), x, z);
+  const y = carveGorge(carveWater(macro(x, z) + vergeRoll(x, z)*(1 - iceAt(x, z)) + ridgeAt(x, z), x, z), x, z);
+  return SPANS.length ? carveSpans(y, x, z) : y;
 }
 const GH  = new Float32Array(GCELLS);     // the finished surface
 const GD  = new Float32Array(GCELLS).fill(1e9);   // distance to the nearest road centreline
@@ -3120,6 +3246,10 @@ function heightAt(x, z){ return gridH(x, z); }
 /* what the wheels are standing on: the grid, the bridge deck where there is
    one, and a little stony roughness off the road that is felt, not drawn */
 function surfaceY(x, z){
+  if(SPANS.length){
+    const f = spanFind(x, z, 1.3);
+    if(f) return pathY(f[0].P, f[1]) + BED;
+  }
   if(GORGE.on){
     const s = deckStation(x, z);
     if(s !== null) return pathY(MAIN, s) + BED;
@@ -3418,7 +3548,10 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
           uv[v*2] = x/17.33; uv[v*2+1] = z/17.33;
           const hw = GP[g] >= 0 ? GHW[g] : 5;
           const d = GD[g] > 1e8 ? 99 : GD[g];
-          const edge = Math.min(40, d - hw);
+          let edge = Math.min(40, d - hw);
+          // under a bridge the ground is not road: it has fallen away below the deck
+          if(GP[g] >= 0){ const Pg = paths[GP[g]], ig = wrapIdx(Pg, GS[g]);
+            if(Pg.noStamp[ig] && GH[g] < Pg.pts[ig].y + BED - 1.2) edge = 40; }
           road[v*4] = edge;
           // where two roads overlap the offset across belongs to neither:
           // push it out past the ruts and the crown so neither is drawn
@@ -3490,6 +3623,11 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
           if(LAKE.on && !LAKE.frozen && t > 0.3){
             const dy = GH[g] - LAKE.level;
             if(dy < 0.9 && dy > -1.5) c.setHSL(0.10, 0.28, 0.42 + Math.random()*0.04);
+          }
+          // round the lava the snow has gone: black basalt, a little red where it is hottest
+          if(SPANS.length || (LAKE.on && LAKE.lava)){
+            const k = lavaNear(x, z);
+            if(k > 0) c.lerp(new THREE.Color().setHSL(0.02 + Math.random()*0.02, 0.10 + k*0.25, 0.09 + Math.random()*0.05 + (1 - k)*0.06), Math.min(0.95, k*1.1));
           }
           col[v*3] = c.r; col[v*3+1] = c.g; col[v*3+2] = c.b;
           v++;
@@ -3872,6 +4010,54 @@ let skyDome = null;
    road through it. Colour goes from clear and brown in the shallows to
    green and deep in the channel, with the sky on it at a grazing angle. */
 const waterMats = [];
+/* Lava: a cooling black crust broken into plates, glowing orange through
+   every crack and running bright where it moves, drifting slowly along. It
+   lights itself (no shading) and is bright enough to bloom. */
+function lavaMaterial(){
+  const m = new THREE.ShaderMaterial({
+    uniforms:{ uTime:{value:0}, tRipple:{value:waterTex},
+      fogColor:{value:new THREE.Color(scene.fog.color)}, fogNear:{value:scene.fog.near}, fogFar:{value:scene.fog.far} },
+    vertexShader:[
+      "attribute float aDepth; varying float vDepth; varying vec3 vWorld;",
+      "void main(){ vDepth = aDepth; vec4 w = modelMatrix*vec4(position, 1.0); vWorld = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }"].join("\n"),
+    fragmentShader:[
+      "uniform float uTime, fogNear, fogFar; uniform sampler2D tRipple; uniform vec3 fogColor;",
+      "varying float vDepth; varying vec3 vWorld;",
+      "vec2 h2(vec2 p){ p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))); return fract(sin(p)*43758.5453); }",
+      // distance to the nearest seam between crust plates, and which plate
+      "vec2 plates(vec2 x){",
+      "  vec2 n = floor(x), f = fract(x), mg = vec2(0.0), mr = vec2(0.0); float md = 8.0;",
+      "  for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){ vec2 g = vec2(float(i), float(j)); vec2 r = g + h2(n + g) - f; float d = dot(r, r); if(d < md){ md = d; mr = r; mg = g; } }",
+      "  float id = h2(n + mg).x; md = 8.0;",
+      "  for(int j=-2;j<=2;j++) for(int i=-2;i<=2;i++){ vec2 g = mg + vec2(float(i), float(j)); vec2 r = g + h2(n + g) - f;",
+      "    if(dot(mr - r, mr - r) > 0.00001) md = min(md, dot(0.5*(mr + r), normalize(r - mr))); }",
+      "  return vec2(md, id);",
+      "}",
+      "void main(){",
+      "  if(vDepth <= 0.0) discard;",
+      "  vec2 p = vWorld.xz;",
+      "  vec2 flow = vec2(uTime*0.05, uTime*0.03);",
+      "  float wob = texture2D(tRipple, p*0.02 + flow*0.2).r;",
+      "  vec2 pl = plates(p*0.16 + flow + wob*0.8);",
+      "  vec2 pl2 = plates(p*0.45 - flow*1.7 + 3.1);",
+      "  float seam = 1.0 - smoothstep(0.0, 0.10, pl.x);",
+      "  float fine = (1.0 - smoothstep(0.0, 0.05, pl2.x))*0.6;",
+      "  float pulse = 0.8 + 0.2*sin(uTime*1.6 + pl.y*20.0);",
+      // plates of dark crust, some still glowing through, bright molten rock in the seams
+      "  vec3 crust = mix(vec3(0.10, 0.035, 0.025), vec3(0.34, 0.07, 0.02), smoothstep(0.55, 1.0, pl.y)*pulse);",
+      "  vec3 hot = mix(vec3(1.0, 0.36, 0.04), vec3(1.0, 0.86, 0.38), seam*seam)*pulse;",
+      "  vec3 col = mix(crust, hot, clamp(seam + fine*0.7, 0.0, 1.0));",
+      // it runs molten where the plates break up, near the middle
+      "  col = mix(col, hot*0.95, smoothstep(0.35, 0.9, vDepth)*smoothstep(0.62, 0.8, wob)*0.8);",
+      "  col = mix(col, vec3(0.08, 0.03, 0.02), (1.0 - smoothstep(0.0, 0.3, vDepth))*0.5);",
+      "  float fd = length(cameraPosition - vWorld);",
+      "  col = mix(col, fogColor, smoothstep(fogNear, fogFar, fd)*0.55);",
+      "  gl_FragColor = vec4(col, 1.0);",
+      "}"].join("\n")
+  });
+  waterMats.push(m);
+  return m;
+}
 function waterMaterial(){
   const m = new THREE.ShaderMaterial({
     uniforms:{
@@ -4097,6 +4283,126 @@ FORDS.forEach(F=>{
     scene.add(line);
   }
   scene.add(gate);
+}
+
+/* ---- the log bridges, and the lava under them ----
+   A deck of logs laid across two big stringers, log rails on posts, and
+   under a crevasse bridge, trestle bents of logs braced in X's standing
+   all the way down in the lava. The lava in each gap is one sheet at its
+   level, drawn only where it lies over the ground. */
+if(SPANS.length){
+  const bark = new THREE.MeshLambertMaterial({color:0x6a4a2c}), bark2 = new THREE.MeshLambertMaterial({color:0x7d5836});
+  const charred = new THREE.MeshLambertMaterial({color:0x2a1e18});
+  const snowM = new THREE.MeshLambertMaterial({color:0xeef3f8});
+  const logBetween = (g, a, b, r, m)=>{
+    const d = new THREE.Vector3().subVectors(b, a), L = d.length();
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(r*(0.9 + Math.random()*0.2), r, L, 7), m);
+    c.position.copy(a).addScaledVector(d, 0.5);
+    c.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+    g.add(c); return c;
+  };
+  SPANS.forEach(sp=>{
+    const P = sp.P, g = new THREE.Group(), seg = P.seg;
+    const at = r0 => { const s0 = sp.i + r0, i0 = Math.floor(s0), f = s0 - i0, A = P.pts[wrapIdx(P, i0)], B = P.pts[wrapIdx(P, i0 + 1)];
+      const T = P.tans[wrapIdx(P, Math.round(s0))];
+      return {x: A.x + (B.x - A.x)*f, z: A.z + (B.z - A.z)*f, y: pathY(P, s0) + BED, tx:T.x, tz:T.z, half:P.half[wrapIdx(P, Math.round(s0))]}; };
+    const L0 = -sp.S, L1 = sp.S;
+    // the deck: logs across, a hand's width apart
+    for(let s0=L0; s0<=L1; s0+=0.5/seg){
+      const q = at(s0), nx = -q.tz, nz = q.tx, w = q.half + 0.7;
+      logBetween(g, new THREE.Vector3(q.x - nx*w, q.y - 0.17, q.z - nz*w), new THREE.Vector3(q.x + nx*w, q.y - 0.17, q.z + nz*w), 0.21, Math.random() < 0.5 ? bark : bark2);
+    }
+    // stringers under it, and the rails
+    const step = Math.max(1, Math.round(3/seg));
+    for(let s0=L0; s0<L1; s0+=step){
+      const a = at(s0), b = at(Math.min(L1, s0 + step));
+      for(const sd of [-1, 1]){
+        const na = [-a.tz, a.tx], nb = [-b.tz, b.tx];
+        const ws = a.half - 0.6, wr = a.half + 0.55;
+        logBetween(g, new THREE.Vector3(a.x + na[0]*sd*ws, a.y - 0.6, a.z + na[1]*sd*ws), new THREE.Vector3(b.x + nb[0]*sd*ws, b.y - 0.6, b.z + nb[1]*sd*ws), 0.42, charred);
+        const pa = new THREE.Vector3(a.x + na[0]*sd*wr, a.y, a.z + na[1]*sd*wr), pb = new THREE.Vector3(b.x + nb[0]*sd*wr, b.y, b.z + nb[1]*sd*wr);
+        logBetween(g, pa, pa.clone().setY(pa.y + 1.2), 0.14, bark);
+        logBetween(g, pa.clone().setY(pa.y + 1.05), pb.clone().setY(pb.y + 1.05), 0.12, bark2);
+        logBetween(g, pa.clone().setY(pa.y + 0.55), pb.clone().setY(pb.y + 0.55), 0.1, bark2);
+        // a line of snow along the top rail
+        const sn = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.08, pa.distanceTo(pb)), snowM);
+        sn.position.copy(pa).add(pb).multiplyScalar(0.5); sn.position.y += 1.15; sn.lookAt(pb.x, sn.position.y, pb.z); g.add(sn);
+      }
+    }
+    // trestle bents down into the gap
+    const bentStep = Math.max(1, Math.round((sp.low ? 8 : 6.5)/seg));
+    for(let s0=-sp.S + bentStep; s0<sp.S; s0+=bentStep){
+      const q = at(s0), nx = -q.tz, nz = q.tx, uvq = spanUV(sp, q.x, q.z);
+      if(Math.abs(uvq[0]) > sp.wall - 2) continue;                // on the rock at the ends, no bent needed
+      const top = q.y - 0.7, foot = sp.floor - 1, w0 = q.half - 0.5, w1 = w0 + (top - foot)*0.12;
+      const T0 = new THREE.Vector3(q.x - nx*w0, top, q.z - nz*w0), T1 = new THREE.Vector3(q.x + nx*w0, top, q.z + nz*w0);
+      const F0 = new THREE.Vector3(q.x - nx*w1, foot, q.z - nz*w1), F1 = new THREE.Vector3(q.x + nx*w1, foot, q.z + nz*w1);
+      logBetween(g, F0, T0, 0.3, charred); logBetween(g, F1, T1, 0.3, charred);
+      logBetween(g, T0, T1, 0.25, bark);
+      // X bracing, storey by storey down the legs
+      const storeys = Math.max(1, Math.round((top - foot)/7));
+      for(let k=0;k<storeys;k++){
+        const f0 = k/storeys, f1 = (k + 1)/storeys;
+        const A0 = T0.clone().lerp(F0, f0), A1 = T0.clone().lerp(F0, f1), B0 = T1.clone().lerp(F1, f0), B1 = T1.clone().lerp(F1, f1);
+        logBetween(g, A0, B1, 0.14, bark); logBetween(g, B0, A1, 0.14, bark);
+        logBetween(g, A1, B1, 0.16, bark2);
+      }
+    }
+    g.traverse(o=>{ if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+    mergeStatic(g); scene.add(g);
+
+    // the lava in the gap, one sheet across its whole length
+    const STEP = 1.6, U = sp.wall + 6, cols = Math.ceil(U*2/STEP) + 1, rows = Math.ceil(sp.reach*2/STEP) + 1;
+    const pos = [], dep = [], idx = [];
+    for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+      const v = -sp.reach + r*STEP, u = -U + c*STEP;
+      // lay the sheet out in the gap's own wandering frame
+      const wob = (Math.sin(v*0.03 + sp.ph)*4 + Math.sin(v*0.011 + sp.ph*2)*7)*smoothstep(20, 60, Math.abs(v));
+      const x = sp.x + sp.tx*(u + wob) - sp.tz*v, z = sp.z + sp.tz*(u + wob) + sp.tx*v;
+      pos.push(x, sp.lava, z);
+      dep.push(Math.max(-1, Math.min(3, sp.lava - gridH(x, z))));
+    }
+    for(let r=0;r<rows-1;r++) for(let c=0;c<cols-1;c++){
+      const a = r*cols + c, b = a + 1, d2 = a + cols, e = d2 + 1;
+      if(dep[a] <= 0 && dep[b] <= 0 && dep[d2] <= 0 && dep[e] <= 0) continue;
+      idx.push(a, e, d2, a, b, e);
+    }
+    const lg = new THREE.BufferGeometry();
+    lg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    lg.setAttribute("aDepth", new THREE.Float32BufferAttribute(dep, 1));
+    lg.setIndex(idx);
+    const lm = new THREE.Mesh(lg, lavaMaterial()); lm.material.side = THREE.DoubleSide; lm.frustumCulled = false; scene.add(lm);
+  });
+  // a sign before each crevasse on the high route
+  SPANS.forEach(sp=>{ if(sp.P === MAIN) roadSign(sp.i - sp.S - Math.round(60/MAIN.seg), 1, ["LOG BRIDGE", "lava below \u2014 keep it straight"], "#e2b21e", "#1f1f1f"); });
+}
+/* the lava's own light: one warm lamp, kept on the nearest lava to the car */
+const LAVA_LIGHT = (SPANS.length || (LAKE.on && LAKE.lava)) ? new THREE.PointLight(0xff6a20, 0, 70, 1.6) : null;
+if(LAVA_LIGHT) scene.add(LAVA_LIGHT);
+function stepLava(dt){
+  if(!LAVA_LIGHT) return;
+  let best = Infinity, bx = 0, by = 0, bz = 0;
+  const x = camera.position.x, z = camera.position.z;
+  SPANS.forEach(sp=>{
+    const dx = x - sp.x, dz = z - sp.z, v = Math.max(-sp.reach*0.9, Math.min(sp.reach*0.9, -dx*sp.tz + dz*sp.tx));
+    const px = sp.x - sp.tz*v, pz = sp.z + sp.tx*v, d = Math.hypot(px - x, pz - z);
+    if(d < best){ best = d; bx = px; by = sp.lava + 2.5; bz = pz; }
+  });
+  if(LAKE.on && LAKE.lava){
+    const a = Math.atan2((z - LAKE.z)/LAKE.rz, (x - LAKE.x)/LAKE.rx), px = LAKE.x + Math.cos(a)*LAKE.rx*0.85, pz = LAKE.z + Math.sin(a)*LAKE.rz*0.85;
+    const d = Math.hypot(px - x, pz - z);
+    if(d < best){ best = d; bx = px; by = LAKE.level + 3; bz = pz; }
+  }
+  LAVA_LIGHT.position.set(bx, by, bz);
+  LAVA_LIGHT.intensity = 2.4*(1 - smoothstep(30, 110, best))*(0.9 + 0.1*Math.sin(state.t*3.1));
+  // embers rising and steam where the heat meets the snow, near the car
+  if(state.phase !== "menu" && best < 90 && Math.random() < dt*14){
+    const jx = bx + (Math.random() - 0.5)*14, jz = bz + (Math.random() - 0.5)*14;
+    if(lavaLevelAt(jx, jz) !== null)
+      spawnDust(jx, by - 2.2, jz, [1.0, 0.45 + Math.random()*0.3, 0.1], 0.25, (Math.random() - 0.5)*1.5, (Math.random() - 0.5)*1.5, 3 + Math.random()*4);
+    else if(Math.random() < 0.5)
+      spawnDust(jx, gridH(jx, jz) + 0.3, jz, 4, 0.8, (Math.random() - 0.5)*1, (Math.random() - 0.5)*1, 1.5 + Math.random()*2);
+  }
 }
 
 /* ---- the bridge over the gorge, on the tracks that have one ---- */
@@ -5575,8 +5881,8 @@ if(LAKE.on){
   g.setAttribute("uv", new THREE.Float32BufferAttribute(uv,2));
   g.setAttribute("aDepth", new THREE.Float32BufferAttribute(dep,1));
   g.setIndex(idx);
-  const wm = new THREE.Mesh(g, waterMaterial()); wm.renderOrder = 3; wm.frustumCulled = false; scene.add(wm);
-  if(!LAKE.frozen){
+  const wm = new THREE.Mesh(g, LAKE.lava ? lavaMaterial() : waterMaterial()); wm.renderOrder = 3; wm.frustumCulled = false; scene.add(wm);
+  if(!LAKE.frozen && !LAKE.lava){
   // riprap along the waterline of the causeway
   const rockMat = new THREE.MeshLambertMaterial({map:rockTex});
   const P = MAIN;
@@ -6027,8 +6333,13 @@ paths.forEach(P=>{
     scene.add(g);
   };
   const turnWord = side > 0 ? "RIGHT" : "LEFT";          // +n is the driver's right
-  big(A - Math.round(70/MAIN.seg), side, "SHORTCUT", turnWord + " IN 70m", side > 0 ? 1 : -1);
-  big(A - Math.round(8/MAIN.seg), side, "SHORTCUT", "", side > 0 ? 1 : -1);
+  const label = P.def.label || "SHORTCUT";
+  big(A - Math.round(70/MAIN.seg), side, label, turnWord + " IN 70m", side > 0 ? 1 : -1);
+  big(A - Math.round(8/MAIN.seg), side, label, "", side > 0 ? 1 : -1);
+  if(P.def.mainLabel){
+    big(A - Math.round(70/MAIN.seg), -side, P.def.mainLabel, "straight on", 0);
+    big(A - Math.round(8/MAIN.seg), -side, P.def.mainLabel, "", 0);
+  }
   // marker poles, red and white with a flag, down both sides of the mouth
   const poleM = new THREE.MeshLambertMaterial({color:0xf2efe6}), redM = new THREE.MeshLambertMaterial({color:0xd8302a});
   const flagM = new THREE.MeshLambertMaterial({color:0xffd23d, side:THREE.DoubleSide});
@@ -9106,6 +9417,28 @@ function stepCar(dt){
     }
   }
 
+  /* The log bridges have rails: they stop the car rather than let it off
+     the side into the lava. */
+  if(SPANS.length){
+    const f = spanFind(pose.x, pose.z, 4.5);
+    if(f && pose.y > pathY(f[0].P, f[1]) + BED - 2.5){
+      const P = f[0].P, j = wrapIdx(P, Math.round(f[1])), pB = P.pts[j], tB = P.tans[j];
+      const nx2 = -tB.z, nz2 = tB.x, lat = (pose.x - pB.x)*nx2 + (pose.z - pB.z)*nz2, lim = f[3] + 0.55;
+      if(Math.abs(lat) > lim){
+        const push = (Math.abs(lat) - lim)*Math.sign(lat);
+        pose.x -= nx2*push; pose.z -= nz2*push;
+        const vn = pose.vx*nx2 + pose.vz*nz2;
+        if(vn*Math.sign(lat) > 0){ pose.vx -= nx2*vn*1.35; pose.vz -= nz2*vn*1.35; }
+        if(Math.abs(vn) > 4) GAME.shake = Math.max(GAME.shake || 0, 0.14);
+        if(Math.abs(vn) > 1.5 && (AUD.scrapeT || 0) < now0()){ SFX.bump(Math.abs(vn)*0.6); AUD.scrapeT = now0() + 0.3; }
+      }
+    }
+  }
+  if((SPANS.length || (LAKE.on && LAKE.lava)) && state.phase === "racing"){
+    const lv = lavaLevelAt(pose.x, pose.z);
+    if(lv !== null && pose.y < lv + 0.5) lavaReset();
+  }
+
   /* The gallery's pillars and the canyon's walls are solid: running wide
      there scrapes along them instead of climbing the rock. */
   if(GALLERY.on || CANYON.on){
@@ -9947,7 +10280,7 @@ function drawNoteTile(sh, cx, y, s, alpha){
     hud.fillStyle = col; hud.fill(); hud.lineWidth = 1.6*k; hud.strokeStyle = "#000"; hud.stroke();
     hudText(n.sev === 0 ? "H" : String(n.sev), x + w*0.8, y + h*0.62, UI.value*0.8*s, col, "center");
   } else {
-    const label = n.kind === "fork" ? (n.dir > 0 ? "\u2190 SHORT" : "SHORT \u2192") : {jump:"JUMP", bigjump:"BIG JUMP", ridge:"RIDGE", water:"WATER", creek:"CREEK", mud:"MUD", crossing:"CROSS", ice:"ICE", crest:"CREST", bumps:"BUMPS"}[n.kind] || n.kind.toUpperCase();
+    const label = n.kind === "fork" ? (n.dir > 0 ? "\u2190 " : "") + (n.label ? n.label.split(" ")[0] : "SHORT") + (n.dir > 0 ? "" : " \u2192") : {bridge:"BRIDGE", jump:"JUMP", bigjump:"BIG JUMP", ridge:"RIDGE", water:"WATER", creek:"CREEK", mud:"MUD", crossing:"CROSS", ice:"ICE", crest:"CREST", bumps:"BUMPS"}[n.kind] || n.kind.toUpperCase();
     // a warning triangle
     const tx = x + w/2, ty = y + h*0.12, ts = h*0.44;
     hud.beginPath(); hud.moveTo(tx, ty); hud.lineTo(tx + ts*0.62, ty + ts); hud.lineTo(tx - ts*0.62, ty + ts); hud.closePath();
@@ -10718,6 +11051,23 @@ function stepRaceEvents(dt, info){
 }
 
 /* put the car back on the road, pointing the right way */
+/* into the lava: a hiss, a column of steam, and the car back on the road
+   it fell off, a little short of where it went in */
+function lavaReset(){
+  const x = pose.x, y = pose.y, z = pose.z;
+  for(let k=0;k<40;k++) spawnDust(x + (Math.random() - 0.5)*3, y + 0.5, z + (Math.random() - 0.5)*3, 4, 1.2,
+                                  (Math.random() - 0.5)*3, (Math.random() - 0.5)*3, 4 + Math.random()*5);
+  for(let k=0;k<24;k++) spawnDust(x, y + 0.3, z, [1.0, 0.5, 0.12], 0.6, (Math.random() - 0.5)*8, (Math.random() - 0.5)*8, 5 + Math.random()*6);
+  if(actx){ burst(1.4, "highpass", 1800, 0.3, 0.6, 0, 5000); burst(0.6, "lowpass", 300, 0.3, 1, 0); }
+  banner("INTO THE LAVA", "#ff6a2a", 1.6);
+  const n = nearest(x, z), P = n.path;
+  if(P === MAIN){ resetCar(); return; }
+  // back on the branch, eight metres before where it left the deck
+  resetCar();
+  const j = Math.max(0, n.pi - Math.round(14/P.seg)), p = P.pts[j], t = P.tans[j];
+  pose.x = p.x; pose.z = p.z; pose.h = Math.atan2(t.x, t.z); pose.y = surfaceY(p.x, p.z); pose.lastGy = pose.y;
+  camH = pose.h; camera.position.set(pose.x - Math.sin(pose.h)*9, pose.y + 3.6, pose.z - Math.cos(pose.h)*9);
+}
 function resetCar(){
   if(state.phase !== "racing" || GAME.paused) return;
   const i = state.idx, p = pts[i], t = tans[i];
@@ -11226,7 +11576,9 @@ const mainIdx = m => m === "champ" ? 0 : m === "race" ? 1 : m === "trial" ? 2 : 
    not seventeen. Expeditions have their own list. */
 const GP_GROUPS = (()=>{
   const g = CUPS.map((c, k)=> ({name: c.name.replace(" Cup", " Grand Prix"), short: c.name.replace(" Cup", "").toUpperCase(), ids: c.rounds.slice()}));
-  const extra = TRACKS.map((t, i)=> i).filter(i=> !TRACKS[i].expedition && !g.some(x=> x.ids.includes(i)));
+  const special = TRACKS.map((t, i)=> i).filter(i=> TRACKS[i].special);
+  if(special.length) g.push({name: "Special stages", short: "SPECIAL", ids: special});
+  const extra = TRACKS.map((t, i)=> i).filter(i=> !TRACKS[i].expedition && !TRACKS[i].special && !g.some(x=> x.ids.includes(i)));
   if(extra.length) g.push({name: "Practice", short: "PRACTICE", ids: extra});
   return g;
 })();
@@ -11890,6 +12242,7 @@ function frame(now){
     stepRivals(dt);
     stepLeafPiles(dt);
     stepCritters(dt);
+    stepLava(dt);
     if(state.phase === "racing" || state.phase === "done") state.place = computePlace();
     stepRaceEvents(dt, info);
     stepGhost();
@@ -11952,7 +12305,7 @@ if(/debug/.test(location.hash)){
   window.__R = { THREE, TRACKS, TRACK, TRACK_ID, MAIN, BRANCHES, paths, ROUTE, pose, state, camera, scene, renderer,
                  surfaceY, gridH, nearest, PILES, PIT, GAME, CTL, trans, MAXV, radiiOf, radiiOpen, resetRace, setMode,
                  closeUI, rivals, car, splash, cornerHoldSpeed, stepCar, placeAtStart, drift, AUTO_JUMPS,
-                 CALM, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults, trans, GIANT, RIDGES, CROSSES, NOTES, noteSay, PACE, TRACE, stepNotes, stepTrace, stepCritters, stepDirt, CRIT, CAR_DIRT, UI:{showTitle, showMain, showTracks, showReady, showOptions, showGarage, showHelp, showPause, showChamp}, dustLive: ()=>{ let n=0; for(let i=0;i<DUST;i++) if(dustLife[i]>0) n++; return n; } };
+                 CALM, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults, trans, GIANT, RIDGES, CROSSES, SPANS, LAKE, NOTES, noteSay, PACE, TRACE, stepNotes, stepTrace, stepCritters, stepDirt, CRIT, CAR_DIRT, UI:{showTitle, showMain, showTracks, showReady, showOptions, showGarage, showHelp, showPause, showChamp}, dustLive: ()=>{ let n=0; for(let i=0;i<DUST;i++) if(dustLife[i]>0) n++; return n; } };
 }
 boot();
 requestAnimationFrame(frame);
