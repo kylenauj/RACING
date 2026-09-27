@@ -792,7 +792,32 @@ const TRACKS = [
     summit:[0,0], treeline:150, snowline:205,
     camps:[[-580,-470],[-625,-290],[-239,450],[288,242],[81,11]],
     campNames:["Swamp Camp","Creek Camp","Gully Camp","North Shelf Camp","Switchback Camp"],
-    branches:[]}
+    branches:[]},
+
+  /* ---- the fourth round of the Fall Cup ---- */
+  { name:"ELDERWOOD", after:"a nine hundred year old oak", relief:1.1, season:"fall", cup:1,
+    blurb:"wind up the hill through the maples to the giant oak on its top, round the trunk under its roots, and back down the far side",
+    kit:["crest","rhythm","kicker"],
+    shape:"THE OAK \u2014 through the roots of a giant",
+    feature:"a lap round a giant oak, under and over its roots",
+    ctrl:[[0,-430],[-110,-450],[-215,-400],[-250,-300],[-185,-245],[-240,-175],[-305,-95],[-250,-20],[-300,70],[-230,140],
+          [-150,110],[-105,40],[-80,-15],
+          // round the oak, under the arches of its roots
+          [-48,0],[-42,24],[-24,42],[0,48],[24,42],[42,24],[48,0],[42,-24],[28,-39],
+          [75,-80],[150,-50],[225,-110],[180,-205],[250,-280],[160,-360],[80,-400]],
+    hills:[[0,0,250,74],[-260,-150,130,16],[210,-220,120,14],[-230,110,110,10]],
+    jumps:[], fords:[[-110,-450]],
+    mud:[[[-250,-20],[-300,70]]],
+    flats:[[0,0,98]],
+    giantTree:{at:[0,0], ring:48},
+    branches:[
+      // the deer path: straight up the gully while the road zigzags
+      {a:[-215,-400], b:[-305,-95], via:[[-285,-310],[-300,-210],[-315,-150]],
+       half:4.4, jumps:[[0.5,24,7,2.0,42]], tune:0.35},
+      // the leaf chute: straight down through the maples
+      {a:[150,-50], b:[160,-360], via:[[120,-150],[115,-260]],
+       half:4.4, jumps:[[0.45,24,7,2.2,44]], tune:0.55}
+    ]}
 ];
 
 /* ---- paths -------------------------------------------------------- */
@@ -835,7 +860,9 @@ function ramp(P, centre, up, over, height, land, full, steep){
      a face nobody could land on. The hill gives the flight on its own, so
      the kicker shrinks with the fall past it, and is gone by about 8%. */
   const seg = P.seg;
-  const back = Math.max(over, Math.round(height*7/seg));   // the far side, metres -> samples
+  /* The far side is the landing: a long slope going away downhill, so a car
+     leaving the lip at speed (20 to 35m) comes down on it, not on flat ground. */
+  const back = Math.max(over, Math.round(Math.max(24, Math.min(46, height*16))/seg));
   if(!full){
     const L = Math.max(back + 8, land || 0);
     const a = P.pts[wrapIdx(P, centre)].y, b = P.pts[wrapIdx(P, centre+L)].y;
@@ -855,12 +882,13 @@ function ramp(P, centre, up, over, height, land, full, steep){
   }
   for(let k=1;k<=back;k++){
     const t = k/back;
-    P.pts[wrapIdx(P, centre+k)].y += height*Math.pow(1 - t, 1.5);
+    P.pts[wrapIdx(P, centre+k)].y += height*(1 - t*t*(3 - 2*t));
   }
   /* The landing dip is for flat ground. Where the road already falls away
      past the lip, the hill is the landing, and digging a dip into it as
      well made a 35-50% face that the car could only land on nose first. */
-  const L = land || 0;
+  // (only the big built jumps keep a landing dip; on a kicker its far side was an upslope to land into)
+  const L = full ? (land || 0) : 0;
   if(L){
     const a = P.pts[wrapIdx(P, centre+back)].y, b = P.pts[wrapIdx(P, centre+back+L)].y;
     const grade = (b - a)/(L*seg);                      // negative: downhill
@@ -1139,7 +1167,7 @@ if(DESERT){
   if(TRACK.town)  TRACK.town  = Object.assign({}, TRACK.town,  {at: mv(TRACK.town.at)});
   if(TRACK.river) TRACK.river = Object.assign({}, TRACK.river, {from: mv(TRACK.river.from), to: mv(TRACK.river.to)});
   TRACK.bigJumps = (TRACK.bigJumps||[]).map(j=> [mv(j[0]), j[1]]);
-  ["bowl","lake","washout","pit","dunes","swamp"].forEach(k=>{ if(TRACK[k]) TRACK[k] = Object.assign({}, TRACK[k], {at: mv(TRACK[k].at)}); });
+  ["bowl","lake","washout","pit","dunes","swamp","giantTree"].forEach(k=>{ if(TRACK[k]) TRACK[k] = Object.assign({}, TRACK[k], {at: mv(TRACK[k].at)}); });
   ["canyon","gallery"].forEach(k=>{ if(TRACK[k]) TRACK[k] = Object.assign({}, TRACK[k], {from: mv(TRACK[k].from), to: mv(TRACK[k].to)}); });
   TRACK.washes = (TRACK.washes||[]).map(mv);
   if(TRACK.summit) TRACK.summit = mv(TRACK.summit);
@@ -1405,6 +1433,18 @@ if(TRACK.pit){
     if(Math.hypot(p.x - PIT.x, p.z - PIT.z) < PIT.r + 10) CALM.push([i, 25]);
   }
 }
+/* Elderwood's oak: the road circles its trunk at a set radius, under the
+   arches of its roots, so everything round the ring is kept calm and the
+   roots themselves are the bumps. */
+const GIANT = {on:false};
+if(TRACK.giantTree){
+  const G = TRACK.giantTree;
+  Object.assign(GIANT, {on:true, x:G.at[0], z:G.at[1], ring:G.ring, trunk:15});
+  for(let i=0;i<MAIN.N;i+=4){
+    const p = MAIN.pts[i];
+    if(Math.hypot(p.x - GIANT.x, p.z - GIANT.z) < GIANT.ring + 30) CALM.push([i, 25]);
+  }
+}
 if(TRACK.bowl){
   const B = TRACK.bowl;
   Object.assign(BOWL, {on:true, x:B.at[0], z:B.at[1], r:B.r, bank:B.bank});
@@ -1493,6 +1533,15 @@ function causeway(P){
   }
   const sm = Array.from(lift); smoothAlong(sm, P.closed, Math.round(10/P.seg));
   for(let i=0;i<P.N;i++) P.pts[i].y += Math.max(lift[i], sm[i]);
+  /* where the land past the shore falls away, the causeway comes down onto it
+     as an embankment no steeper than 14%, instead of stopping at a drop */
+  const near = i=>{ const p = P.pts[i]; return Math.hypot((p.x - LAKE.x)/LAKE.rx, (p.z - LAKE.z)/LAKE.rz) < 3.2; };
+  const drop = 0.14*P.seg;
+  for(let pass=0; pass<2; pass++){
+    for(let i=1;i<P.N;i++) if(near(i)) P.pts[i].y = Math.max(P.pts[i].y, P.pts[i-1].y - drop);
+    for(let i=P.N-2;i>=0;i--) if(near(i)) P.pts[i].y = Math.max(P.pts[i].y, P.pts[i+1].y - drop);
+    if(P.closed){ P.pts[0].y = Math.max(P.pts[0].y, P.pts[P.N-1].y - drop); }
+  }
 }
 causeway(MAIN);
 /* banking: through the Bowl the road leans into the turn, the outside edge
@@ -1557,7 +1606,7 @@ TRACK.branches.forEach(def=>{
      rhythm     four rollers in a row, timed to the car
      staircase  three ledges, one after another, down the hill
      ledge      one big ledge, the tall version of a drop           */
-const JUMP_LEN = { kicker:100, crest:70, double:150, tabletop:115, drop:95,
+const JUMP_LEN = { kicker:100, crest:80, double:190, tabletop:115, drop:95,
                    rhythm:150, staircase:170, ledge:120 };
 function shapeJump(P, at, type){
   const seg = P.seg, add = (m0, m1, fn)=>{
@@ -1566,6 +1615,7 @@ function shapeJump(P, at, type){
     }
   };
   const hump = (c, h, L)=> s=> Math.abs(s-c) < L/2 ? h*0.5*(1 + Math.cos(Math.PI*(s-c)/(L/2))) : 0;
+  const crest = (h, up, down)=> s=> s < -up || s > down ? 0 : h*0.5*(1 + Math.cos(Math.PI*(s < 0 ? s/up : s/down)));
   /* a ledge still drops away, but the last 6m curl up into a small kick so
      the car leaves it nose up and flies off rather than falling off */
   const ledge = (c, h, rise)=> s=>{
@@ -1579,8 +1629,8 @@ function shapeJump(P, at, type){
   };
   switch(type){
     case "kicker":   ramp(P, at, 30, 8, 2.0, 50); break;
-    case "crest":    add(-18, 18, hump(0, 1.6, 30)); break;
-    case "double":   ramp(P, at, 26, 7, 1.7, 26); ramp(P, at + Math.round(54/seg), 26, 7, 1.9, 44); break;
+    case "crest":    add(-16, 38, crest(1.6, 15, 36)); break;
+    case "double":   ramp(P, at, 26, 7, 1.7, 0); ramp(P, at + Math.round(95/seg), 26, 7, 1.9, 0); break;
     /* a proper take-off and landing: a curved kicker onto a lip, a step
        down to a flat table you land on, then a long ramp back to the road.
        Fast enough and you clear the table and touch down on the down ramp. */
@@ -1589,8 +1639,8 @@ function shapeJump(P, at, type){
                        if(s < -F){ const t = (s + 32)/(32 - F); return 0.3*h*t*t*(3 - 2*t); }
                        if(s <= 0){ const q = (s + F)/F; return 0.3*h + 0.7*h*q*q; }   // the face, to the lip
                        if(s < 3)  return h - 0.18*h*(s/3);                             // off the lip
-                       if(s < 26) return 0.82*h;                                        // the table
-                       const t = (s - 26)/40; return 0.82*h*(1 - t*t*(3 - 2*t));        // the landing ramp
+                       if(s < 11) return 0.82*h;                                        // a short table, for the slow
+                       const t = Math.min(1, (s - 11)/44); return 0.82*h*(1 - t*t*(3 - 2*t));   // the landing ramp
                      }); break;
     case "drop":     add(-60, 4, ledge(0, 1.5, 58)); break;
     case "ledge":    add(-80, 4, ledge(0, 2.4, 78)); break;
@@ -1625,6 +1675,9 @@ const AUTO_JUMPS = [];
       let straight = true;
       for(let k=-back; k<=fwd; k+=2){ if(R[((i+k)%N+N)%N] < 42){ straight = false; break; } }
       if(!straight) continue;
+      // never where the road climbs through the landing: the hill would eat the landing slope
+      { const a0 = MAIN.pts[i].y, a1 = MAIN.pts[((i + Math.round(40/seg))%N + N)%N].y;
+        if((a1 - a0)/40 > 0.02) continue; }
       let clear = Infinity;
       for(const b of busy) clear = Math.min(clear, gap(i, b[0]) - b[1] - L*0.4);
       if(clear < 0) continue;
@@ -1867,11 +1920,17 @@ if(TRACK.washout && LAKE.on){
   const at = snapTo(MAIN, TRACK.washout.at), seg = MAIN.seg;
   ramp(MAIN, at, Math.round(36/seg), Math.round(4/seg), 2.8, 0, true, 3.0);
   const y0 = LAKE.level - BED - 0.45;
-  for(let k=Math.round(3/seg); k<=Math.round(28/seg); k++){
-    const i = wrapIdx(MAIN, at + k), t = (k*seg - 3)/25;
+  for(let k=Math.round(3/seg); k<=Math.round(18/seg); k++){
+    const i = wrapIdx(MAIN, at + k), t = (k*seg - 3)/15;
     const w = smoothstep(0, 0.25, t)*(1 - smoothstep(0.55, 1, t));
     MAIN.pts[i].y = MAIN.pts[i].y*(1 - w) + y0*w;
     if(w > 0.5) MAIN.surf[i] = SURF.WATER;
+  }
+  // the far bank of the gap is built up and ramps away, so the jump lands on a slope
+  for(let k=Math.round(12/seg); k<=Math.round(62/seg); k++){
+    const i = wrapIdx(MAIN, at + k), s2 = k*seg;
+    const up = smoothstep(13, 17, s2), down = 1 - smoothstep(17, 62, s2);
+    MAIN.pts[i].y += 1.5*Math.min(up, down);
   }
   Object.assign(WASH, {on:true, at});
   CALM.push([at, 60]);
@@ -1910,6 +1969,15 @@ PITS.forEach(at=>{
     MAIN.half[i] += (1 - Math.abs(t))*0.8;
   }
 });
+/* roots lying across the road round the oak: a hump you feel in the wheels */
+if(GIANT.on){
+  GIANT.humps = [];
+  for(const deg of [138, 78, 18, -40]){
+    const a = deg*Math.PI/180, at = snapTo(MAIN, [GIANT.x + Math.cos(a)*GIANT.ring, GIANT.z + Math.sin(a)*GIANT.ring]);
+    for(let k=-6;k<=6;k++){ const i = wrapIdx(MAIN, at + k), d = k*MAIN.seg; MAIN.pts[i].y += 0.42*Math.exp(-d*d/1.4); }
+    GIANT.humps.push(at);
+  }
+}
 /* dry washes: the road dips down through a sandy stream bed and back up */
 (TRACK.washes || []).forEach(w=>{
   const at = snapTo(MAIN, w), span = Math.round(22/MAIN.seg);
@@ -2346,6 +2414,7 @@ function carveWater(y, x, z){
 }
 /* ground nothing grows on: the open dunes, the canyon's walls */
 function barren(x, z){
+  if(GIANT.on && Math.hypot(x - GIANT.x, z - GIANT.z) < GIANT.ring - 7) return true;   // the oak's own ground
   if(DUNE.on && Math.hypot(x - DUNE.x, z - DUNE.z) < DUNE.r*0.88) return true;
   if(CANYON.on){ const uv = canyonUV(x, z); if(uv && uv[0] < 30 && canyonPlateau(x, z, uv) > 0.2) return true; }
   return false;
@@ -4495,6 +4564,75 @@ if(DROP.on && TRACK.skijump){
   }
   g.traverse(o=>{ if(o.isMesh) o.castShadow = true; });
   mergeStatic(g); scene.add(g);
+}
+
+/* ---- Elderwood's oak ----
+   A trunk as wide as a house, flaring into buttresses at the foot, limbs
+   thrown out wide, and a crown of autumn leaves over the whole ring. Its
+   roots run out over the road in arches you drive under (lanterns hung
+   from them) and lie across it where they have sunk into the ground. */
+if(GIANT.on){
+  const gy = gradedY(GIANT.x, GIANT.z), g = new THREE.Group();
+  const bark = new THREE.MeshLambertMaterial({color:0x5c4632, flatShading:true});
+  const bark2 = new THREE.MeshLambertMaterial({color:0x6e5640, flatShading:true});
+  const prof = [[17,-3],[16,0],[13,3],[11,8],[9.5,16],[9,28],[8.4,42],[7.2,56],[5.5,68],[3,76]].map(p=> new THREE.Vector2(p[0], p[1]));
+  const tg = new THREE.LatheGeometry(prof, 18), tp = tg.attributes.position;
+  for(let v=0; v<tp.count; v++){
+    const x = tp.getX(v), y = tp.getY(v), z = tp.getZ(v), a = Math.atan2(z, x);
+    const n = 1 + 0.08*Math.sin(a*7 + y*0.15) + 0.05*Math.sin(a*13 - y*0.3) + (y < 10 ? 0.18*Math.max(0, Math.sin(a*6))*(1 - y/10) : 0);
+    tp.setXYZ(v, x*n, y, z*n);
+  }
+  tg.computeVertexNormals();
+  const trunk = new THREE.Mesh(tg, bark); trunk.castShadow = true; trunk.receiveShadow = true; g.add(trunk);
+  const limb = (pts, r0, r1, mat)=>{
+    const c = new THREE.CatmullRomCurve3(pts.map(p=> new THREE.Vector3(p[0], p[1], p[2])));
+    const segs = 28, rs = 8, geo = new THREE.TubeGeometry(c, segs, 1, rs, false), pa = geo.attributes.position;
+    for(let i=0;i<=segs;i++){
+      const ctr = c.getPointAt(i/segs), r = r0 + (r1 - r0)*(i/segs);
+      for(let j=0;j<=rs;j++){ const v = i*(rs + 1) + j;
+        pa.setXYZ(v, ctr.x + (pa.getX(v) - ctr.x)*r, ctr.y + (pa.getY(v) - ctr.y)*r, ctr.z + (pa.getZ(v) - ctr.z)*r); }
+    }
+    geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = true; g.add(m); return c;
+  };
+  const R = GIANT.ring, P = (a, r, y)=> [Math.cos(a)*r, y, Math.sin(a)*r];
+  const lamp = new THREE.MeshLambertMaterial({color:0xffe2a0, emissive:0xffa030, emissiveIntensity:1.0});
+  for(const deg of [165, 108, 48, -12]){
+    const a = deg*Math.PI/180;
+    const c = limb([P(a, 11, 2), P(a, 22, 6), P(a + 0.03, 34, 9.5), P(a + 0.05, R, 10.5), P(a + 0.06, R + 12, 9.5), P(a + 0.07, R + 22, 5), P(a + 0.08, R + 30, -1.5)], 3.2, 1.6, bark);
+    const top = c.getPointAt(0.52);
+    const l = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.5), lamp); l.position.set(top.x, top.y - 2.8, top.z); g.add(l);
+    const cord = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.1, 0.06), bark2); cord.position.set(top.x, top.y - 1.9, top.z); g.add(cord);
+  }
+  for(const deg of [205, 235, 262, 290]){
+    const a = deg*Math.PI/180;
+    limb([P(a, 11, 1.5), P(a, 22, 2.5), P(a + 0.05, 36, 1.2), P(a + 0.1, 50, 0.2), P(a + 0.12, 62, -1)], 2.6, 1.1, bark);
+  }
+  for(const at of GIANT.humps){
+    const p = MAIN.pts[at], a = Math.atan2(p.z - GIANT.z, p.x - GIANT.x), ry = gradedY(p.x, p.z) - gy;
+    limb([P(a - 0.03, R - 16, ry + 0.2), P(a, R - 8, ry + 0.05), P(a, R, ry - 0.15), P(a + 0.02, R + 9, ry - 0.1), P(a + 0.04, R + 18, ry + 0.1)], 0.55, 0.45, bark2);
+  }
+  for(let k=0;k<7;k++){
+    const a = k/7*Math.PI*2 + 0.3, y0 = 38 + (k % 3)*7;
+    limb([P(a, 5, y0), P(a + 0.1, 22, y0 + 8), P(a + 0.2, 42, y0 + 12), P(a + 0.28, 60, y0 + 18)], 2.6, 0.8, bark);
+  }
+  {
+    const blob = new THREE.IcosahedronGeometry(1, 1), n = 58;
+    const crown = new THREE.InstancedMesh(blob, new THREE.MeshLambertMaterial({flatShading:true}), n);
+    const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), cc = new THREE.Color();
+    for(let k=0;k<n;k++){
+      const a = Math.random()*Math.PI*2, rr = Math.sqrt(Math.random())*70, y = 62 + (1 - rr/70)*26 + (Math.random() - 0.5)*10;
+      const sc = 13 + Math.random()*10;
+      v3.set(Math.cos(a)*rr, y, Math.sin(a)*rr); s3.set(sc, sc*0.8, sc);
+      q4.setFromEuler(new THREE.Euler(Math.random(), Math.random()*6, Math.random())); m4.compose(v3, q4, s3);
+      crown.setMatrixAt(k, m4); fallTint(cc); crown.setColorAt(k, cc);
+    }
+    crown.instanceMatrix.needsUpdate = true; crown.instanceColor.needsUpdate = true;
+    crown.castShadow = true; g.add(crown);
+  }
+  g.position.set(GIANT.x, gy, GIANT.z);
+  scene.add(g);
+  roadSign(Math.round(40/MAIN.seg), 1, ["ELDERWOOD", "the old oak, 900 years standing"], "#7a3b1e", "#f7e7c0");
 }
 
 /* ---- the expedition: base camp, the camps, the summit cairn ----
@@ -8405,6 +8543,17 @@ function stepCar(dt){
     }
   }
 
+  // the oak's trunk is solid: glance off it
+  if(GIANT.on){
+    const dx = pose.x - GIANT.x, dz = pose.z - GIANT.z, d = Math.hypot(dx, dz), lim = GIANT.trunk + 2.4;
+    if(d < lim && d > 0.01){
+      const ux = dx/d, uz = dz/d;
+      pose.x = GIANT.x + ux*lim; pose.z = GIANT.z + uz*lim;
+      const vn = pose.vx*ux + pose.vz*uz;
+      if(vn < 0){ pose.vx -= ux*vn*1.4; pose.vz -= uz*vn*1.4;
+        if(-vn > 3){ SFX.bump(-vn); GAME.shake = Math.max(GAME.shake || 0, Math.min(0.5, -vn*0.05)); } }
+    }
+  }
   // vertical: integrate against the ground so crests actually launch the car
   const gy = surfaceY(pose.x, pose.z);
   const rawStep = gy - pose.lastGy;
@@ -9383,7 +9532,7 @@ const MODES = {
   expedition: { laps:1, rivals:false, label:"Expedition" }
 };
 const CUPS = [ {name:"Summer Cup", rounds:[0, 1, 2, 4]},       // every summer circuit but the test yard
-               {name:"Fall Cup",   rounds:[5, 6, 7]},
+               {name:"Fall Cup",   rounds:[5, 6, 7, 17]},
                {name:"Winter Cup", rounds:[8, 9, 10, 11]},
                {name:"Desert Cup", rounds:[12, 13, 14, 15]} ];
 let CHAMP_ROUNDS = CUPS[0].rounds;
@@ -10240,7 +10389,7 @@ function showMain(sel){
   const C = SAVE.champ;
   const champSub = C && !C.done ? CUPS[C.cup || 0].name + ", round " + (C.round+1) + " of " + CHAMP_ROUNDS.length : "";
   const DESC = {
-    champ:"Four cups: the Summer Cup over four rounds, the Fall Cup over three in the maples, the Winter Cup over four on snow and ice, and the Desert Cup over four in the red rock. Three laps a round against the same three drivers, points 10, 6, 4 and 3, saved between sessions.",
+    champ:"Four cups: the Summer Cup over four rounds, the Fall Cup over four in the maples, the Winter Cup over four on snow and ice, and the Desert Cup over four in the red rock. Three laps a round against the same three drivers, points 10, 6, 4 and 3, saved between sessions.",
     race:"Any circuit, five laps, the full field.",
     trial:"Three laps with the road to yourself. Your best lap on each circuit is saved and comes back as a ghost to chase.",
     exped:"No rivals, no laps, no map: a long day's climb. Wade the swamp, run up the creek, grind up the switchbacks and over the snow to the summit cairn, calling at every camp on the way; the compass points to the next one. The car is in low range, the mud holds you and anything steeper than about half is a wall, so pick your line.",
@@ -10360,7 +10509,7 @@ function showChamp(){
     (C ? '<button class="item" data-act="cont"><span>CONTINUE</span><small>' + esc(CUPS[C.cup || 0].name) + ', round ' + (C.round+1) + ': ' +
          esc(TRACKS[CHAMP_ROUNDS[C.round]].name) + '</small></button>' : '') +
     '<button class="item" data-act="summer" data-k="0"><span>' + (C ? 'NEW ' : 'START ') + 'SUMMER CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds') + '</small></button>' +
-    '<button class="item" data-act="fall" data-k="1"><span>' + (C ? 'NEW ' : 'START ') + 'FALL CUP</span><small>' + (C ? 'Clears your points' : 'Three rounds in the maples') + '</small></button>' +
+    '<button class="item" data-act="fall" data-k="1"><span>' + (C ? 'NEW ' : 'START ') + 'FALL CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds in the maples') + '</small></button>' +
     '<button class="item" data-act="winter" data-k="2"><span>' + (C ? 'NEW ' : 'START ') + 'WINTER CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds on snow and ice') + '</small></button>' +
     '<button class="item" data-act="desert" data-k="3"><span>' + (C ? 'NEW ' : 'START ') + 'DESERT CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds in the red rock') + '</small></button>' +
     '<button class="item back" data-act="back"><span>BACK</span></button></div></div>' +
@@ -10845,7 +10994,7 @@ if(/debug/.test(location.hash)){
   window.__R = { THREE, TRACKS, TRACK, TRACK_ID, MAIN, BRANCHES, paths, ROUTE, pose, state, camera, scene, renderer,
                  surfaceY, gridH, nearest, PILES, PIT, GAME, CTL, trans, MAXV, radiiOf, radiiOpen, resetRace, setMode,
                  closeUI, rivals, car, splash, cornerHoldSpeed, stepCar, placeAtStart, drift, AUTO_JUMPS,
-                 CALM, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults, trans, dustLive: ()=>{ let n=0; for(let i=0;i<DUST;i++) if(dustLife[i]>0) n++; return n; } };
+                 CALM, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults, trans, GIANT, dustLive: ()=>{ let n=0; for(let i=0;i<DUST;i++) if(dustLife[i]>0) n++; return n; } };
 }
 boot();
 requestAnimationFrame(frame);
