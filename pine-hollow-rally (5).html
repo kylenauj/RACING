@@ -563,26 +563,23 @@ const TRACKS = [
     ]},
   /* ---- THE WINTER CUP: four circuits on snow and ice ---- */
   { name:"FROSTBITE LAKE", rollers:1.4, after:"an ice road in the north woods", relief:0.8, season:"winter", cup:2,
-    blurb:"straight across the frozen lake on the ice road, past the fishing huts, where the tail never quite stops sliding",
+    blurb:"a figure of eight on a frozen lake: swing through the spruce, slide down onto the ice, jump the pressure ridges and cut across your own tracks in the middle",
     kit:["crest","tabletop","rhythm"],
-    shape:"THE ICE ROAD \u2014 400m across a frozen lake",
-    feature:"an ice road across a frozen lake",
-    ctrl:[[-280,-20],[-140,-8],[-20,2],[100,8],[220,22],[330,70],[375,170],[345,250],[275,288],
-          [243,392],[181,450],[113,414],[70,318],[10,300],[-45,357],[-109,397],[-170,363],[-205,305],
-          [-280,300],[-345,230],[-461,201],[-501,118],[-455,34],[-380,-8],[-330,-28]],
-    hills:[[0,420,260,12],[-420,240,200,9],[420,300,200,8]],
+    shape:"THE FIGURE EIGHT \u2014 crossing on the ice",
+    feature:"a figure-eight ice road with pressure ridges",
+    ctrl:[[-485,-60],[-480,50],[-430,140],[-340,175],[-250,150],[-148,119],[-80,45],[0,0],[80,-45],
+          [148,-119],[250,-150],[340,-175],[430,-140],[480,-50],[485,60],[430,150],[330,175],[235,135],
+          [161,76],[75,35],[0,0],[-75,-35],[-161,-76],[-235,-135],[-330,-175],[-430,-150]],
+    hills:[[-600,0,230,16],[600,0,230,13],[0,360,280,12],[0,-360,280,10]],
     jumps:[], fords:[],
     mud:[],
-    lake:{at:[0,0], rx:205, rz:115, frozen:true},
+    lake:{at:[0,0], rx:290, rz:150, frozen:true},
+    /* where the ice has buckled into ridges: [x, z, height]. The road is
+       ramped over each one, and the rest of the ridge runs off across the lake */
+    ridges:[[-74,42,1.5],[74,-42,1.8],[77,37,1.4],[-77,-37,2.0]],
     branches:[
-      // the plowed track under the ridge
-      {a:[275,288], b:[70,318], via:[[210,300],[175,305],[140,310]],
-       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true},
-      // straight through the spruce
-      {a:[10,300], b:[-205,305], via:[[-65,302],[-95,303],[-130,304]],
-       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true},
-      // the logging road
-      {a:[-345,230], b:[-380,-8], via:[[-365,150],[-373,100],[-378,50]],
+      // the logging road over the hill, cutting off the east loop
+      {a:[430,-140], b:[430,150], via:[[418,-50],[418,50]],
        half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true}
     ]},
 
@@ -1167,6 +1164,7 @@ if(DESERT){
   if(TRACK.town)  TRACK.town  = Object.assign({}, TRACK.town,  {at: mv(TRACK.town.at)});
   if(TRACK.river) TRACK.river = Object.assign({}, TRACK.river, {from: mv(TRACK.river.from), to: mv(TRACK.river.to)});
   TRACK.bigJumps = (TRACK.bigJumps||[]).map(j=> [mv(j[0]), j[1]]);
+  TRACK.ridges = (TRACK.ridges||[]).map(r=> mv(r).concat(r.slice(2)));
   ["bowl","lake","washout","pit","dunes","swamp","giantTree"].forEach(k=>{ if(TRACK[k]) TRACK[k] = Object.assign({}, TRACK[k], {at: mv(TRACK[k].at)}); });
   ["canyon","gallery"].forEach(k=>{ if(TRACK[k]) TRACK[k] = Object.assign({}, TRACK[k], {from: mv(TRACK[k].from), to: mv(TRACK[k].to)}); });
   TRACK.washes = (TRACK.washes||[]).map(mv);
@@ -1456,7 +1454,7 @@ if(TRACK.bowl){
 if(TRACK.lake){
   for(let i=0;i<MAIN.N;i+=5){
     const p = MAIN.pts[i];
-    if(Math.hypot((p.x - LAKE.x)/LAKE.rx, (p.z - LAKE.z)/LAKE.rz) < 1.25) CALM.push([i, 25]);
+    if(Math.hypot((p.x - LAKE.x)/LAKE.rx, (p.z - LAKE.z)/LAKE.rz) < (LAKE.frozen ? 1.06 : 1.25)) CALM.push([i, 25]);
   }
 }
 if(TRACK.town){
@@ -1648,6 +1646,68 @@ function shapeJump(P, at, type){
     case "staircase":for(let n=0;n<3;n++) add(n*48 - 40, n*48 + 4, ledge(n*48, 1.2, 38)); break;
   }
 }
+/* Where the road runs back over itself (Frostbite's figure of eight), the
+   two stretches cross on the level. Near a crossing the nearest road is
+   either one, so there the car keeps to the one it is already on. */
+const CROSSES = [];
+{
+  const N = MAIN.N, far = Math.round(120/MAIN.seg);
+  for(let i=0;i<N;i+=2) for(let k=i+far;k<N;k+=2){
+    if(N - (k - i) < far) continue;
+    const a = MAIN.pts[i], b = MAIN.pts[k];
+    if((a.x-b.x)**2 + (a.z-b.z)**2 < 9 && !CROSSES.some(c=> Math.hypot(c[0]-a.x, c[1]-a.z) < 40)) CROSSES.push([a.x, a.z]);
+  }
+}
+/* how far a point is from any stretch of the main road more than gapM away along it from station i */
+function otherRoadDist(x, z, i, gapM){
+  const N = MAIN.N, g = Math.round(gapM/MAIN.seg);
+  let best = Infinity;
+  for(let k=0;k<N;k+=2){
+    let d = Math.abs(k - i) % N; d = Math.min(d, N - d);
+    if(d < g) continue;
+    const q = MAIN.pts[k];
+    best = Math.min(best, (q.x - x)**2 + (q.z - z)**2);
+  }
+  return Math.sqrt(best);
+}
+/* Pressure ridges: where the lake ice has been shoved together into a wall
+   of broken slabs. The road is ramped over each one, a jump, and the rest
+   of the ridge wanders off across the ice either side until it meets the
+   shore or comes near the road again. */
+const RIDGES = [];
+(TRACK.ridges || []).forEach((r, n)=>{
+  const at = snapTo(MAIN, [r[0], r[1]]), p = MAIN.pts[at], t = MAIN.tans[at];
+  const rnd = seeded(4711 + n*131);
+  const tilt = (rnd() - 0.5)*0.7;
+  const nx = -t.z, nz = t.x, ca = Math.cos(tilt), sa = Math.sin(tilt);
+  const R = {x:p.x, z:p.z, dx:nx*ca - nz*sa, dz:nx*sa + nz*ca, h:r[2], at, seed:rnd()*6.28, a:0, b:0};
+  R.wave = u=> 3.2*Math.sin(u*0.045) + 1.2*Math.sin(u*0.13 + R.seed)*Math.min(1, Math.abs(u)/20);
+  for(const sd of [1, -1]){
+    let u = 0;
+    while(u < 120){
+      const q = u + 2, v = R.wave(sd*q), x = R.x + R.dx*sd*q + R.dz*v, z = R.z + R.dz*sd*q - R.dx*v;
+      if(iceAt(x, z) < 0.85 || (q > 12 && otherRoadDist(x, z, at, 60) < 18)) break;
+      u = q;
+    }
+    if(sd > 0) R.b = u; else R.a = -u;
+  }
+  RIDGES.push(R);
+});
+/* how high the broken ice of the ridges stands at a point */
+function ridgeAt(x, z){
+  let y = 0;
+  for(const R of RIDGES){
+    const ux = x - R.x, uz = z - R.z;
+    const u = ux*R.dx + uz*R.dz;
+    if(u < R.a - 3 || u > R.b + 3) continue;
+    const v = ux*R.dz - uz*R.dx - R.wave(u);
+    if(Math.abs(v) > 7) continue;
+    const taper = smoothstep(R.a - 3, R.a + 16, u)*(1 - smoothstep(R.b - 16, R.b + 3, u));
+    const jag = 0.72 + 0.18*Math.sin(u*0.41 + R.seed) + 0.1*Math.sin(u*1.3 + R.seed*2);
+    y = Math.max(y, R.h*1.1*jag*taper*(1 - smoothstep(0.6, 6.5, Math.abs(v))));
+  }
+  return y;
+}
 /* where each extra jump goes: straight road, well clear of everything */
 const AUTO_JUMPS = [];
 {
@@ -1656,6 +1716,8 @@ const AUTO_JUMPS = [];
   busy.push([0, 110]);                                 // the start line and grid
   (TRACK.jumps || []).forEach(j=> busy.push([snapTo(MAIN, j[0]), 90]));
   if(TRACK.bigJump) busy.push([snapTo(MAIN, TRACK.bigJump[0]), 140]);
+  RIDGES.forEach(R=> busy.push([R.at, 90]));
+  CROSSES.forEach(c=> busy.push([snapTo(MAIN, c), 60]));
   (TRACK.fords || []).forEach(f=> busy.push([snapTo(MAIN, f), 55]));
   if(TRACK.gorge) busy.push([snapTo(MAIN, TRACK.gorge.at), TRACK.gorge.span + 45]);
   CALM.forEach(c=> busy.push([c[0], c[1]*0.8 + 8]));
@@ -1804,6 +1866,7 @@ function addCrests(P, rnd){
   (TRACK.jumps || []).forEach(j=> J.push(snapTo(MAIN, j[0])));
   if(TRACK.bigJump) J.push(snapTo(MAIN, TRACK.bigJump[0]));
   AUTO_JUMPS.forEach(a=> J.push(a.at, wrapIdx(MAIN, a.at + Math.round(JUMP_LEN[a.type]*0.5/MAIN.seg))));
+  RIDGES.forEach(R=> J.push(R.at, wrapIdx(MAIN, R.at + Math.round(24/MAIN.seg))));
   const Fd = (TRACK.fords || []).map(f=> snapTo(MAIN, f));
   const Jn = [];
   BRANCHES.forEach(P=>{ Jn.push(P.splitAt, wrapIdx(MAIN, P.mainTo - Math.round(12/MAIN.seg))); });
@@ -1907,6 +1970,8 @@ if(TRACK.bigJump){
   GREAT_JUMP = at;
 }
 AUTO_JUMPS.forEach(a=> shapeJump(MAIN, a.at, a.type));
+/* over the pressure ridges: a short kick up the broken ice and a long slope down the far side */
+RIDGES.forEach(R=> ramp(MAIN, R.at, Math.round(22/MAIN.seg), Math.round(36/MAIN.seg), R.h, 0, true, 4.5));
 /* the big ones: built whole, however steep the hill under them */
 (TRACK.bigJumps || []).forEach(j=>{
   const at = snapTo(MAIN, j[0]);
@@ -2516,7 +2581,7 @@ const GN = Math.round(2*GHALF/GSTEP) + 1;
 const GCELLS = GN*GN;
 /* natural ground: the land, its small roll, the channels */
 function naturalY(x, z){
-  return carveGorge(carveWater(macro(x, z) + vergeRoll(x, z)*(1 - iceAt(x, z)), x, z), x, z);
+  return carveGorge(carveWater(macro(x, z) + vergeRoll(x, z)*(1 - iceAt(x, z)) + ridgeAt(x, z), x, z), x, z);
 }
 const GH  = new Float32Array(GCELLS);     // the finished surface
 const GD  = new Float32Array(GCELLS).fill(1e9);   // distance to the nearest road centreline
@@ -3615,6 +3680,17 @@ function waterMaterial(){
     fragmentShader:[
       "uniform float uTime, fogNear, fogFar, uMurk; uniform sampler2D tRipple; uniform vec3 uSun, fogColor;",
       "varying float vDepth; varying vec3 vWorld; varying vec2 vUv; varying float vFoam;",
+      FROZEN ? [
+      // the ice sheet breaks into plates: distance to the nearest plate edge
+      "vec2 h2(vec2 p){ p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))); return fract(sin(p)*43758.5453); }",
+      "float plates(vec2 x){",
+      "  vec2 n = floor(x), f = fract(x), mg = vec2(0.0), mr = vec2(0.0); float md = 8.0;",
+      "  for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){ vec2 g = vec2(float(i), float(j)); vec2 r = g + h2(n + g) - f; float d = dot(r, r); if(d < md){ md = d; mr = r; mg = g; } }",
+      "  md = 8.0;",
+      "  for(int j=-2;j<=2;j++) for(int i=-2;i<=2;i++){ vec2 g = mg + vec2(float(i), float(j)); vec2 r = g + h2(n + g) - f;",
+      "    if(dot(mr - r, mr - r) > 0.00001) md = min(md, dot(0.5*(mr + r), normalize(r - mr))); }",
+      "  return md;",
+      "}"].join("\n") : "",
       "void main(){",
       "  if(vDepth <= 0.0) discard;",
       "  vec2 p = vWorld.xz;",
@@ -3641,8 +3717,24 @@ function waterMaterial(){
       "  vec3 Ni = normalize(vec3((ck - 0.5)*0.08, 1.0, (ck2 - 0.5)*0.08));",
       "  float specI = pow(max(dot(reflect(-uSun, Ni), V), 0.0), 60.0);",
       "  ice += vec3(1.0, 0.97, 0.9)*specI*0.9 + vec3(0.75, 0.85, 0.95)*fres*0.35;",
+      // clear black ice where the wind has swept the snow off, deep blue-green under it
+      "  float swept = smoothstep(0.52, 0.78, texture2D(tRipple, p*0.011 + 0.7).r);",
+      "  ice = mix(ice, vec3(0.08, 0.20, 0.27) + vec3(0.6, 0.75, 0.85)*fres*0.5, swept*0.6);",
+      // the plates: big cracks between them, dark with a shattered white rim, and finer ones inside
+      "  float pe = plates(p*0.065 + vec2(ck, ck2)*0.5), pf = plates(p*0.21 + 3.1);",
+      "  float fd0 = length(cameraPosition - vWorld), sharp = 1.0 + fd0*0.006, near = 1.0 - 0.7*smoothstep(50.0, 220.0, fd0);",
+      "  ice = mix(ice, vec3(0.95, 0.97, 1.0), (1.0 - smoothstep(0.015*sharp, 0.07*sharp, pe))*0.45*near);",
+      "  ice = mix(ice, vec3(0.07, 0.18, 0.28), (1.0 - smoothstep(0.0, 0.016*sharp, pe))*0.85*near);",
+      "  ice = mix(ice, vec3(0.20, 0.34, 0.44), (1.0 - smoothstep(0.0, 0.022*sharp, pf))*0.4*(1.0 - smoothstep(40.0, 110.0, fd0)));",
+      // frost glitter: single crystals that catch the sun as you move
+      "  vec2 gq = floor(p*4.0); float gl = fract(sin(dot(gq, vec2(12.9898, 78.233)))*43758.5453);",
+      "  vec3 gn = normalize(vec3(fract(gl*13.1) - 0.5, 0.9, fract(gl*71.7) - 0.5));",
+      "  ice += vec3(1.0, 0.98, 0.92)*step(0.975, gl)*pow(max(dot(reflect(-uSun, gn), V), 0.0), 30.0)*2.0*(1.0 - smoothstep(8.0, 45.0, fd0));",
       // snow blown onto the ice along the shore, so it runs out into the bank instead of stopping at a line
       "  float rim = 1.0 - smoothstep(0.02, 0.32, vDepth + (ck2 - 0.5)*0.22 + (ck - 0.5)*0.1);",
+      // long drifts of snow blown out across the ice, in lee of nothing in particular
+      "  float dr = texture2D(tRipple, vec2(p.x*0.004 + p.y*0.002, p.y*0.009)).r;",
+      "  rim = max(rim, smoothstep(0.64, 0.78, dr + (ck2 - 0.5)*0.12)*0.75);",
       "  ice = mix(ice, vec3(0.93, 0.95, 0.985), rim*0.9);",
       "  float fdI = length(cameraPosition - vWorld);",
       "  ice = mix(ice, fogColor, smoothstep(fogNear, fogFar, fdI));",
@@ -5180,7 +5272,9 @@ if(LAKE.on){
     const e = Math.hypot((x - LAKE.x)/LAKE.rx, (z - LAKE.z)/LAKE.rz);
     const top = LAKE.frozen ? LAKE.level + 0.05 : LAKE.level;     // ice lies on the flat floor
     pos.push(x, top, z); uv.push(x, z);
-    dep.push(e > 1.12 ? -1 : Math.max(-1, Math.min(3, top - surfaceY(x, z) + (LAKE.frozen ? 0.02 : 0))));
+    const d = top - surfaceY(x, z) + (LAKE.frozen ? 0.02 : 0);
+    // the ice lies on a flat floor, so its depth is how far out from the shore it is: snow drifts at the edge, clear ice out in the middle
+    dep.push(e > 1.12 ? -1 : Math.max(-1, Math.min(3, LAKE.frozen && d > 0 ? Math.max(d, (1 - e)*5) : d)));
   }
   for(let r=0;r<rows-1;r++) for(let c=0;c<cols-1;c++){
     const a = r*cols + c, b = a + 1, d2 = a + cols, e = d2 + 1;
@@ -5255,13 +5349,15 @@ if(LAKE.on){
   /* on the ice: a camp of fishing huts well off the road, marker poles
      either side of the plowed road, and the snow it was plowed into */
   if(LAKE.frozen){
+    const nearRidge = (i, m)=> RIDGES.some(R=>{ const d = Math.abs(i - R.at) % MAIN.N; return Math.min(d, MAIN.N - d)*MAIN.seg < m; });
     const P = MAIN, pole = new THREE.MeshLambertMaterial({color:0xff6a1a}), snow = new THREE.MeshLambertMaterial({color:0xf2f6fa});
     const hutCols = [0xc2382a, 0x2f6fa8, 0xe0a21e, 0x3f8a4a, 0x7a4a8a];
     for(let i=0;i<P.N;i+=Math.round(16/P.seg)){
       const p = P.pts[i], t = P.tans[i];
-      if(iceAt(p.x, p.z) < 0.5) continue;
+      if(iceAt(p.x, p.z) < 0.5 || nearRidge(i, 12)) continue;
       for(const sd of [-1, 1]){
         const off = P.half[i] + 2.2, x = p.x - t.z*sd*off, z = p.z + t.x*sd*off;
+        if(CROSSES.length && otherRoadDist(x, z, i, 60) < 12) continue;
         const m = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.8, 5), pole);
         m.position.set(x, gradedY(x, z) + 0.9, z); scene.add(m);
       }
@@ -5270,9 +5366,10 @@ if(LAKE.on){
     const bank = new THREE.Group();
     for(let i=0;i<P.N;i+=Math.round(3/P.seg)){
       const p = P.pts[i], t = P.tans[i];
-      if(iceAt(p.x, p.z) < 0.6) continue;
+      if(iceAt(p.x, p.z) < 0.6 || nearRidge(i, 9)) continue;
       for(const sd of [-1, 1]){
         const off = P.half[i] + 3.4 + Math.random()*0.6, x = p.x - t.z*sd*off, z = p.z + t.x*sd*off;
+        if(CROSSES.length && otherRoadDist(x, z, i, 60) < 13) continue;
         const m = new THREE.Mesh(new THREE.SphereGeometry(1, 7, 4, 0, Math.PI*2, 0, Math.PI/2), snow);
         m.scale.set(1.3 + Math.random()*0.6, 0.45 + Math.random()*0.3, 2.2);
         m.position.set(x, gradedY(x, z) - 0.05, z); m.rotation.y = Math.atan2(t.x, t.z); bank.add(m);
@@ -5300,6 +5397,39 @@ if(LAKE.on){
     }
     const i0 = snapTo(MAIN, [LAKE.x - LAKE.rx - 30, LAKE.z]);
     roadSign(i0, 1, ["ICE ROAD", "ice 60cm, drive at own risk"], "#2f6fa8", "#f2efe6");
+    /* the pressure ridges: slabs of lake ice a foot thick, shoved up on end
+       and leaning on each other in a broken wall, dusted with snow */
+    const slabMats = [0x8fc4dc, 0xa9d6ea, 0xc6e6f3, 0xe6f2f8].map(c=> new THREE.MeshPhongMaterial({color:c, shininess:90, specular:0x9fc2d4}));
+    RIDGES.forEach((R, n)=>{
+      const rnd = seeded(9001 + n*77), g = new THREE.Group();
+      for(let u=R.a; u<=R.b; u+=0.9 + rnd()*0.8){
+        if(Math.abs(u) < MAIN.half[R.at] + 2.2) continue;          // the road is cut through it
+        const top = ridgeAt(R.x + R.dx*u + R.dz*R.wave(u), R.z + R.dz*u - R.dx*R.wave(u));
+        if(top < 0.25) continue;
+        for(let m=0; m<1 + Math.floor(rnd()*2.4); m++){
+          const v = R.wave(u) + (rnd() - 0.5)*3.2;
+          const x = R.x + R.dx*u + R.dz*v, z = R.z + R.dz*u - R.dx*v;
+          const w = 0.9 + rnd()*2.2, h = 0.8 + rnd()*top*1.3;
+          const s = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.22 + rnd()*0.25), slabMats[Math.floor(rnd()*4)]);
+          s.position.set(x, gradedY(x, z) + h*0.25 - 0.2, z);
+          // stood up along the ridge line, leaning one way or the other
+          s.rotation.set((rnd() - 0.5)*1.1, Math.atan2(R.dx, R.dz) + (rnd() - 0.5)*0.9, (rnd() - 0.5)*0.7);
+          g.add(s);
+        }
+      }
+      // loose chunks thrown out onto the ice either side
+      for(let k=0;k<70;k++){
+        const u = R.a + rnd()*(R.b - R.a);
+        if(Math.abs(u) < MAIN.half[R.at] + 2) continue;
+        const v = R.wave(u) + (rnd() - 0.5)*14;
+        const x = R.x + R.dx*u + R.dz*v, z = R.z + R.dz*u - R.dx*v, c = 0.3 + rnd()*0.7;
+        const s = new THREE.Mesh(new THREE.BoxGeometry(c, c*0.35, c*0.8), slabMats[Math.floor(rnd()*4)]);
+        s.position.set(x, gradedY(x, z) + 0.08, z); s.rotation.set(rnd(), rnd()*6, rnd()*0.5);
+        g.add(s);
+      }
+      mergeStatic(g); scene.add(g);
+      roadSign(wrapIdx(MAIN, R.at - Math.round(65/MAIN.seg)), n % 2 ? 1 : -1, ["PRESSURE RIDGE", "ice heaved \u2014 jump"], "#e2b21e", "#1f1f1f");
+    });
   }
   if(WASH.on){
     roadSign(WASH.at - Math.round(110/MAIN.seg), 1, ["WASHOUT AHEAD", "jump it or wade it"], "#e2b21e", "#1f1f1f");
@@ -8322,6 +8452,17 @@ function stepCar(dt){
   const latx = pose.vx - fx*along, latz = pose.vz - fz*along;
 
   const near0 = nearest(pose.x, pose.z);
+  // at a crossing, stay on the stretch of road the car came in on
+  if(CROSSES.length && near0.path === MAIN && CROSSES.some(c=> Math.hypot(pose.x - c[0], pose.z - c[1]) < 32)){
+    const reach = Math.round(30/MAIN.seg);
+    let best = Infinity, bi = state.idx;
+    for(let k=-reach;k<=reach;k++){
+      const i = wrapIdx(MAIN, state.idx + k), q = MAIN.pts[i];
+      const d = (q.x - pose.x)**2 + (q.z - pose.z)**2;
+      if(d < best){ best = d; bi = i; }
+    }
+    if(best < 400){ near0.i = near0.pi = bi; near0.half = MAIN.half[bi]; near0.surf = MAIN.surf[bi]; }
+  }
   const nIdx = near0.i, nDist = near0.dist, nHalf = near0.half;
   const surf = near0.surf;
   const offRoad = nDist > nHalf - 0.3;
@@ -8692,6 +8833,14 @@ function stepCar(dt){
     pose.bPv += Math.max(-0.85, Math.min(0.85, -mP*6.5));
     pose.bRv += Math.max(-0.85, Math.min(0.85, -mR*6.0));
     pose.bHv -= Math.min(1.6, landed*0.16);
+    // coming down on the lake ice: a burst of ice chips and powder
+    if(landed > 2.5 && iceAt(pose.x, pose.z) > 0.3){
+      for(let k=0;k<Math.min(26, 6 + landed*2.5);k++){
+        const a = Math.random()*Math.PI*2, v = 2 + Math.random()*4 + landed*0.4;
+        spawnDust(pose.x + Math.cos(a)*1.2, gy + 0.1, pose.z + Math.sin(a)*1.6, 4, 0.35 + Math.random()*0.35,
+                  pose.vx*0.2 + Math.cos(a)*v, pose.vz*0.2 + Math.sin(a)*v, 1.5 + Math.random()*2);
+      }
+    }
   };
   if(landed) touchdown();
   let sP = Math.sin(pose.pitch), sR = Math.sin(pose.roll);
@@ -10994,7 +11143,7 @@ if(/debug/.test(location.hash)){
   window.__R = { THREE, TRACKS, TRACK, TRACK_ID, MAIN, BRANCHES, paths, ROUTE, pose, state, camera, scene, renderer,
                  surfaceY, gridH, nearest, PILES, PIT, GAME, CTL, trans, MAXV, radiiOf, radiiOpen, resetRace, setMode,
                  closeUI, rivals, car, splash, cornerHoldSpeed, stepCar, placeAtStart, drift, AUTO_JUMPS,
-                 CALM, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults, trans, GIANT, dustLive: ()=>{ let n=0; for(let i=0;i<DUST;i++) if(dustLife[i]>0) n++; return n; } };
+                 CALM, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults, trans, GIANT, RIDGES, CROSSES, dustLive: ()=>{ let n=0; for(let i=0;i<DUST;i++) if(dustLife[i]>0) n++; return n; } };
 }
 boot();
 requestAnimationFrame(frame);
