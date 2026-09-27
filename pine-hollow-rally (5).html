@@ -920,24 +920,25 @@ const TRACKS = [
     kit:["crest","kicker"],
     shape:"FIRE AND ICE \u2014 over and under",
     feature:"a loop that crosses itself on a trestle, and a high and a low route braided over and under each other",
-    ctrl:[[-440,-470],[-300,-455],[-190,-395],[-60,-400],[40,-470],[170,-500],[300,-440],[420,-400],[530,-340],[600,-240],[590,-150],[638,-92],[596,-30],[602,40],[602,140],[625,240],[700,300],[790,250],[800,150],[720,95],[602,100],[480,120],[380,200],[313,253],[247,275],[180,253],[113,200],[47,147],[-20,125],[-87,147],[-153,200],[-220,253],[-287,275],[-353,253],[-420,200],[-540,170],[-605,95],[-565,15],[-640,-60],[-705,-150],[-715,-260],[-680,-370],[-610,-440],[-540,-475]],
-    hills:[[720,200,200,58],[-720,160,260,48],[247,300,120,20],[-20,90,120,16],[-287,300,120,20],[247,110,100,-10],[-287,110,100,-10],[450,-470,180,18],[-80,-470,160,-10]],
+    ctrl:[[-440,-470],[-300,-455],[-190,-395],[-60,-400],[40,-470],[170,-500],[300,-440],[420,-400],[530,-340],[600,-240],[590,-150],[638,-92],[596,-30],[602,40],[602,140],[625,240],[700,300],[790,250],[800,150],[720,95],[602,100],[520,165],[470,200],[400,200],[332,253],[263,275],[195,253],[127,200],[58,147],[-10,125],[-78,147],[-147,200],[-215,253],[-283,275],[-352,253],[-420,200],[-540,170],[-605,95],[-565,15],[-640,-60],[-705,-150],[-715,-260],[-680,-370],[-610,-440],[-540,-475]],
+    hills:[[720,200,200,58],[-720,160,260,48],[263,305,130,34],[-10,95,130,30],[-283,305,130,34],[263,95,120,-20],[-10,305,120,-18],[-283,95,120,-20],
+           [450,-470,200,34],[-420,-560,230,34],[-80,-430,150,-16],[600,-150,180,26]],
     jumps:[], fords:[[-712,-205]],
     mud:[],
     lake:{at:[0,-150], rx:350, rz:130, lava:true},
     /* the bridges: over another road (over:true, pass picks which time round the lap) or over lava */
     spans:[ {at:[602,100], road:-1, pass:2, under:-1, over:true, span:24, wall:15},
-            {at:[113,200], road:-1, under:0, over:true, span:22, wall:14},
-            {at:[-153,200], road:-1, under:0, over:true, span:22, wall:14},
-            {at:[247,275], road:-1, span:28, depth:30, wall:20, reach:95},
+            {at:[127,200], road:-1, under:0, over:true, span:22, wall:14},
+            {at:[-147,200], road:-1, under:0, over:true, span:22, wall:14},
+            {at:[263,275], road:-1, span:28, depth:30, wall:20, reach:95},
             {at:[-125,-398], road:-1, span:16, depth:3.2, wall:10, reach:120},
             {at:[235,-470], road:-1, span:16, depth:3.2, wall:10, reach:120},
-            {at:[247,125], road:0, span:16, depth:3.2, wall:10, reach:60},
-            {at:[-287,125], road:0, span:16, depth:3.2, wall:10, reach:60} ],
+            {at:[263,125], road:0, span:16, depth:3.2, wall:10, reach:60},
+            {at:[-283,125], road:0, span:16, depth:3.2, wall:10, reach:60} ],
     branches:[
       // the low route: braided under the high one, over the lava streams
-      {a:[380,200], b:[-420,200], via:[[313,147],[247,125],[180,147],[113,200],[47,253],[-20,275],[-87,253],[-153,200],[-220,147],[-287,125],[-353,147]],
-       half:5.0, jumps:[], tune:0, label:"LOW ROUTE", mainLabel:"HIGH ROUTE"}
+      {a:[400,200], b:[-420,200], via:[[332,147],[263,125],[195,147],[127,200],[58,253],[-10,275],[-78,253],[-147,200],[-215,147],[-283,125],[-352,147]],
+       half:5.0, jumps:[], tune:0, flush:30, island:true, label:"LOW ROUTE", mainLabel:"HIGH ROUTE"}
     ]}
 ];
 
@@ -2224,7 +2225,8 @@ if(GIANT.on){
 /* ---- the ravine and its bridge ---- */
 const GORGE = { on:false, i:0, depth:0, span:35, samples:0, reach:0, wall:26 };
 let SPANS = [];                        // the log bridges over lava, built once the roads have their heights
-let SURF_HINT = null;                  // the height a car is at, so a road under a bridge is not mistaken for the deck
+let SURF_HINT = null;
+const ISLANDS = [];                    // dividers where two routes part: solid                  // the height a car is at, so a road under a bridge is not mistaken for the deck
 if(TRACK.gorge){
   const G = TRACK.gorge;
   GORGE.on = true;
@@ -2612,7 +2614,7 @@ BRANCHES.forEach(P=>{
     }
     MY[i] = my;
     // flush at the ends
-    WE[i] = shaped ? 1 - smoothstep(8, 30, Math.min(fromA, fromB))
+    WE[i] = (shaped || P.def.flush) ? 1 - smoothstep(8, P.def.flush || 30, Math.min(fromA, fromB))
                    : 1 - smoothstep(30, 110, Math.min(fromA, fromB));
     /* Where the two roads merely pass close, they only share banks if they
        are already near the same height. Pulling a branch onto a main road a
@@ -6384,9 +6386,48 @@ paths.forEach(P=>{
   const label = P.def.label || "SHORTCUT";
   big(A - Math.round(70/MAIN.seg), side, label, turnWord + " IN 70m", side > 0 ? 1 : -1);
   big(A - Math.round(8/MAIN.seg), side, label, "", side > 0 ? 1 : -1);
+  /* a divider where the two routes part: rocks, a log barrier, and a board
+     with both routes on it, so you pick one well before you reach it */
+  if(P.def.island){
+    // the first place along the fork where the two roads are properly apart
+    let a = null, b = null, gap = 0;
+    for(let m=6; m<=80; m+=2){
+      const aa = MAIN.pts[wrapIdx(MAIN, A + Math.round(m/MAIN.seg))];
+      let bd = Infinity, bb = null;
+      for(let q=0;q<Math.min(P.N, Math.round(140/P.seg));q++){ const o = P.pts[q], d = Math.hypot(o.x - aa.x, o.z - aa.z); if(d < bd){ bd = d; bb = o; } }
+      gap = bd - MAIN.half[A] - P.half[0]; a = aa; b = bb;
+      if(gap > 8) break;
+    }
+    const cx = (a.x + b.x)/2, cz = (a.z + b.z)/2, t0 = MAIN.tans[A];
+    const r = Math.max(1.2, Math.min(2.6, gap*0.25)), g = new THREE.Group(), y = gradedY(cx, cz);
+    const rockM = new THREE.MeshLambertMaterial({map:rockTex, color:0x7a7f86});
+    for(let n=0;n<7;n++){ const m = new THREE.Mesh(rockGeometry(n % 3), rockM), sc = 0.9 + Math.random()*1.1;
+      m.position.set(cx + t0.x*(n - 1)*1.4 + (Math.random() - 0.5)*r*0.6, y + sc*0.3, cz + t0.z*(n - 1)*1.4 + (Math.random() - 0.5)*r*0.6);
+      m.scale.set(sc, sc*0.8, sc); m.rotation.set(Math.random(), Math.random()*6, Math.random()); g.add(m); }
+    const tex = new THREE.CanvasTexture(noiseCanvas(512, 256, (c, W, H)=>{
+      c.fillStyle = "#ffd23d"; c.fillRect(0, 0, W, H);
+      c.fillStyle = "#111"; c.fillRect(W/2 - 5, 18, 10, H - 36);
+      const arrowAt = (x, d)=>{ c.save(); c.translate(x, H*0.3); c.scale(d*0.55, 0.55);
+        c.beginPath(); c.moveTo(-62, -22); c.lineTo(10, -22); c.lineTo(10, -58); c.lineTo(72, 0); c.lineTo(10, 58); c.lineTo(10, 22); c.lineTo(-62, 22); c.closePath(); c.fill(); c.restore(); };
+      // which way each route goes, as the driver sees it
+      const hiLeft = side > 0;                            // the branch is on the right, so the main (high) road is left
+      arrowAt(W*0.25, -1); arrowAt(W*0.75, 1);
+      c.font = "bold 46px Georgia, serif"; c.textAlign = "center"; c.textBaseline = "middle";
+      c.fillText(hiLeft ? (P.def.mainLabel || "MAIN").split(" ")[0] : (P.def.label || "").split(" ")[0], W*0.25, H*0.68);
+      c.fillText(hiLeft ? (P.def.label || "").split(" ")[0] : (P.def.mainLabel || "MAIN").split(" ")[0], W*0.75, H*0.68);
+      c.font = "bold 26px Georgia, serif"; c.fillText("ROUTE", W*0.25, H*0.86); c.fillText("ROUTE", W*0.75, H*0.86);
+    }));
+    const face = new THREE.MeshLambertMaterial({map:tex}), edge = new THREE.MeshLambertMaterial({color:0x1b1b1b});
+    const bd = new THREE.Mesh(new THREE.BoxGeometry(5.2, 2.6, 0.16), [edge, edge, edge, edge, face, edge]);
+    bd.position.set(cx - t0.x*2, y + 3.2, cz - t0.z*2); bd.rotation.y = Math.atan2(-t0.x, -t0.z); g.add(bd);
+    for(const q of [-2, 2]){ const po = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.4, 0.2), edge);
+      po.position.set(cx - t0.x*2 - t0.z*q, y + 1.7, cz - t0.z*2 + t0.x*q); g.add(po); }
+    g.traverse(o=>{ if(o.isMesh) o.castShadow = true; }); scene.add(g);
+    ISLANDS.push({x:cx, z:cz, r});
+  }
   if(P.def.mainLabel){
-    big(A - Math.round(70/MAIN.seg), -side, P.def.mainLabel, "straight on", 0);
-    big(A - Math.round(8/MAIN.seg), -side, P.def.mainLabel, "", 0);
+    big(A - Math.round(70/MAIN.seg), -side, P.def.mainLabel, "KEEP " + (side > 0 ? "LEFT" : "RIGHT"), side > 0 ? -1 : 1);
+    big(A - Math.round(8/MAIN.seg), -side, P.def.mainLabel, "", side > 0 ? -1 : 1);
   }
   // marker poles, red and white with a flag, down both sides of the mouth
   const poleM = new THREE.MeshLambertMaterial({color:0xf2efe6}), redM = new THREE.MeshLambertMaterial({color:0xd8302a});
@@ -9517,6 +9558,15 @@ function stepCarInner(dt){
     }
   }
 
+  // a divider between two routes is solid too
+  for(const I of ISLANDS){
+    const dx = pose.x - I.x, dz = pose.z - I.z, d = Math.hypot(dx, dz), lim = I.r + 1.2;
+    if(d < lim && d > 0.01){
+      const ux = dx/d, uz = dz/d; pose.x = I.x + ux*lim; pose.z = I.z + uz*lim;
+      const vn = pose.vx*ux + pose.vz*uz;
+      if(vn < 0){ pose.vx -= ux*vn*1.4; pose.vz -= uz*vn*1.4; if(-vn > 3){ SFX.bump(-vn); GAME.shake = Math.max(GAME.shake || 0, Math.min(0.5, -vn*0.05)); } }
+    }
+  }
   // the oak's trunk is solid: glance off it
   if(GIANT.on){
     const dx = pose.x - GIANT.x, dz = pose.z - GIANT.z, d = Math.hypot(dx, dz), lim = GIANT.trunk + 2.4;
