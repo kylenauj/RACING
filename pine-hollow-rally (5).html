@@ -751,6 +751,37 @@ const TRACKS = [
       // along the rail bed
       {a:[480,-270], b:[240,-380], via:[[396,-308],[360,-325],[324,-341]],
        half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true}
+    ]},
+
+  /* ---- EXPEDITIONS: no rivals, no laps, a mountain to get to the top of ----
+     The trail is a loop: up the long west side and down the steep east one,
+     so there are two ways to the summit from base camp, and the car can
+     leave the trail and go straight at it over open ground. */
+  { name:"MOUNT TAMARACK", after:"a mountain pass", relief:1.3, expedition:true, minR:20,
+    blurb:"from base camp up the creek, over the fords and the west switchbacks, above the treeline to the summit cairn, or straight up the steep east valley if you dare",
+    kit:[],
+    shape:"THE SUMMIT — two ways up",
+    feature:"an expedition to the top of a mountain",
+    ctrl:[[0,-540],[-135,-567],[-270,-529],[-364,-446],[-425,-324],[-452,-189],[-446,-54],
+          // the west switchbacks: three long legs climbing across the face, two hairpins
+          [-425,54],[-405,162],[-385,270],[-379,289],[-366,302],[-347,308],[-328,302],[-315,289],
+          [-309,270],[-289,162],[-269,54],[-248,-54],[-243,-73],[-230,-86],[-211,-92],[-192,-86],
+          [-178,-73],[-173,-54],[-148,27],[-115,94],[-68,128],
+          // the summit, and the steep east side back down to base camp
+          [0,128],[81,148],[162,115],[216,34],[240,-81],[232,-202],[205,-338],[148,-446],[78,-524]],
+    hills:[[0,115,317,146],[-230,310,202,40],[310,216,202,32],[256,-189,162,-16],[-446,-446,216,-11]],
+    jumps:[], fords:[[148,-446]],
+    river:{from:[-270,-529], to:[-425,-324], pools:5, down:90, up:80, downDir:[0.6,-1], upDir:[-0.2,1]},
+    mud:[[[232,-202],[205,-338]]],
+    summit:[0,128], treeline:84, snowline:116,
+    camps:[[-425,-324],[-347,308],[-211,-92],[232,-202]],
+    branches:[
+      // the goat track: straight up the west face over the switchbacks' heads
+      {a:[-347,308], b:[-68,128], via:[[-256,338],[-162,290],[-101,209]],
+       half:3.8, jumps:[], tune:0.15},
+      // the bog road: round the foot of the east face instead of down its steepest bit
+      {a:[240,-81], b:[148,-446], via:[[324,-162],[344,-297],[270,-405]],
+       half:4.4, jumps:[], tune:0.9}
     ]}
 
 ];
@@ -1102,6 +1133,8 @@ if(DESERT){
   ["bowl","lake","washout","pit","dunes"].forEach(k=>{ if(TRACK[k]) TRACK[k] = Object.assign({}, TRACK[k], {at: mv(TRACK[k].at)}); });
   ["canyon","gallery"].forEach(k=>{ if(TRACK[k]) TRACK[k] = Object.assign({}, TRACK[k], {from: mv(TRACK[k].from), to: mv(TRACK[k].to)}); });
   TRACK.washes = (TRACK.washes||[]).map(mv);
+  if(TRACK.summit) TRACK.summit = mv(TRACK.summit);
+  TRACK.camps = (TRACK.camps||[]).map(mv);
   TRACK.flats = (TRACK.flats||[]).map(f=> mv([f[0], f[1]]).concat([f[2]]));
   TRACK.branches = TRACK.branches.map(b=> Object.assign({}, b, {a: mv(b.a), b: mv(b.b), via: b.via.map(mv)}));
 }
@@ -1202,6 +1235,8 @@ MAIN.mainFrom = 0; MAIN.mainTo = MAIN.N;
      gorge   (the canyon and its bridge, further down)
    CALM lists the stretches the rough stages keep off: [station, metres]. */
 const CALM = [];
+/* the expedition: base camp, the camps on the way, the summit (filled in once the land is built) */
+const EXP = {on:false, camps:[], last:-1, resets:0};
 const PITS = [], SPOTS = [];          // SPOTS: small things jumps keep a little clear of
 const DROP = {on:false};
 if(TRACK.drop){
@@ -1385,12 +1420,12 @@ if(!TRACK.test){
     }
     return best;
   };
-  const want = DESERT ? 0 : Math.max(0, 2 - (TRACK.fords || []).length);
+  const want = DESERT || TRACK.expedition ? 0 : Math.max(0, 2 - (TRACK.fords || []).length);
   for(let k=0;k<want;k++){ const i = pick(35, 70, 0); if(i < 0) break;
     const p = MAIN.pts[i]; TRACK.fords = (TRACK.fords || []).concat([[p.x, p.z]]); taken.push([i, 120]); }
   if(DESERT) for(let k=(TRACK.washes || []).length; k<3; k++){ const i = pick(25, 50, 0); if(i < 0) break;
     const p = MAIN.pts[i]; TRACK.washes = (TRACK.washes || []).concat([[p.x, p.z]]); taken.push([i, 110]); }
-  for(let k=0;k<3;k++){ const i = pick(18, 35, 0); if(i < 0) break; PITS.push(i); taken.push([i, 120]); SPOTS.push([i, 25]); }
+  for(let k=0;k<(TRACK.expedition ? 6 : 3);k++){ const i = pick(18, 35, 0); if(i < 0) break; PITS.push(i); taken.push([i, 120]); SPOTS.push([i, 25]); }
 }
 /* how much ice is under a point: the frozen lake, shore to shore */
 function iceAt(x, z){
@@ -1538,7 +1573,7 @@ const AUTO_JUMPS = [];
     busy.push([wrapIdx(MAIN, P.mainTo - Math.round(12/seg)), 50]);
   });
   const gap = (a, b)=>{ const d = Math.abs(a - b) % N; return Math.min(d, N - d)*seg; };
-  const KIT = (TRACK.kit || []).concat(TRACK.test ? [] : ["kicker","crest","rhythm","double","crest","tabletop"]).slice(0, 9);
+  const KIT = (TRACK.kit || []).concat(TRACK.test || TRACK.expedition ? [] : ["kicker","crest","rhythm","double","crest","tabletop"]).slice(0, 9);
   KIT.forEach(type=>{
     const L = JUMP_LEN[type];
     const back = Math.round(L*0.4/seg), fwd = Math.round((L*0.5 + 20)/seg);
@@ -1688,6 +1723,7 @@ function addCrests(P, rnd){
   MAIN.calmCrest = calm;
   stagePath(MAIN, rnd,
     TRACK.test ? ["gravel","rutted","washboard","muddy","hollow","broken"]
+    : TRACK.expedition ? ["rutted","muddy","rocky","rocky","broken","moguls","single","hollow","gravel","washboard"]
                : ["gravel","rutted","washboard", DESERT ? "washboard" : "muddy","hollow","broken","single",
                   "moguls","moguls","rocky","rocky","paved","paved"],
     calm, calmBank);
@@ -2962,6 +2998,13 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
           c.setHSL(0.078 + t*0.172 + Math.random()*0.012,
                    0.25 + t*0.08 - steep*0.10,
                    0.33 - t*0.05 + Math.random()*0.03 - steep*0.03);
+          // the mountain: bare scree above the treeline, snow lying on the top
+          if(TRACK.treeline && t > 0.3){
+            const rk = smoothstep(TRACK.treeline - 6, TRACK.treeline + 10, GH[g] + (Math.random() - 0.5)*5);
+            if(rk > 0) c.lerp(new THREE.Color().setHSL(0.09 + Math.random()*0.02, 0.07, 0.40 + Math.random()*0.06 - steep*0.08), rk*0.85);
+            const sn = smoothstep(TRACK.snowline - 3, TRACK.snowline + 6, GH[g] + (Math.random() - 0.5)*6)*(1 - steep*0.6);
+            if(sn > 0) c.lerp(new THREE.Color().setHSL(0.58, 0.12, 0.90 + Math.random()*0.05), sn);
+          }
           // the quarry is bare rock, banded by its benches; the lake has a sandy rim
           if(PIT.on){
             const pd = Math.hypot(x - PIT.x, z - PIT.z);
@@ -4402,6 +4445,94 @@ if(DROP.on && TRACK.skijump){
   mergeStatic(g); scene.add(g);
 }
 
+/* ---- the expedition: base camp, the camps, the summit cairn ----
+   Each camp is a couple of tents, a fire with logs round it, a flag on a
+   pole and a board with its name and height. The summit has a cairn with
+   a flag streaming off it and the mountain's own sign. */
+if(TRACK.expedition){
+  EXP.on = true;
+  EXP.baseY = MAIN.pts[0].y;
+  const si = snapTo(MAIN, TRACK.summit), sp = MAIN.pts[si];
+  EXP.summit = {x: sp.x, z: sp.z, y: sp.y, i: si};
+  const NAMES = TRACK.campNames || ["Creek Camp", "Switchback Camp", "Hairpin Camp", "Bog Camp", "Ridge Camp"];
+  EXP.camps = TRACK.camps.map((c, k)=>{ const i = snapTo(MAIN, c), p = MAIN.pts[i];
+    return {x: p.x, z: p.z, y: p.y, i, name: NAMES[k] || ("Camp " + (k+1)), reached: false}; });
+  const tentCols = [0xe0801e, 0x2f6fa8, 0xc2382a, 0x3f8a4a, 0xe0c21e];
+  const fires = [];
+  const camp = (c, k)=>{
+    const t = MAIN.tans[c.i], nx = -t.z, nz = t.x;
+    // pitch it on the flatter side of the trail
+    const off = MAIN.half[c.i] + 9;
+    const sideY = sd => Math.abs(gradedY(c.x + nx*sd*off, c.z + nz*sd*off) - c.y);
+    const sd = sideY(1) < sideY(-1) ? 1 : -1;
+    const cx = c.x + nx*sd*off, cz = c.z + nz*sd*off;
+    for(let n=0;n<2;n++){
+      const g = new THREE.Group(), col = tentCols[(k + n*2) % tentCols.length];
+      const tent = new THREE.Mesh(new THREE.ConeGeometry(1.7, 1.8, 4), PM(col)); tent.rotation.y = Math.PI/4; tent.scale.set(1, 1, 1.5); tent.position.y = 0.9; g.add(tent);
+      pbox(g, 0.5, 0.9, 0.05, 0x2a2a2a, 0, 0.45, 1.25);
+      setDown(g, cx + t.x*(n ? 4.5 : -4.5) + nx*sd*(n ? 2.5 : 0), cz + t.z*(n ? 4.5 : -4.5) + nz*sd*(n ? 2.5 : 0), Math.atan2(-nx*sd, -nz*sd) + (n ? 0.5 : -0.3));
+    }
+    // the fire, logs round it
+    const fx = cx - nx*sd*3, fz = cz - nz*sd*3;
+    const fg = new THREE.Group();
+    for(let n=0;n<5;n++){ const l = pcyl(fg, 0.12, 0.12, 1.1, 6, 0x5a3e28, 0, 0.12, 0); l.rotation.set(Math.PI/2, n/5*Math.PI*2, 0.4); }
+    for(let n=0;n<8;n++){ const a = n/8*Math.PI*2; pbox(fg, 0.35, 0.25, 0.35, 0x6a6a64, Math.cos(a)*0.9, 0.1, Math.sin(a)*0.9); }
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.0, 6),
+      new THREE.MeshBasicMaterial({color:0xffa030, transparent:true, opacity:0.85}));
+    flame.position.y = 0.55; fg.add(flame); fg.userData.noMerge = true; fires.push(flame);
+    for(const lx of [-1.8, 1.8]){ const lg = pcyl(fg, 0.22, 0.22, 1.6, 7, 0x6a4a30, lx, 0.22, -1.4); lg.rotation.z = Math.PI/2; }
+    setDown(fg, fx, fz, 0, false);
+    // flag and the board
+    const pole = new THREE.Group();
+    pcyl(pole, 0.05, 0.06, 5, 6, 0xd8d4c8, 0, 2.5, 0);
+    const fl = pbox(pole, 0.02, 0.7, 1.1, tentCols[k % tentCols.length], 0, 4.55, 0.56);
+    setDown(pole, cx + t.x*9, cz + t.z*9, Math.atan2(t.x, t.z));
+    const bd = new THREE.Group();
+    for(const px of [-1.1, 1.1]) pbox(bd, 0.12, 2.2, 0.12, 0x5a4430, px, 1.1, 0);
+    const board = new THREE.Mesh(new THREE.BoxGeometry(2.8, 1.1, 0.08),
+      [PM(0x5a4430), PM(0x5a4430), PM(0x5a4430), PM(0x5a4430),
+       new THREE.MeshLambertMaterial({map: boardTex([c.name.toUpperCase(), Math.max(0, Math.round(c.y - EXP.baseY)) + " m above base camp"], "#2f5a3a", "#f2efe6")}), PM(0x5a4430)]);
+    board.position.y = 1.9; bd.add(board); bd.userData.noMerge = true;
+    const bx = c.x + nx*sd*(MAIN.half[c.i] + 2.2) - t.x*14, bz = c.z + nz*sd*(MAIN.half[c.i] + 2.2) - t.z*14;
+    setDown(bd, bx, bz, Math.atan2(-t.x, -t.z));
+  };
+  EXP.camps.forEach(camp);
+  ANIMS.push(tt=> fires.forEach((f, k)=>{ const q = 0.8 + 0.25*Math.sin(tt*11 + k*2) + 0.15*Math.sin(tt*23 + k); f.scale.set(q, 0.8 + q*0.5, q); }));
+  // the summit: a cairn off the side of the trail, a tall pole and a flag streaming off it
+  {
+    const t = MAIN.tans[si], nx = -t.z, nz = t.x, off = MAIN.half[si] + 5;
+    const cx = sp.x + nx*off, cz = sp.z + nz*off, g = new THREE.Group();
+    const rm = new THREE.MeshLambertMaterial({map: rockTex, color: 0x9a968c});
+    for(let n=0;n<14;n++){
+      const lvl = Math.floor(n/5), a = n*2.4, r = (2 - lvl*0.7)*(0.6 + 0.4*Math.random());
+      const rk = new THREE.Mesh(rockGeometry(n % 3), rm); const sc = 0.9 - lvl*0.2;
+      rk.scale.set(sc, sc*0.7, sc); rk.position.set(Math.cos(a)*r, 0.4 + lvl*0.9, Math.sin(a)*r); g.add(rk);
+    }
+    pcyl(g, 0.07, 0.08, 7, 6, 0xd8d4c8, 0, 3.5, 0);
+    const flag = new THREE.Group(); flag.position.y = 6.3; g.add(flag); flag.userData.noMerge = true;
+    const cloth = pbox(flag, 0.02, 1.0, 1.8, 0xd8302a, 0, 0, 0.92);
+    ANIMS.push(tt=>{ flag.rotation.y = 0.25*Math.sin(tt*2.3); cloth.rotation.x = 0.06*Math.sin(tt*7); });
+    setDown(g, cx, cz, 0);
+    roadSign(si - Math.round(10/MAIN.seg), -1, ["SUMMIT", TRACK.name + "  \u00b7  " + Math.round(sp.y - EXP.baseY) + " m"], "#d8302a", "#f7f2e6");
+  }
+  roadSign(Math.round(30/MAIN.seg), 1, [TRACK.name + " BASE CAMP", "summit " + Math.round(sp.y - EXP.baseY) + " m up, two ways"], "#2f5a3a", "#f2efe6");
+  // boulders strewn over the open ground above the trees
+  {
+    const spots = [];
+    for(let n=0;n<2600 && spots.length<520;n++){
+      const x = sp.x + (Math.random() - 0.5)*560, z = sp.z + (Math.random() - 0.5)*560;
+      const y = gradedY(x, z);
+      if(y < TRACK.treeline - 8 || !clearOf(x, z, 3)) continue;
+      spots.push([x, y, z, 0.3 + Math.pow(Math.random(), 2.2)*2.4]);
+    }
+    const inst = new THREE.InstancedMesh(rockGeometry(4.2), new THREE.MeshLambertMaterial({map: rockTex}), spots.length);
+    const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), e3 = new THREE.Euler();
+    spots.forEach((p, i)=>{ e3.set(Math.random()*0.5, Math.random()*6, Math.random()*0.5); q4.setFromEuler(e3);
+      v3.set(p[0], p[1] - p[3]*0.3, p[2]); s3.set(p[3]*(0.8 + Math.random()*0.5), p[3]*0.7, p[3]); m4.compose(v3, q4, s3); inst.setMatrixAt(i, m4); });
+    inst.castShadow = true; scene.add(inst);
+  }
+}
+
 /* ---- the slot's walls: sculpted sandstone ----
    The heightfield can only draw the slot as 2m triangles, which read as a
    row of polygons. Over it stands a smooth-shaded skin of rock, one per
@@ -5473,6 +5604,7 @@ function bushGeometry(seed){
       if(nearest(x,z).dist < 9.4) return false;
       if(Math.hypot(x,z) > 620) return false;
       if(inWaterway(x,z) || barren(x,z)) return false;          // trees do not grow in the river
+      if(TRACK.treeline && gradedY(x, z) > TRACK.treeline + (Math.random() - 0.7)*14) return false;   // nor above the treeline
       if(DESERT && Math.random() > 0.2) return false;        // the desert is open country
       const kind = FALL ? (Math.random() < 0.22 ? 0 : (Math.random() < 0.55 ? 1 : 2))
                  : DESERT ? (Math.random() < 0.6 ? 0 : (Math.random() < 0.6 ? 1 : 2))
@@ -5656,6 +5788,7 @@ function bushGeometry(seed){
       const z = P.pts[i].z + nz*side*off + t.z*(Math.random()-0.5)*16;
       if(inWaterway(x,z) || barren(x,z)) return false;
       if(nearest(x,z).dist < 6.6) return false;
+      if(TRACK.treeline && gradedY(x, z) > TRACK.treeline + 8) return false;
       bushSpots[(Math.random()*3)|0].push([x, gradedY(x,z)-0.15, z, 0.9 + Math.random()*1.9]);
       return true;
     });
@@ -5748,6 +5881,7 @@ function bushGeometry(seed){
       const z = P.pts[i].z + nz*side*off + t.z*(Math.random()-0.5)*16;
       if(nearest(x,z).dist < 6.2) continue;
       if(inWaterway(x,z) || barren(x,z)) continue;
+      if(TRACK.treeline && gradedY(x, z) > TRACK.treeline + 12) continue;
       const h = 0.75 + Math.random()*1.5;
       pos.push(x, gradedY(x,z) - 0.05, z);
       scale.push(h*(1.1 + Math.random()*0.5), h);
@@ -7878,6 +8012,7 @@ function requestShift(g){
   trans.lock = DRIVE.lockout;
 }
 function autoDrive(){
+  if(EXP.on){ const al = pose.vx*Math.sin(pose.h) + pose.vz*Math.cos(pose.h); return {thr:0, brk: al > 0.4 ? 1 : 0, steer:0}; }   // pull up on the top
   const P = MAIN, i = state.idx, sp = Math.hypot(pose.vx, pose.vz);
   const ahead = Math.round((9 + sp*0.45)/P.seg), tg = P.pts[wrapIdx(P, i + ahead)];
   let err = Math.atan2(tg.x - pose.x, tg.z - pose.z) - pose.h;
@@ -7946,8 +8081,19 @@ function stepCar(dt){
   trans.rpm += (Math.max(DRIVE.idle, rpmAt(along, trans.gear)) - trans.rpm) * Math.min(1, dt*12);
   if(state.phase === "countdown" && AUD.revRpm) trans.rpm = AUD.revRpm;      // revving it on the grid: the tach follows
 
-  let a = 0;
-  const drive = DRIVE.K * torqueCurve(trans.rpm) * DRIVE.totals[trans.gear-1] * traction;
+  /* On the mountain the ground matters: the slope pulls the car back (or
+     runs it away downhill), and past about 45% loose ground spins the
+     wheels, so the steep way up wants a run at it and the right line. */
+  let hillA = 0, climbGrip = 1;
+  if(EXP.on && !pose.air){
+    const hx = Math.sin(pose.h), hz = Math.cos(pose.h);
+    const grade = (surfaceY(pose.x + hx*1.6, pose.z + hz*1.6) - surfaceY(pose.x - hx*1.6, pose.z - hz*1.6))/3.2;
+    hillA = -9.8*grade/Math.sqrt(1 + grade*grade);
+    climbGrip = 1 - 0.55*smoothstep(0.42, 0.8, grade)*(offRoad ? 1 : 0.6);
+    pose.grade = grade;
+  }
+  let a = hillA;
+  const drive = DRIVE.K * torqueCurve(trans.rpm) * DRIVE.totals[trans.gear-1] * traction * climbGrip;
 
   if(trans.dir > 0){
     if(thr) a += Math.min(11.0, drive) * (1 - trans.cut*0.7);
@@ -7961,6 +8107,7 @@ function stepCar(dt){
   const sgn = Math.sign(along || 1);
   a -= sgn * (0.0006*along*along + (deepOff ? 1.9 : offRoad ? 1.0 : 0.30 + mudAmt*0.68 + wetAmt*0.34));
   a -= along * (deepOff ? 0.15 : offRoad ? 0.09 : 0.02 + mudAmt*0.075 + wetAmt*0.035 - tarAmt*0.006);
+  if(EXP.on) a -= along*mudAmt*0.09;                 // the mountain's mud is deep: keep it moving
   if(pose.air) a = -sgn*0.12;                       // no drive in the air
   if(hand && drift.mode !== "slide") a -= along*0.45;   // only a plain handbrake scrubs
 
@@ -8612,7 +8759,7 @@ function stepCar(dt){
   // inside ten seconds.
   const gateDist = Math.hypot(pose.x - pts[0].x, pose.z - pts[0].z);
   const sane = gateDist < 40 && (state.t - state.lapStart) > 10;
-  if(wrapForward && nDist < HALF + 14 && sane){
+  if(wrapForward && nDist < HALF + 14 && sane && !EXP.on){
     const now = state.t;
     const lt = now - state.lapStart;
     const prevBest = state.best;
@@ -8797,6 +8944,40 @@ const UI = {
   key:   "#ffd23d",     // the one accent, used sparingly
   warn:  "#ff6a2a"
 };
+/* The expedition's readout: how high you are, which way the summit is and
+   how far, the camps you have reached, and the best time to the top. */
+function drawExpHUD(W, H, k){
+  const reached = EXP.camps.filter(c=> c.reached).length;
+  hudText("CAMPS", 12*k, 72*k, UI.label, UI.dim);
+  for(let i=0;i<EXP.camps.length;i++){
+    hud.beginPath(); hud.moveTo((16 + i*16)*k, 90*k); hud.lineTo((23 + i*16)*k, 78*k); hud.lineTo((30 + i*16)*k, 90*k); hud.closePath();
+    hud.fillStyle = EXP.camps[i].reached ? UI.key : "rgba(20,26,30,.55)"; hud.fill();
+    hud.lineWidth = 2*k; hud.strokeStyle = "#000"; hud.stroke();
+  }
+  // altitude, big, in the middle, and the summit's for scale
+  const alt = Math.max(0, Math.round(pose.y - EXP.baseY)), top = Math.round(EXP.summit.y - EXP.baseY);
+  hudText(alt + " M", W/2, 44*k, UI.value*1.2, UI.key, "center");
+  hudText("ALTITUDE  \u00b7  SUMMIT " + top + " M", W/2, 57*k, UI.label, UI.dim, "center");
+  // a compass needle pointing at the summit, relative to where you are looking
+  const dx = EXP.summit.x - pose.x, dz = EXP.summit.z - pose.z, dist = Math.hypot(dx, dz);
+  const ang = Math.atan2(dx, dz) - camH;
+  const cx = W/2, cy = 80*k, r = 13*k;
+  hud.beginPath(); hud.arc(cx, cy, r + 4*k, 0, 7); hud.fillStyle = "rgba(12,22,32,.55)"; hud.fill();
+  hud.lineWidth = 2*k; hud.strokeStyle = "#000"; hud.stroke();
+  hud.save(); hud.translate(cx, cy); hud.rotate(-ang);
+  hud.beginPath(); hud.moveTo(0, -r); hud.lineTo(r*0.55, r*0.6); hud.lineTo(0, r*0.25); hud.lineTo(-r*0.55, r*0.6); hud.closePath();
+  hud.fillStyle = UI.warn; hud.fill(); hud.lineWidth = 1.6*k; hud.strokeStyle = "#000"; hud.stroke();
+  hud.restore();
+  // how far, and the best climb
+  hudText("TO THE SUMMIT", W-12*k, 20*k, UI.label, UI.dim, "right");
+  hudText(dist > 999 ? (dist/1000).toFixed(2) + " KM" : Math.round(dist) + " M", W-10*k, 50*k, UI.value*0.9, UI.ink, "right");
+  const rb = recordFor().summit;
+  hudText("BEST CLIMB", W-12*k, 72*k, UI.label, UI.dim, "right");
+  hudText(rb != null ? fmt(rb) : "--'--\"--", W-10*k, 90*k, UI.small, UI.ink, "right");
+  if(EXP.resets) hudText("RESETS " + EXP.resets, W-10*k, 106*k, UI.label, UI.dim, "right");
+  if(pose.grade !== undefined && Math.abs(pose.grade) > 0.25 && !pose.air)
+    hudText(Math.round(pose.grade*100) + "% GRADE", W/2, 112*k, UI.small, Math.abs(pose.grade) > 0.45 ? UI.warn : UI.ink, "center");
+}
 function drawHUD(dt, alongNow){
   const W = HUD_W, H = HUD_H, k = HK;
   hud.clearRect(0, 0, W, H);
@@ -8806,6 +8987,8 @@ function drawHUD(dt, alongNow){
   /* top left: total and lap times */
   hudText("TOTAL TIME", 12*k, 20*k, UI.label, UI.dim);
   hudText(fmt(state.t), 10*k, 46*k, UI.value, UI.ink);
+  if(EXP.on) drawExpHUD(W, H, k);
+  else {
   hud.fillStyle = UI.key;
   hud.fillRect(11*k, 54*k, 20*k, 16*k);
   hud.strokeStyle = "#000"; hud.lineWidth = 2*k;
@@ -8841,6 +9024,7 @@ function drawHUD(dt, alongNow){
     hudText(top[i] !== undefined ? fmt(top[i]) : "--'--\"--", W-10*k, y, UI.small, UI.ink, "right");
   }
 
+  }
   /* bottom left: tachometer */
   drawTach(trans.rpm, 74*k, H-58*k, 46*k);
 
@@ -8910,6 +9094,13 @@ function drawHUD(dt, alongNow){
     });
     hud.fillStyle = UI.key;
     hud.fillRect(px(pts[0].x)-2*k, pz(pts[0].z)-2*k, 4*k, 4*k);
+    if(EXP.on){
+      EXP.camps.forEach(c=>{ hud.beginPath(); hud.arc(px(c.x), pz(c.z), 2.4*k, 0, 7);
+        hud.fillStyle = c.reached ? UI.key : "#8fa0a8"; hud.fill(); hud.lineWidth = 1.2*k; hud.strokeStyle = "#000"; hud.stroke(); });
+      const sx = px(EXP.summit.x), sz = pz(EXP.summit.z);
+      hud.beginPath(); hud.moveTo(sx, sz - 5*k); hud.lineTo(sx + 4.5*k, sz + 3*k); hud.lineTo(sx - 4.5*k, sz + 3*k); hud.closePath();
+      hud.fillStyle = "#f2efe6"; hud.fill(); hud.lineWidth = 1.4*k; hud.strokeStyle = "#000"; hud.stroke();
+    }
     FIELD.forEach(r=>{
       hud.beginPath();
       hud.arc(px(r.mesh.position.x), pz(r.mesh.position.z), 2.6*k, 0, 7);
@@ -9004,7 +9195,8 @@ function applySettings(){
 const MODES = {
   race:  { laps:5, rivals:true,  label:"Quick race" },
   champ: { laps:3, rivals:true,  label:"Championship" },
-  trial: { laps:3, rivals:false, label:"Time trial", ghost:true }
+  trial: { laps:3, rivals:false, label:"Time trial", ghost:true },
+  expedition: { laps:1, rivals:false, label:"Expedition" }
 };
 const CUPS = [ {name:"Summer Cup", rounds:[0, 1, 2, 4]},       // every summer circuit but the test yard
                {name:"Fall Cup",   rounds:[5, 6, 7]},
@@ -9364,6 +9556,17 @@ function stepRaceEvents(dt, info){
 
   if(state.phase !== "racing") return;
 
+  if(EXP.on){
+    EXP.camps.forEach((c, k)=>{
+      if(c.reached || Math.hypot(pose.x - c.x, pose.z - c.z) > 22) return;
+      c.reached = true; EXP.last = k;
+      const n = EXP.camps.filter(q=> q.reached).length;
+      banner(c.name.toUpperCase(), UI.key, 2.6, "camp " + n + " of " + EXP.camps.length + "  \u00b7  " + Math.max(0, Math.round(c.y - EXP.baseY)) + " m up");
+      SFX.lap();
+    });
+    if(Math.hypot(pose.x - EXP.summit.x, pose.z - EXP.summit.z) < 16) finishExpedition();
+  }
+
   // positions gained and lost
   if(state.t > 2 && FIELD.length){
     if(GAME.placePrev && state.place !== GAME.placePrev){
@@ -9376,7 +9579,7 @@ function stepRaceEvents(dt, info){
   // wrong way, and a hint when you're stuck somewhere
   const t = tans[state.idx];
   const fwd = Math.sin(pose.h)*t.x + Math.cos(pose.h)*t.z;
-  if(info.sp > 3 && fwd < -0.35) GAME.wrongT += dt;
+  if(!EXP.on && info.sp > 3 && fwd < -0.35) GAME.wrongT += dt;
   else GAME.wrongT = Math.max(0, GAME.wrongT - dt*3);
   if(GAME.wrongT > 1 && !GAME.wrongSaid){ SFX.wrong(); GAME.wrongSaid = true; }
   if(GAME.wrongT <= 0) GAME.wrongSaid = false;
@@ -9399,6 +9602,7 @@ function resetCar(){
   camH = pose.h;
   camera.position.set(pose.x - Math.sin(pose.h)*9, pose.y + 3.6, pose.z - Math.cos(pose.h)*9);
   GAME.stuckT = 0; GAME.wrongT = 0; GAME.resetFlash = 1;
+  if(EXP.on) EXP.resets++;
   SFX.reset();
 }
 
@@ -9537,6 +9741,7 @@ function resetRace(){
   state.lap = 1; state.lapTimes = []; state.lapStart = 0; state.best = null;
   placeAtStart();
   if(typeof resetPiles === "function") resetPiles();
+  EXP.camps.forEach(c=> c.reached = false); EXP.last = -1; EXP.resets = 0;
   car.visible = true; carShadow.visible = true;
   camH = pose.h;
   camera.position.set(pose.x - Math.sin(pose.h)*9.2, pose.y + 3.55, pose.z - Math.cos(pose.h)*9.2);
@@ -9550,6 +9755,16 @@ function resetRace(){
   closeUI();
 }
 
+function finishExpedition(){
+  state.phase = "done";
+  GAME.doneT = 0;
+  GAME.finishTime = state.t;
+  banner("SUMMIT!", UI.key, 3.4, TRACK.name + "  \u00b7  " + Math.round(EXP.summit.y - EXP.baseY) + " m");
+  SFX.finish();
+  const rec = recordFor();
+  if(rec.summit == null || state.t < rec.summit){ rec.summit = state.t; GAME.raceRecord = true; }
+  persist();
+}
 function finishRace(){
   state.phase = "done";
   GAME.doneT = 0;
@@ -9769,6 +9984,8 @@ function drawThumb(cv, id){
 }
 function trackFacts(id){
   const t = TRACKS[id], rec = SAVE.records[t.name] || {};
+  if(t.expedition) return '<div class="facts">' + [["Trail", (trackThumb(id).len/1000).toFixed(2) + " km round"], ["Camps", String((t.camps || []).length)],
+    ["Best climb", rec.summit != null ? fmt(rec.summit) : "none yet"]].map(b => '<span>' + b[0] + '<b>' + esc(b[1]) + '</b></span>').join("") + '</div>';
   const bits = [["Length", (trackThumb(id).len/1000).toFixed(2) + " km"]];
   if(id === TRACK_ID) bits.push(["Typical lap", fmt(LAP_TEST.lap)]);
   bits.push(["Best lap", rec.bestLap != null ? fmt(rec.bestLap) : "none yet"]);
@@ -9822,6 +10039,7 @@ function showMain(sel){
     champ:"Four cups: the Summer Cup over four rounds, the Fall Cup over three in the maples, the Winter Cup over four on snow and ice, and the Desert Cup over four in the red rock. Three laps a round against the same three drivers, points 10, 6, 4 and 3, saved between sessions.",
     race:"Any circuit, five laps, the full field.",
     trial:"Three laps with the road to yourself. Your best lap on each circuit is saved and comes back as a ghost to chase.",
+    exped:"No rivals and no laps: a mountain, a trail with two ways up it, and all the open ground in between. Cross the creek, climb the switchbacks, get through the bog and reach the summit cairn. The slopes pull on the car here, so pick your line.",
     garage:"Pick the box wagon or the sport wagon, then its paint, livery, fenders, rims, wheel size and the kit on the roof. Saved for every race.",
     opts:"Rival pace, sound, camera, gearbox and the arcade filter.",
     help:"Keyboard and gamepad controls, and how the drift turbo works."
@@ -9834,6 +10052,7 @@ function showMain(sel){
     '<button class="item" data-act="champ" data-k="champ"><span>CHAMPIONSHIP</span><small>' + champSub + '</small></button>' +
     '<button class="item" data-act="race" data-k="race"><span>QUICK RACE</span></button>' +
     '<button class="item" data-act="trial" data-k="trial"><span>TIME TRIAL</span></button>' +
+    '<button class="item" data-act="exped" data-k="exped"><span>EXPEDITION</span></button>' +
     '<button class="item" data-act="garage" data-k="garage"><span>GARAGE</span></button>' +
     '<button class="item" data-act="opts" data-k="opts"><span>OPTIONS</span></button>' +
     '<button class="item" data-act="help" data-k="help"><span>HOW TO DRIVE</span></button>' +
@@ -9843,28 +10062,30 @@ function showMain(sel){
       acts:{ champ:()=>{ SFX.ok(); showChamp(); },
              race:()=>{ SFX.ok(); showTracks("race"); },
              trial:()=>{ SFX.ok(); showTracks("trial"); },
-             garage:()=>{ SFX.ok(); showGarage(()=> showMain(3), ()=> showMain(3)); },
-             opts:()=>{ SFX.ok(); showOptions(()=> showMain(4)); },
-             help:()=>{ SFX.ok(); showHelp(()=> showMain(5)); } } });
+             exped:()=>{ SFX.ok(); showTracks("expedition"); },
+             garage:()=>{ SFX.ok(); showGarage(()=> showMain(4), ()=> showMain(4)); },
+             opts:()=>{ SFX.ok(); showOptions(()=> showMain(5)); },
+             help:()=>{ SFX.ok(); showHelp(()=> showMain(6)); } } });
   MENU.onSel(MENU.items[MENU.sel]);
 }
 
+const mainIdx = m => m === "champ" ? 0 : m === "race" ? 1 : m === "trial" ? 2 : 3;
 function showTracks(mode){
-  const ids = TRACKS.map((t,i)=>i).sort((a, b)=> (TRACKS[a].test ? 9 : TRACKS[a].cup || 0) - (TRACKS[b].test ? 9 : TRACKS[b].cup || 0) || a - b);
+  const ids = TRACKS.map((t,i)=>i).filter(i=> !!TRACKS[i].expedition === (mode === "expedition")).sort((a, b)=> (TRACKS[a].test ? 9 : TRACKS[a].cup || 0) - (TRACKS[b].test ? 9 : TRACKS[b].cup || 0) || a - b);
   openScreen("scTracks",
     '<div style="width:100%;max-width:980px;margin:auto 0">' +
-    '<h2 class="head">' + esc(MODES[mode].label) + ': choose a circuit</h2>' +
+    '<h2 class="head">' + esc(MODES[mode].label) + (mode === "expedition" ? ': choose a mountain' : ': choose a circuit') + '</h2>' +
     '<div class="tracks">' + ids.map(id =>
       '<button class="tk" data-track="' + id + '"><canvas width="132" height="132"></canvas><span>' +
       esc(TRACKS[id].name) + '</span><small>' + esc(TRACKS[id].shape.split(/\s+[\u2014-]\s+/)[0].toLowerCase()) +
       '</small></button>').join("") + '</div>' +
     '<div class="detail" id="tkDetail"></div>' +
     '<div class="menu" style="margin-top:14px;max-width:260px"><button class="item back" data-act="back"><span>BACK</span></button></div></div>',
-    { grid:true, sel: Math.max(0, ids.indexOf(TRACK_ID)), back: ()=> showMain(mode === "race" ? 1 : 2),
+    { grid:true, sel: Math.max(0, ids.indexOf(TRACK_ID)), back: ()=> showMain(mainIdx(mode)),
       onSel: el => { if(el.dataset.track !== undefined)
                        document.getElementById("tkDetail").innerHTML = detailHTML(+el.dataset.track); },
       acts:{ track: el => startMode(mode, +el.dataset.track),
-             back: ()=>{ SFX.back(); showMain(mode === "race" ? 1 : 2); } } });
+             back: ()=>{ SFX.back(); showMain(mainIdx(mode)); } } });
   UIEL.querySelectorAll(".tk canvas").forEach((cv, i)=> drawThumb(cv, ids[i]));
   MENU.onSel(MENU.items[MENU.sel]);
 }
@@ -9874,8 +10095,8 @@ function showTracks(mode){
 function showReady(mode){
   openScreen("scReady",
     '<div class="cols"><div class="left"><h2 class="head">' + esc(MODES[mode].label) + '</h2>' +
-    '<div class="menu"><button class="item" data-act="go"><span>START RACE</span></button>' +
-    '<button class="item back" data-act="back"><span>CHOOSE ANOTHER CIRCUIT</span></button></div></div>' +
+    '<div class="menu"><button class="item" data-act="go"><span>' + (mode === "expedition" ? 'SET OFF' : 'START RACE') + '</span></button>' +
+    '<button class="item back" data-act="back"><span>' + (mode === "expedition" ? 'CHOOSE ANOTHER MOUNTAIN' : 'CHOOSE ANOTHER CIRCUIT') + '</span></button></div></div>' +
     '<div class="right"><div class="detail">' + detailHTML(TRACK_ID) + '</div></div></div>',
     { back: ()=> showTracks(mode),
       acts:{ go:()=>{ SFX.ok(); setMode(mode); resetRace(); }, back:()=>{ SFX.back(); showTracks(mode); } } });
@@ -10044,7 +10265,7 @@ function showPause(sel){
       acts:{ resume: resumeGame,
              restart:()=>{ SFX.ok(); resetRace(); },
              opts:()=>{ SFX.ok(); showOptions(()=> showPause(2)); },
-             quit:()=>{ SFX.back(); enterMenuWorld(); showMain(MODE === "champ" ? 0 : MODE === "race" ? 1 : 2); } } });
+             quit:()=>{ SFX.back(); enterMenuWorld(); showMain(mainIdx(MODE)); } } });
 }
 
 /* ---- results ---- */
@@ -10071,24 +10292,33 @@ function showResults(){
       '<span' + (t === state.best ? ' class="best"' : '') + '>Lap ' + (i+1) + ' ' + fmt(t) + '</span>').join("") + '</div>';
   const badges = (GAME.raceRecord ? '<span class="badge">NEW BEST RACE</span>' : '') +
                  (GAME.lapRecord ? '<span class="badge">NEW BEST LAP</span>' : '');
-  const title = FIELD.length ? (GAME.finishPlace === 1 ? "YOU WIN" : ordinal(GAME.finishPlace) + " PLACE") : fmt(GAME.finishTime);
+  let title = FIELD.length ? (GAME.finishPlace === 1 ? "YOU WIN" : ordinal(GAME.finishPlace) + " PLACE") : fmt(GAME.finishTime);
+  let right = table + laps;
+  if(EXP.on){
+    title = "SUMMIT";
+    const rec = recordFor();
+    right = '<table class="grid">' + [["Time to the top", fmt(GAME.finishTime)], ["Best climb", rec.summit != null ? fmt(rec.summit) : "-"],
+      ["Height climbed", Math.round(EXP.summit.y - EXP.baseY) + " m"], ["Camps on the way", EXP.camps.filter(c=> c.reached).length + " of " + EXP.camps.length],
+      ["Put back on the trail", EXP.resets + (EXP.resets === 1 ? " time" : " times")]]
+      .map(r=> '<tr><td class="n">' + r[0] + '</td><td class="t">' + esc(r[1]) + '</td></tr>').join("") + '</table>';
+  }
   const acts = {}, items = [];
   if(MODE === "champ"){
     items.push(['stand', SAVE.champ && SAVE.champ.done ? "FINAL STANDINGS" : "STANDINGS"]);
     acts.stand = ()=>{ SFX.ok(); showStandings(); };
   } else {
-    items.push(['again', MODE === "trial" ? "GO AGAIN" : "RACE AGAIN"], ['tracks', "CHOOSE CIRCUIT"], ['menu', "MAIN MENU"]);
+    items.push(['again', EXP.on ? "CLIMB AGAIN" : MODE === "trial" ? "GO AGAIN" : "RACE AGAIN"], ['tracks', EXP.on ? "CHOOSE MOUNTAIN" : "CHOOSE CIRCUIT"], ['menu', "MAIN MENU"]);
     acts.again = ()=>{ SFX.ok(); setMode(MODE); resetRace(); };
     acts.tracks = ()=>{ SFX.ok(); const m = MODE; enterMenuWorld(); showTracks(m); };
-    acts.menu = ()=>{ SFX.back(); const m = MODE; enterMenuWorld(); showMain(m === "race" ? 1 : 2); };
+    acts.menu = ()=>{ SFX.back(); const m = MODE; enterMenuWorld(); showMain(mainIdx(m)); };
   }
   openScreen("scResults",
     '<div class="cols" style="align-items:flex-start"><div class="left">' +
     '<div class="big">' + title + '</div><h2 class="head" style="margin-top:6px">' + esc(TRACK.name) +
-    (FIELD.length ? ' in ' + fmt(GAME.finishTime) : '') + '</h2>' + badges +
+    (FIELD.length ? ' in ' + fmt(GAME.finishTime) : '') + '</h2>' + (EXP.on ? (GAME.raceRecord ? '<span class="badge">NEW BEST CLIMB</span>' : '') : badges) +
     '<div class="menu" style="margin-top:22px">' +
     items.map(x => '<button class="item" data-act="' + x[0] + '"><span>' + x[1] + '</span></button>').join("") +
-    '</div></div><div class="right">' + table + laps + '</div></div>',
+    '</div></div><div class="right">' + right + '</div></div>',
     { cls:"dim", acts });
 }
 function showStandings(){
@@ -10170,7 +10400,8 @@ const LITTER = { items:[], leaf:null, stick:null, home:[] };
       put(kind, p.x + t.x*along - t.z*lat, p.z + t.z*along + t.x*lat);
     }
   };
-  const clearHere = (P, i)=> P.surf[i] !== SURF.WATER && !(P.deck && P.deck[i]) && !(P.wet && P.wet[i] > 0.3);
+  const clearHere = (P, i)=> P.surf[i] !== SURF.WATER && !(P.deck && P.deck[i]) && !(P.wet && P.wet[i] > 0.3)
+                          && !(TRACK.treeline && P.pts[i].y > TRACK.treeline - 4);
   // drifts of leaves: often, the whole way round
   if(PILE_KIND !== "none"){
     const step = Math.round(58/MAIN.seg);
@@ -10335,6 +10566,7 @@ function frame(now){
     stepDust(dt);
 
     if(state.phase === "menu") (GAME.garage ? garageCam(dt) : attractCam(dt));
+    else if(state.phase === "done" && EXP.on && GAME.doneT > 1.4) finishCam(dt);
     else stepCamera(dt, info.sp);
     if(GAME.shake > 0){
       camera.position.x += (Math.random()-0.5)*GAME.shake;
@@ -10387,7 +10619,7 @@ if(/debug/.test(location.hash)){
   window.__R = { THREE, TRACKS, TRACK, TRACK_ID, MAIN, BRANCHES, paths, ROUTE, pose, state, camera, scene, renderer,
                  surfaceY, gridH, nearest, PILES, PIT, GAME, CTL, trans, MAXV, radiiOf, radiiOpen, resetRace, setMode,
                  closeUI, rivals, car, splash, cornerHoldSpeed, stepCar, placeAtStart, drift, AUTO_JUMPS,
-                 CALM, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon };
+                 CALM, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults };
 }
 boot();
 requestAnimationFrame(frame);
