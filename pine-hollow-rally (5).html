@@ -766,33 +766,32 @@ const TRACKS = [
      The trail is a loop: up the long west side and down the steep east one,
      so there are two ways to the summit from base camp, and the car can
      leave the trail and go straight at it over open ground. */
-  { name:"MOUNT TAMARACK", after:"a mountain pass", relief:1.2, expedition:true, minR:18, half:4.2,
+  { name:"MOUNT TAMARACK", after:"a mountain pass", relief:0.7, expedition:true, minR:18, half:4.2,
     blurb:"a long day's climb: out through the forest, across the swamp, up the creek bed and two sets of switchbacks, round the rocky north shelf and over the snow to the summit cairn",
     kit:[],
     shape:"THE SUMMIT \u2014 a day's climb",
     feature:"an expedition to the top of a mountain",
     ctrl:[[0,-700],[-43,-706],[-81,-679],[-120,-654],[-168,-697],[-209,-688],[-244,-642],[-288,-652],[-330,-650],[-356,-638],
           [-364,-602],[-390,-589],[-440,-611],[-453,-581],[-445,-522],[-481,-525],[-528,-542],[-538,-508],[-551,-478],[-580,-470],
-          [-600,-390],[-625,-280],[-597,-228],[-638,-176],[-678,-124],[-720,-70],[-726,-55],[-722,-39],[-709,-29],[-693,-28],
-          [-680,-37],[-637,-88],[-595,-138],[-551,-190],[-537,-199],[-521,-198],[-509,-188],[-505,-173],[-510,-158],[-551,-106],
-          [-592,-54],[-633,0],[-639,15],[-635,31],[-622,41],[-606,42],[-593,33],[-550,-18],[-508,-68],[-464,-120],
-          [-451,-129],[-435,-128],[-422,-118],[-418,-103],[-424,-88],[-464,-36],[-505,16],[-547,70],[-552,85],[-548,101],
-          [-536,111],[-520,112],[-506,103],[-464,52],[-421,2],[-378,-50],[-344,149],[-304,152],[-273,166],[-289,229],
-          [-265,250],[-192,218],[-182,253],[-206,325],[-162,324],[-106,311],[-103,354],[-92,388],[-60,400],[-29,405],
-          [-7,380],[8,337],[49,370],[87,396],[98,339],[118,312],[155,333],[180,320],[171,312],[223,290],
-          [275,269],[328,247],[341,236],[345,221],[339,206],[325,197],[309,198],[257,219],[204,239],[150,260],
-          [134,261],[121,252],[115,237],[119,222],[131,212],[183,190],[235,169],[288,147],[301,136],[305,121],
-          [299,106],[285,97],[269,98],[217,119],[164,139],[110,160],[94,161],[81,152],[75,137],[79,122],
-          [91,112],[143,90],[195,69],[248,47],[210,-20],[170,-90],[100,-110],[40,-70],[0,0],[-30,-110],
-          [-20,-260],[10,-400],[20,-540],[15,-640]],
-    hills:[[0,0,430,262],[-330,330,210,40],[330,-80,200,30],[-470,-560,200,-14],[260,420,180,20]],
-    jumps:[], fords:[[-60,400],[-209,-688]],
-    river:{from:[-600,-390], to:[-625,-280], pools:4, down:80, up:70, downDir:[0.3,-1], upDir:[-0.2,1]},
+          [-600,-390],[-625,-290],[-613,-299],[-643,-269],[-635,-223],[-639,-183],[-661,-149],[-643,-106],[-639,-67],[-659,-31],
+          [-638,7],[-631,44],[-643,83],[-614,116],[-606,151],[-581,178],[-554,202],[-499,212],[-503,245],[-486,270],
+          [-452,282],[-444,315],[-428,342],[-388,350],[-375,379],[-354,402],[-314,402],[-296,428],[-272,447],[-234,439],
+          [-213,463],[-187,478],[-155,476],[-126,468],[-98,460],[-67,425],[-45,425],[-23,444],[0,430],[24,415],
+          [50,432],[73,414],[93,394],[122,407],[140,385],[157,363],[186,370],[200,346],[211,321],[241,323],
+          [249,297],[256,271],[285,268],[288,242],[287,201],[280,182],[277,160],[272,139],[296,132],[298,112],
+          [284,89],[306,76],[305,57],[287,37],[299,21],[296,-17],[288,-54],[275,-89],[258,-122],[237,-152],
+          [213,-179],[200,-187],[186,-186],[174,-176],[171,-162],[195,-116],[208,-81],[215,-46],[216,-10],[212,25],
+          [202,58],[194,70],[180,75],[165,71],[156,59],[158,18],[156,-7],[150,-32],[140,-55],[126,-75],
+          [110,-93],[98,-100],[83,-99],[72,-90],[68,-75],[79,-50],[83,-37],[86,-25],[86,-12],[84,0],
+          [81,11],[35,-29],[0,0],[-30,-110],[-20,-260],[10,-400],[20,-540],[15,-640]],
+    hills:[[0,0,430,262],[-640,560,220,40],[560,-360,200,30],[-470,-560,300,-6],[560,560,200,24]],
+    jumps:[], fords:[[73,414],[-209,-688]],
+    river:{from:[-608,-360], to:[-625,-290], pools:3, down:60, up:40, downDir:[-1,-0.15], upDir:[-0.3,1]},
     mud:[[[-330,-650],[-580,-470]]],
     swamp:{at:[-455,-565], r:175},
     summit:[0,0], treeline:150, snowline:205,
-    camps:[[-580,-470],[-625,-280],[-400,60],[180,320],[150,30]],
-    campNames:["Swamp Camp","Creek Camp","Switchback Camp","North Shelf Camp","Shoulder Camp"],
+    camps:[[-580,-470],[-625,-290],[-239,450],[288,242],[81,11]],
+    campNames:["Swamp Camp","Creek Camp","Gully Camp","North Shelf Camp","Switchback Camp"],
     branches:[]}
 ];
 
@@ -1906,7 +1905,7 @@ PITS.forEach(at=>{
   const span = Math.round(15/MAIN.seg);
   for(let k=-span;k<=span;k++){
     const i = wrapIdx(MAIN, at + k), t = k/span;
-    MAIN.pts[i].y -= 0.55*0.5*(1 + Math.cos(Math.PI*t));
+    MAIN.pts[i].y -= (TRACK.expedition ? 0.85 : 0.55)*0.5*(1 + Math.cos(Math.PI*t));
     if(Math.abs(t) < 0.8) MAIN.surf[i] = SURF.MUD;
     MAIN.half[i] += (1 - Math.abs(t))*0.8;
   }
@@ -4534,20 +4533,20 @@ if(TRACK.expedition){
     {
       const g = new THREE.Group(), span = hw + 2.2;
       for(const sd of [-1, 1]){
-        pcyl(g, 0.24, 0.3, 6.2, 7, 0x6a4a2c, sd*span, 3.1, 0);
-        const lamp = pbox(g, 0.34, 0.45, 0.34, new THREE.MeshLambertMaterial({color:0xffe2a0, emissive:0xffb040, emissiveIntensity:0.9}), sd*span, 4.6, 0.3);
-        pbox(g, 0.05, 1.6, 0.05, 0xd8d4c8, sd*span, 6.9, 0);
-        pbox(g, 0.02, 0.55, 0.9, bunt[(k + (sd > 0 ? 1 : 3)) % bunt.length], sd*span, 7.3, 0.47);
+        pcyl(g, 0.26, 0.32, 7.6, 7, 0x6a4a2c, sd*span, 3.8, 0);
+        const lamp = pbox(g, 0.34, 0.45, 0.34, new THREE.MeshLambertMaterial({color:0xffe2a0, emissive:0xffb040, emissiveIntensity:0.9}), sd*span, 5.4, 0.3);
+        pbox(g, 0.05, 1.6, 0.05, 0xd8d4c8, sd*span, 8.3, 0);
+        pbox(g, 0.02, 0.55, 0.9, bunt[(k + (sd > 0 ? 1 : 3)) % bunt.length], sd*span, 8.7, 0.47);
       }
-      const beam = pcyl(g, 0.2, 0.2, span*2 + 1.2, 7, 0x6a4a2c, 0, 5.9, 0); beam.rotation.z = Math.PI/2;
+      const beam = pcyl(g, 0.2, 0.2, span*2 + 1.2, 7, 0x6a4a2c, 0, 7.3, 0); beam.rotation.z = Math.PI/2;
       const board = new THREE.Mesh(new THREE.BoxGeometry(Math.min(8.5, span*2 - 1), 1.3, 0.12),
         [PM(0x5a4430), PM(0x5a4430), PM(0x5a4430), PM(0x5a4430),
          new THREE.MeshLambertMaterial({map: boardTex(["CAMP " + (k + 1) + "  \u00b7  " + c.name.toUpperCase(), Math.max(0, Math.round(c.y - EXP.baseY)) + " m above base camp"], "#2f5a3a", "#f2efe6", 512, 110)}),
          new THREE.MeshLambertMaterial({map: boardTex([c.name.toUpperCase(), "keep climbing"], "#2f5a3a", "#f2efe6", 512, 110)})]);
-      board.position.y = 5.05; g.add(board);
+      board.position.y = 6.45; g.add(board);
       // strings of flags hanging under the beam
       for(let n=0;n<12;n++){
-        const f = pbox(g, 0.5, 0.5, 0.02, bunt[n % bunt.length], -span + (n + 0.5)*(span*2/12), 5.45 - 0.25*Math.sin(Math.PI*(n + 0.5)/12), 0.1);
+        const f = pbox(g, 0.5, 0.5, 0.02, bunt[n % bunt.length], -span + (n + 0.5)*(span*2/12), 6.85 - 0.25*Math.sin(Math.PI*(n + 0.5)/12), 0.1);
         f.rotation.z = Math.PI/4;
       }
       g.userData.noMerge = true;
@@ -7249,6 +7248,7 @@ const dust = new THREE.Points(dustGeo, new THREE.ShaderMaterial({
 // 999m underground, and never recomputed as particles move. Three then culls
 // the whole system every frame. This is why no smoke or spray ever appeared.
 dust.frustumCulled = false;
+dust.renderOrder = 5;             // after the water, so spray and clods show over it
 dustGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 4000);
 scene.add(dust);
 let dustHead = 0;
@@ -7273,6 +7273,13 @@ function spawnDust(x,y,z,sandy,force,vx,vz,lift){
     dustCol[j+1] = Math.min(1, (g2*(1-m) + c[1]*m)*b);
     dustCol[j+2] = Math.min(1, (g2*(1-m) + c[2]*m)*b);
     dustSize[i]*=1.7; dustLife[i]*=1.3;
+  }
+  else if(sandy === 5){                           // clods of thick mud
+    const g2 = 0.8 + Math.random()*0.3;
+    dustCol[j]=0.40*g2; dustCol[j+1]=0.29*g2; dustCol[j+2]=0.17*g2;
+    dustSize[i] = 1.2 + Math.random()*1.0 + force*0.8; dustLife[i] = 0.8 + Math.random()*0.5;
+    dustGrav[i] = 16; dustGrow[i] = 0.1;
+    dustVel[i*3+1] = (lift === undefined ? 3 : lift)*(0.6 + Math.random()*0.7);
   }
   else if(sandy === 4){                           // powder snow
     const g2 = 0.9 + Math.random()*0.1;
@@ -7996,7 +8003,7 @@ function stepAudio(info, dt){
       AUD.revRpm = AUD.revRpm || DRIVE.idle;
       AUD.revRpm += gas ? Math.min(9000*dt, (DRIVE.redline*1.02 - AUD.revRpm)) : -Math.min(5000*dt, AUD.revRpm - DRIVE.idle);
     } else AUD.revRpm = trans.rpm;
-    let rpm = onGrid ? AUD.revRpm : trans.rpm;
+    let rpm = onGrid ? AUD.revRpm : Math.min(DRIVE.redline*1.02, trans.rpm + (trans.spin || 0));
     /* The limiter: at the red line with the throttle down, the ignition cuts
        and comes back fifteen times a second, and it spits pops. */
     AUD.limT = (AUD.limT || 0) + dt;
@@ -8132,9 +8139,7 @@ const MAXV = 44;
    speedometer after the fact, so a shift is an event with torque behind it. */
 const DRIVE = {
   R: 0.40,                                   // rolling radius, metres
-  // gear ratio x final drive; on an expedition the transfer box is in low range:
-  // everything pulls harder and tops out around 65km/h
-  totals: TRACK.expedition ? [44, 28.5, 19.8, 14.1, 10.1] : [24.0, 15.5, 10.8, 7.7, 5.5],
+  totals: [24.0, 15.5, 10.8, 7.7, 5.5],      // gear ratio x final drive
   idle: 900, redline: 6300,
   up: 5800, down: 2500,                      // auto shift points: wound out near the top before it changes
   K: 0.62,                                   // torque to acceleration constant
@@ -8228,6 +8233,11 @@ function stepCar(dt){
   trans.cut += ((trans.shiftT > 0 ? 1 : 0) - trans.cut) * Math.min(1, dt*13);
   trans.rpm += (Math.max(DRIVE.idle, rpmAt(along, trans.gear)) - trans.rpm) * Math.min(1, dt*12);
   if(state.phase === "countdown" && AUD.revRpm) trans.rpm = AUD.revRpm;      // revving it on the grid: the tach follows
+  {
+    const muck = EXP.on && !pose.air ? Math.min(1, mudAmt + wetAmt*0.5) : 0;
+    const want = thr ? muck*3300*(1 - Math.min(1, Math.abs(along)/18)) : 0;
+    trans.spin = (trans.spin || 0) + (want - (trans.spin || 0))*Math.min(1, dt*(want > (trans.spin || 0) ? 6 : 3));
+  }
 
   /* On the mountain the ground matters: the slope pulls the car back (or
      runs it away downhill), and past about 45% loose ground spins the
@@ -8256,21 +8266,21 @@ function stepCar(dt){
   const sgn = Math.sign(along || 1);
   a -= sgn * (0.0006*along*along + (deepOff ? 1.9 : offRoad ? 1.0 : 0.30 + mudAmt*0.68 + wetAmt*0.34));
   a -= along * (deepOff ? 0.15 : offRoad ? 0.09 : 0.02 + mudAmt*0.075 + wetAmt*0.035 - tarAmt*0.006);
-  if(EXP.on) a -= along*(mudAmt*0.16 + wetAmt*0.08);  // the mountain's mud is deep: keep it moving
+  /* The mountain's mud is thick. It holds the car harder the faster it tries
+     to go (the tyres and the body are pushing a bow wave of it), so in a
+     bog you plough along with the engine screaming and the wheels flinging
+     it, not cruise. Swamp water drags the same way, a bit less. */
+  if(EXP.on){
+    const muck = mudAmt + wetAmt*0.6;
+    a -= Math.sign(along)*muck*(0.95*Math.abs(along) + 0.028*along*along);
+  }
   if(pose.air) a = -sgn*0.12;                       // no drive in the air
   if(hand && drift.mode !== "slide") a -= along*0.45;   // only a plain handbrake scrubs
 
   let newAlong = along + a*dt;
   if(!thr && !brk && Math.abs(newAlong) < 0.35) newAlong = 0;   // no creeping
   if(newAlong < -11) newAlong = -11;
-  const ceiling = (EXP.on ? 18.5 : MAXV) + (drift.boostT > 0 ? (EXP.on ? 3 : 8) : 0);   // boost lifts the limiter
-  /* In deep mud and swamp water the car bogs down: past a crawl, every bit
-     more speed is fought by the muck, so you plough through, you don't fly. */
-  if(EXP.on && !pose.air){
-    const bog = Math.min(1, mudAmt + wetAmt*0.8);
-    const vBog = 18.5*(1 - 0.72*bog);
-    if(newAlong > vBog) newAlong -= Math.min(newAlong - vBog, (newAlong - vBog)*3.2*dt + 0.8*bog*dt);
-  }
+  const ceiling = MAXV + (drift.boostT > 0 ? 8 : 0);   // boost lifts the limiter
   if(newAlong > ceiling) newAlong = ceiling;
   const netA = (newAlong - along)/Math.max(dt, 0.0001);
 
@@ -8484,7 +8494,7 @@ function stepCar(dt){
   if(trans.cut < 0.3) pose.accLP += (netA - pose.accLP) * Math.min(1, dt*3.5);
   // (pitch and roll are set with the suspension, below)
   pose.steerVis += (pose.steerIn*0.42 - pose.steerVis) * Math.min(1, dt*10);
-  pose.wheelSpin += newAlong*dt/(car.userData.wr || WHEEL_R);
+  pose.wheelSpin += (newAlong + (trans.spin || 0)*0.006)*dt/(car.userData.wr || WHEEL_R);
 
   /* ---- chassis and body -------------------------------------------
      Two layers, the way a real car is built.
@@ -8815,7 +8825,21 @@ function stepCar(dt){
   }
   drift.flash = Math.max(0, drift.flash - dt*1.6);
 
-  car.position.set(pose.x, pose.y, pose.z);
+  // in thick mud the wheels sink in up to the hubs
+  pose.sink = (pose.sink || 0) + ((EXP.on && !pose.air ? Math.min(1, mudAmt*1.1 + wetAmt*0.4)*0.24 : 0) - (pose.sink || 0))*Math.min(1, dt*3);
+  if(EXP.on && !pose.air && (trans.spin || 0) > 250){
+    const k2 = Math.min(1, trans.spin/2600), n = 1 + Math.round(k2*2);
+    for(const o of [[-1.22, 0.80], [-1.22,-0.80], [1.3, 0.8], [1.3, -0.8]]){
+      if(o[0] > 0 && Math.random() > 0.35) continue;
+      for(let q=0;q<n;q++){
+        const fling = 3 + k2*6;
+        spawnDust(pose.x + nfx*o[0] + (-nfz)*o[1], pose.y + 0.15, pose.z + nfz*o[0] + nfx*o[1], 5, k2,
+                  -nfx*fling + (-nfz)*o[1]*(Math.random()*2), -nfz*fling + nfx*o[1]*(Math.random()*2), 2.5 + k2*4*Math.random());
+      }
+    }
+    splash.mud = Math.min(1, splash.mud + k2*dt*0.12);
+  }
+  car.position.set(pose.x, pose.y - (pose.sink || 0), pose.z);
   car.rotation.order = "YXZ";
   car.rotation.set(pose.pitch, pose.h + pose.yawVis, pose.roll);
   car.userData.wheels.forEach(w=>{
@@ -9186,7 +9210,7 @@ function drawHUD(dt, alongNow){
 
   }
   /* bottom left: tachometer */
-  drawTach(trans.rpm, 74*k, H-58*k, 46*k);
+  drawTach(Math.min(DRIVE.redline*1.02, trans.rpm + (trans.spin || 0)), 74*k, H-58*k, 46*k);
 
   /* gear box and speed */
   const gx = 140*k, gy = H-70*k, gw = 42*k, gh = 44*k;
@@ -10821,7 +10845,7 @@ if(/debug/.test(location.hash)){
   window.__R = { THREE, TRACKS, TRACK, TRACK_ID, MAIN, BRANCHES, paths, ROUTE, pose, state, camera, scene, renderer,
                  surfaceY, gridH, nearest, PILES, PIT, GAME, CTL, trans, MAXV, radiiOf, radiiOpen, resetRace, setMode,
                  closeUI, rivals, car, splash, cornerHoldSpeed, stepCar, placeAtStart, drift, AUTO_JUMPS,
-                 CALM, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults };
+                 CALM, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults, trans, dustLive: ()=>{ let n=0; for(let i=0;i<DUST;i++) if(dustLife[i]>0) n++; return n; } };
 }
 boot();
 requestAnimationFrame(frame);
