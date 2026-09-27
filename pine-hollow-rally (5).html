@@ -16,7 +16,7 @@
     --red:#ff2d20;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;height:100%;overflow:hidden;background:#8fc3ea;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#8fc3ea;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
   body{font-family:"Arial Black","Arial Bold",Arial,Helvetica,sans-serif;color:#fff;}
   canvas{display:block;}
   #hud{position:fixed;inset:0;pointer-events:none;}
@@ -172,10 +172,76 @@
   .keys2{display:grid;grid-template-columns:auto 1fr;gap:7px 18px;font-size:16px;}
   .keys2 b{font-family:var(--display);font-weight:400;color:var(--signal);white-space:nowrap;}
 
+  /* ---- the rally programme: menus printed like the stage behind them ----
+     A season accent, halftone dots over the dark, cream paper cards with
+     ink borders for the details, and a chequered rule under each heading. */
+  body{--accent:#8fd06a;}
+  body[data-season=fall]{--accent:#f08a2a;}
+  body[data-season=winter]{--accent:#8fd3f4;}
+  body[data-season=desert]{--accent:#e56a3a;}
+  .screen.dim::before,.screen.veil::before,.screen.garage::before{content:"";position:absolute;inset:0;pointer-events:none;
+    background-image:radial-gradient(rgba(0,0,0,.30) 1px,rgba(0,0,0,0) 1.5px);background-size:5px 5px;opacity:.5;}
+  .screen > *{position:relative;}
+  h2.head::after{content:"";display:block;width:4.2em;height:7px;margin-top:9px;
+    background:repeating-linear-gradient(90deg,var(--ink) 0 9px,var(--cream) 9px 18px);
+    border:2px solid var(--ink);box-shadow:3px 3px 0 var(--accent);}
+  .item{border-left:6px solid var(--ink);}
+  .item.sel{border-left-color:var(--accent);box-shadow:4px 4px 0 var(--ink),-2px 0 0 var(--accent);}
+  .detail,.note.detail{
+    background:
+      radial-gradient(rgba(90,60,20,.10) 1px,rgba(0,0,0,0) 1.4px) 0 0/4px 4px,
+      linear-gradient(180deg,#f7eed6,#eadcb4);
+    color:var(--ink);border:3px solid var(--ink);border-left:10px solid var(--accent);
+    box-shadow:6px 6px 0 var(--ink);transform:skewX(-3deg);}
+  .detail > *,.note.detail > *{transform:skewX(3deg);}
+  .detail h3{color:var(--ink);letter-spacing:.02em;}
+  .detail p,.note.detail p{color:#2c2516;}
+  .facts{color:#5e4c2a;} .facts b{color:var(--ink);}
+  .tk{position:relative;border-top:7px solid var(--tkc,var(--accent));transition:transform .08s;}
+  .tk.sel{transform:translateY(-4px);box-shadow:4px 8px 0 var(--ink);}
+  .tk em{display:block;margin-top:3px;font-style:normal;font-family:var(--body);font-weight:700;font-size:12px;color:var(--signal);}
+  .tk.sel em{color:#5a3a08;}
+  .cuptab{border-bottom:5px solid var(--tkc,var(--ink));}
+  .gpname{color:var(--accent);}
+  .hint kbd{box-shadow:2px 2px 0 var(--ink);}
+  #scTitle .press{letter-spacing:.06em;}
+  /* touch: steering on the left thumb, pedals and the handbrake on the right */
+  #touch{position:fixed;inset:0;pointer-events:none;display:none;z-index:4;}
+  #touch.on{display:block;}
+  #touch .tb{position:absolute;pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none;
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--display);color:var(--cream);font-size:clamp(14px,3.2vmin,22px);
+    background:rgba(12,24,16,.42);border:3px solid rgba(10,15,12,.85);border-radius:18px;
+    box-shadow:3px 3px 0 rgba(10,15,12,.6);}
+  #touch .tb.down{background:rgba(255,210,61,.78);color:var(--ink);}
+  #touch .tb svg{width:48%;height:48%;}
+  #tL{left:max(14px,env(safe-area-inset-left));bottom:max(18px,env(safe-area-inset-bottom));width:21vmin;height:21vmin;}
+  #tR{left:calc(max(14px,env(safe-area-inset-left)) + 24vmin);bottom:max(18px,env(safe-area-inset-bottom));width:21vmin;height:21vmin;}
+  #tGas{right:max(14px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));width:19vmin;height:30vmin;}
+  #tBrk{right:calc(max(14px,env(safe-area-inset-right)) + 22vmin);bottom:max(18px,env(safe-area-inset-bottom));width:17vmin;height:17vmin;}
+  #tHand{right:calc(max(14px,env(safe-area-inset-right)) + 22vmin);bottom:calc(max(18px,env(safe-area-inset-bottom)) + 20vmin);width:17vmin;height:12vmin;font-size:clamp(11px,2.4vmin,16px);}
+  #tPause{right:max(14px,env(safe-area-inset-right));top:calc(max(10px,env(safe-area-inset-top)) + 44vmin);width:11vmin;height:11vmin;border-radius:50%;}
+  #tCam{right:calc(max(14px,env(safe-area-inset-right)) + 13vmin);top:calc(max(10px,env(safe-area-inset-top)) + 44vmin);width:11vmin;height:11vmin;border-radius:50%;font-size:clamp(10px,2.2vmin,14px);}
   #loading{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;
-    background:var(--pine);font-family:"Russo One","Arial Black",Arial,sans-serif;color:#f3e6c4;
-    font-size:22px;letter-spacing:.04em;}
-  #loading.gone{display:none;}
+    background:
+      radial-gradient(ellipse at 50% 120%,rgba(255,210,61,.16),rgba(0,0,0,0) 60%),
+      repeating-linear-gradient(-9deg,rgba(255,255,255,.025) 0 2px,rgba(0,0,0,0) 2px 7px),
+      var(--pine);
+    font-family:"Russo One","Arial Black",Arial,sans-serif;color:#f3e6c4;letter-spacing:.04em;}
+  #loading .lcard{width:min(560px,86vw);transform:skewX(-6deg);}
+  #loading .lt{font-size:clamp(30px,6vw,56px);line-height:.9;text-shadow:3px 3px 0 #0a0f0c;}
+  #loading .lt span{display:inline-block;margin-left:.2em;padding:0 .3em;color:#ffd23d;background:#8a5a2b;border:3px solid #0a0f0c;box-shadow:4px 4px 0 #0a0f0c;}
+  #loading .ln{margin:22px 0 10px;font-size:clamp(15px,2.2vw,20px);color:#ffd23d;}
+  #loading .lbar{height:14px;border:3px solid #0a0f0c;background:rgba(0,0,0,.35);overflow:hidden;box-shadow:3px 3px 0 #0a0f0c;}
+  #loading .lbar i{display:block;height:100%;width:40%;
+    background:repeating-linear-gradient(135deg,#ffd23d 0 10px,#e0a21e 10px 20px);
+    animation:lslide 1.1s linear infinite;}
+  @keyframes lslide{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
+  #loading .ltip{margin-top:16px;font-family:"Barlow Semi Condensed","Arial Narrow",Arial,sans-serif;font-weight:600;
+    font-size:clamp(14px,1.8vw,17px);color:#cfe0c8;letter-spacing:0;transform:skewX(6deg);}
+  #loading .ltip b{color:#ffd23d;font-weight:700;}
+  #loading{transition:opacity .45s;}
+  #loading.gone{opacity:0;pointer-events:none;}
 
   @media (max-width:760px){
     .cols{flex-direction:column;align-items:stretch;gap:20px;}
@@ -198,13 +264,45 @@
 </style>
 </head>
 <body>
-<div id="loading">LOADING</div>
+<div id="loading"><div class="lcard">
+  <div class="lt">PINE HOLLOW<br><span>RALLY</span></div>
+  <div class="ln" id="lname">LOADING</div>
+  <div class="lbar"><i></i></div>
+  <div class="ltip" id="ltip"></div>
+</div></div>
+<script>
+(function(){
+  var tips = [
+    "<b>Tip</b> — Tap drift going into a corner, hold the slide, and let go for a turbo.",
+    "<b>Tip</b> — Your co-driver calls every corner: 6 is nearly flat, 1 is a crawl, H is a hairpin.",
+    "<b>Tip</b> — Water and mud cost you grip. Some alternate routes are quicker; some just look it.",
+    "<b>Tip</b> — Off the road? X (or B on a pad) puts the car back on it.",
+    "<b>Tip</b> — Land a jump straight and on the throttle, and the springs keep you moving.",
+    "<b>Tip</b> — Time trial shows your best lap as a ghost, and the gap to it under your lap time.",
+    "<b>Tip</b> — C cycles the camera: chase, bonnet, and a far chase for the big jumps.",
+    "<b>Tip</b> — On ice the tail never quite stops sliding. Be gentle with the throttle."];
+  try{
+    var n = sessionStorage.getItem("pinehollow.loadname");
+    if(n) document.getElementById("lname").textContent = "LOADING · " + n;
+  }catch(e){}
+  document.getElementById("ltip").innerHTML = tips[Math.floor(Math.random()*tips.length)];
+})();
+</script>
 <div id="hud">
   <canvas id="hud2d"></canvas>
   <div id="splatMud" class="splat"></div>
   <div id="splatWater" class="splat"></div>
 
   <div id="ui"></div>
+  <div id="touch">
+    <div class="tb" id="tL" data-k="left"><svg viewBox="0 0 24 24"><path d="M15 4 L7 12 L15 20" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="tb" id="tR" data-k="right"><svg viewBox="0 0 24 24"><path d="M9 4 L17 12 L9 20" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="tb" id="tGas" data-k="gas">GAS</div>
+    <div class="tb" id="tBrk" data-k="brake">BRAKE</div>
+    <div class="tb" id="tHand" data-k="hand">DRIFT</div>
+    <div class="tb" id="tPause" data-k="pause"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" fill="currentColor"/><rect x="14" y="5" width="4" height="14" fill="currentColor"/></svg></div>
+    <div class="tb" id="tCam" data-k="cam">CAM</div>
+  </div>
 
   </div>
 
@@ -1116,6 +1214,7 @@ const TRACK_ID = Math.max(0, Math.min(TRACKS.length-1,
   parseInt((location.hash.match(/track=(\d+)/) || [])[1] || "0", 10) || 0));
 const TRACK = TRACKS[TRACK_ID];
 const FALL = TRACK.season === "fall";
+document.body.dataset.season = TRACK.season || "summer";
 /* the fall palette: maples red, sugar maples orange, birch and aspen gold */
 function fallTint(c, rnd){
   const r = (rnd || Math.random)();
@@ -2610,6 +2709,87 @@ paths.forEach(P=>{
 });
 const ROUTE = routingTest(MAIN);
 let LAP_TEST = ROUTE;
+
+/* ---- pace notes ----------------------------------------------------
+   What a co-driver would read you: every corner by direction and how
+   tight it is (6 is nearly flat, 1 is a crawl, then a hairpin), whether it
+   tightens or runs long, and everything else on the road worth a warning:
+   jumps, crests, water, ice, mud, the crossing. Read off the finished
+   road, so every track has them without being written by hand. */
+const NOTES = (()=>{
+  if(TRACK.test) return [];
+  const P = MAIN, N = P.N, seg = P.seg, R = radiiOf(P), W = Math.max(4, Math.round(10/seg));
+  const turn = new Float64Array(N);               // signed: + is a left
+  for(let i=0;i<N;i++){
+    const a = P.tans[((i-W)%N+N)%N], b = P.tans[(i+W)%N];
+    let d = Math.atan2(b.x,b.z) - Math.atan2(a.x,a.z);
+    while(d >  Math.PI) d -= Math.PI*2;
+    while(d < -Math.PI) d += Math.PI*2;
+    turn[i] = d;
+  }
+  const sev = r => r < 24 ? 0 : r < 38 ? 1 : r < 55 ? 2 : r < 80 ? 3 : r < 110 ? 4 : r < 150 ? 5 : 6;
+  const out = [];
+  // corners: runs of one hand of turn tighter than 190m
+  const bent = i => R[i] < 190;
+  let i0 = 0; while(i0 < N && bent(i0)) i0++;      // start on a straight so no corner is split by the line
+  for(let k=0;k<N;k++){
+    const i = (i0 + k) % N;
+    if(!bent(i)) continue;
+    const hand = Math.sign(turn[i]);
+    let j = k, minR = Infinity, minAt = k, total = 0;
+    while(j < N && bent((i0 + j) % N) && Math.sign(turn[(i0 + j) % N]) === hand){
+      const q = (i0 + j) % N; total += turn[q]/(2*W);
+      if(R[q] < minR){ minR = R[q]; minAt = j; }
+      j++;
+    }
+    const len = (j - k)*seg;
+    if(Math.abs(total) > 0.35 && len > 10){
+      const mods = [];
+      if(len > 45 && (minAt - k) > (j - k)*0.62) mods.push("tightens");
+      else if(len > 110) mods.push("long");
+      out.push({at: i, kind:"corner", dir: hand, sev: sev(minR), mods, len});
+    }
+    k = j;
+  }
+  // everything else, from what was built
+  const add = (at, kind)=>{ if(at >= 0) out.push({at: wrapIdx(P, at), kind, mods:[]}); };
+  AUTO_JUMPS.forEach(a=> add(a.at - Math.round((a.type === "tabletop" ? 20 : a.type === "double" ? 18 : 12)/seg), a.type === "rhythm" ? "bumps" : "jump"));
+  (TRACK.jumps || []).forEach(j=> add(snapTo(P, j[0]) - Math.round(14/seg), "jump"));
+  (TRACK.bigJumps || []).forEach(j=> add(snapTo(P, j[0]) - Math.round(30/seg), "bigjump"));
+  if(GREAT_JUMP >= 0) add(GREAT_JUMP - Math.round(40/seg), "bigjump");
+  if(DROP.on && DROP.i !== undefined) add(DROP.i - Math.round(40/seg), "bigjump");
+  RIDGES.forEach(R0=> add(R0.at - Math.round(18/seg), "ridge"));
+  FORDS.forEach(F=>{ if(F.path === P) add(F.at - Math.round(20/seg), "water"); });
+  if(RIVER.on) add(RIVER.a - Math.round(24/seg), "creek");
+  PITS.forEach(at=> add(at - Math.round(15/seg), "mud"));
+  CROSSES.forEach(c=>{ for(let i=0;i<N;i++){ const p = P.pts[i]; if(Math.hypot(p.x - c[0], p.z - c[1]) < 2.5){ add(i - Math.round(25/seg), "crossing"); i += Math.round(60/seg); } } });
+  if(LAKE.on && LAKE.frozen){
+    for(let i=0;i<N;i++){ const a = iceAt(P.pts[i].x, P.pts[i].z) > 0.5, b = iceAt(P.pts[(i+N-1)%N].x, P.pts[(i+N-1)%N].z) > 0.5; if(a && !b) add(i - Math.round(10/seg), "ice"); }
+  }
+  // crests the road goes over hard enough to go light
+  const y = i => P.pts[((i%N)+N)%N].y, D = Math.round(12/seg);
+  for(let i=0;i<N;i+=2){
+    const c = y(i) - (y(i - D) + y(i + D))/2;
+    if(c > 0.9 && !out.some(n=> n.kind !== "corner" && Math.abs(((n.at - i + N + N/2) % N) - N/2)*seg < 40)){
+      add(i - Math.round(14/seg), "crest"); i += Math.round(40/seg);
+    }
+  }
+  out.sort((a, b)=> a.at - b.at);
+  // one after another close together: read as "into"
+  for(let k=0;k<out.length;k++){
+    const n = out[k], m = out[(k+1) % out.length];
+    const gap = ((m.at - n.at + N) % N)*seg;
+    n.into = out.length > 1 && gap < 34;
+  }
+  return out;
+})();
+const NOTE_WORDS = { jump:"jump", bigjump:"big jump, keep straight", ridge:"ice ridge, jump", water:"water", creek:"into the creek",
+                     mud:"mud", crossing:"crossing", ice:"onto ice", crest:"over crest", bumps:"bumps" };
+function noteSay(n){
+  if(n.kind !== "corner") return NOTE_WORDS[n.kind] || n.kind;
+  const d = n.dir > 0 ? "left" : "right";
+  return (n.sev === 0 ? "hairpin " + d : d + " " + ["", "one", "two", "three", "four", "five", "six"][n.sev]) + (n.mods.length ? " " + n.mods.join(" ") : "");
+}
 
 /* ---- the heightfield ------------------------------------------------ */
 let FAR = 0;
@@ -8297,6 +8477,68 @@ function burst(dur, type, f, vol, q, at, fTo, bus){
   s.connect(fl); fl.connect(g); g.connect(bus || AUD.sfx);
   s.start(t, Math.random()*1.5); s.stop(t+dur+0.02);
 }
+/* ---- the world around you: birds in the woods, wind in the snow, a hawk
+   over the desert. Quiet, placed left or right, never on a beat. ---- */
+const AMB = { t:1.5, gustT:3, gust:null };
+function ambOut(pan){
+  const g = actx.createGain(); g.gain.value = 1;
+  if(actx.createStereoPanner){ const p = actx.createStereoPanner(); p.pan.value = pan; g.connect(p); p.connect(AUD.sfx); }
+  else g.connect(AUD.sfx);
+  return g;
+}
+function ambTone(f, dur, vol, to, at, bus, type){ tone(f, dur, type || "sine", vol, to, at, bus); }
+function stepAmbience(dt){
+  if(!actx || actx.state !== "running" || muted) return;
+  const menu = state.phase === "menu", q = menu ? 1 : 0.8;
+  AMB.t -= dt; AMB.gustT -= dt;
+  if(AMB.t <= 0){
+    const pan = (Math.random() - 0.5)*1.6, bus = ambOut(pan);
+    if(!WINTER && !DESERT && !(CANYON.on && canyonAt(pose.x, pose.z) > 0.3)){
+      if(Math.random() < 0.12){
+        // a woodpecker, off in the trees
+        const n = 10 + Math.floor(Math.random()*8);
+        for(let k=0;k<n;k++) burst(0.025, "bandpass", 1500 + Math.random()*200, 0.05*q, 4, k*0.055, 0, bus);
+        AMB.t = 6 + Math.random()*6;
+      } else {
+        // a songbird: a few quick whistles, each a little different
+        const base = 2400 + Math.random()*1600, n = 2 + Math.floor(Math.random()*5);
+        for(let k=0;k<n;k++){
+          const f0 = base*(0.85 + Math.random()*0.35), up = Math.random() < 0.5;
+          ambTone(f0, 0.06 + Math.random()*0.08, (0.018 + Math.random()*0.02)*q, f0*(up ? 1.35 : 0.72), k*(0.09 + Math.random()*0.07), bus);
+        }
+        AMB.t = 1.2 + Math.random()*3.8;
+      }
+    } else if(DESERT){
+      // a hawk, high up, and now and then the tick of the heat
+      if(Math.random() < 0.5){
+        ambTone(2300, 0.75, 0.03*q, 1250, 0, bus);
+        ambTone(2350, 0.5, 0.012*q, 1500, 0.02, bus, "triangle");
+      }
+      AMB.t = 7 + Math.random()*9;
+    } else {
+      // winter: a crow, far off, or the lake ice settling with a low groan
+      if(LAKE.on && LAKE.frozen && Math.random() < 0.5){
+        ambTone(95 + Math.random()*40, 1.4, 0.06*q, 48, 0, bus, "sawtooth");
+        burst(0.5, "bandpass", 700, 0.03*q, 6, 0.1, 2400, bus);
+      } else {
+        for(let k=0;k<2 + Math.floor(Math.random()*2);k++){ burst(0.18, "bandpass", 900, 0.035*q, 3, k*0.32, 600, bus); ambTone(520, 0.16, 0.008*q, 380, k*0.32, bus, "sawtooth"); }
+      }
+      AMB.t = 6 + Math.random()*8;
+    }
+  }
+  // gusts of wind through the trees, stronger on snow and sand
+  if(AMB.gustT <= 0){
+    const strong = WINTER || DESERT ? 1 : 0.5, len = 2.5 + Math.random()*3;
+    const bus = ambOut((Math.random() - 0.5)*1.2);
+    const t = actx.currentTime, src = actx.createBufferSource(); src.buffer = AUD.noise; src.loop = true;
+    const fl = actx.createBiquadFilter(); fl.type = "bandpass"; fl.Q.value = 0.8;
+    fl.frequency.setValueAtTime(300, t); fl.frequency.linearRampToValueAtTime(700 + Math.random()*500, t + len*0.5); fl.frequency.linearRampToValueAtTime(260, t + len);
+    const g = actx.createGain(); g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.05*strong*q, t + len*0.45); g.gain.linearRampToValueAtTime(0.0001, t + len);
+    src.connect(fl); fl.connect(g); g.connect(bus); src.start(t, Math.random()*1.5); src.stop(t + len + 0.1);
+    AMB.gustT = len + 2 + Math.random()*(WINTER ? 4 : 9);
+  }
+}
 /* a soft menu blip: a triangle with a sine an octave up, no buzz */
 function blip(f, dur, vol, at, to){ tone(f, dur, "triangle", vol, to, at); tone(f*2, dur*0.6, "sine", vol*0.35, to ? to*2 : 0, at); }
 const SFX = {
@@ -8958,6 +9200,8 @@ function stepCar(dt){
     pose.bHv -= Math.min(1.6, landed*0.16);
     // coming down on the lake ice: a burst of ice chips and powder
     if(landed > 2.5 && iceAt(pose.x, pose.z) > 0.3){
+      burst(0.16, "highpass", 2600, Math.min(0.2, 0.05 + landed*0.02), 1.2, 0, 5200);
+      tone(140, 0.4, "sawtooth", Math.min(0.06, landed*0.008), 70, 0.02);
       for(let k=0;k<Math.min(26, 6 + landed*2.5);k++){
         const a = Math.random()*Math.PI*2, v = 2 + Math.random()*4 + landed*0.4;
         spawnDust(pose.x + Math.cos(a)*1.2, gy + 0.1, pose.z + Math.sin(a)*1.6, 4, 0.35 + Math.random()*0.35,
@@ -9398,9 +9642,10 @@ function stepCamera(dt, sp){
   camH += d * Math.min(1, dt*(drift.mode === "slide" ? 5 : 9));
   camera.position.y -= GAME.bobWas || 0;             // the seat motion is added back at the end
   const fx = Math.sin(camH), fz = Math.cos(camH);
-  if(camMode === 0){
-    const back = 9.2 + Math.min(3.4, sp*0.09);
-    camPos.set(pose.x - fx*back, pose.y + 3.55, pose.z - fz*back);
+  if(camMode !== 1){
+    const far = camMode === 2;
+    const back = (far ? 13.5 : 9.2) + Math.min(3.4, sp*0.09);
+    camPos.set(pose.x - fx*back, pose.y + (far ? 5.6 : 3.55), pose.z - fz*back);
     camAim.set(pose.x + fx*7, pose.y + 1.25, pose.z + fz*7);
     // vertical follows slower than lateral so crests and dips don't pump the view
     camera.position.x += (camPos.x - camera.position.x) * Math.min(1, dt*7);
@@ -9411,6 +9656,16 @@ function stepCamera(dt, sp){
     camAim.set(pose.x + fx*12, pose.y + 1.5, pose.z + fz*12);
     camera.position.x = camPos.x; camera.position.z = camPos.z;
     camera.position.y += (camPos.y - camera.position.y) * Math.min(1, dt*9);
+  }
+  /* on the grid: the view swings round from the front of the car and
+     settles in behind it as the lights count down */
+  if(state.phase === "countdown" && !TRACK.test && !EXP.on && camMode !== 1){
+    const e = smoothstep(0, 1, 1 - state.countdown/3.2);
+    const a = (1 - e)*2.5, r = 9.2 + (1 - e)*5, hgt = 3.55 + (1 - e)*3.5;
+    const hx = Math.sin(pose.h + a), hz = Math.cos(pose.h + a);
+    camera.position.set(pose.x - hx*r, pose.y + hgt, pose.z - hz*r);
+    camAim.set(pose.x + fx*7*e, pose.y + 1.25, pose.z + fz*7*e);
+    camH = pose.h;
   }
   // rumble only where the surface is actually rough
   if(nearest(pose.x, pose.z).dist > HALF && sp > 4){
@@ -9423,9 +9678,10 @@ function stepCamera(dt, sp){
   {
     GAME.kick = Math.max(0, (GAME.kick || 0) - dt*0.5);
     const kick = (GAME.kick || 0)*Math.sin(state.t*63);
-    const bob = pose.bH*(camMode === 0 ? 0.45 : 1) + kick*(camMode === 0 ? 0.6 : 1);
+    const chase = camMode !== 1;
+    const bob = pose.bH*(chase ? 0.45 : 1) + kick*(chase ? 0.6 : 1);
     camera.position.y += bob; GAME.bobWas = bob;
-    if(camMode !== 0){ camera.rotateX(-pose.bP*0.8); camera.rotateZ(pose.bR*0.8); }
+    if(!chase){ camera.rotateX(-pose.bP*0.8); camera.rotateZ(pose.bR*0.8); }
     else camera.rotateZ(pose.bR*0.25);
   }
   const fovT = 62 + Math.min(1, sp/MAXV)*11;      // the frame opens up with speed
@@ -9583,6 +9839,52 @@ function drawExpHUD(W, H, k){
   if(pose.grade !== undefined && Math.abs(pose.grade) > 0.25 && !pose.air)
     hudText(Math.round(pose.grade*100) + "% GRADE", W/2, 112*k, UI.small, Math.abs(pose.grade) > 0.45 ? UI.warn : UI.ink, "center");
 }
+/* the pace notes: the next call big under the lap counter, the one after
+   small beside it, each with a bar running down to the corner */
+function drawNoteTile(sh, cx, y, s, alpha){
+  const n = sh.n, k = HK, w = 58*k*s, h = 46*k*s, x = cx - w/2;
+  hud.save(); hud.globalAlpha = alpha;
+  hud.fillStyle = "rgba(12,20,16,.78)"; hud.fillRect(x, y, w, h);
+  hud.strokeStyle = "#000"; hud.lineWidth = 2.5*k; hud.strokeRect(x, y, w, h);
+  const hazard = n.kind !== "corner";
+  const col = hazard ? (n.kind === "bigjump" || n.kind === "ridge" ? "#ff6a2a" : "#ffd23d") : (n.sev <= 1 ? "#ff6a2a" : n.sev <= 3 ? "#ffd23d" : "#f3e6c4");
+  if(!hazard){
+    // a bent arrow: the tighter the corner, the harder it bends
+    const ang = [2.9, 2.35, 1.85, 1.4, 1.0, 0.7, 0.45][n.sev], dir = n.dir > 0 ? -1 : 1;
+    const ax = x + w*0.36, ay = y + h*0.82, L = h*0.62;
+    const pts = []; let px = ax, py = ay, hd = -Math.PI/2;
+    pts.push([px, py]);
+    for(let q=0;q<4;q++){ px += Math.cos(hd)*L*0.06; py += Math.sin(hd)*L*0.06; pts.push([px, py]); }
+    for(let q=0;q<14;q++){ hd += dir*ang/14; px += Math.cos(hd)*L*0.055; py += Math.sin(hd)*L*0.055; pts.push([px, py]); }
+    const draw = (lw, c)=>{ hud.beginPath(); pts.forEach((p, i)=> i ? hud.lineTo(p[0], p[1]) : hud.moveTo(p[0], p[1]));
+      hud.lineWidth = lw; hud.strokeStyle = c; hud.lineCap = "round"; hud.lineJoin = "round"; hud.stroke(); };
+    draw(7*k*s, "#000"); draw(3.6*k*s, col);
+    const hx = Math.cos(hd), hy = Math.sin(hd), a = 6*k*s;
+    hud.beginPath(); hud.moveTo(px + hx*a, py + hy*a); hud.lineTo(px - hy*a*0.8, py + hx*a*0.8); hud.lineTo(px + hy*a*0.8, py - hx*a*0.8); hud.closePath();
+    hud.fillStyle = col; hud.fill(); hud.lineWidth = 1.6*k; hud.strokeStyle = "#000"; hud.stroke();
+    hudText(n.sev === 0 ? "H" : String(n.sev), x + w*0.8, y + h*0.62, UI.value*0.8*s, col, "center");
+  } else {
+    const label = {jump:"JUMP", bigjump:"BIG JUMP", ridge:"RIDGE", water:"WATER", creek:"CREEK", mud:"MUD", crossing:"CROSS", ice:"ICE", crest:"CREST", bumps:"BUMPS"}[n.kind] || n.kind.toUpperCase();
+    // a warning triangle
+    const tx = x + w/2, ty = y + h*0.12, ts = h*0.44;
+    hud.beginPath(); hud.moveTo(tx, ty); hud.lineTo(tx + ts*0.62, ty + ts); hud.lineTo(tx - ts*0.62, ty + ts); hud.closePath();
+    hud.fillStyle = col; hud.fill(); hud.lineWidth = 2*k; hud.strokeStyle = "#000"; hud.stroke();
+    hudText("!", tx, ty + ts*0.88, UI.small*s, "#111", "center");
+    hudText(label, tx, y + h*0.86, UI.label*s*(label.length > 6 ? 0.85 : 1), "#fff", "center");
+  }
+  const sub = (n.into ? "into" : "") || (n.mods && n.mods[0]) || "";
+  if(sub && !hazard) hudText(sub.toUpperCase(), x + w/2, y + h + 11*k*s, UI.label*0.85*s, UI.dim, "center");
+  // distance to it
+  const f = Math.max(0, Math.min(1, sh.ahead/(sh.look*1.5)));
+  hud.fillStyle = col; hud.fillRect(x + 2*k, y + h - 4*k, (w - 4*k)*f, 2.5*k);
+  hud.restore();
+}
+function drawNotes(W, k){
+  if(!PACE.shown.length) return;
+  const a = PACE.shown[0];
+  drawNoteTile(a, W/2, 66*k, 1, Math.min(1, 0.35 + (1 - a.ahead/(a.look*1.5))*1.4));
+  if(PACE.shown[1]) drawNoteTile(PACE.shown[1], W/2 + 52*k, 70*k, 0.66, 0.75);
+}
 function drawHUD(dt, alongNow){
   const W = HUD_W, H = HUD_H, k = HK;
   hud.clearRect(0, 0, W, H);
@@ -9601,6 +9903,8 @@ function drawHUD(dt, alongNow){
   hudText(String(lapNo), 21*k, 67*k, UI.label, "#16202a", "center");
   hudText("LAP TIME", 37*k, 67*k, UI.label, UI.dim);
   hudText(fmt(state.t - state.lapStart), 10*k, 92*k, UI.value, UI.ink);
+  { const d = traceDelta();
+    if(d !== null) hudText((d < 0 ? "\u2212" : "+") + Math.abs(d).toFixed(2), 12*k, 110*k, UI.small, d < 0 ? "#5cf07a" : "#ff6a4a"); }
 
   /* top centre: the lap counter */
   if(LAPS < 99){
@@ -9610,6 +9914,7 @@ function drawHUD(dt, alongNow){
     hudText("/" + LAPS, W/2 - 2*k, 44*k, UI.small*1.2, UI.ink, "left");
   } else hudText(String(lapNo), W/2, 44*k, UI.value*1.3, UI.key, "center");
   hudText("LAP", W/2, 57*k, UI.label, UI.dim, "center");
+  drawNotes(W, k);
 
   /* top right: position and the best laps */
   const field = FIELD.length + 1;
@@ -9736,7 +10041,7 @@ const SAVE_KEY = "pinehollow.save.v1";
 const BOOT_KEY = "pinehollow.boot";
 const SAVE = (()=>{
   const def = { settings:{ master:0.1, music:0.5, sfx:0.9, vol10:true, cam:0, auto:true, filter:true,
-                           res:1, hud:1, diff:1, units:1, gfx:0, look:0, paint:0,
+                           res:1, hud:1, diff:1, units:1, gfx:0, look:0, paint:0, notes:2,
                            car:{ model:0, fender:0, rim:0, wheel:1, livery:0, beat:1,
                                  rack:1, spare:1, cans:1, shovel:0, lights:0, flaps:0, bull:0 } },
                 records:{}, champ:null };
@@ -9833,6 +10138,38 @@ function setMode(m){
  *  Input: keyboard and the first connected gamepad, folded into one
  * ------------------------------------------------------------------ */
 const CTL = { thr:0, brk:0, hand:false, steer:0 };
+/* touch pads: any finger on a pad holds it; sliding off lets it go */
+const TOUCH = { on:false, left:0, right:0, gas:0, brake:0, hand:0 };
+(()=>{
+  const el = document.getElementById("touch");
+  const coarse = (window.matchMedia && matchMedia("(pointer: coarse)").matches) || ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
+  if(!coarse || !el) return;
+  TOUCH.on = true;
+  const held = new Map();                          // pointer id -> pad
+  const set = ()=>{
+    ["left","right","gas","brake","hand"].forEach(k=> TOUCH[k] = 0);
+    held.forEach(b=>{ TOUCH[b.dataset.k] = 1; });
+    el.querySelectorAll(".tb").forEach(b=> b.classList.toggle("down", [...held.values()].includes(b)));
+  };
+  el.querySelectorAll(".tb").forEach(b=>{
+    b.addEventListener("pointerdown", e=>{
+      e.preventDefault(); startAudio();
+      const k = b.dataset.k;
+      if(k === "pause"){ if(!GAME.ui) pauseGame(); return; }
+      if(k === "cam"){ cycleCamera(); return; }
+      try{ b.setPointerCapture(e.pointerId); }catch(_){}
+      held.set(e.pointerId, b); set();
+    });
+    const up = e=>{ held.delete(e.pointerId); set(); };
+    b.addEventListener("pointerup", up); b.addEventListener("pointercancel", up);
+    b.addEventListener("lostpointercapture", up);
+  });
+  addEventListener("blur", ()=>{ held.clear(); set(); });
+})();
+function showTouch(){
+  const el = document.getElementById("touch");
+  if(el) el.classList.toggle("on", TOUCH.on && !GAME.ui && state.phase !== "menu" && state.phase !== "done");
+}
 const PAD = { prev:[], navT:0, navDir:"" };
 function pollInput(dt){
   let thr = (held("KeyW")||held("ArrowUp")) ? 1 : 0;
@@ -9887,10 +10224,17 @@ function pollInput(dt){
     }
     PAD.prev = gp.buttons.map(x => x.value > 0.5);
   }
+  if(TOUCH.on && !GAME.ui){
+    if(TOUCH.gas) thr = 1;
+    if(TOUCH.brake) brk = 1;
+    if(TOUCH.hand) hand = true;
+    if(TOUCH.left || TOUCH.right) steer = TOUCH.left - TOUCH.right;
+  }
+  showTouch();
   CTL.thr = thr; CTL.brk = brk; CTL.hand = hand; CTL.steer = steer;
 }
 function cycleCamera(){
-  camMode = (camMode+1)%2;
+  camMode = (camMode+1)%3;
   SAVE.settings.cam = camMode; persist();
 }
 
@@ -10111,6 +10455,12 @@ function onLap(lt, prevBest){
     SPLIT.col = d < 0 ? "#5cf07a" : "#ff6a4a";
   }
   const rec = recordFor();
+  // the lap to beat, 10m at a time: a clean full lap only (not one cut short across a branch start)
+  if(TRACE.cur.length > 5 && (TRACE.best === null || lt < TRACE.bestLap)){
+    TRACE.best = TRACE.cur.slice(); TRACE.bestLap = lt;
+    if(!TRACK.test && (rec.bestLap == null || lt < rec.bestLap)) rec.trace = TRACE.best;
+  }
+  TRACE.cur = [];
   if(!TRACK.test && (rec.bestLap == null || lt < rec.bestLap)){
     const first = rec.bestLap == null;
     rec.bestLap = lt;
@@ -10129,6 +10479,67 @@ function onLap(lt, prevBest){
   }
 }
 
+const PACE = { shown:[], voice:null };
+function paceVoice(){
+  if(PACE.voice !== null) return PACE.voice;
+  try{
+    const vs = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+    PACE.voice = vs.find(v=> /en[-_]GB/i.test(v.lang)) || vs.find(v=> /^en/i.test(v.lang)) || false;
+  }catch(e){ PACE.voice = false; }
+  return PACE.voice;
+}
+function paceSpeak(text){
+  const S = SAVE.settings;
+  if((S.notes|0) < 2 || muted || !window.speechSynthesis) return;
+  try{
+    // never let the calls fall behind the car: a late call is worse than none
+    if(speechSynthesis.pending) speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    const v = paceVoice(); if(v) u.voice = v;
+    u.rate = 1.35; u.pitch = 0.9; u.volume = Math.min(1, 0.35 + (S.master || 0)*2.4);
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+/* the co-driver: each note called once a lap, a couple of seconds out */
+function stepNotes(info){
+  const S = SAVE.settings;
+  PACE.shown.length = 0;
+  if(!NOTES.length || (S.notes|0) === 0 || EXP.on || !(state.phase === "racing" || state.phase === "countdown")) return;
+  const N = NS, idx = state.idx, sp = Math.max(8, info ? info.sp : 0);
+  const look = Math.max(70, Math.min(170, sp*3.3));
+  let words = [], lastSaid = null;
+  for(let k=0;k<NOTES.length;k++){
+    const n = NOTES[k];
+    const ahead = ((n.at - idx + N) % N)*segLen;
+    if(ahead > look*1.5 || ahead < 2) continue;
+    if(PACE.shown.length < 2) PACE.shown.push({n, ahead, look});
+    if(ahead <= look && n.calledLap !== state.lap && state.phase === "racing"){
+      n.calledLap = state.lap;
+      words.push(noteSay(n) + (n.into ? " into" : ""));
+      lastSaid = n;
+    }
+  }
+  PACE.shown.sort((a, b)=> a.ahead - b.ahead);
+  if(words.length){
+    paceSpeak(words.join(", ").replace(/ into$/, ""));
+    if((S.notes|0) === 1 && lastSaid) blip(lastSaid.kind === "corner" ? 520 + lastSaid.sev*60 : 440, 0.06, 0.05);
+  }
+}
+/* the live gap to your best lap, sampled every 10m round the lap */
+const TRACE = { cur:[], best:null };
+function stepTrace(){
+  if(state.phase !== "racing" || EXP.on) return;
+  const lt = state.t - state.lapStart;
+  if(state.idx > NS*0.8 && lt < 15) return;                 // still behind the line off the grid
+  const b = Math.floor(state.idx*segLen/10);
+  if(TRACE.cur[b] === undefined) TRACE.cur[b] = +lt.toFixed(2);
+}
+function traceDelta(){
+  const B = TRACE.best; if(!B || state.phase !== "racing") return null;
+  const b = Math.floor(state.idx*segLen/10);
+  if(B[b] == null || TRACE.cur[b] === undefined || b < 3) return null;
+  return TRACE.cur[b] - B[b];
+}
 function stepRaceEvents(dt, info){
   GAME.goT = Math.max(0, GAME.goT - dt);
   GAME.shake = Math.max(0, GAME.shake - dt*1.6);
@@ -10362,6 +10773,9 @@ function resetRace(){
   GAME.lapRecord = false; GAME.raceRecord = false; GAME.orbitA = 0;
   BANNER.dur = 0; SPLIT.t = 0; GHOST.rec = [];
   if(MODE === "trial") GHOST.data = recordFor().ghost || null;
+  TRACE.cur = []; TRACE.best = recordFor().trace || null; TRACE.bestLap = recordFor().bestLap;
+  NOTES.forEach(n=> n.calledLap = 0);
+  if(window.speechSynthesis) try{ speechSynthesis.cancel(); }catch(e){}
   AUD.musicMode = "race";
   startAudio(); setLevels();
   closeUI();
@@ -10502,7 +10916,9 @@ const OPTS = [
   {key:"diff",   label:"Rival pace", vals:DIFFS.map(d=>d.name),
    desc:"How hard the other three drivers push. Normal is a fair fight once you're using the drift turbo; hard needs clean laps."},
   {key:"units",  label:"Speed shown in", vals:["mph","km/h"], desc:"What the speedometer reads."},
-  {key:"cam",    label:"Camera", vals:["Chase","Hood"], desc:"C on the keyboard or Y on a pad switches it during a race."},
+  {key:"cam",    label:"Camera", vals:["Chase","Hood","Far chase"], desc:"C on the keyboard or Y on a pad switches it during a race."},
+  {key:"notes",  label:"Co-driver", vals:["Off","Signs","Signs and voice"],
+   desc:"Pace notes for the road ahead: every corner by direction and how tight it is (6 is nearly flat, 1 is a crawl, H a hairpin), and a warning for every jump, crest, water, ice and mud. With voice on, your co-driver reads them out."},
   {key:"auto",   label:"Gearbox", vals:["Manual","Automatic"], bool:true,
    desc:"Shifting with E and Q (or the bumpers) flips to manual on the fly. T goes back to automatic."},
   {key:"master", label:"Volume", bar:true, desc:"Everything, all at once. M mutes during a race."},
@@ -10652,7 +11068,7 @@ function showTitle(){
   openScreen("scTitle",
     '<div><div class="logo"><span class="l1">PINE HOLLOW</span><span class="plank">RALLY</span>' +
     '<span class="sub">Gravel, mud and river crossings in a very tired station wagon.</span></div>' +
-    '<div class="press" data-act="go">PRESS ENTER</div></div>',
+    '<div class="press" data-act="go">' + (TOUCH.on ? 'TAP TO START' : 'PRESS ENTER') + '</div></div>',
     { cls:"", acts:{ go: ()=>{ SFX.ok(); showMain(); } } });
   UIEL.firstChild.addEventListener("click", ()=>{ if(MENU.id === "scTitle"){ startAudio(); SFX.ok(); showMain(); } });
 }
@@ -10704,6 +11120,7 @@ const GP_GROUPS = (()=>{
   if(extra.length) g.push({name: "Practice", short: "PRACTICE", ids: extra});
   return g;
 })();
+const SEASON_COL = { summer:"#8fd06a", fall:"#f08a2a", winter:"#8fd3f4", desert:"#e56a3a" };
 function showTracks(mode, group){
   const exped = mode === "expedition";
   let ids, gi = 0;
@@ -10713,17 +11130,19 @@ function showTracks(mode, group){
     ids = GP_GROUPS[gi].ids;
   }
   const tabs = exped ? '' : '<div class="cuptabs">' + GP_GROUPS.map((x, k)=>
-      '<button class="cuptab' + (k === gi ? ' on' : '') + '" data-act="cup" data-cup="' + k + '"><span>' + esc(x.short) + '</span><small>' +
+      '<button class="cuptab' + (k === gi ? ' on' : '') + '" style="--tkc:' + SEASON_COL[(TRACKS[x.ids[0]] || {}).season || "summer"] + '" data-act="cup" data-cup="' + k + '"><span>' + esc(x.short) + '</span><small>' +
       x.ids.length + ' circuits</small></button>').join("") + '</div>';
   const at = ids.indexOf(TRACK_ID);
   openScreen("scTracks",
     '<div style="width:100%;max-width:980px;margin:auto 0">' +
     '<h2 class="head">' + esc(MODES[mode].label) + (exped ? ': choose a mountain' : ': choose a circuit') + '</h2>' + tabs +
     (exped ? '' : '<div class="gpname">' + esc(GP_GROUPS[gi].name) + '</div>') +
-    '<div class="tracks">' + ids.map(id =>
-      '<button class="tk" data-track="' + id + '"><canvas width="132" height="132"></canvas><span>' +
+    '<div class="tracks">' + ids.map(id =>{
+      const rec = SAVE.records[TRACKS[id].name] || {};
+      const best = exped ? (rec.summit != null ? "summit " + fmt(rec.summit) : "") : (rec.bestLap != null ? "best lap " + fmt(rec.bestLap) : "");
+      return '<button class="tk" style="--tkc:' + SEASON_COL[TRACKS[id].season || "summer"] + '" data-track="' + id + '"><canvas width="132" height="132"></canvas><span>' +
       esc(TRACKS[id].name) + '</span><small>' + esc(TRACKS[id].shape.split(/\s+[\u2014-]\s+/)[0].toLowerCase()) +
-      '</small></button>').join("") + '</div>' +
+      '</small>' + (best ? '<em>' + best + '</em>' : '') + '</button>'; }).join("") + '</div>' +
     '<div class="detail" id="tkDetail"></div>' +
     '<div class="menu" style="margin-top:14px;max-width:260px"><button class="item back" data-act="back"><span>BACK</span></button></div></div>',
     { grid:true, sel: (exped ? 0 : GP_GROUPS.length) + Math.max(0, at), back: ()=> showMain(mainIdx(mode)),
@@ -10757,7 +11176,8 @@ function startMode(mode, id){
 function travel(id, boot){
   try{ sessionStorage.setItem(BOOT_KEY, JSON.stringify(boot)); }catch(e){}
   const L = document.getElementById("loading");
-  L.textContent = "LOADING " + TRACKS[id].name;
+  document.getElementById("lname").textContent = "LOADING \u00b7 " + TRACKS[id].name;
+  try{ sessionStorage.setItem("pinehollow.loadname", TRACKS[id].name); }catch(e){}
   L.classList.remove("gone");
   setTimeout(()=>{ location.hash = "track=" + id; location.reload(); }, 80);
 }
@@ -10873,7 +11293,7 @@ function garageCam(dt){
 function showHelp(back){
   const K = [["W / \u2191","Throttle"],["S / \u2193","Brake, then reverse"],["A D / \u2190 \u2192","Steer"],
              ["Space","Drift"],["E / Q","Shift up and down"],["T","Back to automatic"],
-             ["X","Put the car back on the road"],["C","Camera"],["Esc / P","Pause"],
+             ["X","Put the car back on the road"],["C","Camera: chase, bonnet, far"],["Esc / P","Pause"],
              ["R","Restart the race"],["M","Mute"]];
   const P = [["RT / LT","Throttle, brake"],["Left stick","Steer"],["A","Drift"],["RB / LB","Shift"],
              ["B","Put the car back on the road"],["Y","Camera"],["Start","Pause"]];
@@ -10882,7 +11302,9 @@ function showHelp(back){
     '<div class="cols" style="align-items:flex-start"><div class="left"><h2 class="head">How to drive</h2>' +
     '<div class="note"><p>Tap drift going into a corner and the wagon hops into a slide. Steer through it and hold on: the charge bar goes blue, then orange, then violet.</p>' +
     '<p>Let go to cash the charge in as a turbo. The longer the slide, the bigger the push.</p>' +
-    '<p>Water and mud cost you grip and speed. Most circuits have alternate routes; some are quicker, some just look it.</p></div>' +
+    '<p>Water and mud cost you grip and speed. Most circuits have alternate routes; some are quicker, some just look it.</p>' +
+    '<p>Your co-driver reads the road ahead: every corner by direction and how tight (6 nearly flat, 1 a crawl, H a hairpin), and a warning for jumps, crests, water, ice and mud. Turn the voice off in Options.</p>' +
+    '<p>On a phone or tablet, the pads on the left steer; gas, brake and drift are on the right.</p></div>' +
     '<div class="menu" style="margin-top:20px;max-width:260px"><button class="item back" data-act="back"><span>BACK</span></button></div></div>' +
     '<div class="right"><h2 class="head" style="font-size:22px">Keyboard</h2>' + rows(K) +
     '<h2 class="head" style="font-size:22px;margin-top:22px">Gamepad</h2>' + rows(P) + '</div></div>',
@@ -10894,6 +11316,7 @@ function pauseGame(){
   if(GAME.ui || GAME.paused) return;
   if(state.phase !== "racing" && state.phase !== "countdown") return;
   GAME.paused = true; setLevels();
+  if(window.speechSynthesis) try{ speechSynthesis.cancel(); }catch(e){}
   showPause();
 }
 function resumeGame(){
@@ -11209,6 +11632,7 @@ function frame(now){
     if(state.phase === "racing" || state.phase === "done") state.place = computePlace();
     stepRaceEvents(dt, info);
     stepGhost();
+    stepNotes(info); stepTrace();
 
     stepDust(dt);
 
@@ -11222,6 +11646,7 @@ function frame(now){
   }
   skyDome.position.set(camera.position.x, 0, camera.position.z);  // horizon stays put
   stepAudio(info, dt);
+  stepAmbience(run ? dt : 0);
 
   const alongNow = pose.vx*Math.sin(pose.h) + pose.vz*Math.cos(pose.h);
   drawHUD(run ? dt : 0, alongNow);
@@ -11266,7 +11691,7 @@ if(/debug/.test(location.hash)){
   window.__R = { THREE, TRACKS, TRACK, TRACK_ID, MAIN, BRANCHES, paths, ROUTE, pose, state, camera, scene, renderer,
                  surfaceY, gridH, nearest, PILES, PIT, GAME, CTL, trans, MAXV, radiiOf, radiiOpen, resetRace, setMode,
                  closeUI, rivals, car, splash, cornerHoldSpeed, stepCar, placeAtStart, drift, AUTO_JUMPS,
-                 CALM, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults, trans, GIANT, RIDGES, CROSSES, dustLive: ()=>{ let n=0; for(let i=0;i<DUST;i++) if(dustLife[i]>0) n++; return n; } };
+                 CALM, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults, trans, GIANT, RIDGES, CROSSES, NOTES, noteSay, PACE, TRACE, stepNotes, stepTrace, UI:{showTitle, showMain, showTracks, showReady, showOptions, showGarage, showHelp, showPause, showChamp}, dustLive: ()=>{ let n=0; for(let i=0;i<DUST;i++) if(dustLife[i]>0) n++; return n; } };
 }
 boot();
 requestAnimationFrame(frame);
