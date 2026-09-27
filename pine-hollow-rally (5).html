@@ -1237,8 +1237,12 @@ if(TRACK.canyon){
   pl.forEach(p=>{ x0=Math.min(x0,p[0]); x1=Math.max(x1,p[0]); z0=Math.min(z0,p[1]); z1=Math.max(z1,p[1]); });
   Object.assign(CANYON, {on:true, a, b, pl, coreA, coreB, H:TRACK.canyon.height || 20, len:(b - a)*MAIN.seg,
                          box:[x0 - 150, x1 + 150, z0 - 150, z1 + 150]});
-  for(let k=a - Math.round(60/MAIN.seg); k<=b + Math.round(60/MAIN.seg); k+=6) CALM.push([wrapIdx(MAIN, k), 25]);
+  // no jumps or pits in the slot, but its floor keeps its sand and stones ("soft")
+  for(let k=a - Math.round(60/MAIN.seg); k<=b + Math.round(60/MAIN.seg); k+=6) CALM.push([wrapIdx(MAIN, k), 25, "soft"]);
 }
+/* how far the foot of the slot's wall stands from the road's line, along
+   the canyon: it pinches into squeezes and opens into chambers */
+function canyonFoot(s){ return Math.max(7.3, 9.4 + 2.5*Math.sin(s*0.019 + 0.6) + 1.3*Math.sin(s*0.052 + 2.1)); }
 /* where a point is against the canyon: [distance from the road's line,
    metres along the canyon's core, distance from the core], or null */
 function canyonUV(x, z){
@@ -1267,9 +1271,10 @@ function canyonWall(x, z){
   const plat = canyonPlateau(x, z, uv);
   if(plat <= 0) return 0;
   const d = uv[0], s = uv[1];
-  const W0 = 8.0 + Math.sin(s*0.05)*0.8 + Math.sin(s*0.013 + 1)*0.6;              // the foot of the wall
-  // the slot: a sheer lower wall, a ledge, then the upper wall back to the top
-  const slot = 0.62*smoothstep(W0, W0 + 2.6, d) + 0.38*smoothstep(W0 + 5, W0 + 8.5, d);
+  const W0 = canyonFoot(s);                                   // the foot of the wall
+  // the slot: one sheer wall (the sculpted rock is drawn over it), then a
+  // last low step back to the top of the tableland
+  const slot = 0.85*smoothstep(W0 + 0.8, W0 + 3.6, d) + 0.15*smoothstep(W0 + 6, W0 + 10, d);
   let h = CANYON.H*plat*slot;
   // the rock lies in beds: the rim steps down in terraces as it erodes
   const bed = 4.2, q = h/bed, f = q - Math.floor(q);
@@ -1677,7 +1682,7 @@ function addCrests(P, rnd){
   const add = (m2)=>{ for(let k=0;k<MAIN.N;k++) calm[k] = Math.max(calm[k], m2[k]); };
   add(calmMask(MAIN, J, 18)); add(calmMask(MAIN, Fd, 38)); add(calmMask(MAIN, Jn, 16));
   add(calmMask(MAIN, Gg, (TRACK.gorge ? TRACK.gorge.span : 0) + 25));
-  CALM.forEach(c=> add(calmMask(MAIN, [c[0]], c[1])));
+  CALM.forEach(c=>{ if(c[2] !== "soft") add(calmMask(MAIN, [c[0]], c[1])); });
   const calmBank = calmMask(MAIN, S.concat(J, Fd, Jn, Gg), 85);
   CALM.forEach(c=>{ const m2 = calmMask(MAIN, [c[0]], c[1] + 15); for(let k=0;k<MAIN.N;k++) calmBank[k] = Math.max(calmBank[k], m2[k]); });
   MAIN.calmCrest = calm;
@@ -1700,6 +1705,22 @@ function addCrests(P, rnd){
     const m = Math.max(0, Math.min(1, tuned || 0));
     for(let i=0;i<P.N;i++) P.st_mud[i] = m*(1 - c[i]);
   });
+  /* The slot's floor: drifted sand in ripples, then a stretch of fallen
+     stones, then ripples again, never banked (the walls are the banks). */
+  if(CANYON.on){
+    const A = CANYON.a - Math.round(40/MAIN.seg), B = CANYON.b + Math.round(40/MAIN.seg), n = B - A;
+    for(let k=A; k<=B; k++){
+      const i = wrapIdx(MAIN, k), f = (k - A)/n;
+      const inn = smoothstep(0, 0.08, f)*(1 - smoothstep(0.92, 1, f));
+      const rock = smoothstep(0.30, 0.36, f)*(1 - smoothstep(0.58, 0.64, f));
+      MAIN.st_bump[i] = Math.max(MAIN.st_bump[i]*(1 - inn), inn*(1 - rock)*0.5);
+      MAIN.st_rock[i] = Math.max(MAIN.st_rock[i]*(1 - inn), inn*rock);
+      MAIN.st_crest[i] *= 1 - inn*0.6;
+      MAIN.st_bank[i] *= 1 - inn;
+      MAIN.st_mud[i] *= 1 - inn;
+      MAIN.st_paved[i] *= 1 - inn;                      // no old tarmac down a slot
+    }
+  }
   addCrests(MAIN, rnd);
   /* Launch berms. On the outside of a tighter corner the ground rises into
      a steep earth bank, and running wide into it, or sliding into it, throws
@@ -1925,7 +1946,7 @@ function deckAt(x, z){
 const FORDS = [];
 const FORD_HALF  = 6;      // half the flat bed, along the road
 const FORD_BANK  = 8;      // how far the bank takes to climb out
-const FORD_REACH = 48;     // how far the stream runs off into the trees
+const FORD_REACH = 66;     // how far the stream runs off into the trees
 const FORD_FREE  = 0.45;   // how high the bank stands over the water
 const FORD_DIP   = 0.85;   // how far the road drops into the crossing
 const FORD_BEDY  = 1.0;    // how far the bed sits under the water
@@ -1966,7 +1987,7 @@ function addFord(P, at){
     const sm = Array.from(lift); smoothAlong(sm, false, Math.round(5/seg));
     for(let k=-R;k<=R;k++) P.pts[wrapIdx(P, at+k)].y += Math.max(lift[k+R], sm[k+R]);
   }
-  FORDS.push({ path:P, at:i, x:p.x, z:p.z, tx:t.x, tz:t.z,
+  FORDS.push({ path:P, at:i, x:p.x, z:p.z, tx:t.x, tz:t.z, ph: FORDS.length*2.3 + TRACK_ID*0.7,
                y0, level, bed: level - FORD_BEDY, roadHalf: P.half[i] + 0.6 });
 }
 (TRACK.fords || []).forEach(f=> addFord(MAIN, snapTo(MAIN, f)));
@@ -2198,9 +2219,20 @@ BRANCHES.forEach(P=>{
 
 BRANCHES.forEach(P=> (P.def.fords || []).forEach(f=> addFord(P, Math.round(P.N*f))));
 
+/* [how far from the stream's middle, how far along it from the road].
+   The stream is not ruled across the map: away from the road it wanders,
+   and toward its ends it narrows to a trickle and runs out under the
+   bank, so there is no square end to the water (or the ice). The across
+   distance is scaled by the narrowing, so every user of it sees the
+   stream's real shape. */
 function fordUV(F, x, z){
   const dx = x - F.x, dz = z - F.z;
-  return [Math.abs(dx*F.tx + dz*F.tz), Math.abs(-dx*F.tz + dz*F.tx)];
+  const u = dx*F.tx + dz*F.tz, v = -dx*F.tz + dz*F.tx, b = Math.abs(v);
+  const away = smoothstep(9, 30, b);
+  const m = (Math.sin(v*0.061 + F.ph)*4.2 + Math.sin(v*0.143 + F.ph*1.7)*1.6)*away;
+  const narrow = 1 - 0.88*smoothstep(FORD_REACH*0.38, FORD_REACH*0.97, b)
+               + 0.12*Math.sin(v*0.21 + F.ph*2.9)*away;
+  return [Math.abs(u - m)/Math.max(0.1, narrow), b, Math.abs(u - m)];
 }
 function carveWater(y, x, z){
   if(RIVER.on){
@@ -2219,13 +2251,15 @@ function carveWater(y, x, z){
     const F = FORDS[k];
     const uv = fordUV(F, x, z), a = uv[0], b = uv[1];
     const OUT = FORD_HALF + FORD_BANK + 14;
-    if(a > OUT || b > FORD_REACH*1.35) continue;
+    if(uv[2] > OUT || b > FORD_REACH*1.35) continue;
+    // the blend into the land is judged on the true distance, so where the
+    // stream narrows its banks still ease out over the same width
     const w = (1 - smoothstep(FORD_REACH*0.98, FORD_REACH*1.35, b))
-            * (1 - smoothstep(FORD_HALF + FORD_BANK, OUT, a));
+            * (1 - smoothstep(FORD_HALF + FORD_BANK, OUT, Math.max(uv[2], Math.min(a, FORD_HALF + FORD_BANK))));
     if(w <= 0) continue;
     // a little wander so the stream is not ruled across the map
     const rise = Math.max(smoothstep(FORD_HALF*0.75, FORD_HALF + FORD_BANK, a + Math.sin(b*0.13 + k)*1.2),
-                          smoothstep(FORD_REACH*0.70, FORD_REACH*0.98, b));
+                          smoothstep(FORD_REACH*0.92, FORD_REACH*1.05, b));
     const shape = F.bed + (F.level + FORD_FREE - F.bed)*rise;
     // carve down; where the land is lower than the bank, build the bank up
     y = y*(1-w) + shape*w;
@@ -3446,9 +3480,12 @@ function waterMaterial(){
       "  vec3 Ni = normalize(vec3((ck - 0.5)*0.08, 1.0, (ck2 - 0.5)*0.08));",
       "  float specI = pow(max(dot(reflect(-uSun, Ni), V), 0.0), 60.0);",
       "  ice += vec3(1.0, 0.97, 0.9)*specI*0.9 + vec3(0.75, 0.85, 0.95)*fres*0.35;",
+      // snow blown onto the ice along the shore, so it runs out into the bank instead of stopping at a line
+      "  float rim = 1.0 - smoothstep(0.02, 0.32, vDepth + (ck2 - 0.5)*0.22 + (ck - 0.5)*0.1);",
+      "  ice = mix(ice, vec3(0.93, 0.95, 0.985), rim*0.9);",
       "  float fdI = length(cameraPosition - vWorld);",
       "  ice = mix(ice, fogColor, smoothstep(fogNear, fogFar, fdI));",
-      "  gl_FragColor = vec4(ice, smoothstep(0.0, 0.03, vDepth)*0.94);",
+      "  gl_FragColor = vec4(ice, smoothstep(0.0, 0.07, vDepth)*0.94);",
       "  return;"].join("\n") : "",
       "  float foam = (1.0 - smoothstep(0.0, 0.10, vDepth))*smoothstep(0.45, 0.62, rip);",
       "  foam = max(foam, vFoam*smoothstep(0.30, 0.55, rip + vFoam*0.2));",
@@ -3469,7 +3506,7 @@ FORDS.forEach(F=>{
   const nx = -F.tz, nz = F.tx;                 // along the stream
   const level = F.level;
   const STEP = 0.8;
-  const ACROSS = FORD_HALF + FORD_BANK + 5, ALONG = FORD_REACH;
+  const ACROSS = FORD_HALF + FORD_BANK + 12, ALONG = FORD_REACH;
   const cols = Math.ceil(ACROSS*2/STEP) + 1, rows = Math.ceil(ALONG*2/STEP) + 1;
   const pos=[], uv=[], dep=[], idx=[];
   const shoreRows = [];
@@ -4199,9 +4236,48 @@ function setDown(g, x, z, rotY, shadows){
 /* is a spot clear of every road by at least m metres */
 const clearOf = (x, z, m)=>{ const n = nearest(x, z); return n.dist > n.half + m; };
 
-/* ---- the stones of the rocky stretches, set into the road where the bumps are ---- */
+/* ---- the stones of the rocky stretches, set into the road where the bumps are ----
+   Each one is also solid: the tyre that runs over it climbs it, on its own
+   corner of the car, so a stone under one wheel kicks that wheel and not
+   the whole road. Lone stones lie in the wheel tracks of the plain gravel. */
+const STONES = new Map();
+function stoneKey(a, b){ return a*4099 + b; }
+/* how far a tyre standing at x,z is lifted by the stones: a wheel of
+   radius 0.36m rolling up onto a rounded stone, not a step */
+function stoneY(x, z){
+  if(!STONES.size) return 0;
+  const a = Math.floor(x/4), b = Math.floor(z/4);
+  let y = 0;
+  for(let i=-1;i<=1;i++) for(let j=-1;j<=1;j++){
+    const L = STONES.get(stoneKey(a+i, b+j)); if(!L) continue;
+    for(const st of L){
+      const d = Math.hypot(x - st[0], z - st[1]);
+      const e = Math.max(0, d - st[3]);
+      if(e >= 0.36) continue;
+      y = Math.max(y, st[2] - (0.36 - Math.sqrt(0.1296 - e*e)));
+    }
+  }
+  return Math.max(0, y);
+}
 {
   const spots = [];
+  const rnd = seeded(4441 + TRACK_ID*131);
+  paths.forEach(P=>{
+    if(!P.calmCrest) return;
+    for(let s=20 + rnd()*40; s<P.N*P.seg - 20; s+=38 + rnd()*70){
+      const i = Math.round(s/P.seg);
+      if(P.calmCrest[i] > 0.2 || P.surf[i] !== SURF.GRAVEL || (P.st_rock && P.st_rock[i] > 0.3)) continue;
+      const t = P.tans[i], p = P.pts[i];
+      if(pavedAt(p.x, p.z) > 0.2) continue;
+      // in one wheel track, sometimes a pair
+      const n = rnd() < 0.3 ? 2 : 1;
+      for(let m=0;m<n;m++){
+        const lat = (rnd() < 0.5 ? -1 : 1)*(0.7 + rnd()*1.1), along = m*(1.5 + rnd()*2);
+        const x = p.x - t.z*lat + t.x*along, z = p.z + t.x*lat + t.z*along;
+        spots.push([x, z, 0.17 + rnd()*0.14]);
+      }
+    }
+  });
   paths.forEach(P=>{
     if(!P.rocks || !P.st_rock) return;
     for(const r of P.rocks){
@@ -4221,6 +4297,9 @@ const clearOf = (x, z, m)=>{ const n = nearest(x, z); return n.dist > n.half + m
     spots.forEach((sp, i)=>{
       const k = sp[2];
       v3.set(sp[0], surfaceY(sp[0], sp[1]) - k*0.25, sp[1]); s3.set(k*1.3, k*0.7, k);
+      const key = stoneKey(Math.floor(sp[0]/4), Math.floor(sp[1]/4));
+      if(!STONES.has(key)) STONES.set(key, []);
+      STONES.get(key).push([sp[0], sp[1], k*0.42, k*0.9]);        // where, how proud, how wide
       e3.set(Math.random(), Math.random()*6, Math.random()); q4.setFromEuler(e3); m4.compose(v3, q4, s3); rm.setMatrixAt(i, m4);
     });
     rm.castShadow = true; rm.receiveShadow = true; scene.add(rm);
@@ -4321,6 +4400,122 @@ if(DROP.on && TRACK.skijump){
   }
   g.traverse(o=>{ if(o.isMesh) o.castShadow = true; });
   mergeStatic(g); scene.add(g);
+}
+
+/* ---- the slot's walls: sculpted sandstone ----
+   The heightfield can only draw the slot as 2m triangles, which read as a
+   row of polygons. Over it stands a smooth-shaded skin of rock, one per
+   side: water-carved, so it swells and undercuts in flowing waves that
+   drift with height, lipped where each bed of the rock is harder, and
+   rolling back over at the top onto the tableland. The beds are coloured
+   in bands, dark and purple at the foot, burning orange up toward the sky. */
+if(CANYON.on){
+  const P = MAIN, step = Math.max(1, Math.round(1.5/P.seg)), NJ = 18;
+  const ext = Math.round(170/P.seg);
+  const cc = new THREE.Color();
+  const lipY = [];
+  [1, -1].forEach(side=>{
+    const pos = [], col = [], idx = [];
+    const ph = side > 0 ? 0.3 : 2.4;
+    let rows = 0;
+    for(let k=CANYON.a - ext; k<=CANYON.b + ext; k+=step){
+      const i = wrapIdx(P, k), p = P.pts[i], t = P.tans[i];
+      const nx = -t.z*side, nz = t.x*side;
+      const uv = canyonUV(p.x, p.z), sAl = uv ? uv[1] : 0, W0 = canyonFoot(sAl);
+      const fx = p.x + nx*(W0 - 1.2), fz = p.z + nz*(W0 - 1.2);
+      const floor = gradedY(fx, fz) - 0.5;
+      let top = gradedY(p.x + nx*(W0 + 4.2), p.z + nz*(W0 + 4.2));
+      if(top - floor < 1.2) top = floor - 0.2;               // no wall here: the skin sinks out of sight
+      if(side > 0) lipY.push([k, floor, top, W0]);
+      for(let j=0;j<=NJ;j++){
+        const f = j/NJ, y = floor + f*(top - floor), hy = y - floor;
+        const flow = smoothstep(1.0, 3.2, hy);                // the bottom stays clear of the car
+        let o = W0 - 0.9 - flow*(0.95 + 0.85*Math.sin(k*P.seg*0.10 + hy*0.42 + ph)
+                                     + 0.55*Math.sin(k*P.seg*0.037 - hy*0.23 + ph*2));
+        const bedF = (hy/1.35) % 1;
+        o -= 0.28*flow*smoothstep(0.72, 0.95, bedF);           // a harder bed stands proud
+        const lip = smoothstep(0.80, 1, f);
+        o = o*(1 - lip) + (W0 + 4.4)*lip;
+        pos.push(p.x + nx*o, y, p.z + nz*o);
+        // the beds sweep in long waves along the wall, the way the sand was laid
+        const yb = y + 1.1*Math.sin(k*P.seg*0.045 + ph) + 0.5*Math.sin(k*P.seg*0.13);
+        const band = 0.5*Math.sin(yb*1.9) + 0.35*Math.sin(yb*0.61 + 1) + 0.15*Math.sin(yb*4.7);
+        const pale = smoothstep(0.55, 0.9, Math.sin(yb*0.83 + 2));   // a pale cross-bedded layer here and there
+        const up = smoothstep(0, 1, f);
+        cc.setHSL(0.012 + 0.04*up + 0.02*band - 0.035*(1 - up)*(1 - up) + 0.03*pale,
+                  0.45 + 0.2*up - 0.15*pale, 0.24 + 0.2*up + 0.09*band + 0.14*pale);
+        col.push(cc.r, cc.g, cc.b);
+      }
+      rows++;
+    }
+    for(let r=0;r<rows-1;r++) for(let j=0;j<NJ;j++){
+      const a = r*(NJ+1) + j, b = a + 1, c = a + NJ + 1, d = c + 1;
+      if(side > 0) idx.push(a, c, b, b, c, d); else idx.push(a, b, c, b, d, c);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+    g.setIndex(idx); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide}));
+    m.receiveShadow = true; m.castShadow = true;
+    scene.add(m);
+  });
+  const core = lipY.filter(q=> q[0] >= CANYON.a && q[0] <= CANYON.b && q[2] - q[1] > 9);
+  if(core.length){
+    // a chockstone jammed between the walls where the slot is narrowest
+    const pinch = core.reduce((m, q)=> q[3] < m[3] ? q : m, core[0]);
+    const i = wrapIdx(P, pinch[0]), p = P.pts[i], t = P.tans[i];
+    const hy = Math.min(13, (pinch[2] - pinch[1])*0.62);
+    const cg = new THREE.DodecahedronGeometry(1, 1), cp = cg.attributes.position;
+    for(let v=0; v<cp.count; v++){
+      const x = cp.getX(v), y = cp.getY(v), z = cp.getZ(v), n = 1 + 0.14*Math.sin(x*3.1 + z*2.3) + 0.1*Math.sin(y*4.2);
+      cp.setXYZ(v, x*n, y*n, z*n);
+    }
+    cg.computeVertexNormals();
+    const stoneMat = new THREE.MeshLambertMaterial({color:0x8e4a30, map:rockTex});
+    const chock = new THREE.Mesh(cg, stoneMat);
+    chock.position.set(p.x, pinch[1] + hy, p.z);
+    chock.scale.set(pinch[3] - 0.2, 2.6, 3.2);
+    chock.rotation.y = Math.atan2(t.x, t.z);
+    chock.castShadow = true; scene.add(chock);
+    // a smaller one wedged under it, the way they pile up
+    const c2 = chock.clone(); c2.scale.set(2.2, 1.6, 2); c2.position.set(p.x - t.z*(pinch[3] - 2.8), pinch[1] + hy - 2.9, p.z + t.x*(pinch[3] - 2.8));
+    scene.add(c2);
+
+    // shafts of sun falling through the slot onto the floor
+    // soft at the edges (seen side on, a shaft is thin) and fading out at both ends
+    const beamMat = new THREE.ShaderMaterial({
+      uniforms:{}, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide,
+      vertexShader:"varying float vY; varying float vFace; void main(){ vY = uv.y;"
+        + " vec4 wp = modelMatrix*vec4(position,1.0); vec3 n = normalize(mat3(modelMatrix)*normal);"
+        + " vFace = abs(dot(n, normalize(cameraPosition - wp.xyz))); gl_Position = projectionMatrix*viewMatrix*wp; }",
+      fragmentShader:"varying float vY; varying float vFace; void main(){"
+        + " float a = 0.11*vFace*vFace*smoothstep(0.0, 0.35, vY)*(1.0 - smoothstep(0.75, 1.0, vY));"
+        + " gl_FragColor = vec4(1.0, 0.82, 0.55, a); }"
+    });
+    for(let n=0;n<4;n++){
+      const q = core[Math.floor((n + 0.5)/4*core.length)];
+      const bi = wrapIdx(P, q[0]), bp = P.pts[bi], bt = P.tans[bi];
+      const H = q[2] - q[1];
+      const beam = new THREE.Mesh(new THREE.CylinderGeometry(1.0 + n*0.3, 1.6 + n*0.3, H, 10, 1, true), beamMat);
+      const lat = (n % 2 ? 1 : -1)*2.2;
+      beam.position.set(bp.x - bt.z*lat, q[1] + H/2, bp.z + bt.x*lat);
+      beam.rotation.set(0.12, n*1.3, (n % 2 ? -1 : 1)*0.16);
+      beam.renderOrder = 4;
+      scene.add(beam);
+    }
+    // fallen blocks along the foot of the walls
+    for(let n=0;n<28;n++){
+      const q = core[Math.floor(Math.random()*core.length)];
+      const bi = wrapIdx(P, q[0]), bp = P.pts[bi], bt = P.tans[bi], side = Math.random() < 0.5 ? 1 : -1;
+      const o = (q[3] - 1.0 + Math.random()*0.5)*side, x = bp.x - bt.z*o, z = bp.z + bt.x*o;
+      const sc = 0.5 + Math.random()*0.9;
+      const r = new THREE.Mesh(rockGeometry(n % 3), stoneMat);
+      r.position.set(x, gradedY(x, z) + sc*0.15, z); r.scale.set(sc, sc*0.7, sc);
+      r.rotation.set(Math.random(), Math.random()*6, Math.random());
+      r.castShadow = true; scene.add(r);
+    }
+  }
 }
 
 /* ---- the slot canyon's stone arch: a natural bridge from rim to rim ---- */
@@ -7403,6 +7598,9 @@ const SFX = {
   bump(v){ const k = Math.min(1, v/10);
            tone(90, 0.25, "sine", 0.45*k+0.12, 40); burst(0.22, "bandpass", 1300, 0.3*k+0.08, 1.4, 0, 700);
            burst(0.09, "highpass", 3500, 0.12*k+0.03, 0.8, 0.02); tone(420, 0.08, "square", 0.05*k, 260, 0.01); },
+  // one wheel over a stone or an edge: a short thud and the damper knocking
+  knock(k){ tone(62 + Math.random()*14, 0.13, "sine", 0.22 + 0.4*k, 34); burst(0.07, "lowpass", 520, 0.12 + 0.25*k, 1.2);
+            tone(190, 0.035, "square", 0.02 + 0.05*k, 120, 0.01); },
   // back on the ground: the thud, the springs hitting the stops, a rattle of loose bits
   land(v){ const k = Math.min(1, v/9);
            tone(70, 0.32, "sine", 0.6*k+0.12, 30); burst(0.28, "lowpass", 420, 0.4*k+0.06, 1);
@@ -7823,7 +8021,8 @@ function stepCar(dt){
         const pW = MAIN.pts[nW.pi], tW = MAIN.tans[nW.pi];
         const nx2 = -tW.z, nz2 = tW.x;
         const lat = (pose.x - pW.x)*nx2 + (pose.z - pW.z)*nz2;
-        const lim = nW.half + (inGal ? 1.0 : 1.7);
+        let lim = nW.half + (inGal ? 1.0 : 1.7);
+        if(inCan){ const uv = canyonUV(pose.x, pose.z); if(uv) lim = Math.min(lim, canyonFoot(uv[1]) - 1.9); }
         if(Math.abs(lat) > lim){
           const push = (Math.abs(lat) - lim)*Math.sign(lat);
           pose.x -= nx2*push; pose.z -= nz2*push;
@@ -7995,8 +8194,8 @@ function stepCar(dt){
     }
   }
   if(!pose.air){
-    pose.pitch += (gPitch - pose.pitch) * Math.min(1, dt*22);
-    pose.roll  += (gRoll  - pose.roll)  * Math.min(1, dt*22);
+    pose.pitch += (gPitch - pose.pitch) * Math.min(1, dt*12);
+    pose.roll  += (gRoll  - pose.roll)  * Math.min(1, dt*12);
   } else {
     // in flight the chassis turns slowly toward the arc it is flying
     const arc = Math.max(-0.16, Math.min(0.18, -pose.vy*0.016));
@@ -8025,42 +8224,68 @@ function stepCar(dt){
     }
   }
 
-  // wheels: stiff tyres that follow the ground, full droop in the air
-  let syF = 0, syR = 0, syL = 0, syRt = 0;
+  /* Wheels: each corner on its own. The tyre is stiff and follows the
+     ground under it (and any stone it is running over) up at once, but
+     falls back under its spring, so a sharp edge at speed hops the wheel
+     for an instant. Long travel: 20cm of droop, 26cm of bump. */
+  let knock = 0;
+  const wr0 = car.userData.wr || WHEEL_R;
   car.userData.wheels.forEach((w, wi)=>{
     const o = WOFF[wi];
     if(w.sy === undefined){ w.sy = 0; w.sv = 0; }
     const plane = pose.y - o[0]*sP + wX[wi]*sR;      // where the chassis puts this hub
-    const target = pose.air ? -0.14
-      : Math.max(-0.18, Math.min(0.20, cG[wi] + cRgh[wi] - plane));
-    w.sv += (-300*(w.sy - target) - 24*w.sv)*dt;
+    const wx = pose.x + vfx*o[0] - vfz*o[1], wz = pose.z + vfz*o[0] + vfx*o[1];
+    const target = pose.air ? -0.17
+      : Math.max(-0.20, Math.min(0.26, cG[wi] + cRgh[wi] + stoneY(wx, wz) - plane));
+    const up = target > w.sy;
+    w.sv += ((up ? -1500 : -260)*(w.sy - target) - (up ? 60 : 20)*w.sv)*dt;
     w.sy += w.sv*dt;
-    w.sy = Math.max(-0.15, Math.min(0.19, w.sy));    // droop and bump stops
-    w.pivot.position.y = (car.userData.wr || WHEEL_R) + w.sy;
-    if(wi < 2) syF += w.sy*0.5; else syR += w.sy*0.5;
-    if(wX[wi] > 0) syL += w.sy*0.5; else syRt += w.sy*0.5;
+    if(!pose.air && w.sy < target - 0.05){ w.sy = target - 0.05; w.sv = Math.max(w.sv, 0); }   // never through the ground
+    w.sy = Math.max(-0.20, Math.min(0.26, w.sy));    // droop straps and bump stops
+    if(w.sy >= 0.26) w.sv = Math.min(0, w.sv);
+    if(!pose.air) knock = Math.max(knock, w.sv);
+    pose.wsv = pose.wsv || [0,0,0,0]; pose.wsv[wi] = w.sv;
+    w.pivot.position.y = wr0 + w.sy;
   });
 
-  // body targets: pushed by the wheels, leaned by the load
+  /* The body: sprung on four corners, each spring pushing on its own
+     corner. A wheel pushed up heaves, pitches and rolls the body in
+     proportion to where it sits, so one front wheel over a stone lifts
+     that corner and the car rocks diagonally, not all of it at once. The
+     engine is over the front axle, so the front springs are stiffer. */
   const lean = pose.air ? 0 : Math.max(-0.075, Math.min(0.075, pose.steerIn*sp*0.0098));
   const squat = pose.air ? 0 : Math.max(-0.045, Math.min(0.055, -pose.accLP*0.0046));
-  const tH = pose.air ? -0.05 : (syF + syR)*0.5*0.8;
-  const tP = Math.max(-0.09, Math.min(0.09, -(syF - syR)/WB*0.8 + squat));
-  const tR = Math.max(-0.10, Math.min(0.10, (syL - syRt)/TW*0.8 + lean));
-  const spr = (x, v, t, w0, z)=> v + (w0*w0*(t - x) - 2*z*w0*v)*dt;
-  // heave 1.5Hz and soft enough to show one rebound; pitch stiffer at the
-  // front (nose dips less and settles quicker than the tail squats); roll 1.8Hz
-  pose.bHv = spr(pose.bH, pose.bHv, tH, 9.5, 0.40);
-  const nosing = (tP - pose.bP) > 0;                 // settling nose-down: front spring working
-  pose.bPv = spr(pose.bP, pose.bPv, tP, nosing ? 10.5 : 8.6, nosing ? 0.55 : 0.46);
-  pose.bRv = spr(pose.bR, pose.bRv, tR, 11.2, 0.52);
+  const KF = 125, KR = 96, ZS = 0.30;                // corner rates (per unit mass) and damping
+  let IP = 0, IR = 0;
+  for(let wi=0; wi<4; wi++){ const k = wi < 2 ? KF : KR; IP += k*WOFF[wi][0]*WOFF[wi][0]; IR += k*wX[wi]*wX[wi]; }
+  IP *= 0.25/(10.5*10.5); IR *= 0.25/(11.5*11.5);   // pitch about 1.7Hz, roll 1.8Hz
+  let aH = 0, aP = 0, aR = 0;
+  car.userData.wheels.forEach((w, wi)=>{
+    const o0 = WOFF[wi][0], ox = wX[wi], k = wi < 2 ? KF : KR;
+    const cy = pose.bH - o0*pose.bP + ox*pose.bR;       // the body's corner over this wheel
+    const cv = pose.bHv - o0*pose.bPv + ox*pose.bRv;
+    const wy = pose.air ? Math.max(w.sy, -0.04) : w.sy; // in the air the wheels hang, the body does not follow them down
+    const f = k*(wy - cy) + 2*ZS*Math.sqrt(k)*((pose.air ? 0 : w.sv) - cv);
+    aH += f*0.25; aP -= o0*f*0.25; aR += ox*f*0.25;
+  });
+  aH += pose.air ? -0.05*KF : 0;
+  pose.bHv += aH*dt;
+  pose.bPv += (aP/IP + 10.5*10.5*squat)*dt;
+  pose.bRv += (aR/IR + 11.5*11.5*lean)*dt;
   pose.bH += pose.bHv*dt; pose.bP += pose.bPv*dt; pose.bR += pose.bRv*dt;
+  // a hard hit on one wheel: felt in the seat and heard through the shell
+  if(!pose.air && knock > 3.2 && sp > 5){
+    const k = Math.min(1, (knock - 3.2)/9);
+    GAME.kick = Math.max(GAME.kick || 0, 0.02 + k*0.07);
+    if((GAME.knockCool || 0) <= 0){ SFX.knock(k); GAME.knockCool = 0.09; }
+  }
+  GAME.knockCool = (GAME.knockCool || 0) - dt;
   // bump stops: hard rubber past 10cm of compression, straps at full droop
   if(pose.bH < -0.10){ pose.bHv += (-0.10 - pose.bH)*900*dt; pose.bHv *= 1 - Math.min(1, dt*14); }
   if(pose.bH < -0.15){ pose.bH = -0.15; pose.bHv = Math.max(0, pose.bHv); }
-  if(pose.bH >  0.10){ pose.bH = 0.10;  pose.bHv = Math.min(0, pose.bHv); }
-  pose.bP = Math.max(-0.11, Math.min(0.11, pose.bP));
-  pose.bR = Math.max(-0.12, Math.min(0.12, pose.bR));
+  if(pose.bH >  0.14){ pose.bH = 0.14;  pose.bHv = Math.min(0, pose.bHv); }
+  if(Math.abs(pose.bP) > 0.12){ pose.bP = Math.sign(pose.bP)*0.12; pose.bPv *= -0.3; }
+  if(Math.abs(pose.bR) > 0.13){ pose.bR = Math.sign(pose.bR)*0.13; pose.bRv *= -0.3; }
 
   /* Ground clearance. Where the road rises past the wheels (the bottom of
      a dip, the lip of a ramp) the long overhangs would reach it first. Lift
@@ -8359,6 +8584,7 @@ function stepCamera(dt, sp){
   while(d >  Math.PI) d -= Math.PI*2;
   while(d < -Math.PI) d += Math.PI*2;
   camH += d * Math.min(1, dt*(drift.mode === "slide" ? 5 : 9));
+  camera.position.y -= GAME.bobWas || 0;             // the seat motion is added back at the end
   const fx = Math.sin(camH), fz = Math.cos(camH);
   if(camMode === 0){
     const back = 9.2 + Math.min(3.4, sp*0.09);
@@ -8380,6 +8606,16 @@ function stepCamera(dt, sp){
     camera.position.y += Math.sin(state.t*29)*r + Math.sin(state.t*53)*r*0.45;
   }
   camera.lookAt(camAim);
+  /* the body's motion in the seat: the chase view rides a share of the
+     heave and the jolts, the bonnet view all of it, pitch and roll too */
+  {
+    GAME.kick = Math.max(0, (GAME.kick || 0) - dt*0.5);
+    const kick = (GAME.kick || 0)*Math.sin(state.t*63);
+    const bob = pose.bH*(camMode === 0 ? 0.45 : 1) + kick*(camMode === 0 ? 0.6 : 1);
+    camera.position.y += bob; GAME.bobWas = bob;
+    if(camMode !== 0){ camera.rotateX(-pose.bP*0.8); camera.rotateZ(pose.bR*0.8); }
+    else camera.rotateZ(pose.bR*0.25);
+  }
   const fovT = 62 + Math.min(1, sp/MAXV)*11;      // the frame opens up with speed
   if(Math.abs(camera.fov - fovT) > 0.01){
     camera.fov += (fovT - camera.fov)*Math.min(1, dt*2.5);
@@ -9522,6 +9758,7 @@ function showMain(sel){
     champ:"Four cups: the Summer Cup over four rounds, the Fall Cup over three in the maples, the Winter Cup over four on snow and ice, and the Desert Cup over four in the red rock. Three laps a round against the same three drivers, points 10, 6, 4 and 3, saved between sessions.",
     race:"Any circuit, five laps, the full field.",
     trial:"Three laps with the road to yourself. Your best lap on each circuit is saved and comes back as a ghost to chase.",
+    garage:"Pick the box wagon or the sport wagon, then its paint, livery, fenders, rims, wheel size and the kit on the roof. Saved for every race.",
     opts:"Rival pace, sound, camera, gearbox and the arcade filter.",
     help:"Keyboard and gamepad controls, and how the drift turbo works."
   };
@@ -9533,16 +9770,18 @@ function showMain(sel){
     '<button class="item" data-act="champ" data-k="champ"><span>CHAMPIONSHIP</span><small>' + champSub + '</small></button>' +
     '<button class="item" data-act="race" data-k="race"><span>QUICK RACE</span></button>' +
     '<button class="item" data-act="trial" data-k="trial"><span>TIME TRIAL</span></button>' +
+    '<button class="item" data-act="garage" data-k="garage"><span>GARAGE</span></button>' +
     '<button class="item" data-act="opts" data-k="opts"><span>OPTIONS</span></button>' +
     '<button class="item" data-act="help" data-k="help"><span>HOW TO DRIVE</span></button>' +
     '</div></div><div class="right"><div class="note detail" id="mainNote"></div></div></div>',
     { sel: sel || 0, back: showTitle,
       onSel: el => { const n = document.getElementById("mainNote"); if(n) n.innerHTML = '<p>' + DESC[el.dataset.k] + '</p>'; },
-      acts:{ champ:()=>{ SFX.ok(); showGarage(()=> showChamp(), ()=> showMain(0)); },
-             race:()=>{ SFX.ok(); showGarage(()=> showTracks("race"), ()=> showMain(1)); },
-             trial:()=>{ SFX.ok(); showGarage(()=> showTracks("trial"), ()=> showMain(2)); },
-             opts:()=>{ SFX.ok(); showOptions(()=> showMain(3)); },
-             help:()=>{ SFX.ok(); showHelp(()=> showMain(4)); } } });
+      acts:{ champ:()=>{ SFX.ok(); showChamp(); },
+             race:()=>{ SFX.ok(); showTracks("race"); },
+             trial:()=>{ SFX.ok(); showTracks("trial"); },
+             garage:()=>{ SFX.ok(); showGarage(()=> showMain(3), ()=> showMain(3)); },
+             opts:()=>{ SFX.ok(); showOptions(()=> showMain(4)); },
+             help:()=>{ SFX.ok(); showHelp(()=> showMain(5)); } } });
   MENU.onSel(MENU.items[MENU.sel]);
 }
 
@@ -9677,7 +9916,7 @@ function showGarage(next, back){
     '<div class="cols"><div class="left garage"><h2 class="head">Garage</h2><div class="menu">' +
     GOPTS.map(O => '<button class="item opt" data-opt="' + O.key + '"><span>' + esc(O.label) +
                    '</span><span class="val">' + optValue(O) + '</span></button>').join("") +
-    '<button class="item" data-act="go"><span>DONE: CHOOSE A CIRCUIT</span></button>' +
+    '<button class="item" data-act="go"><span>DONE</span></button>' +
     '<button class="item back" data-act="back"><span>BACK</span></button></div>' +
     '<div class="garnote" id="garNote"></div>' +
     '<div class="hint"><kbd>\u2191</kbd><kbd>\u2193</kbd> pick &nbsp; <kbd>\u2190</kbd><kbd>\u2192</kbd> change &nbsp; <kbd>Enter</kbd> done</div></div>' +
@@ -10085,7 +10324,7 @@ if(/debug/.test(location.hash)){
   window.__R = { THREE, TRACKS, TRACK, TRACK_ID, MAIN, BRANCHES, paths, ROUTE, pose, state, camera, scene, renderer,
                  surfaceY, gridH, nearest, PILES, PIT, GAME, CTL, trans, MAXV, radiiOf, radiiOpen, resetRace, setMode,
                  closeUI, rivals, car, splash, cornerHoldSpeed, stepCar, placeAtStart, drift, AUTO_JUMPS,
-                 CALM, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER };
+                 CALM, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car };
 }
 boot();
 requestAnimationFrame(frame);
