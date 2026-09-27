@@ -129,6 +129,15 @@
 
   /* track select */
   .tracks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
+  .cuptabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px;}
+  .cuptab{appearance:none;cursor:pointer;padding:7px 16px 6px;font-family:var(--display);font-size:16px;color:var(--cream);
+    background:rgba(15,36,25,.85);border:3px solid var(--ink);box-shadow:3px 3px 0 var(--ink);transform:skewX(-9deg);
+    display:flex;flex-direction:column;align-items:flex-start;}
+  .cuptab > *{transform:skewX(9deg);}
+  .cuptab small{font-family:var(--body);font-weight:600;font-size:12px;color:#a9bfa4;}
+  .cuptab.on{background:#3a5a3f;border-color:var(--signal);}
+  .cuptab.sel{background:var(--signal);color:var(--ink);} .cuptab.sel small{color:#3a2c08;}
+  .gpname{font-family:var(--display);font-size:15px;color:var(--signal);margin:2px 0 8px;letter-spacing:.03em;}
   .tk{appearance:none;cursor:pointer;padding:8px 8px 10px;text-align:left;color:var(--cream);
     font-family:var(--display);font-size:15px;background:rgba(15,36,25,.85);
     border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);}
@@ -471,7 +480,7 @@ const TRACKS = [
     ]}
   ,
   /* ---- THE FALL CUP: three circuits in the maples, leaves turning ---- */
-  { name:"MAPLE FAIR", after:"the county fair", relief:1.0, season:"fall", cup:1,
+  { name:"MAPLE FAIR", rollers:1.4, after:"the county fair", relief:1.0, season:"fall", cup:1,
     blurb:"through the county fairground and round the Bowl: a 270 degree banked carousel circling the ferris wheel",
     kit:["crest","tabletop","rhythm","kicker"],
     shape:"THE BOWL — a banked carousel",
@@ -497,7 +506,7 @@ const TRACKS = [
        half:4.6, jumps:[[0.45,24,7,2.2,44]], tune:0.15}
     ]},
 
-  { name:"COPPER LAKE", after:"a reservoir", relief:1.1, season:"fall", cup:1,
+  { name:"COPPER LAKE", rollers:1.4, after:"a reservoir", relief:1.1, season:"fall", cup:1,
     blurb:"straight across Copper Lake on a 300m causeway, and a washed out gap in the middle you either jump or wade",
     kit:["crest","double","tabletop","crest"],
     shape:"THE CAUSEWAY — 300m across the lake",
@@ -553,7 +562,7 @@ const TRACKS = [
        half:5.0, jumps:[[0.4,24,7,1.8,40]], tune:0.7}
     ]},
   /* ---- THE WINTER CUP: four circuits on snow and ice ---- */
-  { name:"FROSTBITE LAKE", after:"an ice road in the north woods", relief:0.8, season:"winter", cup:2,
+  { name:"FROSTBITE LAKE", rollers:1.4, after:"an ice road in the north woods", relief:0.8, season:"winter", cup:2,
     blurb:"straight across the frozen lake on the ice road, past the fishing huts, where the tail never quite stops sliding",
     kit:["crest","tabletop","rhythm"],
     shape:"THE ICE ROAD \u2014 400m across a frozen lake",
@@ -627,7 +636,7 @@ const TRACKS = [
        half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true}
     ]},
 
-  { name:"ICEFALL CREEK", after:"a frozen creek", relief:1.5, season:"winter", cup:2,
+  { name:"ICEFALL CREEK", rollers:1.4, after:"a frozen creek", relief:1.5, season:"winter", cup:2,
     blurb:"turn off the road and up the frozen creek bed, 200m of glare ice stepping up its frozen falls",
     kit:["crest","kicker","tabletop","crest"],
     shape:"THE FROZEN CREEK \u2014 200m up the ice",
@@ -1140,8 +1149,17 @@ if(DESERT){
 }
 
 /* the land the map is laid on, before any road touches it */
+/* Rolling ground under every race circuit: long swells a couple of hundred
+   metres apart, so a lap is always going over a top or down into a dip.
+   Tall enough that the biggest crests go light at full speed. */
+const ROLL = TRACK.test || TRACK.expedition ? 0 : (TRACK.rollers !== undefined ? TRACK.rollers : 1);
+const ROLL_PH = (TRACK.name.length*1.37) % 6.28;
+function rollers(x, z){
+  return 5.6*Math.sin(x*0.029 + z*0.011 + ROLL_PH) + 4.4*Math.sin(z*0.034 - x*0.017 + ROLL_PH*1.7)
+       + 2.6*Math.sin((x + z)*0.047 + ROLL_PH*2.3);
+}
 function macro(x, z){
-  let h = hills(x, z);
+  let h = hills(x, z) + (ROLL ? ROLL*rollers(x, z) : 0);
   const H = TRACK.hills;
   for(let k=0;k<H.length;k++){
     const dx = x-H[k][0], dz = z-H[k][1];
@@ -9855,6 +9873,19 @@ function menuNav(dir){
   if(!MENU.id) return;
   const it = MENU.items[MENU.sel];
   const onTrack = it && it.dataset.track !== undefined;
+  if(it && it.dataset.cup !== undefined){
+    const k = +it.dataset.cup, n = GP_GROUPS.length;
+    if(dir === "left" || dir === "right"){
+      const j = (k + (dir === "left" ? -1 : 1) + n) % n;
+      SFX.move(); showTracks(MENU.mode, j); select(j, true); return;
+    }
+    if(dir === "down"){ select(n); return; }
+    if(dir === "up") return;
+  }
+  if(onTrack && dir === "up" && MENU.id === "scTracks" && MENU.items.some(el=> el.dataset.cup !== undefined)){
+    const first = MENU.items.findIndex(el=> el.dataset.track !== undefined);
+    if(MENU.sel - first < gridCols()){ select(MENU.group || 0); return; }
+  }
   if(dir === "up" || dir === "down"){
     let step = dir === "up" ? -1 : 1;
     if(MENU.grid && onTrack) step *= gridCols();
@@ -10070,22 +10101,44 @@ function showMain(sel){
 }
 
 const mainIdx = m => m === "champ" ? 0 : m === "race" ? 1 : m === "trial" ? 2 : 3;
-function showTracks(mode){
-  const ids = TRACKS.map((t,i)=>i).filter(i=> !!TRACKS[i].expedition === (mode === "expedition")).sort((a, b)=> (TRACKS[a].test ? 9 : TRACKS[a].cup || 0) - (TRACKS[b].test ? 9 : TRACKS[b].cup || 0) || a - b);
+/* The circuits, grouped the way the championship runs them: one Grand Prix
+   at a time, picked from a row of tabs, so the list is four circuits and
+   not seventeen. Expeditions have their own list. */
+const GP_GROUPS = (()=>{
+  const g = CUPS.map((c, k)=> ({name: c.name.replace(" Cup", " Grand Prix"), short: c.name.replace(" Cup", "").toUpperCase(), ids: c.rounds.slice()}));
+  const extra = TRACKS.map((t, i)=> i).filter(i=> !TRACKS[i].expedition && !g.some(x=> x.ids.includes(i)));
+  if(extra.length) g.push({name: "Practice", short: "PRACTICE", ids: extra});
+  return g;
+})();
+function showTracks(mode, group){
+  const exped = mode === "expedition";
+  let ids, gi = 0;
+  if(exped) ids = TRACKS.map((t,i)=>i).filter(i=> TRACKS[i].expedition);
+  else {
+    gi = group !== undefined ? group : Math.max(0, GP_GROUPS.findIndex(x=> x.ids.includes(TRACK_ID)));
+    ids = GP_GROUPS[gi].ids;
+  }
+  const tabs = exped ? '' : '<div class="cuptabs">' + GP_GROUPS.map((x, k)=>
+      '<button class="cuptab' + (k === gi ? ' on' : '') + '" data-act="cup" data-cup="' + k + '"><span>' + esc(x.short) + '</span><small>' +
+      x.ids.length + ' circuits</small></button>').join("") + '</div>';
+  const at = ids.indexOf(TRACK_ID);
   openScreen("scTracks",
     '<div style="width:100%;max-width:980px;margin:auto 0">' +
-    '<h2 class="head">' + esc(MODES[mode].label) + (mode === "expedition" ? ': choose a mountain' : ': choose a circuit') + '</h2>' +
+    '<h2 class="head">' + esc(MODES[mode].label) + (exped ? ': choose a mountain' : ': choose a circuit') + '</h2>' + tabs +
+    (exped ? '' : '<div class="gpname">' + esc(GP_GROUPS[gi].name) + '</div>') +
     '<div class="tracks">' + ids.map(id =>
       '<button class="tk" data-track="' + id + '"><canvas width="132" height="132"></canvas><span>' +
       esc(TRACKS[id].name) + '</span><small>' + esc(TRACKS[id].shape.split(/\s+[\u2014-]\s+/)[0].toLowerCase()) +
       '</small></button>').join("") + '</div>' +
     '<div class="detail" id="tkDetail"></div>' +
     '<div class="menu" style="margin-top:14px;max-width:260px"><button class="item back" data-act="back"><span>BACK</span></button></div></div>',
-    { grid:true, sel: Math.max(0, ids.indexOf(TRACK_ID)), back: ()=> showMain(mainIdx(mode)),
+    { grid:true, sel: (exped ? 0 : GP_GROUPS.length) + Math.max(0, at), back: ()=> showMain(mainIdx(mode)),
       onSel: el => { if(el.dataset.track !== undefined)
                        document.getElementById("tkDetail").innerHTML = detailHTML(+el.dataset.track); },
       acts:{ track: el => startMode(mode, +el.dataset.track),
+             cup: el => { SFX.move(); showTracks(mode, +el.dataset.cup); },
              back: ()=>{ SFX.back(); showMain(mainIdx(mode)); } } });
+  MENU.mode = mode; MENU.group = gi;
   UIEL.querySelectorAll(".tk canvas").forEach((cv, i)=> drawThumb(cv, ids[i]));
   MENU.onSel(MENU.items[MENU.sel]);
 }
