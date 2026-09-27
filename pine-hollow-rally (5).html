@@ -8081,39 +8081,40 @@ function stepCar(dt){
   const curve = (gA - 2*gy + gB)/(look*look);        // d2y/ds2, per metre
   const glue  = slope*spV;                           // the rate the road itself climbs
   let landed = 0;
-  if(!pose.air && curve*spV*spV > -26){
-    pose.y = gy;                                     // still held up by the road
-    pose.vy = glue;
-    pose.airT = 0;
-  } else {
-    /* Leaving a ramp, the vertical speed is the slope the car was just on,
-       not the slope averaged across the crest -- the crest averages to about
-       nothing, which is why a 29 degree ramp would otherwise launch nothing
-       at all. Capped, because a 29 degree ramp at 125km/h is arithmetically
-       19 m/s of lift and about four seconds of hang time. */
-    const launching = !pose.air;
-    if(launching) pose.vy = Math.max(-14, Math.min(11, ((gy - gB)/look)*spV));
-    pose.vy -= 26*dt;                                // mass, not a balloon
+  /* The car rides on its springs over the road, not glued to it. The
+     chassis height is a spring and damper above the ground: the road can
+     push the car up (through the tyres) but never pull it down, so where
+     the road falls away faster than gravity the tyres simply unload.
+     A row of bumps is soaked up by the travel and the car bobs over them;
+     it only flies when the wheels have hung out to full droop and the
+     ground is still falling away (a ramp lip, a crest taken fast), and a
+     hard landing or a steep dip runs the springs onto the bump stops.
+     This replaces the old rule that threw the car off any bump whose
+     curvature beat gravity, which hopped it from mogul to mogul. */
+  const G = 26, SK = 105, SC = 7.5, DROOP = 0.20, STOP = 0.24;
+  if(!pose.air){
+    const sq = gy - pose.y;                          // + compressed
+    const push = Math.max(0, G + SK*sq + SC*(glue - pose.vy));   // what the tyres can give
+    pose.vy += (push - G)*dt;
     pose.y += pose.vy*dt;
-    /* The look-ahead sees the lip about a metre before the wheels reach it,
-       so the car takes off with a little ramp still under it. The ramp keeps
-       climbing for those last frames and used to catch the car and end the
-       flight on the spot, over and over, until it finally let go past the
-       lip at a fraction of the speed. For the first moment of a flight the
-       ground can hold the car up but not end the jump. */
-    if(pose.y <= gy && pose.vy > 0 && (launching || pose.airT < 0.12)){
-      pose.y = gy;
-      pose.air = true;
-      pose.airT += dt;
-    } else if(pose.y <= gy){
-      if(pose.air) landed = Math.min(9, -pose.vy);
-      pose.y = gy;
-      pose.vy = glue;
+    const sq2 = gy - pose.y;
+    if(sq2 > STOP){                                  // on the bump stops: the ground carries it
+      pose.y = gy - STOP;
+      if(pose.vy < glue){ pose.stopHit = Math.max(pose.stopHit || 0, glue - pose.vy); pose.vy = glue; }
+    }
+    if(sq2 < -DROOP){                                // wheels hanging, ground gone: flying
+      pose.air = true; pose.airT = 0;
+      pose.vy = Math.min(11, pose.vy);
+    } else pose.airT = 0;
+  } else {
+    pose.vy -= G*dt;                                 // mass, not a balloon
+    pose.y += pose.vy*dt;
+    pose.airT += dt;
+    // back on the tyres: the springs take it from here
+    if(pose.y <= gy + DROOP*0.5 && (pose.vy <= glue || pose.airT > 0.12)){
+      landed = Math.min(9, Math.max(0, glue - pose.vy));
       pose.air = false;
-      pose.airT = 0;
-    } else {
-      pose.air = true;
-      pose.airT += dt;
+      if(pose.y < gy - STOP){ pose.y = gy - STOP; pose.vy = Math.max(pose.vy, glue); }
     }
   }
   // visual yaw from the slide
@@ -8172,7 +8173,7 @@ function stepCar(dt){
     pose.pitch = gPitch; pose.roll = gRoll;
     pose.bPv += Math.max(-0.85, Math.min(0.85, -mP*6.5));
     pose.bRv += Math.max(-0.85, Math.min(0.85, -mR*6.0));
-    pose.bHv -= Math.min(2.6, landed*0.30);
+    pose.bHv -= Math.min(1.6, landed*0.16);
   };
   if(landed) touchdown();
   let sP = Math.sin(pose.pitch), sR = Math.sin(pose.roll);
@@ -8187,15 +8188,15 @@ function stepCar(dt){
       pen = Math.max(pen, cG[wi] - hub);
     }
     if(pen > 0){
-      landed = Math.min(9, Math.max(1.2, -pose.vy));
-      pose.y = Math.max(pose.y, gy);
-      pose.vy = glue; pose.air = false; pose.airT = 0;
+      landed = Math.min(9, Math.max(1.2, glue - pose.vy));
+      pose.y = Math.max(pose.y, gy - STOP);
+      pose.air = false; pose.airT = 0;
       touchdown();
     }
   }
   if(!pose.air){
-    pose.pitch += (gPitch - pose.pitch) * Math.min(1, dt*12);
-    pose.roll  += (gRoll  - pose.roll)  * Math.min(1, dt*12);
+    pose.pitch += (gPitch - pose.pitch) * Math.min(1, dt*6);
+    pose.roll  += (gRoll  - pose.roll)  * Math.min(1, dt*7);
   } else {
     // in flight the chassis turns slowly toward the arc it is flying
     const arc = Math.max(-0.16, Math.min(0.18, -pose.vy*0.016));
@@ -8259,12 +8260,13 @@ function stepCar(dt){
   let IP = 0, IR = 0;
   for(let wi=0; wi<4; wi++){ const k = wi < 2 ? KF : KR; IP += k*WOFF[wi][0]*WOFF[wi][0]; IR += k*wX[wi]*wX[wi]; }
   IP *= 0.25/(10.5*10.5); IR *= 0.25/(11.5*11.5);   // pitch about 1.7Hz, roll 1.8Hz
-  let aH = 0, aP = 0, aR = 0;
+  let aH = 0, aP = 0, aR = 0, meanSy = 0;
+  car.userData.wheels.forEach(w=> meanSy += (w.sy || 0)*0.25);
   car.userData.wheels.forEach((w, wi)=>{
     const o0 = WOFF[wi][0], ox = wX[wi], k = wi < 2 ? KF : KR;
     const cy = pose.bH - o0*pose.bP + ox*pose.bR;       // the body's corner over this wheel
     const cv = pose.bHv - o0*pose.bPv + ox*pose.bRv;
-    const wy = pose.air ? Math.max(w.sy, -0.04) : w.sy; // in the air the wheels hang, the body does not follow them down
+    const wy = pose.air ? Math.max(w.sy, -0.04) : w.sy - meanSy*0.8; // in the air the wheels hang, the body does not follow them down
     const f = k*(wy - cy) + 2*ZS*Math.sqrt(k)*((pose.air ? 0 : w.sv) - cv);
     aH += f*0.25; aP -= o0*f*0.25; aR += ox*f*0.25;
   });
@@ -8280,6 +8282,12 @@ function stepCar(dt){
     if((GAME.knockCool || 0) <= 0){ SFX.knock(k); GAME.knockCool = 0.09; }
   }
   GAME.knockCool = (GAME.knockCool || 0) - dt;
+  // the springs running out of travel: a dip taken flat, a heavy landing
+  if(pose.stopHit > 2.5 && (GAME.knockCool || 0) <= 0){
+    const k = Math.min(1, (pose.stopHit - 2.5)/6);
+    SFX.knock(0.5 + k*0.5); GAME.kick = Math.max(GAME.kick || 0, 0.04 + k*0.08); GAME.knockCool = 0.15;
+  }
+  pose.stopHit = 0;
   // bump stops: hard rubber past 10cm of compression, straps at full droop
   if(pose.bH < -0.10){ pose.bHv += (-0.10 - pose.bH)*900*dt; pose.bHv *= 1 - Math.min(1, dt*14); }
   if(pose.bH < -0.15){ pose.bH = -0.15; pose.bHv = Math.max(0, pose.bHv); }
