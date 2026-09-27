@@ -633,28 +633,27 @@ const TRACKS = [
        half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true}
     ]},
 
-  { name:"ICEFALL CREEK", rollers:1.4, after:"a frozen creek", relief:1.5, season:"winter", cup:2,
-    blurb:"turn off the road and up the frozen creek bed, 200m of glare ice stepping up its frozen falls",
-    kit:["crest","kicker","tabletop","crest"],
-    shape:"THE FROZEN CREEK \u2014 200m up the ice",
-    feature:"a 200m run up a frozen creek, over its frozen falls",
-    ctrl:[[0,-286],[0,-187],[22,-110],[28,-22],[31,66],[20,140],[50,220],[120,260],[159,371],[229,418],
-          [299,354],[340,265],[410,240],[440,150],[445,10],[518,-51],[543,-131],[440,-190],[370,-200],
-          [324,-256],[306,-355],[235,-394],[150,-340],[100,-320],[40,-320]],
-    hills:[[220,-30,180,-9],[66,130,120,6],[420,290,190,10]],
-    jumps:[], fords:[[430,190],[140,-330]],
-    river:{from:[22,-104], to:[30,74], pools:5, down:70, up:62, downDir:[0.5,-1], upDir:[0.4,1]},
+  { name:"ICEFALL CREEK", rollers:1.4, after:"a frozen valley", relief:1.4, season:"winter", cup:2,
+    blurb:"a long frozen valley: up the creek bed below the icefall, hairpins up the side of the valley, fast along the ridge, then snake down through the spruce",
+    kit:["crest","kicker","tabletop","double","rhythm"],
+    shape:"THE FROZEN CREEK \u2014 200m up the ice below the falls",
+    feature:"a run up a frozen creek that falls from an icefall at the head of the valley",
+    ctrl:[[-420,-190],[-300,-205],[-190,-262],[-110,-298],[0,-304],[100,-298],[180,-262],[240,-205],[330,-190],
+          [430,-215],[500,-160],[495,-80],[420,-45],[320,-60],[235,-20],[250,50],[340,65],[430,95],[475,165],
+          [405,225],[280,210],[165,235],[75,185],[50,95],[-10,25],[-110,0],[-185,50],[-175,140],[-245,205],
+          [-345,220],[-440,180],[-505,100],[-445,35],[-525,-35],[-500,-135]],
+    hills:[[0,320,300,24],[380,230,180,14],[-380,280,220,18],[0,-360,260,-8],[640,-360,200,26],[-650,-320,200,-10],[80,80,120,-6]],
+    jumps:[], fords:[[60,140]],
+    /* the creek runs the length of the valley: down from the icefall at its
+       head, 200m of it driven, and on out of the valley to the west */
+    river:{from:[-110,-298], to:[100,-298], pools:5, icefall:true,
+           downPts:[[-230,-345],[-400,-338],[-540,-305],[-650,-320]],
+           upPts:[[230,-338],[390,-345],[510,-318],[590,-335]]},
     mud:[],
     branches:[
-      // over the beaver dam
-      {a:[120,260], b:[340,265], via:[[195,262],[230,263],[265,264]],
-       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true},
-      // the trapper's trail
-      {a:[445,10], b:[440,-190], via:[[444,-60],[443,-90],[442,-120]],
-       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true},
-      // down the frozen side creek
-      {a:[370,-200], b:[150,-340], via:[[290,-251],[260,-270],[230,-289]],
-       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, fast:true}
+      // the ice chute: straight up the fall line instead of round the hairpin
+      {a:[320,-60], b:[430,95], via:[[355,5],[395,50]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0}
     ]},
 
   /* ---- THE DESERT CUP: four circuits in the red rock ---- */
@@ -1162,7 +1161,8 @@ if(DESERT){
   if(TRACK.gorge) TRACK.gorge = Object.assign({}, TRACK.gorge, {at: mv(TRACK.gorge.at)});
   if(TRACK.drop)  TRACK.drop  = Object.assign({}, TRACK.drop,  {at: mv(TRACK.drop.at)});
   if(TRACK.town)  TRACK.town  = Object.assign({}, TRACK.town,  {at: mv(TRACK.town.at)});
-  if(TRACK.river) TRACK.river = Object.assign({}, TRACK.river, {from: mv(TRACK.river.from), to: mv(TRACK.river.to)});
+  if(TRACK.river) TRACK.river = Object.assign({}, TRACK.river, {from: mv(TRACK.river.from), to: mv(TRACK.river.to),
+    downPts: TRACK.river.downPts && TRACK.river.downPts.map(mv), upPts: TRACK.river.upPts && TRACK.river.upPts.map(mv)});
   TRACK.bigJumps = (TRACK.bigJumps||[]).map(j=> [mv(j[0]), j[1]]);
   TRACK.ridges = (TRACK.ridges||[]).map(r=> mv(r).concat(r.slice(2)));
   ["bowl","lake","washout","pit","dunes","swamp","giantTree"].forEach(k=>{ if(TRACK[k]) TRACK[k] = Object.assign({}, TRACK[k], {at: mv(TRACK[k].at)}); });
@@ -2282,17 +2282,49 @@ function addRiver(P, def){
     }
     return out;
   };
+  /* or, where the map draws the creek's whole course, along that: carried
+     on straight out of the run for a bit, then through the points given */
+  const course = (p, d, pts)=>{
+    const c = new THREE.CatmullRomCurve3([new THREE.Vector3(p.x, 0, p.z), new THREE.Vector3(p.x + d[0]*25, 0, p.z + d[1]*25)]
+      .concat(pts.map(q=> new THREE.Vector3(q[0], 0, q[1]))));
+    const L = c.getLength(), out = [];
+    for(let m=seg; m<=L; m+=seg){ const v = c.getPointAt(m/L); out.push([v.x, v.z]); }
+    return out;
+  };
+  /* The water follows the lie of the land: downstream it only ever falls
+     (cutting a gorge through anything higher), upstream it climbs with the
+     ground, never faster than a steep rapid. */
+  const follow = (pts, lev0, down)=>{
+    let lev = lev0;
+    return pts.map(q=>{
+      const land = macro(q[0], q[1]);
+      lev = down ? Math.min(lev, Math.max(lev - 0.08*seg, land - 0.6)) : Math.max(lev, Math.min(lev + 0.1*seg, land - 0.8));
+      return lev;
+    });
+  };
   const p0 = P.pts[wrapIdx(P, a)], p1 = P.pts[wrapIdx(P, a+n)];
-  trail(p0, dirAt(Math.round(8/seg), 0), def.downDir || dirAt(Math.round(18/seg), 0), def.down || 60)
-    .reverse().forEach(q=> push(q[0], q[1], levels[0]));
+  const dn = def.downPts ? course(p0, dirAt(Math.round(8/seg), 0), def.downPts)
+                         : trail(p0, dirAt(Math.round(8/seg), 0), def.downDir || dirAt(Math.round(18/seg), 0), def.down || 60);
+  const dnL = def.downPts ? follow(dn, levels[0], true) : dn.map(()=> levels[0]);
+  dn.map((q, k)=> [q[0], q[1], dnL[k]]).reverse().forEach(q=> push(q[0], q[1], q[2]));
   for(let k=0;k<=n;k++){ const p = P.pts[wrapIdx(P, a+k)]; push(p.x, p.z, levelAt(k)); }
-  trail(p1, dirAt(n - Math.round(8/seg), n), def.upDir || dirAt(n - Math.round(18/seg), n), def.up || 70)
-    .forEach(q=> push(q[0], q[1], levels[K-1]));
+  const up = def.upPts ? course(p1, dirAt(n - Math.round(8/seg), n), def.upPts)
+                       : trail(p1, dirAt(n - Math.round(8/seg), n), def.upDir || dirAt(n - Math.round(18/seg), n), def.up || 70);
+  const upL = def.upPts ? follow(up, levels[K-1], false) : up.map(()=> levels[K-1]);
+  up.forEach((q, k)=> push(q[0], q[1], upL[k]));
   let x0=Infinity, x1=-Infinity, z0=Infinity, z1=-Infinity;
   S.forEach(q=>{ x0=Math.min(x0,q[0]); x1=Math.max(x1,q[0]); z0=Math.min(z0,q[1]); z1=Math.max(z1,q[1]); });
   const pad = RIVER_BANK + 16;
   Object.assign(RIVER, {on:true, S, a, n, levels, box:[x0-pad, x1+pad, z0-pad, z1+pad],
                         ends:[S.length ? 0 : 0, S.length-1]});
+  /* the head of the creek: a rock step it falls over, frozen in the winter */
+  if(def.icefall){
+    const E = S[S.length - 1], D = S[Math.max(0, S.length - 10)];
+    let tx = E[0] - D[0], tz = E[1] - D[1]; const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl;
+    const H = Math.max(10, Math.min(22, macro(E[0] + tx*18, E[1] + tz*18) - E[2] + 3));
+    RIVER.fall = {x:E[0], z:E[1], tx, tz, lev:E[2], H, w:RIVER_BANK + 6};
+    RIVER.box[0] -= 60; RIVER.box[1] += 60; RIVER.box[2] -= 60; RIVER.box[3] += 60;
+  }
 }
 /* nearest point of the creek: [distance across, level there, metres to the nearer end] */
 function riverAt(x, z){
@@ -2308,7 +2340,7 @@ function riverAt(x, z){
     const d = (S[j][0]-x)*(S[j][0]-x) + (S[j][1]-z)*(S[j][1]-z);
     if(d < best){ best = d; bj = j; }
   }
-  const endM = Math.min(bj, S.length - 1 - bj)*MAIN.seg;
+  const endM = (RIVER.fall ? bj : Math.min(bj, S.length - 1 - bj))*MAIN.seg;   // no fading out under the falls
   return [Math.sqrt(best), S[bj][2], endM];
 }
 if(TRACK.river) addRiver(MAIN, TRACK.river);
@@ -2446,6 +2478,16 @@ function fordUV(F, x, z){
   return [Math.abs(u - m)/Math.max(0.1, narrow), b, Math.abs(u - m)];
 }
 function carveWater(y, x, z){
+  if(RIVER.fall){
+    // the cliff at the head of the creek, the land built up behind it
+    const F = RIVER.fall, dx = x - F.x, dz = z - F.z;
+    const u = dx*F.tx + dz*F.tz, v = -dx*F.tz + dz*F.tx;
+    if(u > -6 && u < 90 && Math.abs(v) < F.w + 60){
+      const face = smoothstep(-1, 3, u + 1.2*Math.sin(v*0.37) + 0.8*Math.sin(v*0.9));
+      const side = 1 - smoothstep(F.w + 10, F.w + 55, Math.abs(v)), back = 1 - smoothstep(40, 90, u);
+      y = Math.max(y, y + (F.lev + F.H - y)*face*side*back);
+    }
+  }
   if(RIVER.on){
     const r = riverAt(x, z);
     if(r){
@@ -2576,6 +2618,7 @@ WORLD_EDGE = FAR + 150;                 // room to run wide, then a soft stop
 const GSTEP = 2.0;
 let MAXABS = 0;
 paths.forEach(P=> P.pts.forEach(p=> MAXABS = Math.max(MAXABS, Math.abs(p.x), Math.abs(p.z))));
+if(RIVER.on) RIVER.S.forEach(q=> MAXABS = Math.max(MAXABS, Math.abs(q[0]) - 120, Math.abs(q[1]) - 120));
 const GHALF = Math.ceil((MAXABS + 180)/GSTEP)*GSTEP;
 const GN = Math.round(2*GHALF/GSTEP) + 1;
 const GCELLS = GN*GN;
@@ -4160,6 +4203,45 @@ if(RIVER.on){
   const m = new THREE.Mesh(g, waterMaterial());
   m.renderOrder = 3; m.frustumCulled = false;
   scene.add(m);
+  /* The icefall at the head of the creek: the water comes over a rock step
+     and has frozen where it fell, in pillars and curtains of blue ice
+     hanging off the lip down onto the creek. */
+  if(RIVER.fall){
+    const F = RIVER.fall, tx = F.tx, tz = F.tz, nx = -tz, nz = tx, g = new THREE.Group();
+    const at = (u, v)=> [F.x + tx*u + nx*v, F.z + tz*u + nz*v];
+    const rockM = new THREE.MeshLambertMaterial({map:rockTex, color:0x8a8f96});
+    const base = F.lev, H = F.H;
+    // rock breaking out of the face of the step, all the way across
+    for(let k=0;k<44;k++){
+      const v = (Math.random() - 0.5)*(F.w*2 + 30), h = Math.random()*H;
+      const q = at(-1.4 + 4*h/H + Math.random(), v), sc = 2 + Math.random()*3.5;
+      const r = new THREE.Mesh(rockGeometry(k % 3), rockM);
+      r.position.set(q[0], base + h, q[1]);
+      r.scale.set(sc, sc*(0.7 + Math.random()*0.6), sc); r.rotation.set(Math.random(), Math.random()*6, Math.random());
+      g.add(r);
+    }
+    if(FROZEN){
+      // the falls, frozen where they fell: pillars and curtains of ice off the lip
+      const iceM = [0xbfe6f4, 0x9fd3ea, 0xe2f3fa].map(c=> new THREE.MeshPhongMaterial({color:c, shininess:110, specular:0xcfe8f4}));
+      for(let k=0;k<70;k++){
+        const v = (Math.random() - 0.5)*RIVER_BED*2.4, mid = Math.max(0, 1 - Math.abs(v)/(RIVER_BED*1.2));
+        const len = H*(0.3 + 0.7*mid)*(0.75 + Math.random()*0.3), rad = 0.3 + Math.random()*0.8*(0.4 + mid);
+        const q = at(-1.6 - Math.random()*1.4, v);
+        const c = new THREE.Mesh(new THREE.CylinderGeometry(rad*0.3, rad, len, 7), iceM[k % 3]);
+        c.rotation.x = Math.PI;                                   // hanging: thick at the lip, a point at the foot
+        c.position.set(q[0], base + H + 0.4 - len/2, q[1]);
+        g.add(c);
+      }
+      for(let k=0;k<22;k++){
+        const v = (Math.random() - 0.5)*RIVER_BED*2, sc = 0.8 + Math.random()*2;
+        const q = at(-3 - Math.random()*5, v);
+        const m = new THREE.Mesh(new THREE.IcosahedronGeometry(sc, 0), iceM[k % 3]);
+        m.position.set(q[0], base + sc*0.2, q[1]); m.scale.y = 0.6; m.rotation.y = Math.random()*6; g.add(m);
+      }
+    }
+    g.traverse(o=>{ if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+    mergeStatic(g); scene.add(g);
+  }
   // boulders along the banks and a few sitting out in the stream
   const rockMat = new THREE.MeshLambertMaterial({map:rockTex});
   for(let k=0, placed=0; k<900 && placed<60; k++){
@@ -4676,13 +4758,20 @@ if(GIANT.on){
   }
   tg.computeVertexNormals();
   const trunk = new THREE.Mesh(tg, bark); trunk.castShadow = true; trunk.receiveShadow = true; g.add(trunk);
-  const limb = (pts, r0, r1, mat)=>{
+  /* a limb or root: a tube along the points, tapering from r0 to r1 (or by
+     rad(t)), gnarled with knots and ridges so it never reads as a pipe */
+  const limb = (pts, r0, r1, mat, rad, jag)=>{
     const c = new THREE.CatmullRomCurve3(pts.map(p=> new THREE.Vector3(p[0], p[1], p[2])));
-    const segs = 28, rs = 8, geo = new THREE.TubeGeometry(c, segs, 1, rs, false), pa = geo.attributes.position;
+    const segs = Math.max(28, Math.round(c.getLength()/1.1)), rs = 7, geo = new THREE.TubeGeometry(c, segs, 1, rs, false), pa = geo.attributes.position;
+    const J = jag === undefined ? 0.32 : jag, ph = Math.random()*9;
+    const knots = []; for(let j=0;j<rs;j++) knots.push(Math.random());
     for(let i=0;i<=segs;i++){
-      const ctr = c.getPointAt(i/segs), r = r0 + (r1 - r0)*(i/segs);
-      for(let j=0;j<=rs;j++){ const v = i*(rs + 1) + j;
-        pa.setXYZ(v, ctr.x + (pa.getX(v) - ctr.x)*r, ctr.y + (pa.getY(v) - ctr.y)*r, ctr.z + (pa.getZ(v) - ctr.z)*r); }
+      const t = i/segs, ctr = c.getPointAt(t), r = rad ? rad(t) : r0 + (r1 - r0)*t;
+      const knot = 1 + 0.9*J*Math.max(0, Math.sin(i*0.9 + ph))*Math.max(0, Math.sin(i*0.37 + ph*2)) + 0.25*J*(Math.random() - 0.5);
+      for(let j=0;j<=rs;j++){ const v = i*(rs + 1) + j, jj = j % rs;
+        // ridges of bark running along it, and lumps
+        const n = knot*(1 + J*(0.6*Math.sin(jj*2.1 + i*0.25 + ph) + 0.7*(knots[jj] - 0.5)*2*Math.sin(i*0.6 + jj) + 0.35*(Math.random() - 0.5)));
+        pa.setXYZ(v, ctr.x + (pa.getX(v) - ctr.x)*r*n, ctr.y + (pa.getY(v) - ctr.y)*r*n, ctr.z + (pa.getZ(v) - ctr.z)*r*n); }
     }
     geo.computeVertexNormals();
     const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = true; g.add(m); return c;
@@ -4696,13 +4785,47 @@ if(GIANT.on){
     const l = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.5), lamp); l.position.set(top.x, top.y - 2.8, top.z); g.add(l);
     const cord = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.1, 0.06), bark2); cord.position.set(top.x, top.y - 1.9, top.z); g.add(cord);
   }
+  /* The roots you drive over: each one comes out of the buttresses at the
+     foot of the trunk, snakes out along the ground half buried, crosses the
+     road as the hump you feel, and dives into the earth on the far side,
+     throwing off smaller roots as it goes. */
+  const ground = (a, r)=> gradedY(GIANT.x + Math.cos(a)*r, GIANT.z + Math.sin(a)*r) - gy;
+  const rootAlong = (a0, rA, rB, seed, rad, onRoad)=>{
+    const pts = [];
+    for(let r=rA; r<=rB; r+=2){
+      const calm = onRoad ? smoothstep(4, 11, Math.abs(r - R)) : 1;             // straight across the road
+      const a = a0 + (0.05*Math.sin(r*0.17 + seed) + 0.03*Math.sin(r*0.41 + seed*2))*calm*(18/Math.max(18, r));
+      const t = (r - rA)/(rB - rA), rr = rad(t);
+      // half sunk into the ground, the top of it riding the hump on the road
+      const y = onRoad && Math.abs(r - R) < 7 ? ground(a, r) - rr + 0.12 : ground(a, r) - rr*0.3 - (t > 0.85 ? (t - 0.85)*rr*6 : 0);
+      pts.push(P(a, r, y));
+    }
+    return pts;
+  };
+  GIANT.humps.forEach((at, n)=>{
+    const p = MAIN.pts[at], a = Math.atan2(p.z - GIANT.z, p.x - GIANT.x), seed = n*2.3 + 1;
+    const rad = t=> t < 0.15 ? 3.0 - t/0.15*1.9 : Math.max(0.25, 1.1 - (t - 0.15)*1.0);
+    limb(rootAlong(a, 13, R + 26, seed, rad, true), 0, 0, bark2, rad, 0.4);
+    // side roots peeling off inside the ring and past the road
+    for(const q of [[0.3, 1], [0.55, -1], [0.85, 1]]){
+      const r0 = 13 + q[0]*(R + 13), a1 = a + q[1]*0.02, pts = [];
+      for(let k=0;k<=6;k++){
+        const r = r0 + k*2.6, aa = a1 + q[1]*k*0.035*(18/r);
+        const rr = 0.5*(1 - k/7) + 0.12;
+        pts.push(P(aa, r, ground(aa, r) - rr*0.3 - (k > 4 ? (k - 4)*0.35 : 0)));
+      }
+      if(Math.abs(r0 - R) > 10 && Math.abs(r0 + 16 - R) > 10) limb(pts, 0.6, 0.15, bark2, null, 0.3);
+    }
+  });
+  // buttress roots all round the foot of the trunk, sprawling out and sinking before the road
+  for(let k=0;k<16;k++){
+    const a = k/16*Math.PI*2 + 0.2 + Math.random()*0.15, len = 16 + Math.random()*(R - 38);
+    const rad = t=> t < 0.2 ? 2.6 - t/0.2*1.7 : Math.max(0.15, 0.9 - (t - 0.2)*0.9);
+    limb(rootAlong(a, 12.5, 12.5 + len, k*1.7, rad, false), 0, 0, bark, rad, 0.3);
+  }
   for(const deg of [205, 235, 262, 290]){
     const a = deg*Math.PI/180;
-    limb([P(a, 11, 1.5), P(a, 22, 2.5), P(a + 0.05, 36, 1.2), P(a + 0.1, 50, 0.2), P(a + 0.12, 62, -1)], 2.6, 1.1, bark);
-  }
-  for(const at of GIANT.humps){
-    const p = MAIN.pts[at], a = Math.atan2(p.z - GIANT.z, p.x - GIANT.x), ry = gradedY(p.x, p.z) - gy;
-    limb([P(a - 0.03, R - 16, ry + 0.2), P(a, R - 8, ry + 0.05), P(a, R, ry - 0.15), P(a + 0.02, R + 9, ry - 0.1), P(a + 0.04, R + 18, ry + 0.1)], 0.55, 0.45, bark2);
+    limb(rootAlong(a, 12, R - 7, deg*0.1, t=> 2.8 - 2.2*Math.sqrt(t), false), 0, 0, bark, t=> 2.8 - 2.2*Math.sqrt(t), 0.3);
   }
   for(let k=0;k<7;k++){
     const a = k/7*Math.PI*2 + 0.3, y0 = 38 + (k % 3)*7;
