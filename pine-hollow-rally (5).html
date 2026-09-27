@@ -920,7 +920,7 @@ const TRACKS = [
     kit:["crest","kicker"],
     shape:"FIRE AND ICE \u2014 over and under",
     feature:"a loop that crosses itself on a trestle, and a high and a low route braided over and under each other",
-    ctrl:[[-440,-470],[-300,-455],[-190,-395],[-60,-400],[40,-470],[170,-500],[300,-440],[420,-400],[530,-340],[600,-240],[590,-150],[638,-92],[596,-30],[602,40],[602,140],[625,240],[700,300],[790,250],[800,150],[720,95],[602,100],[520,165],[470,200],[400,200],[332,253],[263,275],[195,253],[127,200],[58,147],[-10,125],[-78,147],[-147,200],[-215,253],[-283,275],[-352,253],[-420,200],[-540,170],[-605,95],[-565,15],[-640,-60],[-705,-150],[-715,-260],[-680,-370],[-610,-440],[-540,-475]],
+    ctrl:[[-440,-470],[-300,-455],[-190,-395],[-60,-400],[40,-470],[170,-500],[300,-440],[420,-400],[530,-340],[600,-240],[590,-150],[638,-92],[596,-30],[602,40],[602,140],[625,240],[700,300],[790,250],[800,150],[720,95],[602,100],[520,165],[470,200],[400,200],[359,204],[318,224],[277,253],[236,268],[195,253],[154,223],[113,188],[72,156],[31,133],[-10,125],[-51,133],[-92,156],[-133,188],[-174,223],[-215,253],[-256,268],[-297,253],[-338,224],[-379,204],[-420,200],[-540,170],[-605,95],[-565,15],[-640,-60],[-705,-150],[-715,-260],[-680,-370],[-610,-440],[-540,-475]],
     hills:[[720,200,200,58],[-720,160,260,48],[263,305,130,34],[-10,95,130,30],[-283,305,130,34],[263,95,120,-20],[-10,305,120,-18],[-283,95,120,-20],
            [450,-470,200,34],[-420,-560,230,34],[-80,-430,150,-16],[600,-150,180,26]],
     jumps:[], fords:[],
@@ -932,6 +932,7 @@ const TRACKS = [
        the cone's crater erupting, geysers along the lava lake */
     leaps:[{at:[-712,-215], height:2.4, gap:13}],
     tunnels:[{from:[-548,166], to:[-600,60]}],
+    spikes:[{from:[606,-250], to:[600,30]}],
     crater:{at:[720,200], r:34},
     geysers:6,
     /* the bridges: over another road (over:true, pass picks which time round the lap) or over lava */
@@ -945,7 +946,7 @@ const TRACKS = [
             {at:[-283,125], road:0, span:16, depth:3.2, wall:10, reach:60} ],
     branches:[
       // the low route: braided under the high one, over the lava streams
-      {a:[400,200], b:[-420,200], via:[[332,147],[263,125],[195,147],[127,200],[58,253],[-10,275],[-78,253],[-147,200],[-215,147],[-283,125],[-352,147]],
+      {a:[400,200], b:[-420,200], via:[[359,196],[318,176],[277,147],[236,132],[195,147],[154,177],[113,212],[72,244],[31,267],[-10,275],[-51,267],[-92,244],[-133,212],[-174,177],[-215,147],[-256,132],[-297,147],[-338,176],[-379,196]],
        half:5.0, jumps:[], tune:0, flush:30, island:true, label:"LOW ROUTE", mainLabel:"HIGH ROUTE"}
     ]}
 ];
@@ -1308,6 +1309,7 @@ if(DESERT){
   TRACK.spans = (TRACK.spans||[]).map(sp=> Object.assign({}, sp, {at: mv(sp.at)}));
   TRACK.leaps = (TRACK.leaps||[]).map(sp=> Object.assign({}, sp, {at: mv(sp.at)}));
   TRACK.tunnels = (TRACK.tunnels||[]).map(t=> ({from: mv(t.from), to: mv(t.to)}));
+  TRACK.spikes = (TRACK.spikes||[]).map(t=> ({from: mv(t.from), to: mv(t.to)}));
   if(TRACK.crater) TRACK.crater = Object.assign({}, TRACK.crater, {at: mv(TRACK.crater.at)});
   ["bowl","lake","washout","pit","dunes","swamp","giantTree"].forEach(k=>{ if(TRACK[k]) TRACK[k] = Object.assign({}, TRACK[k], {at: mv(TRACK[k].at)}); });
   ["canyon","gallery"].forEach(k=>{ if(TRACK[k]) TRACK[k] = Object.assign({}, TRACK[k], {from: mv(TRACK[k].from), to: mv(TRACK[k].to)}); });
@@ -2773,6 +2775,14 @@ function spanUV(sp, x, z){
 function carveSpans(y, x, z){
   for(let n=0;n<SPANS.length;n++){
     const sp = SPANS[n];
+    if(!sp.leap){
+      // whatever the hillside does, it stays under the deck and falls away from its rails
+      const dx = x - sp.x, dz = z - sp.z, u0 = dx*sp.tx + dz*sp.tz, v0 = Math.abs(-dx*sp.tz + dz*sp.tx);
+      if(Math.abs(u0) <= sp.span + 3 && v0 < 22){
+        const half = sp.P.half[sp.i];
+        y = Math.min(y, sp.y + BED + sp.grade*u0 - 0.45 + Math.max(0, v0 - (half + 1.4))*0.9);
+      }
+    }
     if(sp.over) continue;
     const uv = spanUV(sp, x, z), au = Math.abs(uv[0]), av = Math.abs(uv[1]);
     if(au > sp.wall + 8 || av > sp.reach) continue;
@@ -2893,6 +2903,7 @@ function carveWater(y, x, z){
 function barren(x, z){
   if(GIANT.on && Math.hypot(x - GIANT.x, z - GIANT.z) < GIANT.ring - 7) return true;   // the oak's own ground
   if(SPANS.length && lavaNear(x, z) > 0.2) return true;                                   // nothing grows by the lava
+  if(CRATER.on && Math.hypot(x - CRATER.x, z - CRATER.z) < CRATER.r*3.2) return true;      // nor on the volcano's cone
   if(DUNE.on && Math.hypot(x - DUNE.x, z - DUNE.z) < DUNE.r*0.88) return true;
   if(CANYON.on){ const uv = canyonUV(x, z); if(uv && uv[0] < 30 && canyonPlateau(x, z, uv) > 0.2) return true; }
   return false;
@@ -3725,6 +3736,11 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
             if(dy < 0.9 && dy > -1.5) c.setHSL(0.10, 0.28, 0.42 + Math.random()*0.04);
           }
           // round the lava the snow has gone: black basalt, a little red where it is hottest
+          if(CRATER.on){
+            // the cone: black ash and rock from the rim down, snow lying in the gullies lower on
+            const dc = Math.hypot(x - CRATER.x, z - CRATER.z), kc = 1 - smoothstep(CRATER.r*1.2, CRATER.r*3.2, dc + (Math.random() - 0.5)*14);
+            if(kc > 0) c.lerp(new THREE.Color().setHSL(0.03, 0.12, 0.13 + Math.random()*0.05), Math.min(0.92, kc*1.15));
+          }
           if(SPANS.length || (LAKE.on && LAKE.lava)){
             const k = lavaNear(x, z);
             if(k > 0) c.lerp(new THREE.Color().setHSL(0.02 + Math.random()*0.02, 0.10 + k*0.25, 0.09 + Math.random()*0.05 + (1 - k)*0.06), Math.min(0.95, k*1.1));
@@ -4406,7 +4422,7 @@ if(SPANS.length){
     const at = r0 => { const s0 = sp.i + r0, i0 = Math.floor(s0), f = s0 - i0, A = P.pts[wrapIdx(P, i0)], B = P.pts[wrapIdx(P, i0 + 1)];
       const T = P.tans[wrapIdx(P, Math.round(s0))];
       return {x: A.x + (B.x - A.x)*f, z: A.z + (B.z - A.z)*f, y: pathY(P, s0) + BED, tx:T.x, tz:T.z, half:P.half[wrapIdx(P, Math.round(s0))]}; };
-    const L0 = -sp.S, L1 = sp.S;
+    const Sv = Math.min(sp.S, Math.round((sp.wall + 1.5)/seg)), L0 = -Sv, L1 = Sv;
     if(!sp.leap){
     // the deck: logs across, a hand's width apart
     for(let s0=L0; s0<=L1; s0+=0.5/seg){
@@ -4489,17 +4505,29 @@ if(SPANS.length){
 }
 /* ---- the ice tunnel: a tube of clear blue ice over the road, ribbed,
    hung with icicles, a snow-capped portal at each end ---- */
-const iceTube = new THREE.MeshPhongMaterial({color:0x9fd6ee, shininess:100, specular:0xd8f0fa, transparent:true, opacity:0.45, side:THREE.DoubleSide, depthWrite:false});
+const iceTex = new THREE.CanvasTexture(noiseCanvas(256, 256, (c, W, H)=>{
+  // old ice: pale streaks running down it, darker bands, and white cracks
+  c.fillStyle = "#9fd2ea"; c.fillRect(0, 0, W, H);
+  for(let k=0;k<160;k++){ c.fillStyle = "rgba(" + (Math.random() < 0.5 ? "230,246,255," : "70,130,170,") + (0.08 + Math.random()*0.18) + ")";
+    c.fillRect(Math.random()*W, 0, 2 + Math.random()*8, H); }
+  for(let k=0;k<14;k++){ c.fillStyle = "rgba(60,120,160,.12)"; c.fillRect(0, Math.random()*H, W, 6 + Math.random()*16); }
+  c.strokeStyle = "rgba(255,255,255,.7)"; c.lineWidth = 1.5;
+  for(let k=0;k<22;k++){ c.beginPath(); let x = Math.random()*W, y = Math.random()*H; c.moveTo(x, y);
+    for(let q=0;q<6;q++){ x += (Math.random() - 0.5)*40; y += (Math.random() - 0.5)*40; c.lineTo(x, y); } c.stroke(); }
+}));
+iceTex.wrapS = iceTex.wrapT = THREE.RepeatWrapping;
+const iceTube = new THREE.MeshPhongMaterial({map:iceTex, color:0xffffff, emissive:0x10303e, shininess:110, specular:0xe6f6ff, transparent:true, opacity:0.9, side:THREE.DoubleSide});
 TUNNELS.forEach(T=>{
-  const P = MAIN, seg = P.seg, pos = [], idx = [], NA = 14;
+  const P = MAIN, seg = P.seg, pos = [], idx = [], uvs = [], NA = 14;
   const ring = k=>{
     const i = wrapIdx(P, k), p = P.pts[i], t = P.tans[i], nx = -t.z, nz = t.x, R = P.half[i] + 2.6, y0 = p.y + BED - 0.3;
-    for(let a=0;a<=NA;a++){ const f = a/NA*Math.PI; pos.push(p.x + nx*Math.cos(f)*R, y0 + Math.sin(f)*R*0.95, p.z + nz*Math.cos(f)*R); }
+    for(let a=0;a<=NA;a++){ const f = a/NA*Math.PI; pos.push(p.x + nx*Math.cos(f)*R, y0 + Math.sin(f)*R*0.95, p.z + nz*Math.cos(f)*R); uvs.push(rows*0.12, a/NA*2); }
   };
   let rows = 0;
   for(let k=T.a - Math.round(2/seg); k<=T.b + Math.round(2/seg); k+=Math.max(1, Math.round(1.5/seg))){ ring(k); rows++; }
   for(let r=0;r<rows-1;r++) for(let a=0;a<NA;a++){ const i0 = r*(NA + 1) + a; idx.push(i0, i0 + NA + 1, i0 + 1, i0 + 1, i0 + NA + 1, i0 + NA + 2); }
-  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2)); g.setIndex(idx); g.computeVertexNormals();
   const tube = new THREE.Mesh(g, iceTube); tube.renderOrder = 4; scene.add(tube);
   // ribs and icicles, and a heavy portal at each end
   const rib = new THREE.MeshPhongMaterial({color:0xd4eef8, shininess:90, specular:0xffffff});
@@ -4513,17 +4541,49 @@ TUNNELS.forEach(T=>{
       const tor = new THREE.Mesh(new THREE.TorusGeometry(R, portal ? 1.1 : 0.32, 6, 16, Math.PI), portal ? snowM : rib);
       tor.position.set(p.x, y0, p.z); tor.rotation.y = Math.atan2(-nz, nx); tor.scale.y = 0.95; gg.add(tor);
     }
-    for(let n=0;n<3;n++){
-      const f = (0.25 + Math.random()*0.5)*Math.PI, L = 0.4 + Math.random()*1.2;
-      const c = new THREE.Mesh(new THREE.ConeGeometry(0.1 + Math.random()*0.1, L, 5), icicle);
+    for(let n=0;n<5;n++){
+      // hung from the roof: the base sits in the ice, the point hangs down
+      const f = (0.22 + Math.random()*0.56)*Math.PI, L = 0.6 + Math.random()*1.8, rr = 0.14 + Math.random()*0.16;
+      const c = new THREE.Mesh(new THREE.ConeGeometry(rr, L, 6), icicle);
       c.rotation.x = Math.PI;
-      c.position.set(p.x + nx*Math.cos(f)*(R - 0.2) + t.x*(Math.random() - 0.5)*1.6, y0 + Math.sin(f)*R*0.95 - L/2, p.z + nz*Math.cos(f)*(R - 0.2) + t.z*(Math.random() - 0.5)*1.6);
+      const hx = Math.cos(f)*(R - 0.15), hy = Math.sin(f)*R*0.95 - 0.1;
+      c.position.set(p.x + nx*hx + t.x*(Math.random() - 0.5)*1.6, y0 + hy - L/2 + 0.12, p.z + nz*hx + t.z*(Math.random() - 0.5)*1.6);
       gg.add(c);
     }
   }
   gg.traverse(o=>{ if(o.isMesh) o.castShadow = true; });
   mergeStatic(gg); scene.add(gg);
   roadSign(T.a - Math.round(60/seg), 1, ["ICE TUNNEL", "slippery \u2014 mind the walls"], "#2f6fa8", "#f2efe6");
+});
+/* ---- the ice spikes: giant crystals of blue ice bursting up out of the
+   ground either side of the road, some leaning out over it ---- */
+(TRACK.spikes || []).forEach(d=>{
+  let a = snapTo(MAIN, d.from), b = snapTo(MAIN, d.to); if(b < a){ const q = a; a = b; b = q; }
+  const mats = [0x4f9ccc, 0x7cc0e6, 0x3a86b8].map(c=> new THREE.MeshPhongMaterial({color:c, emissive:0x0a2230, shininess:140, specular:0xffffff, flatShading:true}));
+  const g = new THREE.Group(), seg = MAIN.seg;
+  const crystal = (x, z, y, h, r, lx, lz, m)=>{
+    const c = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(r*0.85, r, h, 6), m); body.position.y = h/2; c.add(body);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(r*0.85, r*2.2, 6), m); tip.position.y = h + r*1.1; c.add(tip);
+    c.position.set(x, y - 0.8, z); c.rotation.set(lz, Math.random()*6, -lx); g.add(c);
+  };
+  for(let k=a; k<=b; k+=Math.max(1, Math.round(11/seg))){
+    const i = wrapIdx(MAIN, k), p = MAIN.pts[i], t = MAIN.tans[i], nx = -t.z, nz = t.x, half = MAIN.half[i];
+    for(const sd of [-1, 1]){
+      if(Math.random() < 0.15) continue;
+      const off = half + 3.5 + Math.random()*8, x0 = p.x + nx*sd*off, z0 = p.z + nz*sd*off, y0 = gridH(x0, z0);
+      // a cluster: one big one leaning out over the road, smaller ones round its foot
+      const H = 7 + Math.random()*10, R0 = 1.6 + Math.random()*1.6, lean = 0.2 + Math.random()*0.35;
+      crystal(x0, z0, y0, H, R0, -nx*sd*lean, -nz*sd*lean, mats[k % 3]);
+      for(let n=0;n<3 + Math.floor(Math.random()*3);n++){
+        const ox = x0 + (Math.random() - 0.5)*6 + nx*sd*Math.random()*4, oz = z0 + (Math.random() - 0.5)*6 + nz*sd*Math.random()*4;
+        crystal(ox, oz, gridH(ox, oz), 2 + Math.random()*5, 0.6 + Math.random()*1.0, (Math.random() - 0.5)*0.9, (Math.random() - 0.5)*0.9, mats[(k + n) % 3]);
+      }
+      if(off < half + 8) ISLANDS.push({x:x0, z:z0, r:R0});
+    }
+  }
+  g.traverse(o=>{ if(o.isMesh) o.castShadow = true; });
+  mergeStatic(g); scene.add(g);
 });
 /* ---- the crater at the top of the cone: a lake of lava, a column of smoke
    and bombs of it thrown up out over the rim ---- */
@@ -4537,29 +4597,62 @@ if(CRATER.on){
     c.fillStyle = gr; c.fillRect(0, 0, W, H); }));
   CRATER_FX.puffs = [];
   for(let k=0;k<40;k++){
-    const m = new THREE.Sprite(new THREE.SpriteMaterial({map:puffTex, color:k % 3 ? 0x5a5a60 : 0x7a7068, transparent:true, depthWrite:false, opacity:0}));
+    const m = new THREE.Sprite(new THREE.SpriteMaterial({map:puffTex, color:k % 3 ? 0x4a4a50 : 0x6a6058, transparent:true, depthWrite:false, opacity:0}));
     m.userData.ph = k/40; scene.add(m); CRATER_FX.puffs.push(m);
   }
   CRATER_FX.bombs = [];
   const bm = new THREE.MeshBasicMaterial({color:0xffa030});
-  for(let k=0;k<10;k++){ const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9, 0), bm); m.visible = false; scene.add(m); CRATER_FX.bombs.push({m, vx:0, vy:0, vz:0, live:false}); }
-  CRATER_FX.light = new THREE.PointLight(0xff5a18, 2.5, 160, 1.4); CRATER_FX.light.position.set(CRATER.x, CRATER.lava + 8, CRATER.z); scene.add(CRATER_FX.light);
+  for(let k=0;k<16;k++){ const m = new THREE.Mesh(new THREE.IcosahedronGeometry(1.3, 0), bm); m.visible = false; scene.add(m); CRATER_FX.bombs.push({m, vx:0, vy:0, vz:0, live:false}); }
+  CRATER_FX.light = new THREE.PointLight(0xff5a18, 2.5, 220, 1.3); CRATER_FX.light.position.set(CRATER.x, CRATER.lava + 8, CRATER.z); scene.add(CRATER_FX.light);
   CRATER_FX.t = 2;
+  /* lava running over the lip and down the cone in glowing rivers, stopping
+     short of the road that loops round below, so the volcano is plain from
+     every part of the loop */
+  for(let k=0;k<4;k++){
+    let a = k/4*Math.PI*2 + 0.4, x = CRATER.x + Math.cos(a)*CRATER.r*0.85, z = CRATER.z + Math.sin(a)*CRATER.r*0.85;
+    const left = [], right = []; let w = 1.6;
+    for(let m=0;m<140;m+=2.5){
+      const n = nearest(x, z);
+      if(n.dist < n.half + 16) break;
+      a += (Math.random() - 0.5)*0.12;
+      const tx = Math.cos(a), tz = Math.sin(a), y = gridH(x, z) + 0.3;
+      left.push([x - tz*w, y, z + tx*w]); right.push([x + tz*w, y, z - tx*w]);
+      x += tx*2.5; z += tz*2.5; w = Math.min(4.2, w + 0.08);
+    }
+    if(left.length < 4) continue;
+    const pos = [], ix = [], dep = [];
+    for(let q=0;q<left.length;q++){ pos.push(...left[q], ...right[q]); dep.push(1, 1);
+      if(q){ const b = (q - 1)*2; ix.push(b, b + 1, b + 3, b, b + 3, b + 2); } }
+    const fg = new THREE.BufferGeometry(); fg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    fg.setAttribute("aDepth", new THREE.Float32BufferAttribute(dep, 1)); fg.setIndex(ix);
+    const fm = lavaMaterial(); fm.side = THREE.DoubleSide;
+    const flow = new THREE.Mesh(fg, fm); flow.frustumCulled = false; scene.add(flow);
+  }
+  // the rim glows from inside
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(CRATER.r*0.85, 1.6, 6, 40), new THREE.MeshBasicMaterial({color:0xff7a20, transparent:true, opacity:0.55, blending:THREE.AdditiveBlending, depthWrite:false}));
+  rim.rotation.x = Math.PI/2; rim.position.set(CRATER.x, CRATER.lava + 1.5, CRATER.z); scene.add(rim);
 }
 /* ---- geysers out on the lava lake, and steam vents by the road ---- */
 const GEYSERS = [], VENTS = [];
 if(TRACK.geysers && LAKE.on && LAKE.lava){
   const baseM = new THREE.MeshLambertMaterial({color:0x2a1a14});
-  for(let k=0;k<TRACK.geysers;k++){
-    const a = (k + 0.3)/TRACK.geysers*Math.PI*2, x = LAKE.x + Math.cos(a)*LAKE.rx*0.8, z = LAKE.z + Math.sin(a)*LAKE.rz*0.78;
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(5, 3.4, 9, 1, true), baseM); cone.position.set(x, LAKE.level + 1.2, z); scene.add(cone);
+  // where they go: up the lava channels either side of every lava bridge, and a few out on the lake
+  const spots = [];
+  SPANS.forEach(sp=>{ if(sp.over) return;
+    const half = sp.P.half[sp.i];
+    for(const sd of [-1, 1]){ const v = sd*(half + (sp.low ? 12 : 16)), x = sp.x - sp.tz*v, z = sp.z + sp.tx*v;
+      spots.push([x, z, sp.lava, sp.low ? 20 : 44]); } });
+  for(let k=0;k<3;k++){ const a = (k + 0.3)/3*Math.PI*2; spots.push([LAKE.x + Math.cos(a)*LAKE.rx*0.8, LAKE.z + Math.sin(a)*LAKE.rz*0.78, LAKE.level, 30]); }
+  for(let k=0;k<spots.length;k++){
+    const x = spots[k][0], z = spots[k][1], lev = spots[k][2];
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(3.2, 2.6, 9, 1, true), baseM); cone.position.set(x, lev + 0.9, z); scene.add(cone);
     // the fountain itself: a glowing column that shoots up and falls back
     const col = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 2.2, 1, 10, 1, true),
       new THREE.MeshBasicMaterial({color:0xffa020, transparent:true, opacity:0.85, blending:THREE.AdditiveBlending, depthWrite:false}));
-    col.position.set(x, LAKE.level + 2.6, z); col.visible = false; scene.add(col);
+    col.position.set(x, lev + 2, z); col.visible = false; scene.add(col);
     const cap = new THREE.Mesh(new THREE.IcosahedronGeometry(2.4, 1), new THREE.MeshBasicMaterial({color:0xffc050, transparent:true, opacity:0.8, blending:THREE.AdditiveBlending, depthWrite:false}));
     cap.visible = false; scene.add(cap);
-    GEYSERS.push({x, z, y:LAKE.level + 2.6, t:2 + k*1.7 + Math.random()*3, on:0, col, cap});
+    GEYSERS.push({x, z, y:lev + 2, H:spots[k][3], t:1 + Math.random()*4, on:0, col, cap});
   }
 }
 if(SPANS.length && TRACK.geysers){
@@ -4580,23 +4673,25 @@ function stepSetPieces(dt){
       const ph = (m.userData.ph + T*0.035) % 1;
       const drift = ph*ph*60;
       m.position.set(CRATER.x + drift*0.8 + Math.sin(ph*9 + m.userData.ph*20)*4, CRATER.lava + 4 + ph*95, CRATER.z + drift*0.35);
-      const sc = 18 + ph*70; m.scale.set(sc, sc, 1);
-      m.material.opacity = Math.min(1, ph*8)*(1 - ph)*0.85;
+      const sc = 22 + ph*90; m.scale.set(sc, sc, 1);
+      m.material.opacity = Math.min(1, ph*8)*(1 - ph)*0.9;
+      // lit from below by the lava for the first stretch of its rise
+      m.material.color.setRGB(0.3 + 0.7*Math.max(0, 1 - ph*5), 0.29 + 0.2*Math.max(0, 1 - ph*5), 0.3);
     });
     CRATER_FX.light.intensity = 2.2 + Math.sin(T*2.3)*0.5 + Math.sin(T*7.1)*0.25;
     CRATER_FX.t -= dt;
     if(CRATER_FX.t <= 0 && dt > 0){
       // an eruption: a handful of bombs out over the rim, and a rumble if you are close enough to feel it
-      CRATER_FX.t = 2.5 + Math.random()*4;
-      CRATER_FX.bombs.forEach(b=>{ if(Math.random() < 0.7){ const a = Math.random()*6.28, v = 6 + Math.random()*9;
-        b.live = true; b.m.visible = true; b.m.position.set(CRATER.x, CRATER.lava + 2, CRATER.z); b.vx = Math.cos(a)*v; b.vz = Math.sin(a)*v; b.vy = 20 + Math.random()*14; } });
+      CRATER_FX.t = 1.2 + Math.random()*2.2;
+      CRATER_FX.bombs.forEach(b=>{ if(!b.live && Math.random() < 0.8){ const a = Math.random()*6.28, v = 5 + Math.random()*10;
+        b.live = true; b.m.visible = true; b.m.position.set(CRATER.x, CRATER.lava + 2, CRATER.z); b.vx = Math.cos(a)*v; b.vz = Math.sin(a)*v; b.vy = 26 + Math.random()*16; b.m.scale.setScalar(1 + Math.random()*1.2); } });
       if(actx && far < 450){ const k = 1 - far/450; burst(1.6, "lowpass", 120, 0.35*k, 1, 0, 60); tone(40, 1.4, "sine", 0.3*k, 28); }
       CRATER_FX.light.intensity = 6;
     }
     CRATER_FX.bombs.forEach(b=>{
       if(!b.live) return;
       b.vy -= 9.8*dt; const p = b.m.position; p.x += b.vx*dt; p.y += b.vy*dt; p.z += b.vz*dt;
-      if(far < 400 && Math.random() < 0.6) spawnDust(p.x, p.y, p.z, [1.0, 0.5 + Math.random()*0.3, 0.12], 0.3, 0, 0, 0.5);
+      if(far < 700) spawnDust(p.x, p.y, p.z, [1.0, 0.5 + Math.random()*0.3, 0.12], 0.6, 0, 0, 0.5);
       if(p.y < gridH(p.x, p.z)){ b.live = false; b.m.visible = false;
         if(far < 300) for(let k=0;k<8;k++) spawnDust(p.x, p.y + 0.5, p.z, [1.0, 0.45, 0.1], 0.5, (Math.random() - 0.5)*6, (Math.random() - 0.5)*6, 4); }
     });
@@ -4604,18 +4699,21 @@ function stepSetPieces(dt){
   GEYSERS.forEach(G=>{
     G.t -= dt;
     const far = Math.hypot(cx - G.x, cz - G.z);
-    if(G.t <= 0 && dt > 0){ G.t = 5 + Math.random()*6; G.on = 1.8;
+    // one goes up as you come to it
+    if(far < 80 && G.on <= 0 && G.t > 1.5 && !G.near){ G.t = 0.2 + Math.random()*0.8; G.near = true; }
+    if(far > 140) G.near = false;
+    if(G.t <= 0 && dt > 0){ G.t = 3.5 + Math.random()*4; G.on = 1.8;
       if(actx && far < 260){ const k = 1 - far/260; burst(1.8, "bandpass", 500, 0.25*k, 0.7, 0, 1400); burst(0.5, "lowpass", 160, 0.3*k, 1, 0); } }
     if(G.on > 0){
       G.on -= dt;
-      const ph = 1 - G.on/1.8, h = 26*Math.sin(Math.min(1, ph*1.2)*Math.PI);          // up fast, falls back
+      const ph = 1 - G.on/1.8, h = G.H*Math.sin(Math.min(1, ph*1.2)*Math.PI);          // up fast, falls back
       G.col.visible = G.cap.visible = h > 0.5;
       G.col.scale.set(1 + ph*0.6, h, 1 + ph*0.6); G.col.position.y = G.y + h/2;
       G.cap.position.set(G.x, G.y + h, G.z); G.cap.scale.setScalar(1 + ph*1.5);
       G.col.material.opacity = 0.85*(1 - ph*0.5);
       if(far < 500) for(let k=0;k<5;k++){
-        spawnDust(G.x + (Math.random() - 0.5)*2, G.y, G.z + (Math.random() - 0.5)*2, [1.0, 0.4 + Math.random()*0.45, 0.08], 1.2,
-                  (Math.random() - 0.5)*3, (Math.random() - 0.5)*3, 14 + Math.random()*10);
+        spawnDust(G.x + (Math.random() - 0.5)*2, G.y + Math.random()*G.H*0.6, G.z + (Math.random() - 0.5)*2, [1.0, 0.4 + Math.random()*0.45, 0.08], 1.2,
+                  (Math.random() - 0.5)*5, (Math.random() - 0.5)*5, 8 + Math.random()*10);
         if(Math.random() < 0.4) spawnDust(G.x, G.y + 6 + Math.random()*10, G.z, 4, 1.4, (Math.random() - 0.5)*2, (Math.random() - 0.5)*2, 3);
       }
       if(LAVA_LIGHT && far < 200){ LAVA_LIGHT.position.set(G.x, G.y + 8, G.z); LAVA_LIGHT.intensity = 4; }
