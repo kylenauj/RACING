@@ -7839,6 +7839,19 @@ function requestShift(g){
   trans.shiftT = DRIVE.shiftTime;
   trans.lock = DRIVE.lockout;
 }
+function autoDrive(){
+  const P = MAIN, i = state.idx, sp = Math.hypot(pose.vx, pose.vz);
+  const ahead = Math.round((9 + sp*0.45)/P.seg), tg = P.pts[wrapIdx(P, i + ahead)];
+  let err = Math.atan2(tg.x - pose.x, tg.z - pose.z) - pose.h;
+  while(err >  Math.PI) err -= Math.PI*2;
+  while(err < -Math.PI) err += Math.PI*2;
+  let want = 26;
+  if(ROUTE_V){ want = 1e9; for(let k=0;k<Math.round(40/P.seg);k+=2) want = Math.min(want, ROUTE_V[wrapIdx(P, i + k)]); want *= 0.8; }
+  const along = pose.vx*Math.sin(pose.h) + pose.vz*Math.cos(pose.h);
+  // pointing the wrong way (it spun, or it was sideways at the line): turn it round slowly
+  if(Math.abs(err) > 1.6) return {thr: 1, brk: 0, steer: Math.sign(err)};
+  return {thr: along < want ? 1 : 0, brk: along > want + 3 ? 1 : 0, steer: Math.max(-1, Math.min(1, err*2.6))};
+}
 function stepCar(dt){
   const fx = Math.sin(pose.h), fz = Math.cos(pose.h);
   const along = pose.vx*fx + pose.vz*fz;
@@ -7860,10 +7873,15 @@ function stepCar(dt){
   const inWater = wetAmt > 0.30;
 
   const driving = state.phase === "racing";
-  const thr = driving && CTL.thr ? 1 : 0;
-  const brk = driving && CTL.brk ? 1 : 0;
-  const hand = driving && CTL.hand;
-  const steer = driving ? CTL.steer : 0;
+  /* After the flag the computer takes the wheel and drives a cool-down
+     lap, round and round, at a steady pace, the way the rivals do: aim at
+     a point on the road ahead, ease off for the corners the routing test
+     says to brake for. */
+  const auto = state.phase === "done" ? autoDrive() : null;
+  const thr = auto ? auto.thr : driving && CTL.thr ? 1 : 0;
+  const brk = auto ? auto.brk : driving && CTL.brk ? 1 : 0;
+  const hand = auto ? false : driving && CTL.hand;
+  const steer = auto ? auto.steer : driving ? CTL.steer : 0;
 
   // ---- drivetrain -------------------------------------------------
   const sp0 = Math.abs(along);
@@ -7881,7 +7899,7 @@ function stepCar(dt){
   if(trans.shiftT > 0){
     trans.shiftT -= dt;
     if(trans.shiftT <= DRIVE.shiftTime*0.45) trans.gear = trans.target;
-  } else if(trans.auto && trans.dir > 0 && state.phase === "racing"){
+  } else if((trans.auto || state.phase === "done") && trans.dir > 0 && (state.phase === "racing" || state.phase === "done")){
     const g = trans.gear;
     if(g < DRIVE.totals.length && trans.rpm > (thr ? DRIVE.up : DRIVE.up*0.72)) requestShift(g+1);
     else if(g > 1 && trans.rpm < DRIVE.down && rpmAt(along, g-1) < DRIVE.up*0.90) requestShift(g-1);
@@ -8565,7 +8583,7 @@ function stepCar(dt){
     state.lapStart = now;
     state.lap++;
     onLap(lt, prevBest);
-    if(state.lap > LAPS) finishRace();
+    if(state.lap > LAPS && state.phase === "racing") finishRace();
   } else if(wrapBack && state.lap > 1 && gateDist < 40){
     state.lap--;
   }
@@ -10279,7 +10297,6 @@ function frame(now){
     stepDust(dt);
 
     if(state.phase === "menu") (GAME.garage ? garageCam(dt) : attractCam(dt));
-    else if(state.phase === "done" && GAME.doneT > 1.4) finishCam(dt);
     else stepCamera(dt, info.sp);
     if(GAME.shake > 0){
       camera.position.x += (Math.random()-0.5)*GAME.shake;
