@@ -1021,6 +1021,8 @@ function ramp(P, centre, up, over, height, land, full, steep){
     height *= Math.max(0, Math.min(1, 1 + grade/0.08));
     if(height < 0.2) return;
   }
+  // remembered, so nothing roughs up a kicker, its lip or its landing later
+  (P.rampSpans = P.rampSpans || []).push([centre - up, centre + back + (land || 0)]);
   const run  = up*seg;
   const face = Math.min(run*0.6, Math.max(7, height*(steep || 5)));   // the curved face, metres
   const lead = run - face;
@@ -3071,6 +3073,41 @@ paths.forEach(P=>{
     P.wet[i] = wet;
   }
 });
+/* ---- mud underfoot ----
+   Where the road has properly gone to mud it is no longer graded: it sinks
+   a little, heaves up into soft humps and holds water in the hollows
+   between them. mudRel is how much of that each sample carries, and it is
+   nothing where the road has to stay true: jumps and their landings, the
+   fords, the bridges, a built ramp, the start and the forks. */
+paths.forEach(P=>{
+  P.mudRel = new Float32Array(P.N);
+  if(P.def && (P.def.leap || P.def.even)) return;
+  const hold = P.calmCrest ? Float64Array.from(P.calmCrest) : new Float64Array(P.N);
+  const F = Math.round(30/P.seg);
+  (P.rampSpans || []).forEach(sp=>{
+    for(let k=sp[0]-F; k<=sp[1]+F; k++){
+      if(!P.closed && (k < 0 || k >= P.N)) continue;
+      const i = wrapIdx(P, k), out = Math.max(sp[0] - k, k - sp[1], 0);
+      hold[i] = Math.max(hold[i], 1 - out/F);
+    }
+  });
+  for(let i=0;i<P.N;i++){
+    let h = Math.max(hold[i], P.share ? Math.min(1, P.share[i]*3) : 0, P.deck ? P.deck[i] : 0, P.noStamp[i] ? 1 : 0);
+    for(const sp of SPANS) if((sp.P === P && Math.abs(i - sp.i) < 40/P.seg) || (sp.Q === P && Math.abs(i - sp.j) < 40/P.seg)) h = 1;
+    P.mudRel[i] = smoothstep(0.3, 0.65, P.mud[i])*(1 - h)*(1 - smoothstep(0.65, 0.9, P.wet[i]));
+  }
+});
+/* The shape of it: broad humps and hollows about ten metres across, set in
+   the world rather than along the road so the pattern never seams where
+   two roads meet, and sunk a few centimetres overall. Gentle enough that a
+   car wallows over it rather than being thrown off the top. The road
+   shader draws the puddles from the same numbers. */
+function mudHeave(x, z){
+  return -0.05
+       + 0.055*Math.sin(x*0.50 + 1.7*Math.cos(z*0.23))
+       + 0.045*Math.sin(z*0.57 + 1.9*Math.sin(x*0.19))
+       + 0.030*Math.sin((x - z)*0.41 + 0.9);
+}
 
 /* Banking: every corner leans in a little, so an S-bend throws the car from
    one bank across to the other. Held off wherever the road must be flat. */
@@ -3245,6 +3282,7 @@ const GPV = new Float32Array(GCELLS);     // how much of the old tar is left
 const GWA = new Float32Array(GCELLS);     // washboard chatter
 const GSM = new Float32Array(GCELLS);     // metres along the road
 const GBK = new Float32Array(GCELLS);     // bank height of a hollow-way
+const GMR = new Float32Array(GCELLS);     // how far the road has gone to soft mud
 /* The runner up: the next closest stretch of road to each cell (another
    road at a fork, or the same road coming back past itself). Where two
    roads overlap, taking every value from whichever happened to be nearest
@@ -3352,6 +3390,7 @@ function caveOf(s){ for(const C of CAVES){ if(s >= C.a && s <= C.b) return C; } 
             GWA[g] = P.st_wash[ia]*(1-f) + P.st_wash[ib]*f;
             GSM[g] = s*P.seg;
             GBK[g] = P.st_bank[ia]*(1-f) + P.st_bank[ib]*f;
+            GMR[g] = P.mudRel[ia]*(1-f) + P.mudRel[ib]*f;
           } else if(d < GD2[g]){
             GD2[g] = d; GHW2[g] = half; GM2[g] = mudHere; GW2[g] = wetHere;
           }
@@ -3417,7 +3456,15 @@ function caveOf(s){ for(const C of CAVES){ if(s >= C.a && s <= C.b) return C; } 
     const h = c*0.5;
     GM[g] = GM[g]*(1 - h) + GM2[g]*h;
     GW[g] = GW[g]*(1 - h) + GW2[g]*h;
-    GRU[g] *= 1 - c; GWA[g] *= 1 - c;
+    GRU[g] *= 1 - c; GWA[g] *= 1 - c; GMR[g] *= 1 - c;
+  }
+  // soft mud: the humps and hollows across the road, easing out over the verge
+  for(let g=0; g<GCELLS; g++){
+    if(GMR[g] <= 0.001 || GP[g] < 0) continue;
+    const on = 1 - smoothstep(GHW[g] + 0.5, GHW[g] + 3.5, GD[g]);
+    if(on <= 0) continue;
+    const a = g % GN, b = (g - a)/GN;
+    GH[g] += GMR[g]*on*mudHeave(-GHALF + a*GSTEP, -GHALF + b*GSTEP);
   }
   for(let b=0;b<GN-1;b++) for(let a=0;a<GN-1;a++){
     const k = b*GN + a;
@@ -3490,7 +3537,7 @@ function pathY(P, s){
   const g = k => P.pts[wrapIdx(P, i0+k)].y;
   return catmull(g(-1), g(0), g(1), g(2), f);
 }
-const _near = {i:0, dist:0, path:MAIN, pi:0, half:5.7, surf:0, deck:0, mud:0, wet:0};
+const _near = {i:0, dist:0, path:MAIN, pi:0, half:5.7, surf:0, deck:0, mud:0, wet:0, soft:0};
 function nearest(x, z){
   const c = cellAt(x, z);
   if(c < 0 || GP[c] < 0){
@@ -3502,7 +3549,7 @@ function nearest(x, z){
     }
     _near.path = MAIN; _near.pi = bi; _near.i = bi; _near.dist = Math.sqrt(best);
     _near.half = MAIN.half[bi]; _near.surf = MAIN.surf[bi]; _near.deck = 0;
-    _near.mud = 0; _near.wet = 0;
+    _near.mud = 0; _near.wet = 0; _near.soft = 0;
     return _near;
   }
   const P = paths[GP[c]], s = GS[c], pi = wrapIdx(P, s);
@@ -3510,7 +3557,7 @@ function nearest(x, z){
   _near.dist = distAt(x, z);
   _near.half = GHW[c]; _near.surf = P.surf[pi];
   _near.deck = P.deck ? P.deck[pi] : 0;
-  _near.mud = GM[c]; _near.wet = GW[c];
+  _near.mud = GM[c]; _near.wet = GW[c]; _near.soft = GMR[c];
   _near.i = P.closed ? pi
     : ((Math.round(P.mainFrom + (P.mainTo-P.mainFrom)*(s/(P.N-1))) % MAIN.N) + MAIN.N) % MAIN.N;
   return _near;
@@ -3568,8 +3615,18 @@ function roughY(x, z){
   const sm = lerpCell(GSM, x, z, c);
   const rut = Math.max(0, GRU[c])*Math.exp(-Math.pow((lat - 1.65)/0.5, 2));
   const wash = GWA[c]*Math.sin(sm*2*Math.PI/1.35);
-  return (wash - rut)*on;
+  /* In soft mud the ruts are cut deeper and wider, and the ground between
+     is churned into lumps a couple of metres across that each tyre meets
+     on its own, so the body pitches and rolls its way through. */
+  let mud = 0;
+  const mr = GMR[c];
+  if(mr > 0.001){
+    const churn = Math.sin(x*1.9 + Math.cos(z*1.3)*1.4)*Math.sin(z*2.1 + Math.sin(x*0.9)*1.2);
+    mud = mr*(0.035*churn - 0.045*Math.exp(-Math.pow((lat - 1.65)/0.65, 2)));
+  }
+  return (wash - rut + mud)*on;
 }
+function softAt(x, z){ const c = cellAt(x, z); return c >= 0 && GP[c] >= 0 ? GMR[c] : 0; }
 function pavedAt(x, z){ const c = cellAt(x, z); return c >= 0 && GP[c] >= 0 ? GPV[c] : 0; }
 function surfaceInfo(x, z){
   const n = nearest(x, z);
@@ -3782,10 +3839,10 @@ const TERRAIN_MAT = new THREE.MeshLambertMaterial({map:grassTex, vertexColors:tr
 const GROUND_MAT = TERRAIN_MAT;
 TERRAIN_MAT.onBeforeCompile = sh=>{
   sh.vertexShader = sh.vertexShader
-    .replace("#include <common>", "#include <common>\nattribute vec4 aRoad;\nattribute vec4 aRoad2;\nvarying vec4 vRoad;\nvarying vec4 vRoad2;\nvarying vec2 vXZ;")
-    .replace("#include <begin_vertex>", "#include <begin_vertex>\nvRoad = aRoad;\nvRoad2 = aRoad2;\nvXZ = position.xz;");
+    .replace("#include <common>", "#include <common>\nattribute vec4 aRoad;\nattribute vec4 aRoad2;\nattribute float aSoft;\nvarying vec4 vRoad;\nvarying vec4 vRoad2;\nvarying float vSoft;\nvarying vec2 vXZ;")
+    .replace("#include <begin_vertex>", "#include <begin_vertex>\nvRoad = aRoad;\nvRoad2 = aRoad2;\nvSoft = aSoft;\nvXZ = position.xz;");
   sh.fragmentShader = sh.fragmentShader
-    .replace("#include <common>", "#include <common>\nvarying vec4 vRoad;\nvarying vec4 vRoad2;\nvarying vec2 vXZ;\n" +
+    .replace("#include <common>", "#include <common>\nvarying vec4 vRoad;\nvarying vec4 vRoad2;\nvarying float vSoft;\nvarying vec2 vXZ;\n" +
       "float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }\n" +
       "float vnz(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);\n" +
       "  return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }")
@@ -3821,6 +3878,17 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
       "vec3 col = mix(grd, sandy, verge*0.85);",
       "col = mix(col, gravel, onRoad);",
       "col = mix(col, mudC, mk*max(onRoad, verge*0.7));",
+      // soft mud: the same humps the ground is built with (mudHeave), paler
+      // and drier on their crowns, with water standing in the hollows
+      "if(vSoft > 0.01){",
+      "  float hv = 0.055*sin(vXZ.x*0.50 + 1.7*cos(vXZ.y*0.23)) + 0.045*sin(vXZ.y*0.57 + 1.9*sin(vXZ.x*0.19))",
+      "           + 0.030*sin((vXZ.x - vXZ.y)*0.41 + 0.9) + (n2 - 0.5)*0.035;",
+      "  float inMud = vSoft*max(onRoad, verge*0.6);",
+      "  col = mix(col, col*1.18, smoothstep(0.035, 0.10, hv)*inMud*0.7);",
+      "  float pool = (1.0 - smoothstep(-0.085, -0.045, hv))*inMud;",
+      "  vec3 water = " + (WINTER ? "vec3(0.66, 0.72, 0.78)" : "vec3(0.30, 0.33, 0.34)") + " * (0.85 + 0.3*n1);",
+      "  col = mix(col, water, pool*0.85);",
+      "}",
       // what is left of an old tar road: dark, cracked, broken into islands with gravel between
       "float pv = vRoad2.w;",
       "float brk = vnz(vXZ*0.085)*0.6 + vnz(vXZ*0.31 + 7.0)*0.3 + vnz(vXZ*1.3)*0.1;",
@@ -3854,6 +3922,7 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
       const col = new Float32Array(cols*rows*3), uv = new Float32Array(cols*rows*2);
       const road = new Float32Array(cols*rows*4);
       const road2 = new Float32Array(cols*rows*4);
+      const soft = new Float32Array(cols*rows);
       let v = 0;
       for(let b=tb;b<=b1;b++){
         for(let a=ta;a<=a1;a++){
@@ -3881,6 +3950,7 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
           road2[v*4+1] = GP[g] >= 0 ? GWA[g] : 0;
           road2[v*4+2] = GP[g] >= 0 ? GSM[g] : 0;
           road2[v*4+3] = GP[g] >= 0 ? GPV[g] : 0;
+          soft[v] = GP[g] >= 0 ? GMR[g] : 0;
           // dirt near the road, grass beyond; bare earth on steep banks
           const t = smoothstep(1.5, 9, edge);
           const steep = Math.max(smoothstep(0.80, 0.55, n[1]),
@@ -3983,6 +4053,7 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
       gg.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
       gg.setAttribute("aRoad", new THREE.BufferAttribute(road, 4));
       gg.setAttribute("aRoad2", new THREE.BufferAttribute(road2, 4));
+      gg.setAttribute("aSoft", new THREE.BufferAttribute(soft, 1));
       gg.setIndex(idx);
       gg.computeBoundingSphere();
       const m = new THREE.Mesh(gg, TERRAIN_MAT);
@@ -4021,6 +4092,7 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
     const far = new Float32Array(pos.length/3*4).fill(0); for(let i=0;i<far.length;i+=4) far[i] = 40;
     gg.setAttribute("aRoad", new THREE.BufferAttribute(far, 4));
     gg.setAttribute("aRoad2", new THREE.BufferAttribute(new Float32Array(far.length), 4));
+    gg.setAttribute("aSoft", new THREE.BufferAttribute(new Float32Array(far.length/4), 1));
     gg.setIndex(idx);
     gg.computeVertexNormals();
     scene.add(new THREE.Mesh(gg, TERRAIN_MAT));
@@ -4991,6 +5063,7 @@ CAVES.forEach(C=>{
     const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
     g.setAttribute("aRoad", new THREE.Float32BufferAttribute(road, 4)); g.setAttribute("aRoad2", new THREE.Float32BufferAttribute(road2, 4));
+    g.setAttribute("aSoft", new THREE.Float32BufferAttribute(new Float32Array(road2.length/4), 1));
     g.setIndex(idx); g.computeVertexNormals();
     const m = new THREE.Mesh(g, TERRAIN_MAT); m.castShadow = true; m.receiveShadow = true; scene.add(m);
   }
@@ -5761,6 +5834,7 @@ if(GORGE.depth > 0.5){
     gg.setAttribute("uv", new THREE.Float32BufferAttribute(uv,2));
     gg.setAttribute("aRoad", new THREE.Float32BufferAttribute(road,4));
     gg.setAttribute("aRoad2", new THREE.Float32BufferAttribute(new Array(road.length).fill(0),4));
+    gg.setAttribute("aSoft", new THREE.Float32BufferAttribute(new Float32Array(road.length/4), 1));
     gg.setIndex(ix);
     const deck = new THREE.Mesh(gg, TERRAIN_MAT);
     deck.receiveShadow = true;
@@ -8623,20 +8697,25 @@ function mergeStatic(root, keep){
 
 /* Muck on the car: it builds up through the race, mud and dust low on the
    body and flung up the sides, packed snow in the arches, and a wade through
-   a ford washes some of it off again. Only the player's wagon carries it. */
-const CAR_DIRT = { uDirt:{value:0}, uSnow:{value:0}, uGround:{value:0}, uDirtCol:{value:new THREE.Color(0x4a3524)} };
+   a ford washes some of it off again. Only the player's wagon carries it.
+   How low a spot sits is measured on the car itself, not in the world: the
+   body is merged into a model whose origin is at ground level, so the line
+   stays painted on the panels however the car pitches over a bump, rides
+   its springs or climbs a hill. (Wheels and axle keep their own local
+   heights, all low, so they stay caked.) */
+const CAR_DIRT = { uDirt:{value:0}, uSnow:{value:0}, uDirtCol:{value:new THREE.Color(0x4a3524)} };
 function dirtify(m){
   m.onBeforeCompile = sh=>{
     Object.assign(sh.uniforms, CAR_DIRT);
     sh.vertexShader = sh.vertexShader
-      .replace("#include <common>", "#include <common>\nvarying vec3 vDW; varying vec3 vDL;")
-      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvDL = transformed; vDW = (modelMatrix*vec4(transformed, 1.0)).xyz;");
+      .replace("#include <common>", "#include <common>\nvarying vec3 vDL;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvDL = transformed;");
     sh.fragmentShader = sh.fragmentShader
-      .replace("#include <common>", "#include <common>\nvarying vec3 vDW; varying vec3 vDL; uniform float uDirt, uSnow, uGround; uniform vec3 uDirtCol;")
+      .replace("#include <common>", "#include <common>\nvarying vec3 vDL; uniform float uDirt, uSnow; uniform vec3 uDirtCol;")
       .replace("#include <color_fragment>", [
         "#include <color_fragment>",
         "{",
-        "  float hgt = vDW.y - uGround;",
+        "  float hgt = vDL.y;",
         "  float low = 1.0 - smoothstep(0.30, 1.35, hgt);",
         "  vec2 q = floor(vDL.xz*7.0 + vDL.y*4.0);",
         "  float n = fract(sin(dot(q, vec2(12.9898, 78.233)))*43758.5453);",
@@ -10591,6 +10670,7 @@ function stepCarInner(dt){
   const wetAmt = FROZEN ? 0 : wet0;
   const inMud   = mudAmt > 0.25;
   const inWater = wetAmt > 0.30;
+  const soft = offRoad ? 0 : near0.soft;           // how churned up the mud underfoot is
 
   const driving = state.phase === "racing";
   /* After the flag the computer takes the wheel and drives a cool-down
@@ -10606,7 +10686,8 @@ function stepCarInner(dt){
   // ---- drivetrain -------------------------------------------------
   const sp0 = Math.abs(along);
   // dirt off the road costs grip and some speed, not the whole run
-  const traction = (deepOff ? 0.60 : offRoad ? 0.74 : 1 - mudAmt*0.20 - wetAmt*0.08) * (1 - iceAmt*0.28);
+  // mud costs no drive: it is there to look and feel like a rally stage, not to slow you
+  const traction = (deepOff ? 0.60 : offRoad ? 0.74 : 1 - wetAmt*0.08) * (1 - iceAmt*0.28);
 
   // engage forward or reverse from a near stop
   if(sp0 < 0.6){
@@ -10658,8 +10739,8 @@ function stepCarInner(dt){
 
   // resistance sets top speed instead of a hard clamp
   const sgn = Math.sign(along || 1);
-  a -= sgn * (0.0006*along*along + (deepOff ? 1.9 : offRoad ? 1.0 : 0.30 + mudAmt*0.68 + wetAmt*0.34));
-  a -= along * (deepOff ? 0.15 : offRoad ? 0.09 : 0.02 + mudAmt*0.075 + wetAmt*0.035 - tarAmt*0.006);
+  a -= sgn * (0.0006*along*along + (deepOff ? 1.9 : offRoad ? 1.0 : 0.30 + wetAmt*0.34));
+  a -= along * (deepOff ? 0.15 : offRoad ? 0.09 : 0.02 + wetAmt*0.035 - tarAmt*0.006);
   /* The mountain's mud is thick. It holds the car harder the faster it tries
      to go (the tyres and the body are pushing a bow wave of it), so in a
      bog you plough along with the engine screaming and the wheels flinging
@@ -10980,6 +11061,25 @@ function stepCarInner(dt){
     cRgh[wi] = roughY(wx, wz);
     wX[wi] = -o[1];                                   // model x: + is the driver's side
   });
+  /* Mud pushes back. With so little grip the car slithers down whatever
+     camber the humps and ruts give it, and a front tyre that drops into a
+     rut or a hollow drags the nose toward it, so a muddy stretch has to be
+     driven, not just aimed at. Only the mud's own shape counts here, so a
+     road's banking still drives the way it always did. */
+  if(soft > 0.02 && !pose.air){
+    const mH = [0,0,0,0];
+    for(let wi=0; wi<4; wi++){
+      const o = WOFF[wi];
+      mH[wi] = soft*mudHeave(pose.x + vfx*o[0] - vfz*o[1], pose.z + vfz*o[0] + vfx*o[1]) + cRgh[wi]*soft;
+    }
+    // sideways fall, downhill toward wheels 1 and 3 (the negative offsets)
+    const fall = ((mH[0] + mH[2]) - (mH[1] + mH[3]))/(2*TW);
+    const shove = Math.max(-2.2, Math.min(2.2, 26*fall*0.9))*soft;
+    pose.vx += vfz*shove*dt; pose.vz -= vfx*shove*dt;
+    // a front wheel dropping in pulls that way; +h turns toward wheel 1's side
+    const tug = Math.max(-0.12, Math.min(0.12, mH[0] - mH[1]));
+    pose.h += tug*1.8*Math.min(1, sp/15)*Math.sign(newAlong || 1)*dt;
+  }
   const gPitch = Math.atan2((cG[2]+cG[3]) - (cG[0]+cG[1]), 2*WB);   // + is nose down
   const gRoll  = Math.atan2((cG[1]+cG[3]) - (cG[0]+cG[2]), 2*TW);   // + is driver's side up
   if(pose.bH === undefined){ pose.bH = pose.bHv = pose.bP = pose.bPv = pose.bR = pose.bRv = 0; }
@@ -11326,11 +11426,13 @@ function stepCarInner(dt){
     const dirScale = (inWater ? 0.62 : 0.45) * Math.min(1, sp/12);
     const backX = -pose.vx*dirScale, backZ = -pose.vz*dirScale;
     const sideKick = -slip*0.45;
-    const lift = inWater ? 2.2 : 0.6;            // thrown back along the ground, not up
+    // thrown back along the ground, not up; mud comes off the tread in a low rooster tail
+    const lift = inWater ? 2.2 : inMud ? 1.1 + Math.random()*0.6 : 0.6;
     // the rear tyres throw it: the fronts used to as well, and in water that
     // stood a column of spray straight up in front of the camera
     const wheels = [[-1.22, 0.80], [-1.22,-0.80]];
-    const perWheel = inWater ? 3 : (wading || slid > 2.2 || hand) ? (Math.random() < 0.6 ? 1 : 0)
+    const perWheel = inWater ? 3 : inMud ? 1 + (Math.random() < Math.min(0.85, sp/24) ? 1 : 0)
+                   : (wading || slid > 2.2 || hand) ? (Math.random() < 0.6 ? 1 : 0)
                    : (Math.random() < 0.2 ? 1 : 0);
     wheels.forEach(w=>{
       const wx = pose.x + nfx*w[0] + rx*w[1];
@@ -11347,7 +11449,7 @@ function stepCarInner(dt){
       }
     });
     if(inWater) splash.water = Math.min(1, splash.water + sp*dt*0.10);
-    if(inMud)   splash.mud   = Math.min(1, splash.mud   + sp*dt*0.025);  // mud only; running wide no longer muddies the lens
+    if(inMud)   splash.mud   = Math.min(1, splash.mud   + sp*dt*0.035);  // mud only; running wide no longer muddies the lens
   }
   // dirt off the outside pair while the body is leaning on them
   if(hardTurn){
@@ -12168,8 +12270,9 @@ function stepRivals(dt){
         target *= 1 - Math.max(-1, Math.min(1, gap/240))*0.07;
       }
       const q = nearest(r.mesh.position.x, r.mesh.position.z);
-      target *= FROZEN ? 1 - Math.max(q.wet||0, iceAt(r.mesh.position.x, r.mesh.position.z))*0.12 - (q.mud||0)*0.12
-                       : 1 - (q.wet||0)*0.32 - (q.mud||0)*0.12;
+      // (mud no longer slows the player, so it does not slow the rivals either)
+      target *= FROZEN ? 1 - Math.max(q.wet||0, iceAt(r.mesh.position.x, r.mesh.position.z))*0.12
+                       : 1 - (q.wet||0)*0.32;
 
       // traffic: anything close ahead in the same lane
       let blocked = false;
@@ -12221,7 +12324,8 @@ function stepRivals(dt){
     SURF_HINT = null;
     const gSlope = (gA - gB)/(2*look), gCurve = (gA - 2*gy + gB)/(look*look);
     if(r.y === null || !isFinite(r.y) || dt <= 0){ r.y = gy; r.vy = 0; r.air = false; }
-    else if(!r.air && (gCurve*spR*spR > -26 || spR < 6)){ r.y = gy; r.vy = gSlope*spR; }
+    // (soft mud soaks up the rebound, so a rival wallows over its humps)
+    else if(!r.air && (gCurve*spR*spR > -26*(1 + 1.5*softAt(x, z)) || spR < 6)){ r.y = gy; r.vy = gSlope*spR; }
     else {
       const launching = !r.air;
       if(launching){ r.vy = Math.max(-14, Math.min(11, ((gy - gB)/look)*spR)); r.air = true; r.airT = 0; }
@@ -12423,7 +12527,6 @@ function traceDelta(){
    snow in the winter, and water washing it off again */
 function stepDirt(dt, info){
   const D = CAR_DIRT;
-  D.uGround.value = surfaceY(pose.x, pose.z);
   if(state.phase === "menu"){ D.uDirt.value = 0; D.uSnow.value = 0; return; }
   if(state.phase !== "racing" || !info || pose.air) return;
   const v = Math.min(1, info.sp/30), mud = info.mud || 0, wet = info.wet || 0;
