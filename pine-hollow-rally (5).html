@@ -940,10 +940,10 @@ const TRACKS = [
             {at:[127,200], road:-1, under:0, over:true, span:22, wall:14},
             {at:[-147,200], road:-1, under:0, over:true, span:22, wall:14},
             {at:[263,275], road:-1, span:28, depth:30, wall:20, reach:95},
-            {at:[-125,-398], road:-1, span:16, depth:3.2, wall:10, reach:120},
+            {at:[-184,-403], road:-1, span:16, depth:3.2, wall:10, reach:120},
             {at:[235,-470], road:-1, span:16, depth:3.2, wall:10, reach:120},
             {at:[263,125], road:0, span:16, depth:3.2, wall:10, reach:60},
-            {at:[-283,125], road:0, span:16, depth:3.2, wall:10, reach:60} ],
+            {at:[-206,144], road:0, span:16, depth:3.2, wall:10, reach:60} ],
     branches:[
       // the low route: braided under the high one, over the lava streams
       {a:[400,200], b:[-420,200], via:[[359,196],[318,176],[277,147],[236,132],[195,147],[154,177],[113,212],[72,244],[31,267],[-10,275],[-51,267],[-92,244],[-133,212],[-174,177],[-215,147],[-256,132],[-297,147],[-338,176],[-379,196]],
@@ -2615,7 +2615,7 @@ BRANCHES.forEach(P=>{
     }
     return bj;
   };
-  const MY = new Float64Array(P.N), WE = new Float64Array(P.N), WN = new Array(P.N).fill(0);
+  const MY = new Float64Array(P.N), WE = new Float64Array(P.N), WN = new Array(P.N).fill(0), DM = new Float64Array(P.N);
   for(let i=0;i<P.N;i++){
     const fromA = i*P.seg, fromB = (P.N-1-i)*P.seg;
     const guess = fromA < fromB ? P.mainFrom + i : P.mainTo - (P.N-1-i);
@@ -2643,11 +2643,26 @@ BRANCHES.forEach(P=>{
     /* A branch marked hug leaves at a shallow angle and runs beside the main
        road for a long way: there it keeps the main road's height, whatever
        its own land does, until the two are far enough apart to part levels. */
-    const hug = P.def.hug ? (1 - smoothstep(16, 38, dm))*(1 - smoothstep(200, 250, Math.min(fromA, fromB))) : 0;
-    WN[i] = shaped ? 0 : Math.max(hug, (1 - smoothstep(14, 34, dm))*(1 - smoothstep(0.6, 2.0, dy)));
+    DM[i] = dm;
+    WN[i] = shaped ? 0 : (1 - smoothstep(14, 34, dm))*(1 - smoothstep(0.6, 2.0, dy));
+  }
+  /* A branch marked hug leaves at a shallow angle and runs beside the main
+     road for a while: until the two have properly parted it keeps the main
+     road's height, whatever its own land does, then eases down (or up) to
+     its own over a long ramp. Only the stretch joined to each end counts,
+     so where the two wander close again further on nothing is propped up. */
+  if(P.def.hug && !shaped){
+    const RAMP = 70;
+    let rA = 0; while(rA < P.N - 1 && DM[rA] < 14) rA++;
+    let rB = P.N - 1; while(rB > 0 && DM[rB] < 14) rB--;
+    for(let i=0;i<P.N;i++){
+      const h = Math.max(i <= rA ? 1 : 1 - smoothstep(0, RAMP, (i - rA)*P.seg), i >= rB ? 1 : 1 - smoothstep(0, RAMP, (rB - i)*P.seg));
+      WN[i] = Math.max(WN[i], h);
+    }
   }
   // and never switched on or off over a few metres
   smoothAlong(WN, false, Math.round(12/P.seg));
+
   for(let i=0;i<P.N;i++){
     const w = Math.max(WE[i], WN[i]);
     P.share[i] = Math.max(0, w);
@@ -2795,6 +2810,13 @@ function carveSpans(y, x, z){
     // sheer ice walls on a crevasse, a shelving bank on a stream
     const across = (lip - sp.floor)*smoothstep(wu*(sp.low ? 0.45 : 0.25), wu, au + Math.sin(uv[1]*0.2 + sp.ph)*0.8) + Math.max(0, au - wu)*2.2;
     const ends = (sp.depth + 24)*smoothstep(sp.reach*0.72, sp.reach, av);
+    /* a shallow channel crossing a dip: its bed is built up to the level
+       of the lava, so the lava lies on ground and not over a hollow; where
+       the land drops right away the channel simply runs out */
+    if(sp.low && y < sp.floor){
+      const d = sp.floor - y, w = (1 - smoothstep(wu, wu + 12, au))*(1 - smoothstep(sp.reach*0.6, sp.reach*0.85, av));
+      y += d*w*(1 - smoothstep(3.5, 6, d));
+    }
     y = Math.min(y, sp.floor + Math.max(across, ends));
   }
   return y;
@@ -4506,7 +4528,7 @@ if(SPANS.length){
       pos.push(x, sp.lava, z);
       // only in the channel itself: where a hillside falls away below the level there is no lava hanging over it
       const gh = gridH(x, z);
-      dep.push(Math.abs(u) > sp.wall + 1.5 || gh < sp.lava - 4 ? -1 : Math.max(-1, Math.min(3, sp.lava - gh)));
+      dep.push(Math.abs(u) > sp.wall + 1.5 || gh < sp.lava - (sp.low ? 2.4 : 4) ? -1 : Math.max(-1, Math.min(3, sp.lava - gh)));
     }
     for(let r=0;r<rows-1;r++) for(let c=0;c<cols-1;c++){
       const a = r*cols + c, b = a + 1, d2 = a + cols, e = d2 + 1;
@@ -4616,6 +4638,7 @@ const FX_TEX = new THREE.CanvasTexture(noiseCanvas(128, 128, (c, W, H)=>{
     c.fillStyle = gr; c.fillRect(0, 0, W, H);
   }
 }));
+const FX_MASK = {scene:new THREE.Scene(), mats:[], rt:null};
 function makeFX(n, glow){
   const g = new THREE.InstancedBufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute([-0.5,-0.5,0, 0.5,-0.5,0, 0.5,0.5,0, -0.5,0.5,0], 3));
@@ -4652,6 +4675,23 @@ function makeFX(n, glow){
     transparent:true, depthWrite:false, blending: glow ? THREE.AdditiveBlending : THREE.NormalBlending
   });
   const mesh = new THREE.Mesh(g, mat); mesh.frustumCulled = false; mesh.renderOrder = glow ? 7 : 6; scene.add(mesh);
+  /* the same puffs drawn again as a plain mask, so the ink lines of trees
+     and hills behind thick steam are hidden by it as their colour is */
+  const maskMat = new THREE.ShaderMaterial({
+    uniforms:{ tPuff:{value:FX_TEX}, tDepth:{value:null}, uRes:{value:new THREE.Vector2(1, 1)}, uNear:{value:camera.near}, uFar:{value:camera.far} },
+    vertexShader: mat.vertexShader,
+    fragmentShader:[
+      "uniform sampler2D tPuff, tDepth; uniform vec2 uRes; uniform float uNear, uFar;",
+      "varying vec2 vUv; varying vec4 vCol; varying float vHeat, vShade, vDist;",
+      "float linZ(float d){ float z = d*2.0 - 1.0; return 2.0*uNear*uFar/(uFar + uNear - z*(uFar - uNear)); }",
+      "void main(){",
+      "  if(vDist > linZ(texture2D(tDepth, gl_FragCoord.xy/uRes).x)) discard;",
+      "  float a = texture2D(tPuff, vUv).a*vCol.a*" + (glow ? "0.0" : "1.6") + ";",
+      "  gl_FragColor = vec4(a, a, a, 1.0);",
+      "}"].join("\n"),
+    transparent:true, depthTest:false, depthWrite:false, blending:THREE.AdditiveBlending
+  });
+  if(!glow){ const mm = new THREE.Mesh(g, maskMat); mm.frustumCulled = false; FX_MASK.scene.add(mm); FX_MASK.mats.push(maskMat); }
   const vel = new Float32Array(n*3), age = new Float32Array(n), life = new Float32Array(n), s0 = new Float32Array(n), s1 = new Float32Array(n),
         drag = new Float32Array(n), grav = new Float32Array(n), a0 = new Float32Array(n), h0 = new Float32Array(n), spin = new Float32Array(n);
   let head = 0, live = 0;
@@ -4710,7 +4750,7 @@ if(CRATER.on){
   const ACR = [-1, -0.55, 0, 0.55, 1], DEP = [0.05, 0.6, 1, 0.6, 0.05];
   for(let k=0;k<5;k++){
     const a0 = k/5*Math.PI*2 + 0.4 + (Math.random() - 0.5)*0.4;
-    let x = CRATER.x + Math.cos(a0)*CRATER.r*0.9, z = CRATER.z + Math.sin(a0)*CRATER.r*0.9, dx = Math.cos(a0), dz = Math.sin(a0), run = 0;
+    let x = CRATER.x + Math.cos(a0)*CRATER.r*1.08, z = CRATER.z + Math.sin(a0)*CRATER.r*1.08, dx = Math.cos(a0), dz = Math.sin(a0), run = 0;
     const rows = [];
     for(let m=0;m<220;m+=2){
       const n = nearest(x, z);
@@ -4746,6 +4786,7 @@ if(TRACK.geysers && LAKE.on && LAKE.lava){
   SPANS.forEach(sp=>{ if(sp.over) return;
     const half = sp.P.half[sp.i];
     for(const sd of [-1, 1]){ const v = sd*(half + (sp.low ? 12 : 16)), x = sp.x - sp.tz*v, z = sp.z + sp.tx*v;
+      if(Math.abs(gridH(x, z) - (sp.lava - 1)) > 1.6 || lavaLevelAt(x, z) === null) continue;      // out of the channel: leave it
       spots.push([x, z, sp.lava, sp.low ? 20 : 44]); } });
   for(let k=0;k<3;k++){ const a = (k + 0.3)/3*Math.PI*2; spots.push([LAKE.x + Math.cos(a)*LAKE.rx*0.8, LAKE.z + Math.sin(a)*LAKE.rz*0.78, LAKE.level, 30]); }
   const rockM = new THREE.MeshLambertMaterial({color:0x2c2420, flatShading:true}), crustM = new THREE.MeshLambertMaterial({color:0x6e655a, flatShading:true});
@@ -8854,6 +8895,7 @@ const postMat = new THREE.ShaderMaterial({
     uTime:    {value: 0},
     uFxaa:    {value: 0},
     tDepth:   {value: null},
+    tFxMask:  {value: null}, uFxMask: {value: 0},
     uPrint:   {value: 1},
     uStock:   {value: WINTER ? new THREE.Vector3(0.90, 0.95, 1.0) : new THREE.Vector3(0.98, 0.93, 0.80)},
     uWarm:    {value: WINTER ? new THREE.Vector3(0.97, 1.0, 1.04) : new THREE.Vector3(1.04, 1.00, 0.90)},
@@ -8866,7 +8908,7 @@ const postMat = new THREE.ShaderMaterial({
     "uniform sampler2D tDiffuse, tBloom;",
     "uniform vec2 uRes, uSunPos;",
     "uniform float uAspect, uSpeed, uSunVis, uFlash, uTime, uFxaa; uniform vec3 uRayCol;",
-    "uniform sampler2D tDepth; uniform float uPrint, uNear, uFar, uInk; uniform vec3 uStock, uWarm;",
+    "uniform sampler2D tDepth, tFxMask; uniform float uPrint, uNear, uFar, uInk, uFxMask; uniform vec3 uStock, uWarm;",
     "float linZ(float d){ float z = d*2.0 - 1.0; return 2.0*uNear*uFar/(uFar + uNear - z*(uFar - uNear)); }",
     "varying vec2 vUv;",
 
@@ -8965,6 +9007,7 @@ const postMat = new THREE.ShaderMaterial({
     "    float crease = smoothstep(0.010, 0.030, lap);",
     "    float ink = max(sil, crease*0.55)*(1.0 - smoothstep(90.0, 420.0, zc));",
     "    if(dc > 0.99999) ink = 0.0;",
+    "    ink *= 1.0 - clamp(texture2D(tFxMask, uv).r*uFxMask*1.3, 0.0, 1.0);",
     "    float l0 = dot(col, vec3(0.2126, 0.7152, 0.0722));",
     // light falls into a few soft bands, the way cheap colour printing flattens it
     "    float bands = 5.0;",
@@ -9032,6 +9075,13 @@ function sizeRT(){
     rt.depthTexture.type = THREE.UnsignedIntType;
   }
   postMat.uniforms.tDepth.value = rt.depthTexture || null;
+  if(FX_MASK.mats.length && rt.depthTexture){
+    if(FX_MASK.rt) FX_MASK.rt.dispose();
+    const mw = Math.max(2, w >> 1), mh = Math.max(2, h >> 1);
+    FX_MASK.rt = new THREE.WebGLRenderTarget(mw, mh, Object.assign({depthBuffer:false}, opts));
+    FX_MASK.mats.forEach(m=>{ m.uniforms.tDepth.value = rt.depthTexture; m.uniforms.uRes.value.set(mw, mh); });
+    postMat.uniforms.tFxMask.value = FX_MASK.rt.texture;
+  }
   postMat.uniforms.uPrint.value = LOOK.print && rt.depthTexture ? 1 : 0;
   postMat.uniforms.uInk.value = pr;
   blurMat.uniforms.uDir.value.set(1/bw, 0);
@@ -9044,6 +9094,15 @@ function renderView(time){
   postMat.uniforms.uTime.value = time || 0;
   renderer.setRenderTarget(rt);
   renderer.render(scene, camera);
+  postMat.uniforms.uFxMask.value = 0;
+  if(FX_MASK.rt && postMat.uniforms.uPrint.value > 0.5){
+    FX_MASK.mats.forEach(m=>{ m.uniforms.uNear.value = camera.near; m.uniforms.uFar.value = camera.far; });
+    const cc = renderer.getClearColor(new THREE.Color()), ca = renderer.getClearAlpha();
+    renderer.setClearColor(0x000000, 1);
+    renderer.setRenderTarget(FX_MASK.rt); renderer.render(FX_MASK.scene, camera);
+    renderer.setClearColor(cc, ca);
+    postMat.uniforms.uFxMask.value = 1;
+  }
   postQuad.material = brightMat; brightMat.uniforms.tDiffuse.value = rt.texture;
   renderer.setRenderTarget(rtA); renderer.render(postScene, postCam);
   postQuad.material = blurMat;
