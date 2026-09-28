@@ -930,9 +930,14 @@ const TRACKS = [
     lake:{at:[0,-150], rx:350, rz:130, lava:true},
     /* the set pieces: a leap over a lava channel, an ice tunnel through the corkscrew,
        the cone's crater erupting, geysers along the lava lake */
-    leaps:[{at:[-712,-215], height:2.4, gap:13}],
+    leaps:[{at:[-712,-215], height:2.4, gap:13},
+           // two more inside the lava cave, over rivers of lava running under the hill
+           {at:[589,-267], height:2.2, gap:12, reach:13, cave:true},
+           {at:[590,-174], height:2.2, gap:12, reach:13, cave:true}],
     tunnels:[{from:[-548,166], to:[-600,60]}],
-    spikes:[{from:[606,-250], to:[600,30]}],
+    // the road goes into the hill east of the lake and through it in a cave of black rock and lava
+    caves:[{from:[562,-307], to:[618,-118]}],
+    spikes:[{from:[632,-100], to:[600,30]}],
     crater:{at:[720,200], r:34},
     geysers:6,
     /* the bridges: over another road (over:true, pass picks which time round the lap) or over lava */
@@ -1310,6 +1315,7 @@ if(DESERT){
   TRACK.leaps = (TRACK.leaps||[]).map(sp=> Object.assign({}, sp, {at: mv(sp.at)}));
   TRACK.tunnels = (TRACK.tunnels||[]).map(t=> ({from: mv(t.from), to: mv(t.to)}));
   TRACK.spikes = (TRACK.spikes||[]).map(t=> ({from: mv(t.from), to: mv(t.to)}));
+  TRACK.caves = (TRACK.caves||[]).map(t=> Object.assign({}, t, {from: mv(t.from), to: mv(t.to)}));
   if(TRACK.crater) TRACK.crater = Object.assign({}, TRACK.crater, {at: mv(TRACK.crater.at)});
   ["bowl","lake","washout","pit","dunes","swamp","giantTree"].forEach(k=>{ if(TRACK[k]) TRACK[k] = Object.assign({}, TRACK[k], {at: mv(TRACK[k].at)}); });
   ["canyon","gallery"].forEach(k=>{ if(TRACK[k]) TRACK[k] = Object.assign({}, TRACK[k], {from: mv(TRACK[k].from), to: mv(TRACK[k].to)}); });
@@ -2243,8 +2249,10 @@ if(GIANT.on){
 const GORGE = { on:false, i:0, depth:0, span:35, samples:0, reach:0, wall:26 };
 let SPANS = [];                        // the log bridges over lava, built once the roads have their heights
 let SURF_HINT = null;
+const CAVE_FX_PENDING = [];            // spots where lava pours down a wall: sparks and fumes at the foot
 const ISLANDS = [];                    // dividers where two routes part: solid
 const TUNNELS = [];                    // ice tunnels over the main road: [a, b] stations
+const CAVES = [];                      // lava caves: the road goes into a hill and through it
 const CRATER = {on:false};                  // the height a car is at, so a road under a bridge is not mistaken for the deck
 if(TRACK.gorge){
   const G = TRACK.gorge;
@@ -2760,6 +2768,22 @@ function passIdx(P, at, pass, skip){
 /* The lava leap: no bridge at all. A kicker on the approach, a channel of
    lava cut straight across the road beyond its lip, and the road picking up
    again on the far side, falling away so the landing is a slope. */
+/* A lava cave: the road stops following the land up over the hill and
+   runs through it on one steady line, easing off the old profile over
+   the approach at each end; the hill is left standing over it. */
+(TRACK.caves || []).forEach(d=>{
+  const P = MAIN, seg = P.seg;
+  let a = snapTo(P, d.from), b = snapTo(P, d.to); if(b < a){ const q = a; a = b; b = q; }
+  const E = Math.round(40/seg), A = a - E, B = b + E;
+  const yA = P.pts[wrapIdx(P, A)].y, yB = P.pts[wrapIdx(P, B)].y;
+  for(let k=A;k<=B;k++){
+    const i = wrapIdx(P, k), line = yA + (yB - yA)*(k - A)/(B - A);
+    const w = k < a ? smoothstep(A, a, k) : k > b ? 1 - smoothstep(b, B, k) : 1;
+    P.pts[i].y = P.pts[i].y*(1 - w) + line*w;
+  }
+  CAVES.push({a, b, grow:4});
+  TUNNELS.push({a, b, cave:true});
+});
 (TRACK.leaps || []).forEach(d=>{
   const P = MAIN, seg = P.seg, i = snapTo(P, d.at), p = P.pts[i], t = P.tans[i];
   const lip = i - Math.round((d.gap/2 + 3)/seg);
@@ -2769,7 +2793,7 @@ function passIdx(P, at, pass, skip){
   for(let k=-E;k<=E;k++) P.pts[wrapIdx(P, i + k)].y = ya + (yb - ya)*(k + E)/(2*E);
   ramp(P, lip, Math.round(34/seg), Math.round(40/seg), d.height, 0, true, 4);
   const y = P.pts[i].y;
-  const sp = {P, i, S:0, x:p.x, z:p.z, y, tx:t.x, tz:t.z, grade:0, span:0, depth:7, wall:d.gap/2 + 1, reach:70,
+  const sp = {P, i, S:0, x:p.x, z:p.z, y, tx:t.x, tz:t.z, grade:0, span:0, depth:7, wall:d.gap/2 + 1, reach:d.reach || 70, cave:!!d.cave,
               low:true, ph: SPANS.length*1.7 + 0.5, over:false, leap:true, Q:null, j:-1};
   sp.floor = Math.min(ya, yb) + BED - 7; sp.lava = sp.floor + 1.2;
   const W = Math.round((d.gap/2)/seg);
@@ -2808,7 +2832,10 @@ function carveSpans(y, x, z){
     const wu = sp.wall - 1;
     const lip = sp.y + BED + sp.grade*uv[0] - 0.35;
     // sheer ice walls on a crevasse, a shelving bank on a stream
-    const across = (lip - sp.floor)*smoothstep(wu*(sp.low ? 0.45 : 0.25), wu, au + Math.sin(uv[1]*0.2 + sp.ph)*0.8) + Math.max(0, au - wu)*2.2;
+    /* beyond the edge of the gap the ground climbs back out; on a leap it
+       stays flush with the road for a few metres first, so a stretch the
+       road stamp does not reach is not left standing proud of the lip */
+    const across = (lip - sp.floor)*smoothstep(wu*(sp.low ? 0.45 : 0.25), wu, au + Math.sin(uv[1]*0.2 + sp.ph)*0.8) + Math.max(0, au - wu - (sp.leap ? 4 : 0))*2.2;
     const ends = (sp.depth + 24)*smoothstep(sp.reach*0.72, sp.reach, av);
     /* a shallow channel crossing a dip: its bed is built up to the level
        of the lava, so the lava lies on ground and not over a hollow; where
@@ -2930,6 +2957,7 @@ function barren(x, z){
   if(GIANT.on && Math.hypot(x - GIANT.x, z - GIANT.z) < GIANT.ring - 7) return true;   // the oak's own ground
   if(SPANS.length && lavaNear(x, z) > 0.2) return true;                                   // nothing grows by the lava
   if(CRATER.on && Math.hypot(x - CRATER.x, z - CRATER.z) < CRATER.r*3.2) return true;      // nor on the volcano's cone
+  if(GCAVE){ const c = cellAt(x, z); if(c >= 0 && GHV[c] > GH[c] + 0.3) return true; }     // nor in the cutting under a cave's hill
   if(DUNE.on && Math.hypot(x - DUNE.x, z - DUNE.z) < DUNE.r*0.88) return true;
   if(CANYON.on){ const uv = canyonUV(x, z); if(uv && uv[0] < 30 && canyonPlateau(x, z, uv) > 0.2) return true; }
   return false;
@@ -3120,8 +3148,9 @@ const GHALF = Math.ceil((MAXABS + 180)/GSTEP)*GSTEP;
 const GN = Math.round(2*GHALF/GSTEP) + 1;
 const GCELLS = GN*GN;
 /* natural ground: the land, its small roll, the channels */
+function naturalBase(x, z){ return carveGorge(carveWater(macro(x, z) + vergeRoll(x, z)*(1 - iceAt(x, z)) + ridgeAt(x, z), x, z), x, z); }
 function naturalY(x, z){
-  const y = carveGorge(carveWater(macro(x, z) + vergeRoll(x, z)*(1 - iceAt(x, z)) + ridgeAt(x, z), x, z), x, z);
+  const y = naturalBase(x, z);
   let y2 = SPANS.length ? carveSpans(y, x, z) : y;
   if(CRATER.on){
     // the cone's summit hollowed into a crater, a lip standing round it
@@ -3159,6 +3188,17 @@ const GX  = new Float32Array(GCELLS);     // how much two roads overlap here, 0 
    the closer heights, so a steep bank that runs across the grid at an angle
    is drawn as a clean face instead of a row of saw teeth. */
 const GFLIP = new Uint8Array(GCELLS);
+/* Over a lava cave the ground you see is not the ground you drive on: the
+   road runs through a cutting at its own level (GH, what the wheels use),
+   and the hill is drawn back over it (GHV) with a hole where the cave's own
+   floor and vault are. GCAVE marks that hole. */
+let GHV = GH, GCAVE = null;
+const CAVE_W = 44;
+/* the hill over a cave: its own natural height, and never lower than a
+   good roof of rock over the vault */
+function caveRoof(nat, yr, R, av){ return nat + Math.max(0, yr + BED + R*0.95 + 3.2 - nat)*(1 - smoothstep(R + 3, R + 16, av)); }
+function caveYAt(s){ const i0 = Math.floor(s), f = s - i0, A = MAIN.pts[wrapIdx(MAIN, i0)], B = MAIN.pts[wrapIdx(MAIN, i0 + 1)]; return A.y + (B.y - A.y)*f; }
+function caveOf(s){ for(const C of CAVES){ if(s >= C.a && s <= C.b) return C; } return null; }
 {
   const NAT = new Float32Array(GCELLS);
   for(let b=0;b<GN;b++) for(let a=0;a<GN;a++){
@@ -3311,6 +3351,19 @@ const GFLIP = new Uint8Array(GCELLS);
   for(let b=0;b<GN-1;b++) for(let a=0;a<GN-1;a++){
     const k = b*GN + a;
     GFLIP[k] = Math.abs(GH[k] - GH[k+GN+1]) > Math.abs(GH[k+1] - GH[k+GN]) + 0.02 ? 1 : 0;
+  }
+  if(CAVES.length){
+    GHV = new Float32Array(GH); GCAVE = new Uint8Array(GCELLS);
+    const MI = paths.indexOf(MAIN);
+    for(let g=0; g<GCELLS; g++){
+      if(GP[g] !== MI || GD[g] >= CAVE_W) continue;
+      const C = caveOf(GS[g]); if(!C) continue;
+      const i = wrapIdx(MAIN, Math.round(GS[g])), R = MAIN.half[i] + C.grow, av = Math.abs(GL[g]);
+      // the hill as it stands, not as the lava channels under it are cut
+      const nat = Math.max(NAT[g], naturalBase(-GHALF + (g % GN)*GSTEP, -GHALF + Math.floor(g/GN)*GSTEP));
+      GHV[g] = Math.max(GH[g], caveRoof(nat, caveYAt(GS[g]), R, av));
+      if(av < R + 1) GCAVE[g] = 1;
+    }
   }
 }
 
@@ -3660,8 +3713,8 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
   const TILE = 64;                        // cells per tile side
   const c = new THREE.Color();
   const nrm = (a, b)=>{
-    const l = GH[b*GN + Math.max(0, a-1)], r = GH[b*GN + Math.min(GN-1, a+1)];
-    const d = GH[Math.max(0, b-1)*GN + a], u = GH[Math.min(GN-1, b+1)*GN + a];
+    const l = GHV[b*GN + Math.max(0, a-1)], r = GHV[b*GN + Math.min(GN-1, a+1)];
+    const d = GHV[Math.max(0, b-1)*GN + a], u = GHV[Math.min(GN-1, b+1)*GN + a];
     const nx = l - r, ny = 2*GSTEP, nz = d - u;
     const k = 1/Math.hypot(nx, ny, nz);
     return [nx*k, ny*k, nz*k];
@@ -3679,7 +3732,7 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
         for(let a=ta;a<=a1;a++){
           const g = b*GN + a;
           const x = -GHALF + a*GSTEP, z = -GHALF + b*GSTEP;
-          pos[v*3] = x; pos[v*3+1] = GH[g]; pos[v*3+2] = z;
+          pos[v*3] = x; pos[v*3+1] = GHV[g]; pos[v*3+2] = z;
           const n = nrm(a, b);
           nor[v*3] = n[0]; nor[v*3+1] = n[1]; nor[v*3+2] = n[2];
           uv[v*2] = x/17.33; uv[v*2+1] = z/17.33;
@@ -3689,6 +3742,8 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
           // under a bridge the ground is not road: it has fallen away below the deck
           if(GP[g] >= 0){ const Pg = paths[GP[g]], ig = wrapIdx(Pg, GS[g]);
             if(Pg.noStamp[ig] && GH[g] < Pg.pts[ig].y + BED - 1.2) edge = 40; }
+          // the hill over a cave is not road either
+          if(GHV[g] > GH[g] + 0.3) edge = 40;
           road[v*4] = edge;
           // where two roads overlap the offset across belongs to neither:
           // push it out past the ruts and the crown so neither is drawn
@@ -3771,6 +3826,8 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
             const k = lavaNear(x, z);
             if(k > 0) c.lerp(new THREE.Color().setHSL(0.02 + Math.random()*0.02, 0.10 + k*0.25, 0.09 + Math.random()*0.05 + (1 - k)*0.06), Math.min(0.95, k*1.1));
           }
+          // the face of the hill round a cave mouth: bare dark rock where it is steep
+          if(GHV[g] > GH[g] + 0.3 && n[1] < 0.8) c.lerp(new THREE.Color().setHSL(0.04, 0.07, 0.16 + Math.random()*0.05), smoothstep(0.8, 0.55, n[1]));
           col[v*3] = c.r; col[v*3+1] = c.g; col[v*3+2] = c.b;
           v++;
         }
@@ -3779,6 +3836,7 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
       for(let r=0;r<rows-1;r++){
         for(let q=0;q<cols-1;q++){
           const A = r*cols + q, B = A + 1, C = A + cols, D = C + 1;
+          if(GCAVE){ const g0 = (tb + r)*GN + ta + q; if(GCAVE[g0] || GCAVE[g0 + 1] || GCAVE[g0 + GN] || GCAVE[g0 + GN + 1]) continue; }
           if(GFLIP[(tb + r)*GN + ta + q]) idx.push(A, C, B, B, C, D);   // diagonal B-C, as gridH
           else idx.push(A, C, D, A, D, B);                               // diagonal A-D, same as gridH
         }
@@ -4517,6 +4575,32 @@ if(SPANS.length){
     }
 
     if(sp.over) return;
+    /* down the walls of a deep crevasse, falls of lava pour from cracks
+       near the top: seen from the deck, either side of the bridge */
+    if(!sp.low && !sp.leap && sp.depth > 10) for(const [vo, sd] of [[-24, 1], [31, -1], [52, 1], [-46, -1]]){
+      const prof = [];                                  // the wall's own face, from its top down to the lava
+      for(let au=sp.wall + 1.5; au>=0; au-=0.4){
+        const u = sd*au, x = sp.x + sp.tx*u - sp.tz*vo, z = sp.z + sp.tz*u + sp.tx*vo, h = gridH(x, z);
+        prof.push([au, h]); if(h < sp.lava + 0.3) break;
+      }
+      if(prof.length < 6 || prof[0][1] - prof[prof.length - 1][1] < 8) continue;
+      const pos = [], dep = [], run = [], idx = [], NC = 4, wid = 2.2 + Math.random()*1.4;
+      let arc = 0;
+      prof.forEach((pr, r)=>{
+        if(r) arc += Math.hypot(pr[0] - prof[r - 1][0], pr[1] - prof[r - 1][1]);
+        const w = wid*(0.6 + 0.6*r/prof.length);
+        for(let c=0;c<=NC;c++){
+          const vv = vo + (c/NC - 0.5)*2*w, u = sd*(pr[0] - 0.25), x = sp.x + sp.tx*u - sp.tz*vv, z = sp.z + sp.tz*u + sp.tx*vv;
+          pos.push(x, pr[1] + 0.15, z); dep.push(c === 0 || c === NC ? 0.12 : 0.95); run.push((c/NC - 0.5)*2*w, arc);
+        }
+        if(r) for(let c=0;c<NC;c++){ const b0 = (r - 1)*(NC + 1) + c, b1 = r*(NC + 1) + c; idx.push(b0, b1, b0 + 1, b0 + 1, b1, b1 + 1); }
+      });
+      const fg = new THREE.BufferGeometry(); fg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+      fg.setAttribute("aDepth", new THREE.Float32BufferAttribute(dep, 1)); fg.setAttribute("aRun", new THREE.Float32BufferAttribute(run, 2)); fg.setIndex(idx);
+      const fm = new THREE.Mesh(fg, lavaMaterial(true)); fm.material.side = THREE.DoubleSide; fm.frustumCulled = false; fm.renderOrder = 2; scene.add(fm);
+      const bu = sd*(prof[prof.length - 1][0] - 1);
+      CAVE_FX_PENDING.push({x:sp.x + sp.tx*bu - sp.tz*vo, z:sp.z + sp.tz*bu + sp.tx*vo, y:sp.lava + 0.3, kind:"fall"});
+    }
     // the lava in the gap, one sheet across its whole length
     const STEP = 1.6, U = sp.wall + 6, cols = Math.ceil(U*2/STEP) + 1, rows = Math.ceil(sp.reach*2/STEP) + 1;
     const pos = [], dep = [], idx = [];
@@ -4559,6 +4643,7 @@ const iceTex = new THREE.CanvasTexture(noiseCanvas(256, 256, (c, W, H)=>{
 iceTex.wrapS = iceTex.wrapT = THREE.RepeatWrapping;
 const iceTube = new THREE.MeshPhongMaterial({map:iceTex, color:0xffffff, emissive:0x10303e, shininess:110, specular:0xe6f6ff, transparent:true, opacity:0.9, side:THREE.DoubleSide});
 TUNNELS.forEach(T=>{
+  if(T.cave) return;                     // a lava cave is built on its own
   const P = MAIN, seg = P.seg, pos = [], idx = [], uvs = [], NA = 14;
   const ring = k=>{
     const i = wrapIdx(P, k), p = P.pts[i], t = P.tans[i], nx = -t.z, nz = t.x, R = P.half[i] + 2.6, y0 = p.y + BED - 0.3;
@@ -4596,6 +4681,224 @@ TUNNELS.forEach(T=>{
   mergeStatic(gg); scene.add(gg);
   roadSign(T.a - Math.round(60/seg), 1, ["ICE TUNNEL", "slippery \u2014 mind the walls"], "#2f6fa8", "#f2efe6");
 });
+/* ---- the lava cave: a vault of black rock through the hill, lit only by
+   the lava: gutters of it running along the foot of both walls, falls of it
+   pouring down them, and rivers of it crossing under the road that the road
+   jumps. The hill is drawn back over the top (GHV), a face of rock and an
+   arch at each mouth. ---- */
+const CAVE_FX = CAVE_FX_PENDING;
+CAVES.forEach(C=>{
+  const P = MAIN, seg = P.seg, a = C.a, b = C.b;
+  const leaps = SPANS.filter(sp=> sp.leap && sp.cave && sp.i >= a && sp.i <= b);
+  const R = k=> P.half[wrapIdx(P, k)] + C.grow;
+  const frame = k=>{ const i = wrapIdx(P, k), p = P.pts[i], t = P.tans[i]; return {i, p, t, nx:-t.z, nz:t.x, y0:p.y + BED - 0.3}; };
+  // the lava falls: down the walls every so often, turn about, clear of the leaps
+  const falls = [];
+  for(let k=a + Math.round(24/seg), n=0; k<b - Math.round(18/seg); k+=Math.round(29/seg), n++){
+    if(leaps.some(sp=> Math.abs(sp.i - k) < 16/seg)) continue;
+    falls.push({k, side: n % 2 ? 1 : -1});
+  }
+  // how brightly the lava lights a point of the cave: k station, v across, h height above the road
+  const glowAt = (k, v, h)=>{
+    let gl = 0.22*Math.exp(-Math.max(0, h)/2.0);                              // the gutters
+    for(const f of falls){ const ds = (k - f.k)*seg, dv = v - f.side*R(k); gl += 1.1*Math.exp(-(ds*ds)/30 - (dv*dv)/40); }
+    for(const sp of leaps){ const ds = (k - sp.i)*seg; gl += 1.3*Math.exp(-(ds*ds)/60)*Math.exp(-Math.max(0, h + 3)/7); }
+    return Math.min(1.4, gl);
+  };
+  // daylight in at the mouths
+  const spill = k=> Math.max(Math.exp(-(k - a)*seg/9), Math.exp(-(b - k)*seg/9));
+  const rock = new THREE.Color(), hot = new THREE.Color(1.0, 0.36, 0.08), day = new THREE.Color(0.55, 0.58, 0.64);
+  const shade = (k, v, h, base)=>{
+    const r0 = Math.random();
+    rock.setRGB(base*(0.8 + 0.4*r0), base*(0.72 + 0.35*r0), base*(0.7 + 0.3*r0));
+    const g = glowAt(k, v, h), sp = spill(k);
+    return [rock.r + hot.r*g*0.6 + day.r*sp*0.6, rock.g + hot.g*g*0.6 + day.g*sp*0.6, rock.b + hot.b*g*0.6 + day.b*sp*0.6];
+  };
+  const pa = a - Math.round(2/seg), pb = b + Math.round(2/seg);
+  /* the vault: rough, a little wider than a half circle, its walls running
+     on down below the road so the lava rivers pass under them */
+  {
+    const NA = 22, F0 = -0.8, F1 = Math.PI + 0.8, pos = [], col = [], idx = [];
+    let rows = 0;
+    for(let k=pa; k<=pb; k++){
+      const f0 = frame(k), Rk = R(k);
+      for(let q=0;q<=NA;q++){
+        const f = F0 + (F1 - F0)*q/NA, j = 1 + 0.07*Math.sin(k*0.37 + q*1.9) + 0.05*Math.sin(k*0.11 + q*0.7) + (Math.random() - 0.5)*0.05;
+        const cx = Math.cos(f)*Rk*j, hy = Math.sin(f)*Rk*0.92*j;
+        pos.push(f0.p.x + f0.nx*cx, f0.y0 + hy, f0.p.z + f0.nz*cx);
+        col.push(...shade(k, cx, hy, 0.085));
+      }
+      rows++;
+    }
+    for(let r=0;r<rows-1;r++) for(let q=0;q<NA;q++){ const i0 = r*(NA + 1) + q; idx.push(i0, i0 + 1, i0 + NA + 1, i0 + 1, i0 + NA + 2, i0 + NA + 1); }
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.DoubleSide}));
+    m.castShadow = true; m.frustumCulled = false; scene.add(m);
+  }
+  /* the floor: the ground the wheels use, drawn in the cave's own light,
+     dark ash on the road, and out to the walls. Across a jump's gap it
+     stops, and a clean face of rock drops from each lip to the lava. */
+  {
+    const NV = 18, pos = [], col = [], idx = [], gap = [], fpos = [], fcol = [], fidx = [];
+    let rows = 0;
+    const isGap = k=>{ const f0 = frame(k); return gridH(f0.p.x, f0.p.z) < f0.p.y + BED - 1.2; };
+    for(let k=pa - Math.round(3/seg); k<=pb + Math.round(3/seg); k++){
+      const f0 = frame(k), W = R(k) + 4, half = P.half[f0.i];
+      gap.push(isGap(k));
+      // the rows either side of a gap make a straight lip: the channel wanders underneath, the edge does not
+      let nearGap = false; for(let j=-4;j<=4;j++) if(j && isGap(k + j)) nearGap = true;
+      for(let q=0;q<=NV;q++){
+        const v = -W + 2*W*q/NV, x = f0.p.x + f0.nx*v, z = f0.p.z + f0.nz*v;
+        let y = gridH(x, z) + 0.04;
+        if(nearGap && !gap[gap.length - 1] && Math.abs(v) < R(k) + 1) y = Math.max(y, f0.p.y + BED - 0.25);
+        pos.push(x, y, z);
+        const onRoad = 1 - smoothstep(half - 0.5, half + 0.8, Math.abs(v)), rut = Math.exp(-Math.pow((Math.abs(v) - 1.65)/0.5, 2));
+        const c = shade(k, v, Math.max(1.5, y - f0.y0), 0.1 + 0.06*onRoad - 0.03*rut*onRoad); c[0] *= 1.1; c[2] *= 0.92;
+        // out past the mouths it fades back to the day's own ground colour
+        const out = k < a ? smoothstep(a, a - 3/seg, k) : k > b ? smoothstep(b, b + 3/seg, k) : 0;
+        col.push(c[0] + (0.45 - c[0])*out, c[1] + (0.45 - c[1])*out, c[2] + (0.47 - c[2])*out);
+      }
+      rows++;
+    }
+    for(let r=0;r<rows-1;r++){
+      if(!gap[r] && !gap[r + 1]) for(let q=0;q<NV;q++){ const i0 = r*(NV + 1) + q; idx.push(i0, i0 + 1, i0 + NV + 1, i0 + 1, i0 + NV + 2, i0 + NV + 1); }
+      if(gap[r] === gap[r + 1]) continue;
+      // a lip: a face straight down from the last row of floor to below the lava
+      const rr = gap[r] ? r + 1 : r, k = pa - Math.round(3/seg) + rr, sp = leaps.reduce((m, s2)=> Math.abs(s2.i - k) < Math.abs(m.i - k) ? s2 : m, leaps[0]);
+      if(!sp) continue;
+      const base = fpos.length/3;
+      for(let q=0;q<=NV;q++){
+        const j = (rr*(NV + 1) + q)*3;
+        fpos.push(pos[j], pos[j + 1], pos[j + 2], pos[j], sp.lava - 1.5, pos[j + 2]);
+        fcol.push(0.07, 0.05, 0.045, 0.95, 0.4, 0.1);
+        if(q){ const i0 = base + (q - 1)*2; fidx.push(i0, i0 + 2, i0 + 1, i0 + 1, i0 + 2, i0 + 3); }
+      }
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx);
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({vertexColors:true})); m.frustumCulled = false; scene.add(m);
+    if(fidx.length){
+      const fg = new THREE.BufferGeometry(); fg.setAttribute("position", new THREE.Float32BufferAttribute(fpos, 3));
+      fg.setAttribute("color", new THREE.Float32BufferAttribute(fcol, 3)); fg.setIndex(fidx);
+      const fm = new THREE.Mesh(fg, new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.DoubleSide})); fm.frustumCulled = false; scene.add(fm);
+    }
+  }
+  /* the gutters: lava running the length of the cave along the foot of each wall */
+  for(const sd of [-1, 1]){
+    const ACR = [0, 0.33, 0.66, 1], DEP = [0.15, 0.8, 0.8, 0.15], pos = [], dep = [], run = [], idx = [];
+    let rows = 0, prevOK = false;
+    const flush = ()=>{};
+    for(let k=a; k<=b; k++){
+      const f0 = frame(k), half = P.half[f0.i], v0 = half + 1.1, v1 = R(k) - 0.5;
+      const ok = gridH(f0.p.x, f0.p.z) > f0.p.y + BED - 1;          // not across a leap's gap
+      ACR.forEach((c, e)=>{ const v = sd*(v0 + (v1 - v0)*c), x = f0.p.x + f0.nx*v, z = f0.p.z + f0.nz*v;
+        pos.push(x, gridH(x, z) + 0.12, z); dep.push(ok ? DEP[e] : -1); run.push((c - 0.5)*(v1 - v0), (k - a)*seg); });
+      if(rows) for(let e=0;e<3;e++){ const b0 = (rows - 1)*4 + e, b1 = rows*4 + e; idx.push(b0, b1, b0 + 1, b0 + 1, b1, b1 + 1); }
+      rows++;
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute("aDepth", new THREE.Float32BufferAttribute(dep, 1)); g.setAttribute("aRun", new THREE.Float32BufferAttribute(run, 2)); g.setIndex(idx);
+    const m = new THREE.Mesh(g, lavaMaterial(true)); m.material.side = THREE.DoubleSide; m.frustumCulled = false; m.renderOrder = 2; scene.add(m);
+  }
+  /* the falls: sheets of lava pouring down the wall from a crack high up */
+  falls.forEach(f=>{
+    const pos = [], dep = [], run = [], idx = [], NR = 12, NC = 4;
+    const f0 = frame(f.k), Rk = R(f.k) - 0.3, top = 1.25, crack = new THREE.Group();
+    for(let r=0;r<=NR;r++){
+      const th = top*(1 - r/NR), wid = 1.1 + 1.6*(r/NR), arc = (top - th)*Rk;
+      for(let c=0;c<=NC;c++){
+        const u = (c/NC - 0.5)*2*wid, k2 = f.k + u/seg, fr = frame(Math.round(k2));
+        const cx = f.side*Math.cos(th)*Rk, hy = Math.sin(th)*Rk*0.92;
+        pos.push(fr.p.x + fr.nx*cx + fr.t.x*(u - Math.round(u/seg)*seg), f0.y0 + hy + 0.05, fr.p.z + fr.nz*cx + fr.t.z*(u - Math.round(u/seg)*seg));
+        dep.push(c === 0 || c === NC ? 0.12 : 0.9); run.push(u, arc);
+      }
+      if(r) for(let c=0;c<NC;c++){ const b0 = (r - 1)*(NC + 1) + c, b1 = r*(NC + 1) + c; idx.push(b0, b1, b0 + 1, b0 + 1, b1, b1 + 1); }
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute("aDepth", new THREE.Float32BufferAttribute(dep, 1)); g.setAttribute("aRun", new THREE.Float32BufferAttribute(run, 2)); g.setIndex(idx);
+    const m = new THREE.Mesh(g, lavaMaterial(true)); m.material.side = THREE.DoubleSide; m.frustumCulled = false; m.renderOrder = 2; scene.add(m);
+    const bx = f0.p.x + f0.nx*f.side*(R(f.k) - 1.2), bz = f0.p.z + f0.nz*f.side*(R(f.k) - 1.2);
+    CAVE_FX.push({x:bx, z:bz, y:gridH(bx, bz) + 0.3, kind:"fall"});
+  });
+  leaps.forEach(sp=> CAVE_FX.push({x:sp.x, z:sp.z, y:sp.lava, kind:"leap", tx:sp.tx, tz:sp.tz}));
+  // hanging teeth of black rock, few and far between
+  {
+    const g = new THREE.Group(), m = new THREE.MeshBasicMaterial({color:0x1a1210});
+    for(let k=a + 4; k<b - 4; k+=Math.round(4.5/seg)){
+      if(Math.random() < 0.35) continue;
+      const f0 = frame(k), Rk = R(k), th = (0.3 + Math.random()*0.4)*Math.PI, L = 0.8 + Math.random()*2.2;
+      const c = new THREE.Mesh(new THREE.ConeGeometry(0.35 + Math.random()*0.4, L, 5), m); c.rotation.x = Math.PI;
+      const cx = Math.cos(th)*(Rk - 0.3), hy = Math.sin(th)*Rk*0.9;
+      c.position.set(f0.p.x + f0.nx*cx, f0.y0 + hy - L/2 + 0.2, f0.p.z + f0.nz*cx); g.add(c);
+    }
+    mergeStatic(g); scene.add(g);
+  }
+  /* the hill's roof over the vault, and the face of rock over each mouth */
+  const roofAt = (x, z, k, v)=> Math.max(gridH(x, z), caveRoof(naturalBase(x, z), P.pts[wrapIdx(P, k)].y, R(k), Math.abs(v)));
+  {
+    const NV = 16, pos = [], idx = [], col = [], uv = [], road = [], road2 = [];
+    let rows = 0;
+    const snow = new THREE.Color();
+    for(let k=pa; k<=pb; k++){
+      const f0 = frame(k), W = R(k) + 5.5;
+      for(let q=0;q<=NV;q++){
+        const v = -W + 2*W*q/NV, x = f0.p.x + f0.nx*v, z = f0.p.z + f0.nz*v;
+        pos.push(x, roofAt(x, z, k, v) - (q === 0 || q === NV ? 0.35 : 0), z);
+        snow.setHSL(0.58 + Math.random()*0.03, 0.26, 0.74 + Math.random()*0.04);
+        col.push(snow.r, snow.g, snow.b); uv.push(x/17.33, z/17.33); road.push(40, 6, 0, 0); road2.push(0, 0, 0, 0);
+      }
+      rows++;
+    }
+    for(let r=0;r<rows-1;r++) for(let q=0;q<NV;q++){ const i0 = r*(NV + 1) + q; idx.push(i0, i0 + 1, i0 + NV + 1, i0 + 1, i0 + NV + 2, i0 + NV + 1); }
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+    g.setAttribute("aRoad", new THREE.Float32BufferAttribute(road, 4)); g.setAttribute("aRoad2", new THREE.Float32BufferAttribute(road2, 4));
+    g.setIndex(idx); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, TERRAIN_MAT); m.castShadow = true; m.receiveShadow = true; scene.add(m);
+  }
+  const faceM = new THREE.MeshLambertMaterial({color:0x2b2422, flatShading:true, side:THREE.DoubleSide});
+  const archM = new THREE.MeshLambertMaterial({color:0x3a302b, flatShading:true});
+  for(const [k, out] of [[pa, -1], [pb, 1]]){
+    const f0 = frame(k), Rk = R(k), W = Rk + 5.5, NV = 24, pos = [], idx = [];
+    for(let q=0;q<=NV;q++){
+      const v = -W + 2*W*q/NV, x = f0.p.x + f0.nx*v, z = f0.p.z + f0.nz*v;
+      const bot = Math.abs(v) < Rk ? f0.y0 + Math.sqrt(Rk*Rk - v*v)*0.92 - 0.2 : gridH(x, z) - 0.5;
+      const top = roofAt(x, z, k, v) + 0.2;
+      pos.push(x, bot, z, x, Math.max(bot, top), z);
+      if(q){ const i0 = (q - 1)*2; idx.push(i0, i0 + 2, i0 + 1, i0 + 1, i0 + 2, i0 + 3); }
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+    const face = new THREE.Mesh(g, faceM); face.castShadow = true; face.receiveShadow = true; scene.add(face);
+    // a rough arch of rock round the mouth, boulders tumbled at its feet
+    const arch = new THREE.Group();
+    for(let n=0;n<=10;n++){
+      const th = n/10*Math.PI, cx = Math.cos(th)*(Rk + 0.3), hy = Math.sin(th)*Rk*0.92;
+      const rk = new THREE.Mesh(new THREE.DodecahedronGeometry(1.3 + Math.random()*0.7, 0), archM);
+      rk.position.set(f0.p.x + f0.nx*cx + f0.t.x*out*0.4, f0.y0 + hy, f0.p.z + f0.nz*cx + f0.t.z*out*0.4);
+      rk.rotation.set(Math.random()*3, Math.random()*3, Math.random()*3); arch.add(rk);
+    }
+    for(const sd of [-1, 1]) for(let n=0;n<3;n++){
+      const v = sd*(Rk + 2 + Math.random()*4), x = f0.p.x + f0.nx*v + f0.t.x*out*(2 + Math.random()*5), z = f0.p.z + f0.nz*v + f0.t.z*out*(2 + Math.random()*5);
+      const rk = new THREE.Mesh(new THREE.DodecahedronGeometry(1 + Math.random()*1.4, 0), archM); rk.position.set(x, gridH(x, z) + 0.3, z); rk.scale.y = 0.7; arch.add(rk);
+    }
+    arch.traverse(o=>{ if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+    mergeStatic(arch); scene.add(arch);
+  }
+  roadSign(a - Math.round(70/seg), 1, ["LAVA CAVE", "two jumps inside — keep it flat out"], "#b8401c", "#f2efe6");
+});
+/* where the camera is inside a cave, the room it has: [ceiling, half width, station] or null */
+function caveRoom(x, z){
+  if(!CAVES.length) return null;
+  const n = nearest(x, z);
+  if(n.path !== MAIN) return null;
+  for(const C of CAVES){
+    if(n.pi < C.a - 3 || n.pi > C.b + 3) continue;
+    const p = MAIN.pts[n.pi];
+    return [p.y + BED - 0.3 + (MAIN.half[n.pi] + C.grow)*0.92 - 1.4, MAIN.half[n.pi] + C.grow - 1.8, n.pi];
+  }
+  return null;
+}
 /* ---- the ice spikes: giant crystals of blue ice bursting up out of the
    ground either side of the road, some leaning out over it ---- */
 (TRACK.spikes || []).forEach(d=>{
@@ -4730,7 +5033,7 @@ function makeFX(n, glow){
   return FX;
 }
 const FX_WIND = [2.4, 1.1];
-const FX_ON = !!(TRACK.geysers || CRATER.on);
+const FX_ON = !!(TRACK.geysers || CRATER.on || CAVES.length);
 const STEAM = FX_ON ? makeFX(1400, false) : null, SPRAY = FX_ON ? makeFX(900, true) : null;
 /* ---- the crater at the top of the cone: a lake of lava, a column of smoke
    and bombs of it thrown up out over the rim ---- */
@@ -4897,6 +5200,22 @@ function stepSetPieces(dt){
         if(warn && Math.random() < 0.6) SPRAY.spawn(G.x, G.y + 0.5, G.z, (Math.random() - 0.5)*4, 4 + Math.random()*5, (Math.random() - 0.5)*4,
                     {life:0.8, size:[0.8, 0.4], col:[1.0, 0.5, 0.1], heat:1, grav:12});
       }
+    }
+  });
+  // in the lava cave: sparks and fumes where the falls land, embers off the rivers under the jumps
+  if(STEAM && dt > 0) CAVE_FX.forEach(E=>{
+    if(Math.hypot(cx - E.x, cz - E.z) > 110) return;
+    if(E.kind === "fall"){
+      if(Math.random() < dt*10) SPRAY.spawn(E.x + (Math.random() - 0.5)*2, E.y, E.z + (Math.random() - 0.5)*2, (Math.random() - 0.5)*3, 2 + Math.random()*4, (Math.random() - 0.5)*3,
+                                            {life:0.9 + Math.random()*0.6, size:[0.7, 0.3], col:[1.0, 0.5 + Math.random()*0.3, 0.1], heat:1, grav:9});
+      if(Math.random() < dt*3) STEAM.spawn(E.x, E.y + 0.5, E.z, 0, 1.5 + Math.random(), 0, {life:3, size:[1.5, 5], col:[0.35, 0.33, 0.32], alpha:0.35, heat:1.2, drag:0.8, grav:-0.4});
+    } else {
+      if(Math.random() < dt*22){ const v = (Math.random() - 0.5)*18;
+        SPRAY.spawn(E.x - E.tz*v, E.y + 0.3, E.z + E.tx*v, (Math.random() - 0.5), 3 + Math.random()*5, (Math.random() - 0.5),
+                    {life:1.4 + Math.random()*1.2, size:[0.6, 0.25], col:[1.0, 0.45 + Math.random()*0.35, 0.08], heat:1, grav:-0.5, drag:0.6}); }
+      if(Math.random() < dt*2.5){ const v = (Math.random() - 0.5)*14;
+        for(let q=0;q<8;q++) SPRAY.spawn(E.x - E.tz*v, E.y + 0.3, E.z + E.tx*v, (Math.random() - 0.5)*4, 5 + Math.random()*6, (Math.random() - 0.5)*4,
+                    {life:1 + Math.random()*0.5, size:[1, 0.4], col:[1.0, 0.4 + Math.random()*0.3, 0.06], heat:1, grav:12}); }
     }
   });
   VENTS.forEach(V=>{
@@ -10700,6 +11019,15 @@ function stepCamera(dt, sp){
     camAim.set(pose.x + fx*7*e, pose.y + 1.25, pose.z + fz*7*e);
     camH = pose.h;
   }
+  // in a cave the view keeps under the roof and inside the walls
+  if(CAVES.length && camMode !== 1){
+    const rm = caveRoom(camera.position.x, camera.position.z);
+    if(rm){
+      if(camera.position.y > rm[0]) camera.position.y = rm[0];
+      const p = MAIN.pts[rm[2]], t = MAIN.tans[rm[2]], lat = (camera.position.x - p.x)*(-t.z) + (camera.position.z - p.z)*t.x;
+      if(Math.abs(lat) > rm[1]){ const d = (Math.abs(lat) - rm[1])*Math.sign(lat); camera.position.x += t.z*d; camera.position.z -= t.x*d; }
+    }
+  }
   // rumble only where the surface is actually rough
   if(nearest(pose.x, pose.z).dist > HALF && sp > 4){
     const r = Math.min(0.045, sp*0.0011);
@@ -12924,7 +13252,7 @@ if(/debug/.test(location.hash)){
   window.__R = { THREE, TRACKS, TRACK, TRACK_ID, MAIN, BRANCHES, paths, ROUTE, pose, state, camera, scene, renderer,
                  surfaceY, gridH, nearest, PILES, PIT, GAME, CTL, trans, MAXV, radiiOf, radiiOpen, resetRace, setMode,
                  closeUI, rivals, car, splash, cornerHoldSpeed, stepCar, placeAtStart, drift, AUTO_JUMPS,
-                 CALM, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults, trans, GIANT, RIDGES, CROSSES, SPANS, LAKE, TUNNELS, CRATER, GEYSERS, stepSetPieces, NOTES, noteSay, PACE, TRACE, stepNotes, stepTrace, stepCritters, stepDirt, CRIT, CAR_DIRT, UI:{showTitle, showMain, showTracks, showReady, showOptions, showGarage, showHelp, showPause, showChamp}, dustLive: ()=>{ let n=0; for(let i=0;i<DUST;i++) if(dustLife[i]>0) n++; return n; } };
+                 CALM, macro, CAVES, caveDbg: ()=>{ let n=0, m=0; if(GCAVE) for(let g=0;g<GCAVE.length;g++){ if(GCAVE[g]) n++; m=Math.max(m, GHV[g]-GH[g]); } return [n, m, GHV===GH]; }, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults, trans, GIANT, RIDGES, CROSSES, SPANS, LAKE, TUNNELS, CRATER, GEYSERS, stepSetPieces, NOTES, noteSay, PACE, TRACE, stepNotes, stepTrace, stepCritters, stepDirt, CRIT, CAR_DIRT, UI:{showTitle, showMain, showTracks, showReady, showOptions, showGarage, showHelp, showPause, showChamp}, dustLive: ()=>{ let n=0; for(let i=0;i<DUST;i++) if(dustLife[i]>0) n++; return n; } };
 }
 boot();
 requestAnimationFrame(frame);
