@@ -1712,12 +1712,14 @@ function causeway(P){
   for(let i=0;i<P.N;i++) P.pts[i].y += Math.max(lift[i], sm[i]);
   /* where the land past the shore falls away, the causeway comes down onto it
      as an embankment no steeper than 14%, instead of stopping at a drop */
+  /* it runs on, out from the raised stretch, until it has come down to the
+     land: not cut off at some distance from the shore, which left a wall */
   const near = i=>{ const p = P.pts[i]; return Math.hypot((p.x - LAKE.x)/LAKE.rx, (p.z - LAKE.z)/LAKE.rz) < 3.2; };
-  const drop = 0.14*P.seg;
+  const drop = 0.14*P.seg, go = Array.from(P.pts, (p, i)=> near(i));
   for(let pass=0; pass<2; pass++){
-    for(let i=1;i<P.N;i++) if(near(i)) P.pts[i].y = Math.max(P.pts[i].y, P.pts[i-1].y - drop);
-    for(let i=P.N-2;i>=0;i--) if(near(i)) P.pts[i].y = Math.max(P.pts[i].y, P.pts[i+1].y - drop);
-    if(P.closed){ P.pts[0].y = Math.max(P.pts[0].y, P.pts[P.N-1].y - drop); }
+    for(let i=1;i<P.N;i++) if((go[i] || go[i-1]) && P.pts[i].y < P.pts[i-1].y - drop){ P.pts[i].y = P.pts[i-1].y - drop; go[i] = true; }
+    for(let i=P.N-2;i>=0;i--) if((go[i] || go[i+1]) && P.pts[i].y < P.pts[i+1].y - drop){ P.pts[i].y = P.pts[i+1].y - drop; go[i] = true; }
+    if(P.closed && (go[0] || go[P.N-1])) P.pts[0].y = Math.max(P.pts[0].y, P.pts[P.N-1].y - drop);
   }
 }
 causeway(MAIN);
@@ -2677,6 +2679,16 @@ BRANCHES.forEach(P=>{
     if(w <= 0) continue;
     P.pts[i].y = P.pts[i].y*(1-w) + MY[i]*w;
   }
+  /* and a hugging branch, having kept the main road's height beside it,
+     never gets back to its own land by a climb or a drop steeper than 13%:
+     it starts down (or up) sooner instead */
+  if(P.def.hug && !shaped){
+    const g = 0.13*P.seg;
+    for(let pass=0; pass<3; pass++){
+      for(let i=P.N-2;i>=0;i--) P.pts[i].y = Math.max(P.pts[i].y, P.pts[i+1].y - g);
+      for(let i=1;i<P.N;i++) P.pts[i].y = Math.max(P.pts[i].y, P.pts[i-1].y - g);
+    }
+  }
 });
 
 BRANCHES.forEach(P=> causeway(P));
@@ -2957,7 +2969,12 @@ function barren(x, z){
   if(GIANT.on && Math.hypot(x - GIANT.x, z - GIANT.z) < GIANT.ring - 7) return true;   // the oak's own ground
   if(SPANS.length && lavaNear(x, z) > 0.2) return true;                                   // nothing grows by the lava
   if(CRATER.on && Math.hypot(x - CRATER.x, z - CRATER.z) < CRATER.r*3.2) return true;      // nor on the volcano's cone
-  if(GCAVE){ const c = cellAt(x, z); if(c >= 0 && GHV[c] > GH[c] + 0.3) return true; }     // nor in the cutting under a cave's hill
+  if(GCAVE){ const c = cellAt(x, z);                                                         // over a cave: on the hill, not its faces
+    if(c >= 0 && (GCAVE[c] || GHV[c] > GH[c] + 0.3)){
+      if(GCAVE[c] || Math.abs(GL[c]) < GHW[c] + 10.5) return true;
+      const sl = Math.abs(shownH(x + 2, z) - shownH(x - 2, z)) + Math.abs(shownH(x, z + 2) - shownH(x, z - 2));
+      if(sl > 3.2) return true;
+    } }
   if(DUNE.on && Math.hypot(x - DUNE.x, z - DUNE.z) < DUNE.r*0.88) return true;
   if(CANYON.on){ const uv = canyonUV(x, z); if(uv && uv[0] < 30 && canyonPlateau(x, z, uv) > 0.2) return true; }
   return false;
@@ -3196,7 +3213,7 @@ let GHV = GH, GCAVE = null;
 const CAVE_W = 44;
 /* the hill over a cave: its own natural height, and never lower than a
    good roof of rock over the vault */
-function caveRoof(nat, yr, R, av){ return nat + Math.max(0, yr + BED + R*0.95 + 3.2 - nat)*(1 - smoothstep(R + 3, R + 16, av)); }
+function caveRoof(nat, yr, R, av){ return nat + Math.max(0, yr + BED + R*0.95 + 3.2 - nat)*(1 - smoothstep(R + 3, R + 30, av)); }
 function caveYAt(s){ const i0 = Math.floor(s), f = s - i0, A = MAIN.pts[wrapIdx(MAIN, i0)], B = MAIN.pts[wrapIdx(MAIN, i0 + 1)]; return A.y + (B.y - A.y)*f; }
 function caveOf(s){ for(const C of CAVES){ if(s >= C.a && s <= C.b) return C; } return null; }
 {
@@ -3355,14 +3372,25 @@ function caveOf(s){ for(const C of CAVES){ if(s >= C.a && s <= C.b) return C; } 
   if(CAVES.length){
     GHV = new Float32Array(GH); GCAVE = new Uint8Array(GCELLS);
     const MI = paths.indexOf(MAIN);
+    const APPR = Math.round(18/MAIN.seg);
     for(let g=0; g<GCELLS; g++){
       if(GP[g] !== MI || GD[g] >= CAVE_W) continue;
-      const C = caveOf(GS[g]); if(!C) continue;
-      const i = wrapIdx(MAIN, Math.round(GS[g])), R = MAIN.half[i] + C.grow, av = Math.abs(GL[g]);
+      const sg = GS[g];
+      let C = null; for(const c of CAVES) if(sg >= c.a - APPR && sg <= c.b + APPR){ C = c; break; }
+      if(!C) continue;
+      const i = wrapIdx(MAIN, Math.round(sg)), R = MAIN.half[i] + C.grow, av = Math.abs(GL[g]);
+      const inside = sg >= C.a && sg <= C.b;
+      /* in front of each mouth the hill comes down to it as a slope, and the
+         road runs into it along a notch cut out of that slope */
+      if(!inside && av < R + 1.5) continue;
+      if(inside && av < R + 1){ GCAVE[g] = 1; continue; }
+      const wr = inside ? 1 : smoothstep(0, 1, 1 - (sg < C.a ? C.a - sg : sg - C.b)/APPR);
       // the hill as it stands, not as the lava channels under it are cut
       const nat = Math.max(NAT[g], naturalBase(-GHALF + (g % GN)*GSTEP, -GHALF + Math.floor(g/GN)*GSTEP));
-      GHV[g] = Math.max(GH[g], caveRoof(nat, caveYAt(GS[g]), R, av));
-      if(av < R + 1) GCAVE[g] = 1;
+      const roof = caveRoof(nat, caveYAt(sg), R, av);
+      // and it fades out to the land as built before the edge of the road's reach, so there is no seam
+      const wl = 1 - smoothstep(CAVE_W - 18, CAVE_W - 1, GD[g]);
+      GHV[g] = Math.max(GH[g], GH[g] + (roof - GH[g])*wr*wl);
     }
   }
 }
@@ -3431,7 +3459,16 @@ function nearest(x, z){
   return _near;
 }
 function groundY(x, z){ return naturalY(x, z); }   // the land, as if no road existed
-function gradedY(x, z){ return gridH(x, z); }      // the land as built
+function gradedY(x, z){ return GCAVE ? shownH(x, z) : gridH(x, z); }      // the land as built (and as drawn, over a cave)
+function shownH(x, z){
+  const fx = (x + GHALF)/GSTEP, fz = (z + GHALF)/GSTEP;
+  const a = Math.floor(fx), b = Math.floor(fz);
+  if(a < 0 || b < 0 || a >= GN-1 || b >= GN-1) return gridH(x, z);
+  const u = fx - a, v = fz - b, k = b*GN + a;
+  const ha = GHV[k], hb = GHV[k+1], hc = GHV[k+GN], hd = GHV[k+GN+1];
+  if(GFLIP[k]) return u + v <= 1 ? ha + (hb-ha)*u + (hc-ha)*v : hd + (hc-hd)*(1-u) + (hb-hd)*(1-v);
+  return u >= v ? ha + (hb-ha)*u + (hd-hb)*v : ha + (hc-ha)*v + (hd-hc)*u;
+}
 function heightAt(x, z){ return gridH(x, z); }
 /* what the wheels are standing on: the grid, the bridge deck where there is
    one, and a little stony roughness off the road that is felt, not drawn */
@@ -4706,13 +4743,13 @@ CAVES.forEach(C=>{
     return Math.min(1.4, gl);
   };
   // daylight in at the mouths
-  const spill = k=> Math.max(Math.exp(-(k - a)*seg/9), Math.exp(-(b - k)*seg/9));
+  const spill = k=> Math.max(Math.exp(-(k - a)*seg/6), Math.exp(-(b - k)*seg/6));
   const rock = new THREE.Color(), hot = new THREE.Color(1.0, 0.36, 0.08), day = new THREE.Color(0.55, 0.58, 0.64);
   const shade = (k, v, h, base)=>{
     const r0 = Math.random();
     rock.setRGB(base*(0.8 + 0.4*r0), base*(0.72 + 0.35*r0), base*(0.7 + 0.3*r0));
     const g = glowAt(k, v, h), sp = spill(k);
-    return [rock.r + hot.r*g*0.6 + day.r*sp*0.6, rock.g + hot.g*g*0.6 + day.g*sp*0.6, rock.b + hot.b*g*0.6 + day.b*sp*0.6];
+    return [rock.r + hot.r*g*0.6 + day.r*sp*0.32, rock.g + hot.g*g*0.6 + day.g*sp*0.32, rock.b + hot.b*g*0.6 + day.b*sp*0.32];
   };
   const pa = a - Math.round(2/seg), pb = b + Math.round(2/seg);
   /* the vault: rough, a little wider than a half circle, its walls running
@@ -4841,10 +4878,11 @@ CAVES.forEach(C=>{
     let rows = 0;
     const snow = new THREE.Color();
     for(let k=pa; k<=pb; k++){
-      const f0 = frame(k), W = R(k) + 5.5;
+      const f0 = frame(k), W = R(k) + 6.5;
       for(let q=0;q<=NV;q++){
         const v = -W + 2*W*q/NV, x = f0.p.x + f0.nx*v, z = f0.p.z + f0.nz*v;
-        pos.push(x, roofAt(x, z, k, v) - (q === 0 || q === NV ? 0.35 : 0), z);
+        const hy = roofAt(x, z, k, v); pos.push(x, hy, z);
+        if(Math.abs(v) > 2 && k > pa + 6/seg && k < pb - 6/seg && Math.random() < 0.05) (C.treeSpots = C.treeSpots || []).push([x, hy - 0.1, z]);
         snow.setHSL(0.58 + Math.random()*0.03, 0.26, 0.74 + Math.random()*0.04);
         col.push(snow.r, snow.g, snow.b); uv.push(x/17.33, z/17.33); road.push(40, 6, 0, 0); road2.push(0, 0, 0, 0);
       }
@@ -4857,33 +4895,61 @@ CAVES.forEach(C=>{
     g.setIndex(idx); g.computeVertexNormals();
     const m = new THREE.Mesh(g, TERRAIN_MAT); m.castShadow = true; m.receiveShadow = true; scene.add(m);
   }
-  const faceM = new THREE.MeshLambertMaterial({color:0x2b2422, flatShading:true, side:THREE.DoubleSide});
-  const archM = new THREE.MeshLambertMaterial({color:0x3a302b, flatShading:true});
+  /* each mouth: a face of rough rock from the opening up to the hillside,
+     leaning back into the hill, broken and ledged, snow lying on the ledges,
+     and big boulders tumbled either side of the way in */
+  const faceM = new THREE.MeshLambertMaterial({vertexColors:true, flatShading:true, side:THREE.DoubleSide});
+  const bouldM = new THREE.MeshLambertMaterial({color:0x3b3431, flatShading:true});
+  const snowCapM = new THREE.MeshLambertMaterial({color:0xeef3f8, flatShading:true});
   for(const [k, out] of [[pa, -1], [pb, 1]]){
-    const f0 = frame(k), Rk = R(k), W = Rk + 5.5, NV = 24, pos = [], idx = [];
+    const f0 = frame(k), Rk = R(k), W = Rk + 5.5, NV = 26, NR = 7, pos = [], col = [], idx = [];
+    const cc = new THREE.Color();
     for(let q=0;q<=NV;q++){
-      const v = -W + 2*W*q/NV, x = f0.p.x + f0.nx*v, z = f0.p.z + f0.nz*v;
-      const bot = Math.abs(v) < Rk ? f0.y0 + Math.sqrt(Rk*Rk - v*v)*0.92 - 0.2 : gridH(x, z) - 0.5;
-      const top = roofAt(x, z, k, v) + 0.2;
-      pos.push(x, bot, z, x, Math.max(bot, top), z);
-      if(q){ const i0 = (q - 1)*2; idx.push(i0, i0 + 2, i0 + 1, i0 + 1, i0 + 2, i0 + 3); }
+      const v = -W + 2*W*q/NV, x0 = f0.p.x + f0.nx*v, z0 = f0.p.z + f0.nz*v;
+      const bot = Math.abs(v) < Rk ? f0.y0 + Math.sqrt(Rk*Rk - v*v)*0.92 - 0.3 : gridH(x0, z0) - 0.6;
+      // the brow is broken, standing proud of the slope here and there
+      const top = Math.max(bot + 0.5, roofAt(x0, z0, k, v) + 0.3 + (q && q < NV ? Math.random()*1.4 : 0));
+      for(let r=0;r<=NR;r++){
+        const f = r/NR, hgt = bot + (top - bot)*f;
+        // leaning back into the hill as it rises, and knobbly
+        const back = -out*((top - bot)*0.45*f*f + (r && r < NR && q && q < NV ? (Math.random() - 0.3)*0.9 : 0));
+        pos.push(x0 + f0.t.x*back, hgt + (r && r < NR ? (Math.random() - 0.5)*0.5 : 0), z0 + f0.t.z*back);
+        const r0 = Math.random();
+        // dark rock, snow only along the brow where it meets the hillside
+        if(r === NR) cc.setHSL(0.58, 0.14, 0.84 + r0*0.06); else cc.setHSL(0.05 + r0*0.02, 0.07 + r0*0.04, 0.13 + r0*0.05 + f*0.05);
+        col.push(cc.r, cc.g, cc.b);
+      }
+      if(q) for(let r=0;r<NR;r++){ const i0 = (q - 1)*(NR + 1) + r, i1 = q*(NR + 1) + r; idx.push(i0, i1, i0 + 1, i0 + 1, i1, i1 + 1); }
     }
-    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals();
     const face = new THREE.Mesh(g, faceM); face.castShadow = true; face.receiveShadow = true; scene.add(face);
-    // a rough arch of rock round the mouth, boulders tumbled at its feet
-    const arch = new THREE.Group();
-    for(let n=0;n<=10;n++){
-      const th = n/10*Math.PI, cx = Math.cos(th)*(Rk + 0.3), hy = Math.sin(th)*Rk*0.92;
-      const rk = new THREE.Mesh(new THREE.DodecahedronGeometry(1.3 + Math.random()*0.7, 0), archM);
-      rk.position.set(f0.p.x + f0.nx*cx + f0.t.x*out*0.4, f0.y0 + hy, f0.p.z + f0.nz*cx + f0.t.z*out*0.4);
-      rk.rotation.set(Math.random()*3, Math.random()*3, Math.random()*3); arch.add(rk);
+    const rocks = new THREE.Group();
+    const boulder = (x, z, y, s, cap)=>{
+      const rk = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 1), bouldM);
+      const p = rk.geometry.attributes.position;
+      for(let n=0;n<p.count;n++) p.setXYZ(n, p.getX(n)*(0.8 + Math.random()*0.4), p.getY(n)*(0.7 + Math.random()*0.3), p.getZ(n)*(0.8 + Math.random()*0.4));
+      rk.geometry.computeVertexNormals();
+      rk.scale.set(s*(1 + Math.random()*0.5), s*(0.6 + Math.random()*0.3), s*(1 + Math.random()*0.4));
+      rk.position.set(x, y, z); rk.rotation.y = Math.random()*6; rocks.add(rk);
+      if(cap){ const sn = new THREE.Mesh(new THREE.SphereGeometry(1, 7, 4, 0, Math.PI*2, 0, Math.PI*0.35), snowCapM);
+        sn.scale.set(rk.scale.x*0.9, rk.scale.y*0.5, rk.scale.z*0.9); sn.position.set(x, y + rk.scale.y*0.55, z); rocks.add(sn); }
+    };
+    // at the foot of the face either side of the opening, and scattered down the notch
+    for(const sd of [-1, 1]){
+      for(let n=0;n<4;n++){
+        const v = sd*(Rk + 1.5 + Math.random()*3.5), d = out*(1 + n*3.5 + Math.random()*2);
+        const x = f0.p.x + f0.nx*v + f0.t.x*d, z = f0.p.z + f0.nz*v + f0.t.z*d;
+        boulder(x, z, gradedY(x, z) + 0.2, 1.6 + Math.random()*1.8 - n*0.2, Math.random() < 0.7);
+      }
     }
-    for(const sd of [-1, 1]) for(let n=0;n<3;n++){
-      const v = sd*(Rk + 2 + Math.random()*4), x = f0.p.x + f0.nx*v + f0.t.x*out*(2 + Math.random()*5), z = f0.p.z + f0.nz*v + f0.t.z*out*(2 + Math.random()*5);
-      const rk = new THREE.Mesh(new THREE.DodecahedronGeometry(1 + Math.random()*1.4, 0), archM); rk.position.set(x, gridH(x, z) + 0.3, z); rk.scale.y = 0.7; arch.add(rk);
+    // a heavy overhang of rock over the opening
+    for(let n=0;n<3;n++){
+      const v = (n - 1)*Rk*0.75, x = f0.p.x + f0.nx*v + f0.t.x*out*0.6, z = f0.p.z + f0.nz*v + f0.t.z*out*0.6;
+      boulder(x, z, f0.y0 + Rk*0.92 + 1.2 + Math.random()*0.6, 2.2 + Math.random()*0.8, true);
     }
-    arch.traverse(o=>{ if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
-    mergeStatic(arch); scene.add(arch);
+    rocks.traverse(o=>{ if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+    mergeStatic(rocks); scene.add(rocks);
   }
   roadSign(a - Math.round(70/seg), 1, ["LAVA CAVE", "two jumps inside — keep it flat out"], "#b8401c", "#f2efe6");
 });
@@ -7570,6 +7636,9 @@ function bushGeometry(seed){
       return true;
     });
   });
+  // the forest carries on over the top of a cave's hill
+  CAVES.forEach(C=> (C.treeSpots || []).forEach(p=>{ const kind = Math.random() < 0.5 ? 0 : (Math.random() < 0.6 ? 1 : 2);
+    treeSpots[kind].push([p[0], p[1], p[2], 8 + Math.random()*9]); }));
 
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(),
         sc = new THREE.Vector3(), v = new THREE.Vector3(), e = new THREE.Euler();
