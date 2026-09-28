@@ -2105,6 +2105,8 @@ function addCrests(P, rnd){
       MAIN.st_paved[i] *= 1 - inn;                      // no old tarmac down a slot
     }
   }
+  // no old tarmac anywhere on the volcano: it is a wild road
+  if(TRACK.special) paths.forEach(P=>{ if(P.st_paved) P.st_paved.fill(0); });
   addCrests(MAIN, rnd);
   /* Launch berms. On the outside of a tighter corner the ground rises into
      a steep earth bank, and running wide into it, or sliding into it, throws
@@ -2251,6 +2253,7 @@ if(GIANT.on){
 const GORGE = { on:false, i:0, depth:0, span:35, samples:0, reach:0, wall:26 };
 let SPANS = [];                        // the log bridges over lava, built once the roads have their heights
 let SURF_HINT = null;
+const FISS = [];                       // points along the lava fissures, kept clear of trees
 const CAVE_FX_PENDING = [];            // spots where lava pours down a wall: sparks and fumes at the foot
 const ISLANDS = [];                    // dividers where two routes part: solid
 const TUNNELS = [];                    // ice tunnels over the main road: [a, b] stations
@@ -2969,6 +2972,7 @@ function barren(x, z){
   if(GIANT.on && Math.hypot(x - GIANT.x, z - GIANT.z) < GIANT.ring - 7) return true;   // the oak's own ground
   if(SPANS.length && lavaNear(x, z) > 0.2) return true;                                   // nothing grows by the lava
   if(CRATER.on && Math.hypot(x - CRATER.x, z - CRATER.z) < CRATER.r*3.2) return true;      // nor on the volcano's cone
+  for(let n=0;n<FISS.length;n++) if(Math.abs(x - FISS[n][0]) < 6 && Math.abs(z - FISS[n][1]) < 6) return true;   // nor on a fissure
   if(GCAVE){ const c = cellAt(x, z);                                                         // over a cave: on the hill, not its faces
     if(c >= 0 && (GCAVE[c] || GHV[c] > GH[c] + 0.3)){
       if(GCAVE[c] || Math.abs(GL[c]) < GHW[c] + 10.5) return true;
@@ -3688,6 +3692,39 @@ function paintCanvas(base, rustAmt){
  *  is, where it sits across the road, mud and wet. Because the edge is a
  *  distance, not a triangle boundary, it comes out crisp at any angle.
  * ------------------------------------------------------------------ */
+/* ---- where the lava fissures run on the volcano: jagged cracks a few
+   metres off the verge, on the flat, clear of the set pieces ---- */
+const FISS_ROWS = [];
+if(TRACK.special && (SPANS.length || CRATER.on)){
+  const P = MAIN, seg = P.seg, clear = (i, x, z)=>{
+    if(i*seg < 160 || (P.N - i)*seg < 60) return false;
+    if(SPANS.some(sp=> Math.hypot(x - sp.x, z - sp.z) < 55)) return false;
+    if(CAVES.some(C=> i > C.a - 40/seg && i < C.b + 40/seg)) return false;
+    if(TUNNELS.some(T=> i > T.a - 30/seg && i < T.b + 30/seg)) return false;
+    if(CRATER.on && Math.hypot(x - CRATER.x, z - CRATER.z) < CRATER.r*1.6) return false;
+    if(lavaLevelAt(x, z) !== null || inWaterway(x, z)) return false;
+    return true;
+  };
+  for(let tries=0; tries<500 && FISS_ROWS.length<16; tries++){
+    const i = Math.floor(Math.random()*P.N), p = P.pts[i], t = P.tans[i], sd = Math.random() < 0.5 ? -1 : 1;
+    const off = P.half[i] + 6 + Math.random()*9, x0 = p.x - t.z*sd*off, z0 = p.z + t.x*sd*off;
+    if(!clear(i, x0, z0) || nearest(x0, z0).dist < P.half[i] + 4) continue;
+    if(Math.abs(gridH(x0 + 4, z0) - gridH(x0 - 4, z0)) + Math.abs(gridH(x0, z0 + 4) - gridH(x0, z0 - 4)) > 1.6) continue;
+    const L = 9 + Math.random()*12, NS = Math.round(L/1.2);
+    let a = Math.atan2(t.z, t.x) + (Math.random() - 0.5)*0.6, x = x0, z = z0, run = 0, ok = true;
+    const rows = [];
+    for(let k=0;k<=NS;k++){
+      a += (Math.random() - 0.5)*0.3;
+      const w = (0.35 + 0.75*Math.sin(Math.PI*k/NS))*(0.75 + Math.random()*0.4), nx = -Math.sin(a), nz = Math.cos(a);
+      if(nearest(x, z).dist < P.half[i] + 3 || Math.abs(gridH(x, z) - gridH(x0, z0)) > 1.5){ ok = false; break; }
+      rows.push([x, z, nx, nz, w, run]);
+      x += Math.cos(a)*1.2; z += Math.sin(a)*1.2; run += 1.2;
+    }
+    if(!ok) continue;
+    FISS_ROWS.push(rows); rows.forEach(r=> FISS.push([r[0], r[1]]));
+  }
+}
+function fissNear(x, z){ let d = 1e9; for(let n=0;n<FISS.length;n++){ const dx = x - FISS[n][0], dz = z - FISS[n][1]; if(Math.abs(dx) < 8 && Math.abs(dz) < 8) d = Math.min(d, Math.hypot(dx, dz)); } return d; }
 const TERRAIN_MAT = new THREE.MeshLambertMaterial({map:grassTex, vertexColors:true});
 const GROUND_MAT = TERRAIN_MAT;
 TERRAIN_MAT.onBeforeCompile = sh=>{
@@ -3856,13 +3893,21 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
           // round the lava the snow has gone: black basalt, a little red where it is hottest
           if(CRATER.on){
             // the cone: black ash and rock from the rim down, snow lying in the gullies lower on
-            const dc = Math.hypot(x - CRATER.x, z - CRATER.z), kc = 1 - smoothstep(CRATER.r*1.2, CRATER.r*3.2, dc + (Math.random() - 0.5)*14);
+            const dc = Math.hypot(x - CRATER.x, z - CRATER.z), kc = 1 - smoothstep(CRATER.r*1.5, CRATER.r*4.6, dc + (Math.random() - 0.5)*18 + Math.sin(Math.atan2(z - CRATER.z, x - CRATER.x)*5)*CRATER.r*0.6);
             if(kc > 0) c.lerp(new THREE.Color().setHSL(0.02, 0.08, 0.075 + Math.random()*0.04), Math.min(0.95, kc*1.3));
           }
           if(SPANS.length || (LAKE.on && LAKE.lava)){
             const k = lavaNear(x, z);
             if(k > 0) c.lerp(new THREE.Color().setHSL(0.02 + Math.random()*0.02, 0.10 + k*0.25, 0.09 + Math.random()*0.05 + (1 - k)*0.06), Math.min(0.95, k*1.1));
           }
+          /* on the volcano the snow is thin: drifts of black ash and scree
+             show through it in patches, more of them on the steeper ground */
+          if(TRACK.special && t > 0.35){
+            const nz = Math.sin(x*0.031 + Math.sin(z*0.023)*2.1) + Math.sin(z*0.027 + Math.sin(x*0.019)*1.7) + 0.5*Math.sin((x + z)*0.071);
+            const k = smoothstep(0.7, 1.35, nz + steep*0.8 + (Math.random() - 0.5)*0.45);
+            if(k > 0) c.lerp(new THREE.Color().setHSL(0.04 + Math.random()*0.03, 0.09, 0.12 + Math.random()*0.09), k*0.9);
+          }
+          if(FISS.length){ const fd = fissNear(x, z); if(fd < 7) c.lerp(new THREE.Color().setHSL(0.04, 0.12, 0.08 + Math.random()*0.06), (1 - smoothstep(2, 7, fd + Math.random()*1.5))*0.95); }
           // the face of the hill round a cave mouth: bare dark rock where it is steep
           if(GHV[g] > GH[g] + 0.3 && n[1] < 0.8) c.lerp(new THREE.Color().setHSL(0.04, 0.07, 0.16 + Math.random()*0.05), smoothstep(0.8, 0.55, n[1]));
           col[v*3] = c.r; col[v*3+1] = c.g; col[v*3+2] = c.b;
@@ -4960,6 +5005,95 @@ function caveRoom(x, z){
   }
   return null;
 }
+/* ---- the volcano all round the lap, not only at its set pieces: glowing
+   fissures steaming in the snow beside the road, the charred skeletons of
+   trees the lava has reached, and black basalt tumbled over the snowfields
+   round the cone ---- */
+if(TRACK.special && (SPANS.length || CRATER.on)){
+  const P = MAIN, seg = P.seg, clear = (i, x, z)=>{
+    if(i*seg < 160 || (P.N - i)*seg < 60) return false;                                   // the start
+    if(SPANS.some(sp=> Math.hypot(x - sp.x, z - sp.z) < 55)) return false;
+    if(CAVES.some(C=> i > C.a - 40/seg && i < C.b + 40/seg)) return false;
+    if(TUNNELS.some(T=> i > T.a - 30/seg && i < T.b + 30/seg)) return false;
+    if(CRATER.on && Math.hypot(x - CRATER.x, z - CRATER.z) < CRATER.r*1.6) return false;
+    if(lavaLevelAt(x, z) !== null || inWaterway(x, z)) return false;
+    return true;
+  };
+  /* the fissures (their paths picked before the ground was coloured, so
+     it could be scorched round them) */
+  const fm = lavaMaterial(); fm.side = THREE.DoubleSide;
+  const fpos = [], fdep = [], frun = [], fidx = [];
+  FISS_ROWS.forEach(rows=>{
+    const base = fpos.length/3;
+    const ACR = [-2.0, -0.8, 0, 0.8, 2.0], DEP = [0.02, 0.25, 0.95, 0.25, 0.02];
+    rows.forEach((r, k)=>{
+      ACR.forEach((c, e)=>{ const px = r[0] + r[2]*c*r[4], pz = r[1] + r[3]*c*r[4];
+        fpos.push(px, gridH(px, pz) + 0.1 + (e === 2 ? 0.04 : 0), pz); fdep.push(DEP[e]); frun.push(c*r[4], r[5]); });
+      if(k) for(let e=0;e<4;e++){ const b0 = base + (k - 1)*5 + e, b1 = base + k*5 + e; fidx.push(b0, b1, b0 + 1, b0 + 1, b1, b1 + 1); }
+    });
+    const mid = rows[rows.length >> 1];
+    CAVE_FX.push({x:mid[0], z:mid[1], y:gridH(mid[0], mid[1]) + 0.2, kind:"fiss", L:rows.length*1.2});
+  });
+  if(fidx.length){
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(fpos, 3));
+    g.setAttribute("aDepth", new THREE.Float32BufferAttribute(fdep, 1)); g.setAttribute("aRun", new THREE.Float32BufferAttribute(frun, 2)); g.setIndex(fidx);
+    const m = new THREE.Mesh(g, fm); m.frustumCulled = false; m.renderOrder = 2; scene.add(m);
+  }
+  /* burnt trees: a black trunk and a few bare, broken limbs, standing in the
+     scorched ground round the lava */
+  {
+    const parts = [];
+    const trunk = new THREE.CylinderGeometry(0.015, 0.05, 1, 6, 1); trunk.translate(0, 0.5, 0); parts.push(trunk);
+    for(let n=0;n<5;n++){
+      const l = new THREE.CylinderGeometry(0.006, 0.018, 0.3 - n*0.04, 4, 1); l.translate(0, (0.32 - n*0.04)/2, 0);
+      l.rotateZ(0.9 + Math.random()*0.5); l.rotateY(n*2.4); l.translate(0, 0.35 + n*0.12, 0); parts.push(l);
+    }
+    const pos = [];
+    parts.forEach(gp=>{ const a = gp.toNonIndexed().attributes.position.array; for(let n=0;n<a.length;n++) pos.push(a[n]); });
+    const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.computeVertexNormals();
+    const spots = [];
+    for(let tries=0; tries<4000 && spots.length<170; tries++){
+      let x, z;
+      const sp = SPANS[Math.floor(Math.random()*SPANS.length)];
+      if(Math.random() < 0.35 && LAKE.on && LAKE.lava){ const a = Math.random()*6.28, r = 1.02 + Math.random()*0.22; x = LAKE.x + Math.cos(a)*LAKE.rx*r; z = LAKE.z + Math.sin(a)*LAKE.rz*r; }
+      else if(sp && !sp.over){ const u = (Math.random() < 0.5 ? -1 : 1)*(sp.wall + 3 + Math.random()*14), v = (Math.random() - 0.5)*2*sp.reach;
+        x = sp.x + sp.tx*u - sp.tz*v; z = sp.z + sp.tz*u + sp.tx*v; }
+      else continue;
+      if(lavaLevelAt(x, z) !== null || inWaterway(x, z)) continue;
+      const n = nearest(x, z); if(n.dist < n.half + 4) continue;
+      if(GCAVE){ const c = cellAt(x, z); if(c >= 0 && GCAVE[c]) continue; }
+      // a grove: a few together, where the fire went through
+      for(let g=0; g<2 + Math.floor(Math.random()*4); g++){
+        const gx = x + (Math.random() - 0.5)*12, gz = z + (Math.random() - 0.5)*12;
+        if(lavaLevelAt(gx, gz) !== null) continue;
+        const gn = nearest(gx, gz); if(gn.dist < gn.half + 4) continue;
+        if(GCAVE){ const c = cellAt(gx, gz); if(c >= 0 && GCAVE[c]) continue; }
+        spots.push([gx, gradedY(gx, gz) - 0.2, gz, 6 + Math.random()*9]);
+      }
+    }
+    if(geo && spots.length){
+      const inst = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({color:0x1d1614}), spots.length);
+      const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(), v = new THREE.Vector3();
+      spots.forEach((p, k)=>{ e.set((Math.random() - 0.5)*0.25, Math.random()*6.28, (Math.random() - 0.5)*0.25); q.setFromEuler(e);
+        sc.set(p[3]*(0.8 + Math.random()*0.4), p[3], p[3]*(0.8 + Math.random()*0.4)); v.set(p[0], p[1], p[2]); m4.compose(v, q, sc); inst.setMatrixAt(k, m4); });
+      inst.castShadow = true; scene.add(inst);
+    }
+  }
+  /* black basalt over the snowfields round the cone, and along the lake shore */
+  if(CRATER.on){
+    const spots = [];
+    for(let tries=0; tries<4000 && spots.length<170; tries++){
+      const a = Math.random()*6.28, r = CRATER.r*(1.4 + Math.random()*4.5), x = CRATER.x + Math.cos(a)*r, z = CRATER.z + Math.sin(a)*r;
+      const n = nearest(x, z); if(n.dist < n.half + 3) continue;
+      if(lavaLevelAt(x, z) !== null) continue;
+      spots.push([x, gradedY(x, z), z, 0.5 + Math.pow(Math.random(), 2)*2.4]);
+    }
+    const inst = new THREE.InstancedMesh(rockGeometry(3.3), new THREE.MeshLambertMaterial({map:rockTex, color:0x7a716c}), spots.length);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(), v = new THREE.Vector3();
+    spots.forEach((p, k)=>{ e.set(Math.random()*0.4, Math.random()*6.28, Math.random()*0.4); q.setFromEuler(e); sc.set(p[3]*1.3, p[3], p[3]*1.1); v.set(p[0], p[1] + p[3]*0.1, p[2]); m4.compose(v, q, sc); inst.setMatrixAt(k, m4); });
+    inst.castShadow = true; inst.receiveShadow = true; scene.add(inst);
+  }
+}
 /* ---- the ice spikes: giant crystals of blue ice bursting up out of the
    ground either side of the road, some leaning out over it ---- */
 (TRACK.spikes || []).forEach(d=>{
@@ -5356,6 +5490,13 @@ function stepSetPieces(dt){
   // in the lava cave: sparks and fumes where the falls land, embers off the rivers under the jumps
   if(STEAM && dt > 0) CAVE_FX.forEach(E=>{
     if(Math.hypot(cx - E.x, cz - E.z) > 110) return;
+    if(E.kind === "fiss"){
+      if(Math.random() < dt*3) STEAM.spawn(E.x + (Math.random() - 0.5)*E.L*0.6, E.y, E.z + (Math.random() - 0.5)*E.L*0.6, 0, 1.2 + Math.random(), 0,
+                                           {life:3 + Math.random()*2, size:[1.5, 6], col:[0.88, 0.88, 0.9], alpha:0.35, heat:0.9, drag:0.6, grav:-0.5});
+      if(Math.random() < dt*4) SPRAY.spawn(E.x + (Math.random() - 0.5)*E.L*0.5, E.y, E.z + (Math.random() - 0.5)*E.L*0.5, (Math.random() - 0.5), 2 + Math.random()*3, (Math.random() - 0.5),
+                                           {life:1.2, size:[0.5, 0.2], col:[1.0, 0.5, 0.1], heat:1, grav:-0.3, drag:0.5});
+      return;
+    }
     if(E.kind === "fall"){
       if(Math.random() < dt*10) SPRAY.spawn(E.x + (Math.random() - 0.5)*2, E.y, E.z + (Math.random() - 0.5)*2, (Math.random() - 0.5)*3, 2 + Math.random()*4, (Math.random() - 0.5)*3,
                                             {life:0.9 + Math.random()*0.6, size:[0.7, 0.3], col:[1.0, 0.5 + Math.random()*0.3, 0.1], heat:1, grav:9});
@@ -13406,7 +13547,7 @@ if(/debug/.test(location.hash)){
   window.__R = { THREE, TRACKS, TRACK, TRACK_ID, MAIN, BRANCHES, paths, ROUTE, pose, state, camera, scene, renderer,
                  surfaceY, gridH, nearest, PILES, PIT, GAME, CTL, trans, MAXV, radiiOf, radiiOpen, resetRace, setMode,
                  closeUI, rivals, car, splash, cornerHoldSpeed, stepCar, placeAtStart, drift, AUTO_JUMPS,
-                 CALM, macro, CAVES, BOMBS, pose, caveDbg: ()=>{ let n=0, m=0; if(GCAVE) for(let g=0;g<GCAVE.length;g++){ if(GCAVE[g]) n++; m=Math.max(m, GHV[g]-GH[g]); } return [n, m, GHV===GH]; }, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults, trans, GIANT, RIDGES, CROSSES, SPANS, LAKE, TUNNELS, CRATER, GEYSERS, stepSetPieces, NOTES, noteSay, PACE, TRACE, stepNotes, stepTrace, stepCritters, stepDirt, CRIT, CAR_DIRT, UI:{showTitle, showMain, showTracks, showReady, showOptions, showGarage, showHelp, showPause, showChamp}, dustLive: ()=>{ let n=0; for(let i=0;i<DUST;i++) if(dustLife[i]>0) n++; return n; } };
+                 CALM, macro, CAVES, BOMBS, pose, CAVE_FX, caveDbg: ()=>{ let n=0, m=0; if(GCAVE) for(let g=0;g<GCAVE.length;g++){ if(GCAVE[g]) n++; m=Math.max(m, GHV[g]-GH[g]); } return [n, m, GHV===GH]; }, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults, trans, GIANT, RIDGES, CROSSES, SPANS, LAKE, TUNNELS, CRATER, GEYSERS, stepSetPieces, NOTES, noteSay, PACE, TRACE, stepNotes, stepTrace, stepCritters, stepDirt, CRIT, CAR_DIRT, UI:{showTitle, showMain, showTracks, showReady, showOptions, showGarage, showHelp, showPause, showChamp}, dustLive: ()=>{ let n=0; for(let i=0;i<DUST;i++) if(dustLife[i]>0) n++; return n; } };
 }
 boot();
 requestAnimationFrame(frame);
