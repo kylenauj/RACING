@@ -947,7 +947,7 @@ const TRACKS = [
     branches:[
       // the low route: braided under the high one, over the lava streams
       {a:[400,200], b:[-420,200], via:[[359,196],[318,176],[277,147],[236,132],[195,147],[154,177],[113,212],[72,244],[31,267],[-10,275],[-51,267],[-92,244],[-133,212],[-174,177],[-215,147],[-256,132],[-297,147],[-338,176],[-379,196]],
-       half:5.0, jumps:[], tune:0, flush:30, island:true, label:"LOW ROUTE", mainLabel:"HIGH ROUTE"}
+       half:5.0, jumps:[], tune:0, flush:30, hug:true, island:true, label:"LOW ROUTE", mainLabel:"HIGH ROUTE"}
     ]}
 ];
 
@@ -2640,7 +2640,11 @@ BRANCHES.forEach(P=>{
        bench above or below it (the quarry spiral, a hillside) bent it up and
        back down again: the zig zag climbs. */
     const dy = Math.abs(P.pts[i].y - my);
-    WN[i] = shaped ? 0 : (1 - smoothstep(14, 34, dm))*(1 - smoothstep(0.6, 2.0, dy));
+    /* A branch marked hug leaves at a shallow angle and runs beside the main
+       road for a long way: there it keeps the main road's height, whatever
+       its own land does, until the two are far enough apart to part levels. */
+    const hug = P.def.hug ? (1 - smoothstep(16, 38, dm))*(1 - smoothstep(200, 250, Math.min(fromA, fromB))) : 0;
+    WN[i] = shaped ? 0 : Math.max(hug, (1 - smoothstep(14, 34, dm))*(1 - smoothstep(0.6, 2.0, dy)));
   }
   // and never switched on or off over a few metres
   smoothAlong(WN, false, Math.round(12/P.seg));
@@ -2764,7 +2768,7 @@ function passIdx(P, at, pass, skip){
 if(TRACK.crater){
   Object.assign(CRATER, {on:true, x:TRACK.crater.at[0], z:TRACK.crater.at[1], r:TRACK.crater.r});
   CRATER.top = macro(CRATER.x, CRATER.z);
-  CRATER.lava = CRATER.top - 7;
+  CRATER.lava = CRATER.top - 6;
 }
 /* a gap's own frame: u along the road, v along the gap, which wanders away from the bridge */
 function spanUV(sp, x, z){
@@ -3739,7 +3743,7 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
           if(CRATER.on){
             // the cone: black ash and rock from the rim down, snow lying in the gullies lower on
             const dc = Math.hypot(x - CRATER.x, z - CRATER.z), kc = 1 - smoothstep(CRATER.r*1.2, CRATER.r*3.2, dc + (Math.random() - 0.5)*14);
-            if(kc > 0) c.lerp(new THREE.Color().setHSL(0.03, 0.12, 0.13 + Math.random()*0.05), Math.min(0.92, kc*1.15));
+            if(kc > 0) c.lerp(new THREE.Color().setHSL(0.02, 0.08, 0.075 + Math.random()*0.04), Math.min(0.95, kc*1.3));
           }
           if(SPANS.length || (LAKE.on && LAKE.lava)){
             const k = lavaNear(x, z);
@@ -4129,16 +4133,18 @@ const waterMats = [];
 /* Lava: a cooling black crust broken into plates, glowing orange through
    every crack and running bright where it moves, drifting slowly along. It
    lights itself (no shading) and is bright enough to bloom. */
-function lavaMaterial(){
-  const m = new THREE.ShaderMaterial({
+function lavaMaterial(flow){
+  const m = new THREE.ShaderMaterial({ defines: flow ? {FLOW:1} : {},
     uniforms:{ uTime:{value:0}, tRipple:{value:waterTex},
       fogColor:{value:new THREE.Color(scene.fog.color)}, fogNear:{value:scene.fog.near}, fogFar:{value:scene.fog.far} },
     vertexShader:[
       "attribute float aDepth; varying float vDepth; varying vec3 vWorld;",
-      "void main(){ vDepth = aDepth; vec4 w = modelMatrix*vec4(position, 1.0); vWorld = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }"].join("\n"),
+      "#ifdef FLOW\nattribute vec2 aRun; varying vec2 vRun;\n#endif",
+      "void main(){ vDepth = aDepth;\n#ifdef FLOW\nvRun = aRun;\n#endif\n vec4 w = modelMatrix*vec4(position, 1.0); vWorld = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }"].join("\n"),
     fragmentShader:[
       "uniform float uTime, fogNear, fogFar; uniform sampler2D tRipple; uniform vec3 fogColor;",
       "varying float vDepth; varying vec3 vWorld;",
+      "#ifdef FLOW\nvarying vec2 vRun;\n#endif",
       "vec2 h2(vec2 p){ p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))); return fract(sin(p)*43758.5453); }",
       // distance to the nearest seam between crust plates, and which plate
       "vec2 plates(vec2 x){",
@@ -4153,19 +4159,32 @@ function lavaMaterial(){
       "  if(vDepth <= 0.0) discard;",
       "  vec2 p = vWorld.xz;",
       "  vec2 flow = vec2(uTime*0.05, uTime*0.03);",
-      "  float wob = texture2D(tRipple, p*0.02 + flow*0.2).r;",
-      "  vec2 pl = plates(p*0.16 + flow + wob*0.8);",
+      // down a slope the crust rides the current: faster in the middle than at the banks
+      "#ifdef FLOW\n  p = vec2(vRun.x*1.6, vRun.y - uTime*(1.2 + 2.6*vDepth)); flow = vec2(0.0);\n#endif",
+      "  float wob = texture2D(tRipple, p*0.02 + flow*0.2).r, wob2 = texture2D(tRipple, p*0.007 - flow*0.1 + 0.37).r;",
+      // big rafts and small, torn and bent by the currents under them
+      "  vec2 pl = plates(p*mix(0.09, 0.2, wob2) + flow + vec2(wob, wob2)*2.2);",
       "  vec2 pl2 = plates(p*0.45 - flow*1.7 + 3.1);",
-      "  float seam = 1.0 - smoothstep(0.0, 0.10, pl.x);",
-      "  float fine = (1.0 - smoothstep(0.0, 0.05, pl2.x))*0.6;",
+      "  float seam = 1.0 - smoothstep(0.0, 0.05 + 0.13*wob2*wob2, pl.x);",
+      "  float fine = (1.0 - smoothstep(0.0, 0.04, pl2.x))*0.3;",
       "  float pulse = 0.8 + 0.2*sin(uTime*1.6 + pl.y*20.0);",
       // plates of dark crust, some still glowing through, bright molten rock in the seams
-      "  vec3 crust = mix(vec3(0.10, 0.035, 0.025), vec3(0.34, 0.07, 0.02), smoothstep(0.55, 1.0, pl.y)*pulse);",
+      "  vec3 crust = mix(vec3(0.07, 0.03, 0.025), vec3(0.42, 0.08, 0.02), smoothstep(0.5, 1.0, pl.y)*pulse);",
+      "  crust += vec3(0.55, 0.12, 0.01)*(1.0 - smoothstep(0.0, 0.22, pl.x))*0.6;",
       "  vec3 hot = mix(vec3(1.0, 0.36, 0.04), vec3(1.0, 0.86, 0.38), seam*seam)*pulse;",
       "  vec3 col = mix(crust, hot, clamp(seam + fine*0.7, 0.0, 1.0));",
       // it runs molten where the plates break up, near the middle
-      "  col = mix(col, hot*0.95, smoothstep(0.35, 0.9, vDepth)*smoothstep(0.62, 0.8, wob)*0.8);",
+      "  col = mix(col, hot*0.95, smoothstep(0.35, 0.9, vDepth)*smoothstep(0.66, 0.85, wob)*0.6);",
+      // here and there a raft has broken up altogether and it is open, molten
+      "  col = mix(col, hot*(0.85 + 0.15*wob), smoothstep(0.88, 0.97, pl.y)*smoothstep(0.3, 0.8, vDepth));",
       "  col = mix(col, vec3(0.08, 0.03, 0.02), (1.0 - smoothstep(0.0, 0.3, vDepth))*0.5);",
+      // gas bubbles swelling and bursting in bright rings
+      "  vec2 bc = floor(p*0.22); vec2 bh = h2(bc + 7.0); float bt = fract(uTime*(0.25 + bh.x*0.3) + bh.y);",
+      "  float bd = length(fract(p*0.22) - 0.5 - (bh - 0.5)*0.4)*4.5, br = bt*0.9;",
+      "  col = mix(col, vec3(1.0, 0.88, 0.5), (1.0 - smoothstep(0.0, 0.12, abs(bd - br)))*step(0.55, bh.x)*(1.0 - bt)*smoothstep(0.3, 0.7, vDepth));",
+      // it throws off heat: brighter where you look across it
+      "  float gl = pow(1.0 - abs(normalize(cameraPosition - vWorld).y), 3.0);",
+      "  col += vec3(0.5, 0.14, 0.02)*gl*smoothstep(0.2, 0.8, vDepth);",
       "  float fd = length(cameraPosition - vWorld);",
       "  col = mix(col, fogColor, smoothstep(fogNear, fogFar, fd)*0.55);",
       "  gl_FragColor = vec4(col, 1.0);",
@@ -4585,55 +4604,141 @@ TUNNELS.forEach(T=>{
   g.traverse(o=>{ if(o.isMesh) o.castShadow = true; });
   mergeStatic(g); scene.add(g);
 });
+/* ---- billowing particles for the set pieces: steam and smoke that shades
+   itself (lit on top, lava-lit underneath) and glowing spray. Camera-facing
+   quads, so a puff right by the car can be as big as it likes ---- */
+const FX_TEX = new THREE.CanvasTexture(noiseCanvas(128, 128, (c, W, H)=>{
+  c.clearRect(0, 0, W, H);
+  // a cauliflower of soft blobs rather than one round dot
+  for(let k=0;k<22;k++){
+    const a = Math.random()*6.28, r = Math.random()*26, x = 64 + Math.cos(a)*r, y = 64 + Math.sin(a)*r*0.9, s = 16 + Math.random()*22 - r*0.3;
+    const gr = c.createRadialGradient(x, y, 0, x, y, s); gr.addColorStop(0, "rgba(255,255,255,.55)"); gr.addColorStop(0.6, "rgba(255,255,255,.22)"); gr.addColorStop(1, "rgba(255,255,255,0)");
+    c.fillStyle = gr; c.fillRect(0, 0, W, H);
+  }
+}));
+function makeFX(n, glow){
+  const g = new THREE.InstancedBufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute([-0.5,-0.5,0, 0.5,-0.5,0, 0.5,0.5,0, -0.5,0.5,0], 3));
+  g.setIndex([0, 1, 2, 0, 2, 3]);
+  const iPos = new THREE.InstancedBufferAttribute(new Float32Array(n*3), 3), iSR = new THREE.InstancedBufferAttribute(new Float32Array(n*2), 2),
+        iCol = new THREE.InstancedBufferAttribute(new Float32Array(n*4), 4), iHeat = new THREE.InstancedBufferAttribute(new Float32Array(n), 1);
+  [iPos, iSR, iCol, iHeat].forEach(a=> a.setUsage(THREE.DynamicDrawUsage));
+  g.setAttribute("iPos", iPos); g.setAttribute("iSR", iSR); g.setAttribute("iCol", iCol); g.setAttribute("iHeat", iHeat);
+  g.instanceCount = n;
+  const mat = new THREE.ShaderMaterial({
+    uniforms:{ tPuff:{value:FX_TEX}, fogColor:{value:new THREE.Color(scene.fog.color)}, fogNear:{value:scene.fog.near}, fogFar:{value:scene.fog.far} },
+    vertexShader:[
+      "attribute vec3 iPos; attribute vec2 iSR; attribute vec4 iCol; attribute float iHeat;",
+      "varying vec2 vUv; varying vec4 vCol; varying float vHeat, vShade, vDist;",
+      "void main(){",
+      "  vec4 mv = viewMatrix*vec4(iPos, 1.0); float c = cos(iSR.y), s = sin(iSR.y);",
+      "  mv.xy += mat2(c, s, -s, c)*position.xy*iSR.x;",
+      "  vUv = position.xy + 0.5; vShade = position.y + 0.5; vCol = iCol; vHeat = iHeat; vDist = -mv.z;",
+      "  gl_Position = projectionMatrix*mv;",
+      "}"].join("\n"),
+    fragmentShader:[
+      "uniform sampler2D tPuff; uniform vec3 fogColor; uniform float fogNear, fogFar;",
+      "varying vec2 vUv; varying vec4 vCol; varying float vHeat, vShade, vDist;",
+      "void main(){",
+      "  float t = texture2D(tPuff, vUv).a;",
+      glow ?
+      "  float a = pow(t, 1.6)*vCol.a*2.2; vec3 col = mix(vCol.rgb, vec3(1.0, 0.95, 0.8), clamp(t*t*1.8, 0.0, 1.0)*vHeat);" :
+      // light from above, shadow underneath, and the lava's glow coming up from below
+      "  float a = t*vCol.a*1.6; vec3 col = vCol.rgb*mix(0.62, 1.08, smoothstep(0.1, 0.95, vShade + (t - 0.5)*0.4)) + vec3(1.0, 0.42, 0.1)*vHeat*(1.15 - vShade);",
+      "  if(a < 0.004) discard;",
+      "  col = mix(col, fogColor, smoothstep(fogNear, fogFar, vDist)*0.7);",
+      "  gl_FragColor = vec4(col, min(1.0, a));",
+      "}"].join("\n"),
+    transparent:true, depthWrite:false, blending: glow ? THREE.AdditiveBlending : THREE.NormalBlending
+  });
+  const mesh = new THREE.Mesh(g, mat); mesh.frustumCulled = false; mesh.renderOrder = glow ? 7 : 6; scene.add(mesh);
+  const vel = new Float32Array(n*3), age = new Float32Array(n), life = new Float32Array(n), s0 = new Float32Array(n), s1 = new Float32Array(n),
+        drag = new Float32Array(n), grav = new Float32Array(n), a0 = new Float32Array(n), h0 = new Float32Array(n), spin = new Float32Array(n);
+  let head = 0, live = 0;
+  const FX = {
+    mesh,
+    // o: {life, size:[from, to], col:[r,g,b], alpha, heat, drag, grav (negative floats up)}
+    spawn(x, y, z, vx, vy, vz, o){
+      const i = head = (head + 1) % n;
+      iPos.array[i*3] = x; iPos.array[i*3+1] = y; iPos.array[i*3+2] = z;
+      vel[i*3] = vx; vel[i*3+1] = vy; vel[i*3+2] = vz;
+      age[i] = 0; life[i] = o.life; s0[i] = o.size[0]; s1[i] = o.size[1]; drag[i] = o.drag || 0; grav[i] = o.grav || 0;
+      a0[i] = o.alpha === undefined ? 1 : o.alpha; h0[i] = o.heat || 0; spin[i] = (Math.random() - 0.5)*(o.spin || 0.6);
+      iCol.array[i*4] = o.col[0]; iCol.array[i*4+1] = o.col[1]; iCol.array[i*4+2] = o.col[2];
+      iSR.array[i*2+1] = Math.random()*6.28;
+      live = n;
+    },
+    step(dt){
+      if(!live) return;
+      let any = 0;
+      const P = iPos.array, SR = iSR.array, C = iCol.array, HT = iHeat.array;
+      for(let i=0;i<n;i++){
+        if(age[i] >= life[i]){ if(SR[i*2]){ SR[i*2] = 0; C[i*4+3] = 0; } continue; }
+        any++;
+        age[i] += dt; const t = Math.min(1, age[i]/life[i]), k = Math.exp(-drag[i]*dt);
+        vel[i*3] = vel[i*3]*k + FX_WIND[0]*(1 - k); vel[i*3+2] = vel[i*3+2]*k + FX_WIND[1]*(1 - k);
+        vel[i*3+1] = vel[i*3+1]*k - grav[i]*dt;
+        P[i*3] += vel[i*3]*dt; P[i*3+1] += vel[i*3+1]*dt; P[i*3+2] += vel[i*3+2]*dt;
+        SR[i*2] = s0[i] + (s1[i] - s0[i])*(1 - (1 - t)*(1 - t)); SR[i*2+1] += spin[i]*dt;
+        C[i*4+3] = a0[i]*Math.min(1, t*7)*Math.pow(1 - t, 1.4);
+        HT[i] = h0[i]*Math.pow(1 - t, 2.2);
+      }
+      if(!any) live = 0;
+      iPos.needsUpdate = iSR.needsUpdate = iCol.needsUpdate = iHeat.needsUpdate = true;
+    }
+  };
+  return FX;
+}
+const FX_WIND = [2.4, 1.1];
+const FX_ON = !!(TRACK.geysers || CRATER.on);
+const STEAM = FX_ON ? makeFX(1400, false) : null, SPRAY = FX_ON ? makeFX(900, true) : null;
 /* ---- the crater at the top of the cone: a lake of lava, a column of smoke
    and bombs of it thrown up out over the rim ---- */
 const CRATER_FX = {};
 if(CRATER.on){
-  const g = new THREE.CircleGeometry(CRATER.r*0.8, 40); g.rotateX(-Math.PI/2);
+  const g = new THREE.CircleGeometry(CRATER.r*0.64, 40); g.rotateX(-Math.PI/2);
   g.setAttribute("aDepth", new THREE.Float32BufferAttribute(new Array(g.attributes.position.count).fill(1), 1));
   const lv = new THREE.Mesh(g, lavaMaterial()); lv.position.set(CRATER.x, CRATER.lava, CRATER.z); scene.add(lv);
-  const puffTex = new THREE.CanvasTexture(noiseCanvas(64, 64, (c, W, H)=>{
-    const gr = c.createRadialGradient(32, 32, 2, 32, 32, 30); gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(0.5, "rgba(255,255,255,.55)"); gr.addColorStop(1, "rgba(255,255,255,0)");
-    c.fillStyle = gr; c.fillRect(0, 0, W, H); }));
-  CRATER_FX.puffs = [];
-  for(let k=0;k<40;k++){
-    const m = new THREE.Sprite(new THREE.SpriteMaterial({map:puffTex, color:k % 3 ? 0x4a4a50 : 0x6a6058, transparent:true, depthWrite:false, opacity:0}));
-    m.userData.ph = k/40; scene.add(m); CRATER_FX.puffs.push(m);
-  }
   CRATER_FX.bombs = [];
   const bm = new THREE.MeshBasicMaterial({color:0xffa030});
   for(let k=0;k<16;k++){ const m = new THREE.Mesh(new THREE.IcosahedronGeometry(1.3, 0), bm); m.visible = false; scene.add(m); CRATER_FX.bombs.push({m, vx:0, vy:0, vz:0, live:false}); }
-  CRATER_FX.light = new THREE.PointLight(0xff5a18, 2.5, 220, 1.3); CRATER_FX.light.position.set(CRATER.x, CRATER.lava + 8, CRATER.z); scene.add(CRATER_FX.light);
+  CRATER_FX.light = new THREE.PointLight(0xff5a18, 1.6, 170, 1.4); CRATER_FX.light.position.set(CRATER.x, CRATER.lava + 8, CRATER.z); scene.add(CRATER_FX.light);
   CRATER_FX.t = 2;
   /* lava running over the lip and down the cone in glowing rivers, stopping
      short of the road that loops round below, so the volcano is plain from
      every part of the loop */
-  for(let k=0;k<4;k++){
-    let a = k/4*Math.PI*2 + 0.4, x = CRATER.x + Math.cos(a)*CRATER.r*0.85, z = CRATER.z + Math.sin(a)*CRATER.r*0.85;
-    const left = [], right = []; let w = 1.6;
-    for(let m=0;m<140;m+=2.5){
+  const ACR = [-1, -0.55, 0, 0.55, 1], DEP = [0.05, 0.6, 1, 0.6, 0.05];
+  for(let k=0;k<5;k++){
+    const a0 = k/5*Math.PI*2 + 0.4 + (Math.random() - 0.5)*0.4;
+    let x = CRATER.x + Math.cos(a0)*CRATER.r*0.9, z = CRATER.z + Math.sin(a0)*CRATER.r*0.9, dx = Math.cos(a0), dz = Math.sin(a0), run = 0;
+    const rows = [];
+    for(let m=0;m<220;m+=2){
       const n = nearest(x, z);
-      if(n.dist < n.half + 16) break;
-      a += (Math.random() - 0.5)*0.12;
-      const tx = Math.cos(a), tz = Math.sin(a), y = gridH(x, z) + 0.3;
-      left.push([x - tz*w, y, z + tx*w]); right.push([x + tz*w, y, z - tx*w]);
-      x += tx*2.5; z += tz*2.5; w = Math.min(4.2, w + 0.08);
+      if(n.dist < n.half + 14) break;
+      // it runs downhill, wandering a little, and spreads as it slows
+      const gx = gridH(x + 1, z) - gridH(x - 1, z), gz = gridH(x, z + 1) - gridH(x, z - 1), gl = Math.hypot(gx, gz) || 1;
+      dx = dx*0.7 - gx/gl*0.3 + (Math.random() - 0.5)*0.15; dz = dz*0.7 - gz/gl*0.3 + (Math.random() - 0.5)*0.15;
+      const dl = Math.hypot(dx, dz); dx /= dl; dz /= dl;
+      const w = (2.2 + Math.min(1, m/60)*3.2)*(1 + 0.22*Math.sin(m*0.21 + k*3));
+      rows.push({x, z, dx, dz, w, run}); x += dx*2; z += dz*2; run += 2;
     }
-    if(left.length < 4) continue;
-    const pos = [], ix = [], dep = [];
-    for(let q=0;q<left.length;q++){ pos.push(...left[q], ...right[q]); dep.push(1, 1);
-      if(q){ const b = (q - 1)*2; ix.push(b, b + 1, b + 3, b, b + 3, b + 2); } }
+    if(rows.length < 6) continue;
+    const pos = [], ix = [], dep = [], uv = [], L = rows.length;
+    rows.forEach((r, q)=>{
+      const tail = Math.min(1, (L - 1 - q)/6);      // the snout of the flow rounds off
+      ACR.forEach((c, e)=>{ const ww = r.w*(0.35 + 0.65*tail), px = r.x - r.dz*c*ww, pz = r.z + r.dx*c*ww;
+        pos.push(px, gridH(px, pz) + 0.25 + (1 - Math.abs(c))*0.35, pz); dep.push(DEP[e]*(0.4 + 0.6*tail)); uv.push(c*ww, r.run); });
+      if(q) for(let e=0;e<4;e++){ const b0 = (q - 1)*5 + e, b1 = q*5 + e; ix.push(b0, b0 + 1, b1 + 1, b0, b1 + 1, b1); }
+    });
     const fg = new THREE.BufferGeometry(); fg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-    fg.setAttribute("aDepth", new THREE.Float32BufferAttribute(dep, 1)); fg.setIndex(ix);
-    const fm = lavaMaterial(); fm.side = THREE.DoubleSide;
-    const flow = new THREE.Mesh(fg, fm); flow.frustumCulled = false; scene.add(flow);
+    fg.setAttribute("aDepth", new THREE.Float32BufferAttribute(dep, 1)); fg.setAttribute("aRun", new THREE.Float32BufferAttribute(uv, 2)); fg.setIndex(ix);
+    const fm = lavaMaterial(true); fm.side = THREE.DoubleSide;
+    const flow = new THREE.Mesh(fg, fm); flow.frustumCulled = false; flow.renderOrder = 2; scene.add(flow);
+    CRATER_FX.flows = (CRATER_FX.flows || []).concat([rows]);
   }
-  // the rim glows from inside
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(CRATER.r*0.85, 1.6, 6, 40), new THREE.MeshBasicMaterial({color:0xff7a20, transparent:true, opacity:0.55, blending:THREE.AdditiveBlending, depthWrite:false}));
-  rim.rotation.x = Math.PI/2; rim.position.set(CRATER.x, CRATER.lava + 1.5, CRATER.z); scene.add(rim);
 }
 /* ---- geysers out on the lava lake, and steam vents by the road ---- */
-const GEYSERS = [], VENTS = [];
+const GEYSERS = [], VENTS = [], GEY_ON = 3.4;
 if(TRACK.geysers && LAKE.on && LAKE.lava){
   const baseM = new THREE.MeshLambertMaterial({color:0x2a1a14});
   // where they go: up the lava channels either side of every lava bridge, and a few out on the lake
@@ -4643,17 +4748,22 @@ if(TRACK.geysers && LAKE.on && LAKE.lava){
     for(const sd of [-1, 1]){ const v = sd*(half + (sp.low ? 12 : 16)), x = sp.x - sp.tz*v, z = sp.z + sp.tx*v;
       spots.push([x, z, sp.lava, sp.low ? 20 : 44]); } });
   for(let k=0;k<3;k++){ const a = (k + 0.3)/3*Math.PI*2; spots.push([LAKE.x + Math.cos(a)*LAKE.rx*0.8, LAKE.z + Math.sin(a)*LAKE.rz*0.78, LAKE.level, 30]); }
+  const rockM = new THREE.MeshLambertMaterial({color:0x2c2420, flatShading:true}), crustM = new THREE.MeshLambertMaterial({color:0x6e655a, flatShading:true});
+  const ventM = new THREE.MeshBasicMaterial({color:0xff6a18});
   for(let k=0;k<spots.length;k++){
     const x = spots[k][0], z = spots[k][1], lev = spots[k][2];
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(3.2, 2.6, 9, 1, true), baseM); cone.position.set(x, lev + 0.9, z); scene.add(cone);
-    // the fountain itself: a glowing column that shoots up and falls back
-    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 2.2, 1, 10, 1, true),
-      new THREE.MeshBasicMaterial({color:0xffa020, transparent:true, opacity:0.85, blending:THREE.AdditiveBlending, depthWrite:false}));
-    col.position.set(x, lev + 2, z); col.visible = false; scene.add(col);
-    const cap = new THREE.Mesh(new THREE.IcosahedronGeometry(2.4, 1), new THREE.MeshBasicMaterial({color:0xffc050, transparent:true, opacity:0.8, blending:THREE.AdditiveBlending, depthWrite:false}));
-    cap.visible = false; scene.add(cap);
-    GEYSERS.push({x, z, y:lev + 2, H:spots[k][3], t:1 + Math.random()*4, on:0, col, cap});
+    // a crusted mound of black rock and pale mineral round a glowing throat
+    const g = new THREE.Group(); g.position.set(x, lev, z);
+    const mound = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 5.2, 2.6, 9, 1), rockM); mound.position.y = 0.9; g.add(mound);
+    const lip = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 2.8, 0.7, 9, 1, true), crustM); lip.position.y = 2.4; g.add(lip);
+    for(let r=0;r<7;r++){ const a = r/7*6.28 + Math.random(), d = 3.6 + Math.random()*1.6;
+      const rk = new THREE.Mesh(new THREE.DodecahedronGeometry(0.8 + Math.random()*0.9, 0), r % 3 ? rockM : crustM);
+      rk.position.set(Math.cos(a)*d, 0.6 + Math.random()*0.6, Math.sin(a)*d); rk.rotation.set(Math.random()*3, Math.random()*3, 0); rk.scale.y = 0.7; g.add(rk); }
+    const vent = new THREE.Mesh(new THREE.CircleGeometry(1.3, 9), ventM); vent.rotation.x = -Math.PI/2; vent.position.y = 2.35; g.add(vent);
+    scene.add(g);
+    GEYSERS.push({x, z, y:lev + 2.6, H:spots[k][3], t:1 + Math.random()*4, on:0, vent, emit:0});
   }
+
 }
 if(SPANS.length && TRACK.geysers){
   for(let k=0;k<10;k++){
@@ -4667,17 +4777,27 @@ if(SPANS.length && TRACK.geysers){
 function stepSetPieces(dt){
   if(state.phase === "menu" && !GAME.garage) {} // the attract view still gets its smoke
   const cx = camera.position.x, cz = camera.position.z, T = state.phase === "menu" ? GAME.attractT : state.t;
+  if(STEAM && dt > 0){ STEAM.step(dt); SPRAY.step(dt); }
   if(CRATER.on){
     const far = Math.hypot(cx - CRATER.x, cz - CRATER.z);
-    CRATER_FX.puffs.forEach(m=>{
-      const ph = (m.userData.ph + T*0.035) % 1;
-      const drift = ph*ph*60;
-      m.position.set(CRATER.x + drift*0.8 + Math.sin(ph*9 + m.userData.ph*20)*4, CRATER.lava + 4 + ph*95, CRATER.z + drift*0.35);
-      const sc = 22 + ph*90; m.scale.set(sc, sc, 1);
-      m.material.opacity = Math.min(1, ph*8)*(1 - ph)*0.9;
-      // lit from below by the lava for the first stretch of its rise
-      m.material.color.setRGB(0.3 + 0.7*Math.max(0, 1 - ph*5), 0.29 + 0.2*Math.max(0, 1 - ph*5), 0.3);
-    });
+    if(far < 1400 && dt > 0){
+      // a thick column of ash, glowing underneath where the lava lights it, leaning off with the wind
+      CRATER_FX.smoke = (CRATER_FX.smoke || 0) + dt*7;
+      while(CRATER_FX.smoke >= 1){ CRATER_FX.smoke -= 1; const g = 0.22 + Math.random()*0.14;
+        STEAM.spawn(CRATER.x + (Math.random() - 0.5)*CRATER.r*0.6, CRATER.lava + 3, CRATER.z + (Math.random() - 0.5)*CRATER.r*0.6,
+                    (Math.random() - 0.5)*3, 9 + Math.random()*6, (Math.random() - 0.5)*3,
+                    {life:11 + Math.random()*5, size:[18, 75 + Math.random()*35], col:[g, g*0.96, g*0.95], alpha:0.85, heat:0.2, drag:0.12, grav:-0.25, spin:0.3}); }
+      // and the fountain of molten rock that never quite stops
+      CRATER_FX.fount = (CRATER_FX.fount || 0) + dt*(far < 700 ? 45 : 15);
+      while(CRATER_FX.fount >= 1){ CRATER_FX.fount -= 1; const a = Math.random()*6.28, r = Math.random()*6;
+        SPRAY.spawn(CRATER.x + Math.cos(a)*r, CRATER.lava + 1, CRATER.z + Math.sin(a)*r, Math.cos(a)*(2 + Math.random()*6), 16 + Math.random()*16, Math.sin(a)*(2 + Math.random()*6),
+                    {life:2 + Math.random()*1.4, size:[2.4 + Math.random()*2, 1.2], col:[1.0, 0.38 + Math.random()*0.35, 0.06], heat:1, grav:9.8, drag:0.05}); }
+    }
+    // steam where the flows meet the snow
+    if(far < 600 && dt > 0 && CRATER_FX.flows) CRATER_FX.flows.forEach(rows=>{ if(Math.random() > dt*4) return;
+      const r = rows[rows.length - 1 - Math.floor(Math.random()*3)];
+      STEAM.spawn(r.x + (Math.random() - 0.5)*4, gridH(r.x, r.z) + 0.5, r.z + (Math.random() - 0.5)*4, 0, 2 + Math.random()*2, 0,
+                  {life:4 + Math.random()*2, size:[3, 12], col:[0.9, 0.9, 0.93], alpha:0.45, heat:0.7, drag:0.5, grav:-0.5}); });
     CRATER_FX.light.intensity = 2.2 + Math.sin(T*2.3)*0.5 + Math.sin(T*7.1)*0.25;
     CRATER_FX.t -= dt;
     if(CRATER_FX.t <= 0 && dt > 0){
@@ -4686,7 +4806,12 @@ function stepSetPieces(dt){
       CRATER_FX.bombs.forEach(b=>{ if(!b.live && Math.random() < 0.8){ const a = Math.random()*6.28, v = 5 + Math.random()*10;
         b.live = true; b.m.visible = true; b.m.position.set(CRATER.x, CRATER.lava + 2, CRATER.z); b.vx = Math.cos(a)*v; b.vz = Math.sin(a)*v; b.vy = 26 + Math.random()*16; b.m.scale.setScalar(1 + Math.random()*1.2); } });
       if(actx && far < 450){ const k = 1 - far/450; burst(1.6, "lowpass", 120, 0.35*k, 1, 0, 60); tone(40, 1.4, "sine", 0.3*k, 28); }
-      CRATER_FX.light.intensity = 6;
+      CRATER_FX.light.intensity = 5;
+      for(let k=0;k<70;k++){ const a = Math.random()*6.28, v = 4 + Math.random()*12;
+        SPRAY.spawn(CRATER.x, CRATER.lava + 2, CRATER.z, Math.cos(a)*v, 24 + Math.random()*22, Math.sin(a)*v,
+                    {life:2.6 + Math.random()*1.5, size:[3 + Math.random()*2.5, 1.2], col:[1.0, 0.35 + Math.random()*0.4, 0.05], heat:1, grav:9.8, drag:0.05}); }
+      for(let k=0;k<10;k++) STEAM.spawn(CRATER.x + (Math.random() - 0.5)*10, CRATER.lava + 6, CRATER.z + (Math.random() - 0.5)*10, (Math.random() - 0.5)*8, 16 + Math.random()*10, (Math.random() - 0.5)*8,
+                    {life:9 + Math.random()*4, size:[18, 70], col:[0.2, 0.19, 0.19], alpha:0.85, heat:0.3, drag:0.2, grav:-0.3});
     }
     CRATER_FX.bombs.forEach(b=>{
       if(!b.live) return;
@@ -4700,24 +4825,38 @@ function stepSetPieces(dt){
     G.t -= dt;
     const far = Math.hypot(cx - G.x, cz - G.z);
     // one goes up as you come to it
-    if(far < 80 && G.on <= 0 && G.t > 1.5 && !G.near){ G.t = 0.2 + Math.random()*0.8; G.near = true; }
-    if(far > 140) G.near = false;
-    if(G.t <= 0 && dt > 0){ G.t = 3.5 + Math.random()*4; G.on = 1.8;
-      if(actx && far < 260){ const k = 1 - far/260; burst(1.8, "bandpass", 500, 0.25*k, 0.7, 0, 1400); burst(0.5, "lowpass", 160, 0.3*k, 1, 0); } }
+    if(far < 110 && G.on <= 0 && G.t > 1.8 && !G.near){ G.t = 1.3 + Math.random()*0.5; G.near = true; }
+    if(far > 170) G.near = false;
+    if(G.t <= 0 && dt > 0){ G.t = 5 + Math.random()*4; G.on = GEY_ON;
+      if(actx && far < 260){ const k = 1 - far/260; burst(2.6, "bandpass", 700, 0.3*k, 0.9, 0, 2200); burst(0.7, "lowpass", 140, 0.35*k, 1, 0); } }
+    if(far > 650 || dt <= 0) return;
+    const S = G.H/44;
+    G.vent.material.color.setRGB(1, 0.35 + 0.15*Math.sin(T*9 + G.x), 0.08);
     if(G.on > 0){
       G.on -= dt;
-      const ph = 1 - G.on/1.8, h = G.H*Math.sin(Math.min(1, ph*1.2)*Math.PI);          // up fast, falls back
-      G.col.visible = G.cap.visible = h > 0.5;
-      G.col.scale.set(1 + ph*0.6, h, 1 + ph*0.6); G.col.position.y = G.y + h/2;
-      G.cap.position.set(G.x, G.y + h, G.z); G.cap.scale.setScalar(1 + ph*1.5);
-      G.col.material.opacity = 0.85*(1 - ph*0.5);
-      if(far < 500) for(let k=0;k<5;k++){
-        spawnDust(G.x + (Math.random() - 0.5)*2, G.y + Math.random()*G.H*0.6, G.z + (Math.random() - 0.5)*2, [1.0, 0.4 + Math.random()*0.45, 0.08], 1.2,
-                  (Math.random() - 0.5)*5, (Math.random() - 0.5)*5, 8 + Math.random()*10);
-        if(Math.random() < 0.4) spawnDust(G.x, G.y + 6 + Math.random()*10, G.z, 4, 1.4, (Math.random() - 0.5)*2, (Math.random() - 0.5)*2, 3);
+      const ph = 1 - G.on/GEY_ON, pw = ph < 0.08 ? ph/0.08 : ph > 0.7 ? (1 - ph)/0.3 : 1;      // slams on, dies away
+      G.emit += dt*70*pw;
+      while(G.emit >= 1){ G.emit -= 1;
+        const v = (0.55 + 0.5*Math.random())*G.H*1.05*(0.4 + 0.6*pw), sp = 2 + Math.random()*2.5;
+        STEAM.spawn(G.x + (Math.random() - 0.5)*1.5, G.y + Math.random()*2, G.z + (Math.random() - 0.5)*1.5,
+                    (Math.random() - 0.5)*sp, v, (Math.random() - 0.5)*sp,
+                    {life:2.6 + Math.random()*2.2, size:[2.5*S + 1.5, (15 + Math.random()*12)*S + 6], col:[0.93, 0.94, 0.96], alpha:0.7, heat:0.9, drag:1.0, grav:-0.6});
+        if(Math.random() < 0.55) SPRAY.spawn(G.x + (Math.random() - 0.5)*1.2, G.y + 1, G.z + (Math.random() - 0.5)*1.2,
+                    (Math.random() - 0.5)*7, v*0.62, (Math.random() - 0.5)*7,
+                    {life:1.2 + Math.random()*1.1, size:[0.9 + Math.random()*0.8, 0.4], col:[1.0, 0.42 + Math.random()*0.3, 0.07], alpha:1, heat:1, drag:0.3, grav:12});
       }
-      if(LAVA_LIGHT && far < 200){ LAVA_LIGHT.position.set(G.x, G.y + 8, G.z); LAVA_LIGHT.intensity = 4; }
-    } else if(G.col.visible){ G.col.visible = G.cap.visible = false; }
+      if(LAVA_LIGHT && far < 200){ LAVA_LIGHT.position.set(G.x, G.y + 8, G.z); LAVA_LIGHT.intensity = 4*pw; }
+    } else {
+      // between blows it breathes, and it gurgles and spits just before it goes
+      const warn = G.t < 1.2;
+      G.emit += dt*(warn ? 14 : 3);
+      while(G.emit >= 1){ G.emit -= 1;
+        STEAM.spawn(G.x + (Math.random() - 0.5)*2, G.y, G.z + (Math.random() - 0.5)*2, (Math.random() - 0.5), (warn ? 6 : 2) + Math.random()*3, (Math.random() - 0.5),
+                    {life:2.5 + Math.random()*1.5, size:[1.5, 6 + Math.random()*4], col:[0.9, 0.9, 0.92], alpha:0.4, heat:0.8, drag:0.6, grav:-0.8});
+        if(warn && Math.random() < 0.6) SPRAY.spawn(G.x, G.y + 0.5, G.z, (Math.random() - 0.5)*4, 4 + Math.random()*5, (Math.random() - 0.5)*4,
+                    {life:0.8, size:[0.8, 0.4], col:[1.0, 0.5, 0.1], heat:1, grav:12});
+      }
+    }
   });
   VENTS.forEach(V=>{
     if(Math.hypot(cx - V.x, cz - V.z) > 140 || dt <= 0) return;
