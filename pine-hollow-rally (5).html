@@ -2440,7 +2440,8 @@ function addFord(P, at){
       const d = Math.abs(k)*seg;
       if(d < 17) continue;
       const y = P.pts[wrapIdx(P, at+k)].y;
-      lift[k+R] = Math.max(0, need - y)*(1 - smoothstep(50, 75, d))*smoothstep(17, 24, d);
+      // (on a shortcut only the banks at the water are lifted whole; the climb to them is spread below)
+      lift[k+R] = Math.max(0, need - y)*(P === MAIN ? 1 - smoothstep(50, 75, d) : 1 - smoothstep(26, 40, d))*smoothstep(17, 24, d);
     }
     const sm = Array.from(lift); smoothAlong(sm, false, Math.round(5/seg));
     for(let k=-R;k<=R;k++) P.pts[wrapIdx(P, at+k)].y += Math.max(lift[k+R], sm[k+R]);
@@ -2448,15 +2449,29 @@ function addFord(P, at){
        at 160 km/h: carry it back along the road instead, no steeper than 16%,
        leaving alone only the stretch shared with the main road */
     if(P !== MAIN){
-      const g = 0.16*seg, R2 = Math.round(160/seg);
+      const R2 = Math.round(160/seg), k0 = Math.round(24/seg);
       for(const dir of [-1, 1]){
-        let prev = P.pts[wrapIdx(P, at + dir*Math.round(17/seg))].y;
-        for(let k=Math.round(17/seg)+1; k<=R2; k++){
+        const top = P.pts[wrapIdx(P, at + dir*k0)].y;
+        // where the road is the main road's (or ends), it stays put: the climb must fit before that,
+        // so it is as gentle as the room allows, 16% where there is room
+        let kEnd = R2, yEnd = -Infinity;
+        for(let k=k0+1; k<=R2; k++){
           const ii = at + dir*k;
-          if(!P.closed && (ii < 0 || ii >= P.N)) break;
-          const q = P.pts[wrapIdx(P, ii)];
-          if(q.y < prev - g) q.y += (prev - g - q.y)*(1 - (P.share ? smoothstep(0.6, 0.95, P.share[wrapIdx(P, ii)]) : 0));
+          if(!P.closed && (ii < 0 || ii >= P.N)){ kEnd = k - 1; break; }
+          if(P.share && P.share[wrapIdx(P, ii)] > 0.9){ kEnd = k; yEnd = P.pts[wrapIdx(P, ii)].y; break; }
+        }
+        const g = Math.max(0.16*seg, yEnd > -Infinity ? (top - yEnd)/Math.max(1, kEnd - k0) : 0);
+        let prev = top;
+        for(let k=k0+1; k<kEnd; k++){
+          const q = P.pts[wrapIdx(P, at + dir*k)];
+          if(q.y < prev - g) q.y = prev - g;
           prev = q.y;
+        }
+        // and the foot of it rounded over 20m, so a car at speed rides up into it rather than into a kink
+        const F = Math.round(20/seg);
+        for(let it=0; it<F; it++) for(let k=Math.max(k0+1, kEnd - F); k<kEnd; k++){
+          const a = P.pts[wrapIdx(P, at + dir*(k-1))].y, c = P.pts[wrapIdx(P, at + dir*(k+1))].y;
+          P.pts[wrapIdx(P, at + dir*k)].y = (a + P.pts[wrapIdx(P, at + dir*k)].y + c)/3;
         }
       }
     }
