@@ -4899,8 +4899,7 @@ CAVES.forEach(C=>{
      leaning back into the hill, broken and ledged, snow lying on the ledges,
      and big boulders tumbled either side of the way in */
   const faceM = new THREE.MeshLambertMaterial({vertexColors:true, flatShading:true, side:THREE.DoubleSide});
-  const bouldM = new THREE.MeshLambertMaterial({color:0x3b3431, flatShading:true});
-  const snowCapM = new THREE.MeshLambertMaterial({color:0xeef3f8, flatShading:true});
+  const bouldM = new THREE.MeshLambertMaterial({map:rockTex, color:0xffffff, vertexColors:true});
   for(const [k, out] of [[pa, -1], [pb, 1]]){
     const f0 = frame(k), Rk = R(k), W = Rk + 5.5, NV = 26, NR = 7, pos = [], col = [], idx = [];
     const cc = new THREE.Color();
@@ -4926,28 +4925,24 @@ CAVES.forEach(C=>{
     const face = new THREE.Mesh(g, faceM); face.castShadow = true; face.receiveShadow = true; scene.add(face);
     const rocks = new THREE.Group();
     const boulder = (x, z, y, s, cap)=>{
-      const rk = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 1), bouldM);
-      const p = rk.geometry.attributes.position;
-      for(let n=0;n<p.count;n++) p.setXYZ(n, p.getX(n)*(0.8 + Math.random()*0.4), p.getY(n)*(0.7 + Math.random()*0.3), p.getZ(n)*(0.8 + Math.random()*0.4));
-      rk.geometry.computeVertexNormals();
-      rk.scale.set(s*(1 + Math.random()*0.5), s*(0.6 + Math.random()*0.3), s*(1 + Math.random()*0.4));
-      rk.position.set(x, y, z); rk.rotation.y = Math.random()*6; rocks.add(rk);
-      if(cap){ const sn = new THREE.Mesh(new THREE.SphereGeometry(1, 7, 4, 0, Math.PI*2, 0, Math.PI*0.35), snowCapM);
-        sn.scale.set(rk.scale.x*0.9, rk.scale.y*0.5, rk.scale.z*0.9); sn.position.set(x, y + rk.scale.y*0.55, z); rocks.add(sn); }
+      const g = rockGeometry(Math.random()*9), p = g.attributes.position, nn = g.attributes.normal, col = [];
+      // snow lying on whatever faces the sky
+      for(let n=0;n<p.count;n++){ const up = cap ? smoothstep(0.45, 0.75, nn.getY(n)) : 0, k = 0.85 + Math.random()*0.15;
+        col.push(0.72*k + 0.28*up, 0.7*k + 0.3*up, 0.67*k + 0.35*up); }
+      g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+      const rk = new THREE.Mesh(g, bouldM);
+      rk.scale.set(s*(1 + Math.random()*0.4), s*(0.8 + Math.random()*0.3), s*(1 + Math.random()*0.4));
+      rk.position.set(x, y - s*0.25, z); rk.rotation.y = Math.random()*6; rocks.add(rk);
     };
     // at the foot of the face either side of the opening, and scattered down the notch
     for(const sd of [-1, 1]){
-      for(let n=0;n<4;n++){
-        const v = sd*(Rk + 1.5 + Math.random()*3.5), d = out*(1 + n*3.5 + Math.random()*2);
+      for(let n=0;n<3;n++){
+        const v = sd*(Rk + 2.5 + Math.random()*4), d = out*(9 + n*6 + Math.random()*3);
         const x = f0.p.x + f0.nx*v + f0.t.x*d, z = f0.p.z + f0.nz*v + f0.t.z*d;
         boulder(x, z, gradedY(x, z) + 0.2, 1.6 + Math.random()*1.8 - n*0.2, Math.random() < 0.7);
       }
     }
     // a heavy overhang of rock over the opening
-    for(let n=0;n<3;n++){
-      const v = (n - 1)*Rk*0.75, x = f0.p.x + f0.nx*v + f0.t.x*out*0.6, z = f0.p.z + f0.nz*v + f0.t.z*out*0.6;
-      boulder(x, z, f0.y0 + Rk*0.92 + 1.2 + Math.random()*0.6, 2.2 + Math.random()*0.8, true);
-    }
     rocks.traverse(o=>{ if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
     mergeStatic(rocks); scene.add(rocks);
   }
@@ -5184,10 +5179,100 @@ if(SPANS.length && TRACK.geysers){
   }
 }
 
+/* ---- volcanic bombs: while you are on the loop round the cone it lobs
+   blazing rocks at the road ahead of you. A ring of glow on the snow marks
+   where each will land; most come down beside your line, and one that
+   catches you knocks you off it. ---- */
+const BOMBS = [];
+if(CRATER.on){
+  const bm = new THREE.MeshBasicMaterial({color:0xff5a12});
+  const ringG = new THREE.RingGeometry(0.72, 1, 28); ringG.rotateX(-Math.PI/2);
+  const scorchG = new THREE.CircleGeometry(1, 16); scorchG.rotateX(-Math.PI/2);
+  for(let k=0;k<5;k++){
+    const m = new THREE.Mesh(rockGeometry(k*2.3), bm); m.visible = false; scene.add(m);
+    const ring = new THREE.Mesh(ringG, new THREE.MeshBasicMaterial({color:0xe8340a, transparent:true, opacity:0, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-3}));
+    ring.visible = false; ring.renderOrder = 5; scene.add(ring);
+    // and a soft red glow filling it, the shadow of what is coming
+    const glow = new THREE.Mesh(scorchG, new THREE.MeshBasicMaterial({color:0xff6a2a, transparent:true, opacity:0, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2}));
+    glow.visible = false; glow.renderOrder = 4; scene.add(glow); ring.userData.glow = glow;
+    const scorch = new THREE.Mesh(scorchG, new THREE.MeshBasicMaterial({color:0x140c08, transparent:true, opacity:0, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2}));
+    scorch.visible = false; scorch.renderOrder = 3; scene.add(scorch);
+    BOMBS.push({m, ring, scorch, live:false, t:0, T:1, sx:0, sy:0, sz:0, vx:0, vy:0, vz:0, tx:0, ty:0, tz:0, burn:0});
+  }
+  BOMBS.next = 4;
+  const k0 = snapTo(MAIN, [CRATER.x, CRATER.z]);
+  // a warning on the way up to the cone
+  let bestI = 0, bd = 1e9; for(let i=0;i<MAIN.N;i+=4){ const d = Math.hypot(MAIN.pts[i].x - CRATER.x, MAIN.pts[i].z - CRATER.z); if(d < 170 && i < bd) bd = i; }
+  if(bd < 1e9) roadSign(bd - Math.round(90/MAIN.seg), 1, ["ERUPTION", "falling rock \u2014 watch the glow"], "#b8401c", "#f2efe6");
+}
+function stepBombs(dt){
+  if(!BOMBS.length || dt <= 0) return;
+  const racing = state.phase === "racing";
+  const dc = Math.hypot(pose.x - CRATER.x, pose.z - CRATER.z);
+  BOMBS.next -= dt;
+  if(racing && dc < 190 && BOMBS.next <= 0){
+    const B = BOMBS.find(b=> !b.live);
+    if(B){
+      BOMBS.next = 1.6 + Math.random()*1.8;
+      // aim at the road where you will be when it lands
+      const T = 3.4 + Math.random()*0.8, sp = Math.hypot(pose.vx, pose.vz);
+      const n = nearest(pose.x, pose.z), P = n.path;
+      const k = wrapIdx(P, n.pi + Math.round((sp*T*0.92 + 4)/P.seg));
+      const p = P.pts[k], t = P.tans[k], nx = -t.z, nz = t.x;
+      const off = (Math.random() < 0.28 ? (Math.random() - 0.5)*2 : (Math.random() < 0.5 ? -1 : 1)*(3.2 + Math.random()*5));
+      B.tx = p.x + nx*off; B.tz = p.z + nz*off; B.ty = gridH(B.tx, B.tz);
+      B.sx = CRATER.x + (Math.random() - 0.5)*8; B.sy = CRATER.lava + 3; B.sz = CRATER.z + (Math.random() - 0.5)*8;
+      B.T = T; B.t = 0; B.live = true;
+      B.vx = (B.tx - B.sx)/T; B.vz = (B.tz - B.sz)/T; B.vy = (B.ty - B.sy + 0.5*9.8*T*T)/T;
+      B.m.visible = true; B.m.scale.setScalar(2.2 + Math.random()*0.9);
+      B.ring.visible = B.ring.userData.glow.visible = true;
+      // lying on the ground as it slopes
+      const gx = gridH(B.tx + 2, B.tz) - gridH(B.tx - 2, B.tz), gz = gridH(B.tx, B.tz + 2) - gridH(B.tx, B.tz - 2);
+      const nrm = new THREE.Vector3(-gx/4, 1, -gz/4).normalize(), qn = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), nrm);
+      [B.ring, B.ring.userData.glow].forEach((o, n)=>{ o.quaternion.copy(qn); o.position.set(B.tx, B.ty + 0.3 - n*0.05, B.tz); });
+      if(actx && dc < 400){ burst(1.4, "lowpass", 110, 0.3, 1, 0, 60); }
+    }
+  }
+  BOMBS.forEach(B=>{
+    if(B.burn > 0){ B.burn -= dt; B.scorch.material.opacity = Math.min(0.85, B.burn*0.2);
+      if(Math.random() < dt*6) STEAM.spawn(B.scorch.position.x + (Math.random() - 0.5)*3, B.scorch.position.y + 0.3, B.scorch.position.z + (Math.random() - 0.5)*3, 0, 1.5, 0, {life:2.5, size:[1.5, 5], col:[0.3, 0.29, 0.28], alpha:0.4, heat:0.8, drag:0.6, grav:-0.4});
+      if(B.burn <= 0) B.scorch.visible = false; }
+    if(!B.live) return;
+    B.t += dt;
+    const t = B.t, x = B.sx + B.vx*t, y = B.sy + B.vy*t - 4.9*t*t, z = B.sz + B.vz*t;
+    B.m.position.set(x, y, z); B.m.rotation.x += dt*3; B.m.rotation.z += dt*2;
+    for(let q=0;q<2;q++) SPRAY.spawn(x, y, z, (Math.random() - 0.5)*3, (Math.random() - 0.5)*3, (Math.random() - 0.5)*3, {life:0.9, size:[3.2, 0.6], col:[1.0, 0.42, 0.08], heat:1, grav:-1});
+    if(Math.random() < 0.8) STEAM.spawn(x, y, z, 0, 1, 0, {life:4, size:[3, 10], col:[0.16, 0.15, 0.15], alpha:0.7, heat:1, drag:0.8, grav:-0.3});
+    // the warning glow brightens as it comes
+    const f = Math.min(1, t/B.T);
+    B.ring.scale.setScalar(4.6 - 1.4*f); B.ring.material.opacity = (0.45 + 0.55*f)*(0.7 + 0.3*Math.sin(t*(8 + f*22)));
+    const gw = B.ring.userData.glow; gw.scale.setScalar(4.6 - 1.4*f); gw.material.opacity = 0.12 + 0.3*f;
+    if(t >= B.T){
+      B.live = false; B.m.visible = false; B.ring.visible = B.ring.userData.glow.visible = false;
+      for(let q=0;q<50;q++){ const a = Math.random()*6.28, v = 3 + Math.random()*9;
+        SPRAY.spawn(B.tx, B.ty + 0.6, B.tz, Math.cos(a)*v, 4 + Math.random()*9, Math.sin(a)*v, {life:0.8 + Math.random()*0.8, size:[1.2, 0.4], col:[1.0, 0.4 + Math.random()*0.4, 0.08], heat:1, grav:14}); }
+      for(let q=0;q<9;q++) STEAM.spawn(B.tx + (Math.random() - 0.5)*3, B.ty + 1, B.tz + (Math.random() - 0.5)*3, (Math.random() - 0.5)*4, 3 + Math.random()*4, (Math.random() - 0.5)*4,
+                                        {life:4 + Math.random()*2, size:[3, 12], col:[0.22, 0.2, 0.2], alpha:0.7, heat:1.2, drag:0.7, grav:-0.3});
+      for(let q=0;q<10;q++) spawnDust(B.tx, B.ty + 0.3, B.tz, 4, 1.5, (Math.random() - 0.5)*8, (Math.random() - 0.5)*8, 5 + Math.random()*4);
+      B.scorch.visible = true; B.scorch.position.set(B.tx, B.ty + 0.06, B.tz); B.scorch.scale.setScalar(2.4 + Math.random()); B.burn = 9;
+      const d = Math.hypot(pose.x - B.tx, pose.z - B.tz);
+      if(actx && d < 300){ const kk = 1 - d/300; burst(0.9, "lowpass", 200, 0.5*kk, 1, 0, 80); tone(55, 0.6, "sine", 0.35*kk, 30); }
+      if(racing && d < 40) GAME.shake = Math.max(GAME.shake || 0, 0.5*(1 - d/40));
+      // caught under it: thrown sideways and up
+      if(racing && d < 3.6){
+        const ux = (pose.x - B.tx)/(d || 1), uz = (pose.z - B.tz)/(d || 1);
+        pose.vx = pose.vx*0.6 + ux*7; pose.vz = pose.vz*0.6 + uz*7; pose.vy = Math.max(pose.vy || 0, 4); pose.air = true;
+        SFX.bump(9); GAME.shake = 0.9;
+      }
+      if(LAVA_LIGHT && d < 120){ LAVA_LIGHT.position.set(B.tx, B.ty + 4, B.tz); LAVA_LIGHT.intensity = 5; }
+    }
+  });
+}
 function stepSetPieces(dt){
   if(state.phase === "menu" && !GAME.garage) {} // the attract view still gets its smoke
   const cx = camera.position.x, cz = camera.position.z, T = state.phase === "menu" ? GAME.attractT : state.t;
   if(STEAM && dt > 0){ STEAM.step(dt); SPRAY.step(dt); }
+  stepBombs(dt);
   if(CRATER.on){
     const far = Math.hypot(cx - CRATER.x, cz - CRATER.z);
     if(far < 1400 && dt > 0){
@@ -13321,7 +13406,7 @@ if(/debug/.test(location.hash)){
   window.__R = { THREE, TRACKS, TRACK, TRACK_ID, MAIN, BRANCHES, paths, ROUTE, pose, state, camera, scene, renderer,
                  surfaceY, gridH, nearest, PILES, PIT, GAME, CTL, trans, MAXV, radiiOf, radiiOpen, resetRace, setMode,
                  closeUI, rivals, car, splash, cornerHoldSpeed, stepCar, placeAtStart, drift, AUTO_JUMPS,
-                 CALM, macro, CAVES, caveDbg: ()=>{ let n=0, m=0; if(GCAVE) for(let g=0;g<GCAVE.length;g++){ if(GCAVE[g]) n++; m=Math.max(m, GHV[g]-GH[g]); } return [n, m, GHV===GH]; }, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults, trans, GIANT, RIDGES, CROSSES, SPANS, LAKE, TUNNELS, CRATER, GEYSERS, stepSetPieces, NOTES, noteSay, PACE, TRACE, stepNotes, stepTrace, stepCritters, stepDirt, CRIT, CAR_DIRT, UI:{showTitle, showMain, showTracks, showReady, showOptions, showGarage, showHelp, showPause, showChamp}, dustLive: ()=>{ let n=0; for(let i=0;i<DUST;i++) if(dustLife[i]>0) n++; return n; } };
+                 CALM, macro, CAVES, BOMBS, pose, caveDbg: ()=>{ let n=0, m=0; if(GCAVE) for(let g=0;g<GCAVE.length;g++){ if(GCAVE[g]) n++; m=Math.max(m, GHV[g]-GH[g]); } return [n, m, GHV===GH]; }, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults, trans, GIANT, RIDGES, CROSSES, SPANS, LAKE, TUNNELS, CRATER, GEYSERS, stepSetPieces, NOTES, noteSay, PACE, TRACE, stepNotes, stepTrace, stepCritters, stepDirt, CRIT, CAR_DIRT, UI:{showTitle, showMain, showTracks, showReady, showOptions, showGarage, showHelp, showPause, showChamp}, dustLive: ()=>{ let n=0; for(let i=0;i<DUST;i++) if(dustLife[i]>0) n++; return n; } };
 }
 boot();
 requestAnimationFrame(frame);
