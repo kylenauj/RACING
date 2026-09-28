@@ -920,7 +920,7 @@ const TRACKS = [
     kit:["crest","kicker"],
     shape:"FIRE AND ICE \u2014 over and under",
     feature:"a loop that crosses itself on a trestle, and a high and a low route braided over and under each other",
-    ctrl:[[-440,-470],[-300,-455],[-190,-395],[-60,-400],[40,-470],[170,-500],[300,-440],[420,-400],[530,-340],[600,-240],[590,-150],[620,-86],[610,-22],[602,40],[602,140],[625,240],[700,300],[790,250],[800,150],[720,95],[602,100],[520,165],[470,200],[400,200],[359,204],[318,224],[277,253],[236,268],[195,253],[154,223],[113,188],[72,156],[31,133],[-10,125],[-51,133],[-92,156],[-133,188],[-174,223],[-215,253],[-256,268],[-297,253],[-338,224],[-379,204],[-420,200],[-540,170],[-605,95],[-565,15],[-640,-60],[-705,-150],[-715,-260],[-680,-370],[-610,-440],[-540,-475]],
+    ctrl:[[-440,-470],[-330,-470],[-268,-500],[-218,-452],[-190,-398],[-128,-376],[-64,-418],[-12,-472],[46,-446],[104,-500],[170,-500],[235,-470],[300,-440],[362,-468],[420,-400],[530,-340],[600,-240],[590,-150],[620,-86],[610,-22],[602,40],[602,140],[625,240],[700,300],[790,250],[800,150],[720,95],[602,100],[520,165],[470,200],[400,200],[359,204],[318,224],[277,253],[236,268],[195,253],[154,223],[113,188],[72,156],[31,133],[-10,125],[-51,133],[-92,156],[-133,188],[-174,223],[-215,253],[-256,268],[-297,253],[-338,224],[-379,204],[-420,200],[-540,170],[-605,95],[-565,15],[-640,-60],[-705,-150],[-715,-260],[-680,-370],[-610,-440],[-540,-475]],
     hills:[[720,200,200,58],[-720,160,260,48],[263,305,130,34],[-10,95,130,30],[-283,305,130,34],[263,95,120,-20],[-10,305,120,-18],[-283,95,120,-20],
            [450,-470,200,34],[-420,-560,230,34],[-80,-430,150,-16],[600,-150,180,26]],
     jumps:[], fords:[],
@@ -3063,6 +3063,28 @@ paths.forEach(P=>{
                           P.noStamp ? P.noStamp[i] : 0, P.wet ? Math.min(1, P.wet[i]*2) : 0);
     b[i] = -Math.sign(left)*Math.min(0.13, 5.5/Math.max(20, R[i]))*(1 - hold);
   }
+  /* on the volcano the road is an old lava bench, never quite level: corners
+     lean in harder, and along the straights it rolls from one camber to the
+     other, so the car is always working a little. Flat where it must be. */
+  if(TRACK.special){
+    const ph = P.closed ? 0.7 : 2.9;
+    for(let i=0;i<N;i++){
+      const hold = Math.max(P.calmCrest ? P.calmCrest[i] : 0, P.share ? Math.min(1, P.share[i]*3) : 0, P.deck ? P.deck[i] : 0,
+                            P.noStamp ? P.noStamp[i] : 0);
+      let calm = hold;
+      const sI = i*P.seg;
+      if(P === MAIN){
+        if(sI < 150 || (N - i)*P.seg < 40) calm = 1;                                            // the grid
+        for(const T of TUNNELS) if(i > T.a - 25/P.seg && i < T.b + 25/P.seg) calm = 1;           // the ice tunnel and the cave
+        for(const sp of SPANS) if(sp.P === P && Math.abs(i - sp.i) < 45/P.seg) calm = 1;
+        for(const B of BRANCHES) for(const e of [B.mainFrom, B.mainTo, B.splitAt]) if(e !== undefined && Math.abs(i - e) < 80/P.seg) calm = 1;
+      } else if(sI < 60 || (N - i)*P.seg < 60) calm = 1;
+      for(const sp of SPANS) if(sp.Q === P && Math.abs(i - sp.j) < 40/P.seg) calm = 1;
+      const roll = 0.055*Math.sin(sI*2*Math.PI/190 + ph) + 0.03*Math.sin(sI*2*Math.PI/71 + ph*2);
+      b[i] = (b[i]*1.55 + roll*(1 - Math.min(1, Math.abs(b[i])/0.06)))*(1 - calm);
+      b[i] = Math.max(-0.2, Math.min(0.2, b[i]));
+    }
+  }
   const sm = Array.from(b); smoothAlong(sm, P.closed, Math.round(12/P.seg));
   if(P.bank){ for(let i=0;i<N;i++) if(Math.abs(P.bank[i]) < Math.abs(sm[i])) P.bank[i] = sm[i]; }
   else P.bank = Float32Array.from(sm);
@@ -3390,7 +3412,10 @@ function caveOf(s){ for(const C of CAVES){ if(s >= C.a && s <= C.b) return C; } 
          road runs into it along a notch cut out of that slope */
       if(!inside && av < R + 1.5) continue;
       if(inside && av < R + 1){ GCAVE[g] = 1; continue; }
-      const wr = inside ? 1 : smoothstep(0, 1, 1 - (sg < C.a ? C.a - sg : sg - C.b)/APPR);
+      const lat = smoothstep(R + 1.5, R + 16, av);
+      // just inside each mouth the hill still rolls down towards the way in; deeper in it stands full height
+      const deep = inside ? smoothstep(0, 10/MAIN.seg, Math.min(sg - C.a, C.b - sg)) : 0;
+      const wr = inside ? lat + (1 - lat)*deep : smoothstep(0, 1, 1 - (sg < C.a ? C.a - sg : sg - C.b)/APPR)*lat;
       // the hill as it stands, not as the lava channels under it are cut
       const nat = Math.max(NAT[g], naturalBase(-GHALF + (g % GN)*GSTEP, -GHALF + Math.floor(g/GN)*GSTEP));
       const roof = caveRoof(nat, caveYAt(sg), R, av);
@@ -4945,55 +4970,36 @@ CAVES.forEach(C=>{
   /* each mouth: a face of rough rock from the opening up to the hillside,
      leaning back into the hill, broken and ledged, snow lying on the ledges,
      and big boulders tumbled either side of the way in */
-  const faceM = new THREE.MeshLambertMaterial({vertexColors:true, flatShading:true, side:THREE.DoubleSide});
-  const bouldM = new THREE.MeshLambertMaterial({map:rockTex, color:0xffffff, vertexColors:true});
+  const faceM = new THREE.MeshLambertMaterial({map:rockTex, vertexColors:true, flatShading:true, side:THREE.DoubleSide});
+  const bouldM = new THREE.MeshLambertMaterial({map:rockTex, color:0xffffff, vertexColors:true, emissive:0x1a1816});
   for(const [k, out] of [[pa, -1], [pb, 1]]){
-    const f0 = frame(k), Rk = R(k), W = Rk + 8, NV = 30, NR = 7, pos = [], col = [], idx = [];
+    const f0 = frame(k), Rk = R(k), W = Rk + 15, NV = 40, NR = 8, pos = [], col = [], idx = [], uvs = [];
     const cc = new THREE.Color();
     for(let q=0;q<=NV;q++){
       const v = -W + 2*W*q/NV, x0 = f0.p.x + f0.nx*v, z0 = f0.p.z + f0.nz*v;
-      const bot = Math.abs(v) < Rk ? f0.y0 + Math.sqrt(Rk*Rk - v*v)*0.92 - 0.3 : gridH(x0, z0) - 0.6;
+      const bot = Math.abs(v) < Rk ? f0.y0 + Math.sqrt(Rk*Rk - v*v)*0.92 - 0.3 : Math.min(gridH(x0, z0), shownH(x0 + f0.t.x*out*2, z0 + f0.t.z*out*2)) - 0.6;
       // the brow is broken, standing proud of the slope here and there
-      const top = Math.max(bot + 0.5, Math.max(roofAt(x0, z0, k, v), shownH(x0, z0)) + 0.3 + (q && q < NV ? Math.random()*1.4 : 0));
+      // over the opening the face rises to the roof; to the sides it only has to meet the slope
+      const wv = smoothstep(Rk + 2, Rk + 7, Math.abs(v));
+      const hill = Math.max(shownH(x0, z0), shownH(x0 - f0.t.x*out*3, z0 - f0.t.z*out*3));
+      const top = Math.max(bot + 0.5, roofAt(x0, z0, k, v)*(1 - wv) + hill*wv + 0.3 + (q && q < NV ? Math.random()*1.4 : 0));
       for(let r=0;r<=NR;r++){
         const f = r/NR, hgt = bot + (top - bot)*f;
         // leaning back into the hill as it rises, and knobbly
         const back = -out*((top - bot)*0.45*f*f + (r && r < NR && q && q < NV ? (Math.random() - 0.3)*0.9 : 0));
         pos.push(x0 + f0.t.x*back, hgt + (r && r < NR ? (Math.random() - 0.5)*0.5 : 0), z0 + f0.t.z*back);
+        uvs.push(v*0.12, hgt*0.12);
         const r0 = Math.random();
-        // dark rock, snow only along the brow where it meets the hillside
-        if(r === NR) cc.setHSL(0.58, 0.14, 0.84 + r0*0.06); else cc.setHSL(0.05 + r0*0.02, 0.07 + r0*0.04, 0.13 + r0*0.05 + f*0.05);
+        // weathered grey rock, darker low down by the mouth, snow along the brow and lying on ledges
+        if(r === NR || (r > NR*0.5 && r0 < 0.12)) cc.setHSL(0.58, 0.12, 0.86 + r0*0.06);
+        else cc.setHSL(0.06 + r0*0.03, 0.06 + r0*0.04, 0.34 + r0*0.1 + f*0.12 - (Math.abs(v) < Rk + 1 ? 0.1 : 0));
         col.push(cc.r, cc.g, cc.b);
       }
       if(q) for(let r=0;r<NR;r++){ const i0 = (q - 1)*(NR + 1) + r, i1 = q*(NR + 1) + r; idx.push(i0, i1, i0 + 1, i0 + 1, i1, i1 + 1); }
     }
     const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals();
+    g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); g.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2)); g.setIndex(idx); g.computeVertexNormals();
     const face = new THREE.Mesh(g, faceM); face.castShadow = true; face.receiveShadow = true; scene.add(face);
-    /* the sides of the notch the road runs in along: faces of rock from the
-       verge up to the hillside, so nothing shows through between the ground
-       and the face over the mouth */
-    for(const sd of [-1, 1]){
-      const wp = [], wc = [], wi = [], NRW = 4, len = Math.round(22/seg);
-      for(let j=0;j<=len;j++){
-        const kk = k + out*j, fj = frame(kk), Rj = R(kk);
-        const vb = sd*(Rj + 0.2), xb = fj.p.x + fj.nx*vb, zb = fj.p.z + fj.nz*vb;
-        const bot = gridH(xb, zb) - 0.6;
-        const vt = sd*(Rj + 5), xt = fj.p.x + fj.nx*vt, zt = fj.p.z + fj.nz*vt;
-        const top = Math.max(bot + 0.2, shownH(xt, zt) + 0.4);
-        for(let r=0;r<=NRW;r++){
-          const f = r/NRW, lean = sd*(0.9*f), jit = r && r < NRW ? (Math.random() - 0.5)*0.5 : 0;
-          wp.push(fj.p.x + fj.nx*(vb + lean + jit), bot + (top - bot)*f, fj.p.z + fj.nz*(vb + lean + jit));
-          const r0 = Math.random();
-          if(r === NRW) cc.setHSL(0.58, 0.14, 0.84 + r0*0.06); else cc.setHSL(0.05 + r0*0.02, 0.07 + r0*0.04, 0.13 + r0*0.05 + f*0.05);
-          wc.push(cc.r, cc.g, cc.b);
-        }
-        if(j) for(let r=0;r<NRW;r++){ const i0 = (j - 1)*(NRW + 1) + r, i1 = j*(NRW + 1) + r; wi.push(i0, i1, i0 + 1, i0 + 1, i1, i1 + 1); }
-      }
-      const wg = new THREE.BufferGeometry(); wg.setAttribute("position", new THREE.Float32BufferAttribute(wp, 3));
-      wg.setAttribute("color", new THREE.Float32BufferAttribute(wc, 3)); wg.setIndex(wi); wg.computeVertexNormals();
-      const wall = new THREE.Mesh(wg, faceM); wall.castShadow = true; wall.receiveShadow = true; scene.add(wall);
-    }
     const rocks = new THREE.Group();
     const boulder = (x, z, y, s, cap)=>{
       const g = rockGeometry(Math.random()*9), p = g.attributes.position, nn = g.attributes.normal, col = [];
@@ -5007,10 +5013,10 @@ CAVES.forEach(C=>{
     };
     // at the foot of the face either side of the opening, and scattered down the notch
     for(const sd of [-1, 1]){
-      for(let n=0;n<3;n++){
-        const v = sd*(Rk + 2.5 + Math.random()*4), d = out*(9 + n*6 + Math.random()*3);
+      for(let n=0;n<2;n++){
+        const v = sd*(Rk + 3 + n*4 + Math.random()*2), d = out*(1.5 + n*3 + Math.random()*2);
         const x = f0.p.x + f0.nx*v + f0.t.x*d, z = f0.p.z + f0.nz*v + f0.t.z*d;
-        boulder(x, z, gradedY(x, z) + 0.2, 1.6 + Math.random()*1.8 - n*0.2, Math.random() < 0.7);
+        boulder(x, z, gradedY(x, z) + 0.2, 3.2 - n*0.8 + Math.random()*1.2, true);
       }
     }
     // a heavy overhang of rock over the opening
