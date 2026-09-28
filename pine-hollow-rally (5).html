@@ -138,6 +138,13 @@
   .cuptab.on{background:#3a5a3f;border-color:var(--signal);}
   .cuptab.sel{background:var(--signal);color:var(--ink);} .cuptab.sel small{color:#3a2c08;}
   .gpname{font-family:var(--display);font-size:15px;color:var(--signal);margin:2px 0 8px;letter-spacing:.03em;}
+  .cuptab.hasTro{flex-direction:row;align-items:center;gap:8px;padding-left:10px;}
+  .cuptab .tro{width:42px;height:42px;flex:none;margin:-6px 0;}
+  .cuptab .ttx{display:flex;flex-direction:column;align-items:flex-start;}
+  .item .tro{width:40px;height:40px;flex:none;margin:-6px 0;}
+  .item .tro + span{margin-right:auto;}
+  .trophyBig{width:150px;height:150px;display:block;margin:4px 0 6px;filter:drop-shadow(4px 5px 0 rgba(0,0,0,.45));animation:troIn .7s cubic-bezier(.2,1.6,.4,1) both;}
+  @keyframes troIn{from{transform:scale(.2) rotate(-25deg);opacity:0}to{transform:none;opacity:1}}
   .tk{appearance:none;cursor:pointer;padding:8px 8px 10px;text-align:left;color:var(--cream);
     font-family:var(--display);font-size:15px;background:rgba(15,36,25,.85);
     border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);}
@@ -2255,6 +2262,7 @@ let SPANS = [];                        // the log bridges over lava, built once 
 let SURF_HINT = null;
 const FISS = [];                       // points along the lava fissures, kept clear of trees
 const PILLARS = [];                    // the ice pillar clusters out in the snow
+const NO_TREES = [];                   // [x, z, r]: kept clear for something built there
 const CAVE_FX_PENDING = [];            // spots where lava pours down a wall: sparks and fumes at the foot
 const ISLANDS = [];                    // dividers where two routes part: solid
 const TUNNELS = [];                    // ice tunnels over the main road: [a, b] stations
@@ -2974,6 +2982,7 @@ function barren(x, z){
   if(SPANS.length && lavaNear(x, z) > 0.2) return true;                                   // nothing grows by the lava
   if(CRATER.on && Math.hypot(x - CRATER.x, z - CRATER.z) < CRATER.r*3.2) return true;      // nor on the volcano's cone
   for(let n=0;n<FISS.length;n++) if(Math.abs(x - FISS[n][0]) < 6 && Math.abs(z - FISS[n][1]) < 6) return true;   // nor on a fissure
+  for(let n=0;n<NO_TREES.length;n++) if(Math.hypot(x - NO_TREES[n][0], z - NO_TREES[n][1]) < NO_TREES[n][2]) return true;
   for(let n=0;n<PILLARS.length;n++) if(Math.abs(x - PILLARS[n][0]) < 7 && Math.abs(z - PILLARS[n][1]) < 7) return true;   // nor in the ice
   if(GCAVE){ const c = cellAt(x, z);                                                         // over a cave: on the hill, not its faces
     if(c >= 0 && (GCAVE[c] || GHV[c] > GH[c] + 0.3)){
@@ -5969,6 +5978,63 @@ if(RIVER.on){
 }
 
 /* a painted board on a post or two, for the signs below */
+/* ---- each course's one sign: a proper roadside billboard a little way
+   past the grid, the course's name on it in the season's colours ---- */
+function courseBillboard(){
+  const P = MAIN, pal = { summer:["#2f6a3a", "#8fd06a"], fall:["#6a2c12", "#f08a2a"], winter:["#1f4a6e", "#8fd3f4"], desert:["#6a2a16", "#e56a3a"] };
+  const c0 = TRACK.special ? ["#3a1208", "#ff7a2a"] : pal[TRACK.season || "summer"] || pal.summer;
+  // the spot: past the grid, on whichever side the ground sits nearer the road
+  let best = null;
+  for(let d=100; d<=220; d+=15){
+    const i = wrapIdx(P, Math.round(d/P.seg)), p = P.pts[i], t = P.tans[i];
+    for(const sd of [-1, 1]){
+      const off = P.half[i] + 10, x = p.x - t.z*sd*off, z = p.z + t.x*sd*off;
+      if(nearest(x, z).dist < P.half[i] + 7 || inWaterway(x, z) || (SPANS.length && lavaNear(x, z) > 0.05)) continue;
+      const cost = Math.abs(gridH(x, z) - p.y) + Math.abs(gridH(x + 4, z) - gridH(x - 4, z)) + Math.abs(gridH(x, z + 4) - gridH(x, z - 4));
+      if(!best || cost < best.cost) best = {cost, x, z, t, sd};
+    }
+  }
+  if(!best) return;
+  const tex = new THREE.CanvasTexture(noiseCanvas(1024, 400, (g, W, H)=>{
+    const gr = g.createLinearGradient(0, 0, W, H); gr.addColorStop(0, c0[0]); gr.addColorStop(1, c0[0]); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    // a sunburst behind the name, in the season's colour
+    g.save(); g.translate(W*0.12, H*1.05); g.globalAlpha = 0.22; g.fillStyle = c0[1];
+    for(let k=0;k<14;k++){ g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, W*1.2, -Math.PI + k*Math.PI/14, -Math.PI + (k + 0.5)*Math.PI/14); g.closePath(); g.fill(); }
+    g.restore();
+    g.fillStyle = "#f2efe6"; g.fillRect(0, 0, W, 64); g.fillStyle = "#1b1b1b";
+    g.font = "bold 40px Georgia, serif"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText("PINE HOLLOW RALLY", 34, 34);
+    g.textAlign = "right"; g.fillText(TRACK.special ? "SPECIAL STAGE" : (TRACK.season || "summer").toUpperCase() + " GRAND PRIX", W - 34, 34);
+    g.textAlign = "left"; g.fillStyle = "#f7f2e6"; g.font = "italic bold 150px Georgia, serif";
+    g.shadowColor = "rgba(0,0,0,.45)"; g.shadowOffsetX = 8; g.shadowOffsetY = 8;
+    let size = 150; while(size > 60){ g.font = "italic bold " + size + "px Georgia, serif"; if(g.measureText(TRACK.name).width < W - 80) break; size -= 8; }
+    g.fillText(TRACK.name, 40, H*0.52); g.shadowColor = "transparent";
+    g.fillStyle = c0[1]; g.font = "bold 40px Georgia, serif"; g.fillText((TRACK.after ? "after " + TRACK.after : "").toUpperCase(), 44, H*0.79);
+    // a checkered edge along the bottom
+    for(let k=0;k<W/32;k++){ g.fillStyle = k % 2 ? "#f2efe6" : "#1b1b1b"; g.fillRect(k*32, H - 32, 32, 16); g.fillStyle = k % 2 ? "#1b1b1b" : "#f2efe6"; g.fillRect(k*32, H - 16, 32, 16); }
+  }));
+  const steel = new THREE.MeshLambertMaterial({color:0x3a3f44}), g = new THREE.Group();
+  const W = 11, H = 4.3, base = 4.2;
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(W, H, 0.25), [steel, steel, steel, steel, new THREE.MeshLambertMaterial({map:tex}), steel]);
+  panel.position.y = base + H/2; g.add(panel);
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(W + 0.4, H + 0.4, 0.18), steel); frame.position.set(0, base + H/2, -0.12); g.add(frame);
+  for(const q of [-W*0.3, W*0.3]){
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.45, base + H*0.6 + 2, 0.45), steel); leg.position.set(q, (base + H*0.6 + 2)/2 - 2, -0.5); g.add(leg);
+    const brace = new THREE.Mesh(new THREE.BoxGeometry(0.2, base*1.2, 0.2), steel); brace.position.set(q*0.8, base*0.55, -1.5); brace.rotation.x = 0.35; g.add(brace);
+  }
+  // a catwalk along the foot, and lamps leaning over the face
+  const walk = new THREE.Mesh(new THREE.BoxGeometry(W, 0.12, 1.0), steel); walk.position.set(0, base - 0.2, 0.45); g.add(walk);
+  const lampM = new THREE.MeshBasicMaterial({color:0xfff3c8});
+  for(const q of [-W*0.33, 0, W*0.33]){
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 1.2), steel); arm.position.set(q, base + H + 0.35, 0.5); g.add(arm);
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.16, 0.3), lampM); lamp.position.set(q, base + H + 0.25, 1.05); g.add(lamp);
+  }
+  g.position.set(best.x, gridH(best.x, best.z), best.z);
+  // turned to face the cars coming, a little towards the road
+  g.rotation.y = Math.atan2(best.t.x, best.t.z) + Math.PI - best.sd*0.35;
+  g.traverse(o=>{ if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+  scene.add(g);
+  NO_TREES.push([best.x, best.z, 10]);
+}
 function boardTex(lines, bg, fg, w, h){
   return new THREE.CanvasTexture(noiseCanvas(w || 256, h || 96, (g, W, H)=>{
     g.fillStyle = bg; g.fillRect(0, 0, W, H);
@@ -5981,6 +6047,7 @@ function boardTex(lines, bg, fg, w, h){
   }));
 }
 function roadSign(i, side, lines, bg, fg, back){
+  return;                                  // no warning boards: the course's one billboard says all it needs to
   const P = MAIN, p = P.pts[wrapIdx(P, i)], t = P.tans[wrapIdx(P, i)];
   const off = P.half[wrapIdx(P, i)] + 2.2;
   const x = p.x - t.z*side*off, z = p.z + t.x*side*off;
@@ -7502,20 +7569,11 @@ paths.forEach(P=>{
   const nx=-t.z, nz=t.x;
   const look = P.pts[Math.min(P.N-1, 14)];
   const side = (look.x - m.x)*nx + (look.z - m.z)*nz > 0 ? 1 : -1;
-  const board = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.0, 0.1),
-    new THREE.MeshLambertMaterial({map: signTex}));
-  board.position.set(m.x + nx*side*9.5, m.y + 2.3, m.z + nz*side*9.5);
-  board.rotation.y = Math.atan2(t.x, t.z);
-  if(side < 0) board.scale.x = -1;              // arrow points at the turn off
-  scene.add(board);
-  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.11,2.4,6),
-    new THREE.MeshLambertMaterial({color:0x6b5335}));
-  post.position.set(board.position.x, m.y + 1.1, board.position.z);
-  scene.add(post);
   P.side = side;
   /* and the big boards: one well before the split so there is time to pick
      the line, one at the mouth, and one on the branch where it rejoins */
   const big = (i0, sd, text, sub, arrow, path)=>{
+    return;                                // no big boards at the forks: the marker poles show the way in
     const Q = path || MAIN, i = wrapIdx(Q, i0), p = Q.pts[i], tt = Q.tans[i];
     const off = Q.half[i] + 3.2, x = p.x - tt.z*sd*off, z = p.z + tt.x*sd*off, y = gradedY(x, z);
     const g = new THREE.Group();
@@ -7565,7 +7623,7 @@ paths.forEach(P=>{
     for(let n=0;n<7;n++){ const m = new THREE.Mesh(rockGeometry(n % 3), rockM), sc = 0.9 + Math.random()*1.1;
       m.position.set(cx + t0.x*(n - 1)*1.4 + (Math.random() - 0.5)*r*0.6, y + sc*0.3, cz + t0.z*(n - 1)*1.4 + (Math.random() - 0.5)*r*0.6);
       m.scale.set(sc, sc*0.8, sc); m.rotation.set(Math.random(), Math.random()*6, Math.random()); g.add(m); }
-    const tex = new THREE.CanvasTexture(noiseCanvas(512, 256, (c, W, H)=>{
+    if(false){ const tex = new THREE.CanvasTexture(noiseCanvas(512, 256, (c, W, H)=>{
       c.fillStyle = "#ffd23d"; c.fillRect(0, 0, W, H);
       c.fillStyle = "#111"; c.fillRect(W/2 - 5, 18, 10, H - 36);
       const arrowAt = (x, d)=>{ c.save(); c.translate(x, H*0.3); c.scale(d*0.55, 0.55);
@@ -7582,7 +7640,7 @@ paths.forEach(P=>{
     const bd = new THREE.Mesh(new THREE.BoxGeometry(5.2, 2.6, 0.16), [edge, edge, edge, edge, face, edge]);
     bd.position.set(cx - t0.x*2, y + 3.2, cz - t0.z*2); bd.rotation.y = Math.atan2(-t0.x, -t0.z); g.add(bd);
     for(const q of [-2, 2]){ const po = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.4, 0.2), edge);
-      po.position.set(cx - t0.x*2 - t0.z*q, y + 1.7, cz - t0.z*2 + t0.x*q); g.add(po); }
+      po.position.set(cx - t0.x*2 - t0.z*q, y + 1.7, cz - t0.z*2 + t0.x*q); g.add(po); } }
     g.traverse(o=>{ if(o.isMesh) o.castShadow = true; }); scene.add(g);
     ISLANDS.push({x:cx, z:cz, r});
   }
@@ -7894,6 +7952,7 @@ function bushGeometry(seed){
   return g;
 }
 
+courseBillboard();
 /* ---- plant everything along every path ---- */
 {
   const scatterOn = (P, count, place)=>{
@@ -11837,6 +11896,48 @@ const CUPS = [ {name:"Summer Cup", rounds:[0, 1, 2, 4]},       // every summer c
                {name:"Fall Cup",   rounds:[5, 6, 7, 17]},
                {name:"Winter Cup", rounds:[8, 9, 10, 11]},
                {name:"Desert Cup", rounds:[12, 13, 14, 15]} ];
+/* ---- the trophies: one cup for each Grand Prix, its emblem on the bowl,
+   in gold, silver or bronze once you have placed in it, grey until then ---- */
+const CUP_KIND = ["summer", "fall", "winter", "desert"];
+const TRO_METAL = {
+  gold:  ["#fff3a8", "#f4c531", "#a8740f"], silver:["#ffffff", "#c9d3dc", "#7d8a96"],
+  bronze:["#ffd9b0", "#d08a4a", "#7a4418"], none:  ["#8d9690", "#5d6660", "#353c38"],
+  special:["#ffe0a0", "#ff8a2a", "#9a2f0c"]
+};
+const TRO_EMBLEM = {
+  // a sun
+  summer:'<circle cx="32" cy="23" r="5.2"/><g stroke-width="2.4" stroke-linecap="round">' + [0,1,2,3,4,5,6,7].map(k=>{ const a = k*Math.PI/4;
+    return '<line x1="' + (32 + Math.cos(a)*7.5).toFixed(1) + '" y1="' + (23 + Math.sin(a)*7.5).toFixed(1) + '" x2="' + (32 + Math.cos(a)*10.5).toFixed(1) + '" y2="' + (23 + Math.sin(a)*10.5).toFixed(1) + '"/>'; }).join("") + '</g>',
+  // a maple leaf
+  fall:'<path d="M32 12 l2.2 5 4-2 -1 5.5 5-1 -2.5 4.5 2.5 1 -6.5 4 .8 2.5 -3.5-.8 V33 h-2 v-3.8 l-3.5.8 .8-2.5 -6.5-4 2.5-1 -2.5-4.5 5 1 -1-5.5 4 2z"/>',
+  // a snowflake
+  winter:'<g stroke-width="2.3" stroke-linecap="round" fill="none">' + [0,1,2].map(k=>{ const a = k*Math.PI/3;
+    const x = Math.cos(a)*10, y = Math.sin(a)*10, bx = Math.cos(a)*6, by = Math.sin(a)*6;
+    const tick = (sx, sy)=> ['<line x1="' + (32+sx).toFixed(1) + '" y1="' + (23+sy).toFixed(1) + '" x2="' + (32+sx*1.25 + sy*0.35).toFixed(1) + '" y2="' + (23+sy*1.25 - sx*0.35).toFixed(1) + '"/>',
+                             '<line x1="' + (32+sx).toFixed(1) + '" y1="' + (23+sy).toFixed(1) + '" x2="' + (32+sx*1.25 - sy*0.35).toFixed(1) + '" y2="' + (23+sy*1.25 + sx*0.35).toFixed(1) + '"/>'].join("");
+    return '<line x1="' + (32-x).toFixed(1) + '" y1="' + (23-y).toFixed(1) + '" x2="' + (32+x).toFixed(1) + '" y2="' + (23+y).toFixed(1) + '"/>' + tick(bx, by) + tick(-bx, -by); }).join("") + '</g>',
+  // a saguaro
+  desert:'<path d="M29.5 34 V15 a2.5 2.5 0 0 1 5 0 V34 z M29.5 26 h-3.5 a2.3 2.3 0 0 1 -2.3-2.3 V19 a1.8 1.8 0 0 1 3.6 0 v3.4 h2.2 z M34.5 23 h3 v-4.5 a1.8 1.8 0 0 1 3.6 0 v4.8 a2.3 2.3 0 0 1 -2.3 2.3 h-4.3 z"/>',
+  // a volcano, erupting
+  special:'<path d="M20 33 L28 19 h8 L44 33 z"/><path d="M30 17 c-2-3 1-4 0-7 c3 1 4 4 2 6 c2-1 2-3 1-5 c3 2 3 5 1 7 z" opacity=".95"/>'
+};
+let TRO_N = 0;
+function trophySVG(kind, metal, cls){
+  const m = TRO_METAL[metal] || TRO_METAL.gold, id = "tro" + (TRO_N++);
+  const emb = SEASON_COL[kind] || "#ff6a2a";
+  return '<svg class="' + (cls || "tro") + '" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="' + id + '" x1="0" y1="0" x2="1" y2="1">' +
+    '<stop offset="0" stop-color="' + m[0] + '"/><stop offset=".45" stop-color="' + m[1] + '"/><stop offset="1" stop-color="' + m[2] + '"/></linearGradient></defs>' +
+    '<g stroke="#1a1410" stroke-width="2.2" stroke-linejoin="round">' +
+    '<path d="M15 16 C5 16 5 31 19 33" fill="none" stroke-width="5"/><path d="M49 16 C59 16 59 31 45 33" fill="none" stroke-width="5"/>' +
+    '<path d="M15 16 C5 16 5 31 19 33" fill="none" stroke="' + m[1] + '" stroke-width="2.2"/><path d="M49 16 C59 16 59 31 45 33" fill="none" stroke="' + m[1] + '" stroke-width="2.2"/>' +
+    '<path d="M13 7 H51 V17 C51 32 43 40 32 40 C21 40 13 32 13 17 Z" fill="url(#' + id + ')"/>' +
+    '<path d="M28.5 40 h7 l1.5 8 h-10 z" fill="url(#' + id + ')"/>' +
+    '<rect x="19" y="48" width="26" height="5.5" rx="1" fill="url(#' + id + ')"/><rect x="15" y="53.5" width="34" height="7" rx="1.2" fill="#3a2a1c"/></g>' +
+    '<path d="M17 10 H24 V17 C24 25 26 30 29 34 C21 32 17 26 17 17 Z" fill="#fff" opacity=".28"/>' +
+    '<circle cx="32" cy="23" r="12.5" fill="' + (metal === "none" ? "#2c3430" : "#fffbe8") + '" stroke="#1a1410" stroke-width="2"/>' +
+    '<g fill="' + emb + '" stroke="' + emb + '">' + TRO_EMBLEM[kind] + '</g></svg>';
+}
+function cupMetal(k){ const p = (SAVE.trophies || {})[k]; return p === 1 ? "gold" : p === 2 ? "silver" : p === 3 ? "bronze" : "none"; }
 let CHAMP_ROUNDS = CUPS[0].rounds;
 function setCup(k){ CHAMP_ROUNDS = CUPS[k || 0].rounds; }
 if(SAVE.champ && SAVE.champ.cup) setCup(SAVE.champ.cup);
@@ -12886,11 +12987,9 @@ const mainIdx = m => m === "champ" ? 0 : m === "race" ? 1 : m === "trial" ? 2 : 
    at a time, picked from a row of tabs, so the list is four circuits and
    not seventeen. Expeditions have their own list. */
 const GP_GROUPS = (()=>{
-  const g = CUPS.map((c, k)=> ({name: c.name.replace(" Cup", " Grand Prix"), short: c.name.replace(" Cup", "").toUpperCase(), ids: c.rounds.slice()}));
+  const g = CUPS.map((c, k)=> ({name: c.name.replace(" Cup", " Grand Prix"), short: c.name.replace(" Cup", "").toUpperCase(), ids: c.rounds.slice(), cup:k, kind:CUP_KIND[k]}));
   const special = TRACKS.map((t, i)=> i).filter(i=> TRACKS[i].special);
-  if(special.length) g.push({name: "Special stages", short: "SPECIAL", ids: special});
-  const extra = TRACKS.map((t, i)=> i).filter(i=> !TRACKS[i].expedition && !TRACKS[i].special && !g.some(x=> x.ids.includes(i)));
-  if(extra.length) g.push({name: "Practice", short: "PRACTICE", ids: extra});
+  if(special.length) g.push({name: "Special stages", short: "SPECIAL", ids: special, kind:"special"});
   return g;
 })();
 const SEASON_COL = { summer:"#8fd06a", fall:"#f08a2a", winter:"#8fd3f4", desert:"#e56a3a" };
@@ -12903,8 +13002,9 @@ function showTracks(mode, group){
     ids = GP_GROUPS[gi].ids;
   }
   const tabs = exped ? '' : '<div class="cuptabs">' + GP_GROUPS.map((x, k)=>
-      '<button class="cuptab' + (k === gi ? ' on' : '') + '" style="--tkc:' + SEASON_COL[(TRACKS[x.ids[0]] || {}).season || "summer"] + '" data-act="cup" data-cup="' + k + '"><span>' + esc(x.short) + '</span><small>' +
-      x.ids.length + ' circuits</small></button>').join("") + '</div>';
+      '<button class="cuptab hasTro' + (k === gi ? ' on' : '') + '" style="--tkc:' + SEASON_COL[(TRACKS[x.ids[0]] || {}).season || "summer"] + '" data-act="cup" data-cup="' + k + '">' +
+      trophySVG(x.kind, x.cup === undefined ? "special" : (cupMetal(x.cup) === "none" ? "gold" : cupMetal(x.cup))) +
+      '<span class="ttx"><span>' + esc(x.short) + '</span><small>' + x.ids.length + (x.ids.length === 1 ? ' circuit' : ' circuits') + '</small></span></button>').join("") + '</div>';
   const at = ids.indexOf(TRACK_ID);
   openScreen("scTracks",
     '<div style="width:100%;max-width:980px;margin:auto 0">' +
@@ -12973,10 +13073,10 @@ function showChamp(){
     '<div class="cols"><div class="left"><h2 class="head">Championship</h2><div class="menu">' +
     (C ? '<button class="item" data-act="cont"><span>CONTINUE</span><small>' + esc(CUPS[C.cup || 0].name) + ', round ' + (C.round+1) + ': ' +
          esc(TRACKS[CHAMP_ROUNDS[C.round]].name) + '</small></button>' : '') +
-    '<button class="item" data-act="summer" data-k="0"><span>' + (C ? 'NEW ' : 'START ') + 'SUMMER CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds') + '</small></button>' +
-    '<button class="item" data-act="fall" data-k="1"><span>' + (C ? 'NEW ' : 'START ') + 'FALL CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds in the maples') + '</small></button>' +
-    '<button class="item" data-act="winter" data-k="2"><span>' + (C ? 'NEW ' : 'START ') + 'WINTER CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds on snow and ice') + '</small></button>' +
-    '<button class="item" data-act="desert" data-k="3"><span>' + (C ? 'NEW ' : 'START ') + 'DESERT CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds in the red rock') + '</small></button>' +
+    '<button class="item" data-act="summer" data-k="0">' + trophySVG("summer", cupMetal(0)) + '<span>' + (C ? 'NEW ' : 'START ') + 'SUMMER CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds') + '</small></button>' +
+    '<button class="item" data-act="fall" data-k="1">' + trophySVG("fall", cupMetal(1)) + '<span>' + (C ? 'NEW ' : 'START ') + 'FALL CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds in the maples') + '</small></button>' +
+    '<button class="item" data-act="winter" data-k="2">' + trophySVG("winter", cupMetal(2)) + '<span>' + (C ? 'NEW ' : 'START ') + 'WINTER CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds on snow and ice') + '</small></button>' +
+    '<button class="item" data-act="desert" data-k="3">' + trophySVG("desert", cupMetal(3)) + '<span>' + (C ? 'NEW ' : 'START ') + 'DESERT CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds in the red rock') + '</small></button>' +
     '<button class="item back" data-act="back"><span>BACK</span></button></div></div>' +
     '<div class="right"><div id="cupNote"></div>' +
     (C ? standingsTable() : '<div class="note"><p>Three laps a round. Finish first for 10 points, then 6, 4 and 3. Most points at the end takes the cup.</p></div>') +
@@ -13171,9 +13271,12 @@ function showStandings(){
   const final = C.done;
   const myPos = rows.findIndex(r => r.you) + 1;
   const next = !final ? TRACKS[CHAMP_ROUNDS[C.round]].name : "";
+  // a podium finish wins the cup's trophy, kept for good
+  const ck = C.cup || 0, metal = myPos === 1 ? "gold" : myPos === 2 ? "silver" : myPos === 3 ? "bronze" : null;
+  if(final && metal){ SAVE.trophies = SAVE.trophies || {}; if(!SAVE.trophies[ck] || myPos < SAVE.trophies[ck]){ SAVE.trophies[ck] = myPos; persist(); } }
   openScreen("scStand",
     '<div class="cols"><div class="left">' +
-    (final ? '<div class="big">' + (myPos === 1 ? "CHAMPION" : ordinal(myPos) + " OVERALL") + '</div>'
+    (final ? (metal ? trophySVG(CUP_KIND[ck], metal, "trophyBig") : '') + '<div class="big">' + (myPos === 1 ? "CHAMPION" : ordinal(myPos) + " OVERALL") + '</div>'
            : '<div class="big">STANDINGS</div>') +
     '<h2 class="head" style="margin-top:6px">' + (final ? "Championship over" : "After round " + C.round + " of " + CHAMP_ROUNDS.length) + '</h2>' +
     '<div class="menu">' +
@@ -13616,7 +13719,7 @@ if(/debug/.test(location.hash)){
   window.__R = { THREE, TRACKS, TRACK, TRACK_ID, MAIN, BRANCHES, paths, ROUTE, pose, state, camera, scene, renderer,
                  surfaceY, gridH, nearest, PILES, PIT, GAME, CTL, trans, MAXV, radiiOf, radiiOpen, resetRace, setMode,
                  closeUI, rivals, car, splash, cornerHoldSpeed, stepCar, placeAtStart, drift, AUTO_JUMPS,
-                 CALM, macro, CAVES, BOMBS, pose, CAVE_FX, caveDbg: ()=>{ let n=0, m=0; if(GCAVE) for(let g=0;g<GCAVE.length;g++){ if(GCAVE[g]) n++; m=Math.max(m, GHV[g]-GH[g]); } return [n, m, GHV===GH]; }, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults, trans, GIANT, RIDGES, CROSSES, SPANS, LAKE, TUNNELS, CRATER, GEYSERS, stepSetPieces, NOTES, noteSay, PACE, TRACE, stepNotes, stepTrace, stepCritters, stepDirt, CRIT, CAR_DIRT, UI:{showTitle, showMain, showTracks, showReady, showOptions, showGarage, showHelp, showPause, showChamp}, dustLive: ()=>{ let n=0; for(let i=0;i<DUST;i++) if(dustLife[i]>0) n++; return n; } };
+                 CALM, macro, CAVES, BOMBS, pose, CAVE_FX, caveDbg: ()=>{ let n=0, m=0; if(GCAVE) for(let g=0;g<GCAVE.length;g++){ if(GCAVE[g]) n++; m=Math.max(m, GHV[g]-GH[g]); } return [n, m, GHV===GH]; }, AUTO_JUMPS_N: AUTO_JUMPS.length, __ox: TRACK._ox, __oz: TRACK._oz, stepDust, stepCamera, stepLeafPiles, FORDS, RIVER, CANYON, STONES, stoneY, carNow: ()=> car, buildWagon, EXP, autoDrive, stepRaceEvents, showResults, trans, GIANT, RIDGES, CROSSES, SPANS, LAKE, TUNNELS, CRATER, GEYSERS, stepSetPieces, NOTES, noteSay, PACE, TRACE, stepNotes, stepTrace, stepCritters, stepDirt, CRIT, CAR_DIRT, testStandings: ()=>{ const pts = {"You":40}; rivalDefs.forEach((d,k)=> pts[d.name] = 10 + k); SAVE.champ = {cup:2, round:4, pts, log:[], done:true}; setCup(2); showStandings(); }, UI:{showTitle, showMain, showTracks, showReady, showOptions, showGarage, showHelp, showPause, showChamp}, dustLive: ()=>{ let n=0; for(let i=0;i<DUST;i++) if(dustLife[i]>0) n++; return n; } };
 }
 boot();
 requestAnimationFrame(frame);
