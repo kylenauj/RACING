@@ -1491,9 +1491,10 @@ if(GATOR){
    water, deep mud, and old log cabins going back to the woods. */
 const SWAMPGP = TRACK.season === "swamp" && !GATOR;
 if(SWAMPGP){
-  scene.fog.color.set(0xb9c48e); SKY.set(0xd8d9a4); scene.fog.near = 150; scene.fog.far = 880;
-  hemi.color.set(0xeef2c8); hemi.groundColor.set(0x44523a); hemi.intensity = 0.92;
-  sun.color.set(0xffdc9a); sun.intensity = 1.12;
+  // (green, close air: the haze on the horizon of the bayou's dark green sky)
+  scene.fog.color.set(0x8fa574); SKY.set(0xa9b98a); scene.fog.near = 130; scene.fog.far = 820;
+  hemi.color.set(0xd9e8b8); hemi.groundColor.set(0x33452e); hemi.intensity = 0.9;
+  sun.color.set(0xf0e8b0); sun.intensity = 1.05;
 }
 /* The maps are drawn wherever was convenient; the world is built around
    the origin, so move the whole map (every coordinate in it) to sit there. */
@@ -3871,6 +3872,13 @@ MAIN.bwk = new Float32Array(MAIN.N);
       MAIN.pts[i].y = MAIN.pts[i].y*(1 - w) + Math.min(MAIN.pts[i].y, bed)*w;
       if(w > 0.45){ MAIN.surf[i] = SURF.WATER; MAIN.wet[i] = Math.max(MAIN.wet[i], smoothstep(0.45, 0.8, w)); }
     }
+    // and either side of it the road stays up out of the water for a while, easing back to
+    // its own line: the pool can't run out along a road that carries on downhill
+    const K2 = Math.round(45/seg);
+    for(let k=1;k<=K2;k++) for(const i of [wrapIdx(MAIN, a - k), wrapIdx(MAIN, b + k)]){
+      const f = smoothstep(15, 45, k*seg), want = wLevel + 0.5 - BED;
+      if(MAIN.pts[i].y < want) MAIN.pts[i].y = want*(1 - f) + MAIN.pts[i].y*f;
+    }
   }
   const pts = []; let lo = Infinity, x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
   for(let k=0;k<=n;k+=Math.max(1, Math.round(2/seg))){
@@ -3884,8 +3892,19 @@ MAIN.bwk = new Float32Array(MAIN.N);
     const u = k*seg, w = smoothstep(-12, 4, u)*(1 - smoothstep(L - 4, L + 12, u));
     const i = wrapIdx(MAIN, a + k); if(!wade) MAIN.bwk[i] = Math.max(MAIN.bwk[i], w);      // (a wade has no deck, and no rails)
   }
-  if(wade) BOARDWALKS.push({a, b, n, pts, L, E:Math.min(26, L*0.3), half:MAIN.baseHalf, level:wLevel, floor:wLevel - 1.6, wade:true,
-                            x0:x0 - 42, x1:x1 + 42, z0:z0 - 42, z1:z1 + 42});
+  if(wade){
+    /* the wade's water reaches on past either end of the dip, over the road's banks, so it
+       always stops at a shore (the road climbing out of it, the ground beside) and never
+       in a straight line across low ground where the dip's embankment has pulled it down */
+    const mp = [], K = Math.round(14/seg);
+    for(let k=-K;k<=n + K;k+=Math.max(1, Math.round(2/seg))){
+      const i = wrapIdx(MAIN, a + k), p = MAIN.pts[i];
+      mp.push({x:p.x, z:p.z, u:k*seg, h:MAIN.half[i]});
+      x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); z0 = Math.min(z0, p.z); z1 = Math.max(z1, p.z);
+    }
+    BOARDWALKS.push({a, b, n, pts, mp, L, E:Math.min(26, L*0.3), half:MAIN.baseHalf, level:wLevel, floor:wLevel - 1.6, wade:true,
+                     x0:x0 - 42, x1:x1 + 42, z0:z0 - 42, z1:z1 + 42});
+  }
   else BOARDWALKS.push({a, b, n, pts, L, E, half:MAIN.baseHalf, level:lo - 1.35, floor:lo - 2.9,
                    x0:x0 - 42, x1:x1 + 42, z0:z0 - 42, z1:z1 + 42});
 });
@@ -3907,13 +3926,13 @@ function carveBoardwalks(y, x, z){
   /* and a bank round each one: no ground near a pool lies under its water unless it is in the
      pool, so the water's edge is always a shore, never a sheet stopping in mid air */
   for(const W of BOARDWALKS){
-    if(x < W.x0 || x > W.x1 || z < W.z0 || z > W.z1 || y >= W.level + 0.2) continue;
+    if(x < W.x0 || x > W.x1 || z < W.z0 || z > W.z1 || y >= W.level + 0.5) continue;
     const m = bwMask(W, x, z);
     if(m >= 0.5) continue;
     let best = Infinity, bh = W.half;
     for(const p of W.pts){ const d = (p.x - x)**2 + (p.z - z)**2; if(d < best){ best = d; bh = p.h; } }
     const near = 1 - smoothstep(30 + bh, 42 + bh, Math.sqrt(best));
-    if(near > 0) y += (W.level + 0.2 - y)*near*(1 - m*2);
+    if(near > 0) y += (W.level + 0.5 - y)*near*(1 - m*2);
   }
   return y;
 }
@@ -3922,16 +3941,60 @@ function carveBoardwalks(y, x, z){
 function bwMask(W, x, z){
   if(x < W.x0 || x > W.x1 || z < W.z0 || z > W.z1) return 0;
   let best = Infinity, bu = 0, bh = W.half;
-  for(const p of W.pts){ const d = (p.x - x)**2 + (p.z - z)**2; if(d < best){ best = d; bu = p.u; bh = p.h; } }
-  const d = Math.sqrt(best), ends = smoothstep(0, W.E, bu)*smoothstep(0, W.E, W.L - bu);
+  for(const p of (W.mp || W.pts)){ const d = (p.x - x)**2 + (p.z - z)**2; if(d < best){ best = d; bu = p.u; bh = p.h; } }
+  const d = Math.sqrt(best), ends = W.mp ? smoothstep(-14, -4, bu)*smoothstep(-14, -4, W.L - bu) : smoothstep(0, W.E, bu)*smoothstep(0, W.E, W.L - bu);
   return (1 - smoothstep(16 + bh, 28 + bh, d))*ends*(W.wade ? 1 : smoothstep(bh + 0.2, bh + 1.2, d));
+}
+/* Where a pool's water actually lies: filled out from the middle of the pool over every bit
+   of ground below its level that joins on, so it stops at a shore and never partway across
+   low ground. Worked out once the land is built; drawing and driving both use it. */
+function bwFlood(W){
+  const S = 2, nx = Math.ceil((W.x1 - W.x0)/S) + 1, nz = Math.ceil((W.z1 - W.z0)/S) + 1;
+  const F = new Uint8Array(nx*nz), ok = new Uint8Array(nx*nz), q = [];
+  for(let r=0;r<nz;r++) for(let c=0;c<nx;c++){
+    const x = W.x0 + c*S, z = W.z0 + r*S, m = bwMask(W, x, z), k = r*nx + c;
+    if(m > 0.02 && W.level - gradedY(x, z) > 0.02){ ok[k] = 1; if(m > 0.5){ F[k] = 1; q.push(k); } }
+  }
+  while(q.length){
+    const k = q.pop(), c = k % nx, r = (k - c)/nx;
+    if(c > 0 && ok[k-1] && !F[k-1]){ F[k-1] = 1; q.push(k-1); }
+    if(c < nx-1 && ok[k+1] && !F[k+1]){ F[k+1] = 1; q.push(k+1); }
+    if(r > 0 && ok[k-nx] && !F[k-nx]){ F[k-nx] = 1; q.push(k-nx); }
+    if(r < nz-1 && ok[k+nx] && !F[k+nx]){ F[k+nx] = 1; q.push(k+nx); }
+  }
+  /* where it would run on over lower ground than the pool's area reaches (a valley, the foot
+     of the road's embankment) it doesn't stop in a line: it thins away over ten metres */
+  const dist = new Float32Array(nx*nz).fill(1e9), bq = [];
+  for(let r=0;r<nz;r++) for(let c=0;c<nx;c++){
+    const k = r*nx + c; if(!F[k]) continue;
+    let leak = c === 0 || r === 0 || c === nx - 1 || r === nz - 1;
+    if(!leak) for(const j of [k-1, k+1, k-nx, k+nx]) if(!F[j]){
+      const jc = j % nx, jr = (j - jc)/nx;
+      if(W.level - gradedY(W.x0 + jc*S, W.z0 + jr*S) > 0.05){ leak = true; break; }
+    }
+    if(leak){ dist[k] = 0; bq.push(k); }
+  }
+  for(let h=0; h<bq.length; h++){
+    const k = bq[h], c = k % nx, d = dist[k] + 1;
+    for(const j of [c > 0 ? k-1 : -1, c < nx-1 ? k+1 : -1, k-nx, k+nx]) if(j >= 0 && j < nx*nz && F[j] && dist[j] > d){ dist[j] = d; bq.push(j); }
+  }
+  const E = new Float32Array(nx*nz), Wt = new Float32Array(nx*nz);
+  for(let k=0;k<nx*nz;k++){ E[k] = F[k] ? 1 - smoothstep(0.5, 5, dist[k]) : 1; Wt[k] = F[k]*(1 - E[k]); }
+  W.fl = {S, nx, nz, F, E, Wt};
+}
+function bwWet(W, x, z){
+  if(x < W.x0 || x > W.x1 || z < W.z0 || z > W.z1) return 0;
+  if(!W.fl) return bwMask(W, x, z) > 0.2 ? 1 : 0;
+  const {S, nx, nz, Wt} = W.fl, fx = (x - W.x0)/S, fz = (z - W.z0)/S, c = Math.min(nx - 2, Math.floor(fx)), r = Math.min(nz - 2, Math.floor(fz));
+  const u = fx - c, v = fz - r, k = r*nx + c;
+  return (Wt[k]*(1 - u) + Wt[k+1]*u)*(1 - v) + (Wt[k+nx]*(1 - u) + Wt[k+nx+1]*u)*v;
 }
 /* The top of the standing water at a point (a swamp pool or wade, the lake, the marsh), or
    null on dry land. The car never sinks further than its wheels into any of it: wherever the
    bed is deeper, it drives on a floor a wheel's depth under the surface (see surfaceY). */
 function waterTop(x, z){
   let top = null;
-  for(const W of BOARDWALKS) if(bwMask(W, x, z) > 0.2) top = top === null ? W.level : Math.max(top, W.level);
+  for(const W of BOARDWALKS) if(bwWet(W, x, z) > 0.3) top = top === null ? W.level : Math.max(top, W.level);
   if(LAKE.on && !LAKE.frozen && !LAKE.lava && !GATOR && Math.hypot((x - LAKE.x)/LAKE.rx, (z - LAKE.z)/LAKE.rz) < 1.08)
     top = top === null ? LAKE.level : Math.max(top, LAKE.level);
   if(SWAMP.on && swampAt(x, z) > 0.2) top = top === null ? SWAMP.water : Math.max(top, SWAMP.water);
@@ -4840,10 +4903,19 @@ const SKYS = {
            halo:[255,196,120], sunR:44, cloud:"cumulus", cloudLit:[255,196,206], cloudShade:[152,92,176],
            layers:[ {kind:"round", y:-26, amp:110, step:440, col:[128,74,150], haze:[244,156,168], hz:0.55},
                     {kind:"forest", y:6, amp:86, step:84, col:[76,52,108], haze:[226,132,156], hz:0.38},
-                    {kind:"forest", y:28, amp:52, step:56, col:[34,62,74], haze:[196,112,136], hz:0.2} ] }
+                    {kind:"forest", y:28, amp:52, step:56, col:[34,62,74], haze:[196,112,136], hz:0.2} ] },
+  // the Swamp Cup's bayou: a close, dark green sky, deep bottle green overhead down to a
+  // wet moss-green haze on the horizon, a pale sun lost in it, low mist drifting, and
+  // cypress woods behind cypress woods fading back into the murk
+  bayou: { sky:[[0,"#0b2016"],[0.16,"#133524"],[0.3,"#24503a"],[0.4,"#4d7a52"],[0.47,"#86a36e"],[0.5,"#a9b98a"],[1,"#b4c196"]],
+           halo:[222,236,170], sunR:26, cloud:"streaks", cloudLit:[190,214,168], cloudShade:[40,74,52],
+           layers:[ {kind:"round", y:-30, amp:90, step:460, col:[58,96,70], haze:[150,176,128], hz:0.6},
+                    {kind:"forest", y:-4, amp:78, step:80, col:[40,74,52], haze:[136,164,116], hz:0.45},
+                    {kind:"forest", y:14, amp:66, step:64, col:[30,58,40], haze:[118,146,100], hz:0.3, speck:[[210,236,120],[180,210,96]]},
+                    {kind:"forest", y:32, amp:46, step:50, col:[20,40,28], haze:[98,124,84], hz:0.18} ] }
 };
 function paintSky(g, w, h){
-  const B = SKYS[TRACK.season] || SKYS.summer, hz = h*0.5;
+  const B = (SWAMPGP ? SKYS.bayou : SKYS[TRACK.season]) || SKYS.summer, hz = h*0.5;
   const rgb = (c, k, a)=> "rgba(" + c.map(v=> Math.max(0, Math.min(255, Math.round(v*(k || 1))))).join(",") + "," + (a === undefined ? 1 : a) + ")";
   const grd = g.createLinearGradient(0, 0, 0, h);
   B.sky.forEach(s0=> grd.addColorStop(s0[0], s0[1]));
@@ -5168,16 +5240,16 @@ function waterMaterial(){
       fogNear:{value:scene.fog.near}, fogFar:{value:scene.fog.far}
     },
     vertexShader:[
-      "attribute float aDepth; attribute float aFoam;",
-      "varying float vDepth; varying vec3 vWorld; varying vec2 vUv; varying float vFoam;",
+      "attribute float aDepth; attribute float aFoam; attribute float aEdge;",
+      "varying float vDepth; varying vec3 vWorld; varying vec2 vUv; varying float vFoam; varying float vEdge;",
       "void main(){",
-      "  vDepth = aDepth; vUv = uv; vFoam = aFoam;",
+      "  vDepth = aDepth; vUv = uv; vFoam = aFoam; vEdge = aEdge;",
       "  vec4 w = modelMatrix*vec4(position, 1.0); vWorld = w.xyz;",
       "  gl_Position = projectionMatrix*viewMatrix*w;",
       "}"].join("\n"),
     fragmentShader:[
       "uniform float uTime, fogNear, fogFar, uMurk; uniform sampler2D tRipple; uniform vec3 uSun, fogColor;",
-      "varying float vDepth; varying vec3 vWorld; varying vec2 vUv; varying float vFoam;",
+      "varying float vDepth; varying vec3 vWorld; varying vec2 vUv; varying float vFoam; varying float vEdge;",
       FROZEN ? [
       // the ice sheet breaks into plates: distance to the nearest plate edge
       "vec2 h2(vec2 p){ p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))); return fract(sin(p)*43758.5453); }",
@@ -5247,6 +5319,8 @@ function waterMaterial(){
       // swamp water: black tea, the sky only in it at a glance, never clear
       "  col = mix(col, vec3(0.12, 0.11, 0.06) + vec3(0.55, 0.62, 0.6)*fres*0.5 + vec3(1.0, 0.93, 0.78)*spec, uMurk*0.85);",
       "  a = mix(a, max(a, 0.9*smoothstep(0.0, 0.04, vDepth)), uMurk);",
+      // (a swamp pool thinning away where it would otherwise stop over lower ground)
+      "  a *= 1.0 - vEdge;",
       "  float fd = length(cameraPosition - vWorld);",
       "  col = mix(col, fogColor, smoothstep(fogNear, fogFar, fd));",
       "  gl_FragColor = vec4(col, a);",
@@ -7990,6 +8064,7 @@ if(SWAMPGP){
   }
 
   /* ---- the boardwalks ---- */
+  BOARDWALKS.forEach(bwFlood);
   BOARDWALKS.forEach((W, n)=>{
     // the pool: one sheet of black water at its level, drawn only where it lies over the ground
     const STEP = 2, nx = Math.ceil((W.x1 - W.x0)/STEP) + 1, nz = Math.ceil((W.z1 - W.z0)/STEP) + 1;
@@ -7998,7 +8073,7 @@ if(SWAMPGP){
       const x = W.x0 + q*STEP, z = W.z0 + r*STEP;
       pos.push(x, W.level, z); uv.push(x, z);
       // (only inside this pool: low ground round about is not under its water)
-      dep.push(bwMask(W, x, z) > 0.02 ? Math.max(-1, Math.min(3, W.level - gradedY(x, z))) : -1);
+      dep.push(W.fl.F[r*nx + q] ? Math.max(-1, Math.min(3, W.level - gradedY(x, z))) : -1);
     }
     for(let r=0;r<nz-1;r++) for(let q=0;q<nx-1;q++){
       const a2 = r*nx + q, b2 = a2 + 1, d2 = a2 + nx, e2 = d2 + 1;
@@ -8009,6 +8084,7 @@ if(SWAMPGP){
     wg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
     wg.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
     wg.setAttribute("aDepth", new THREE.Float32BufferAttribute(dep, 1));
+    wg.setAttribute("aEdge", new THREE.Float32BufferAttribute(W.fl.E, 1));
     wg.setIndex(idx);
     const wm = new THREE.Mesh(wg, waterMaterial()); wm.material.uniforms.uMurk.value = 1; wm.renderOrder = 3; wm.frustumCulled = false; scene.add(wm);
 
@@ -15765,15 +15841,18 @@ function showTitle(){
   UIEL.firstChild.addEventListener("click", ()=>{ if(MENU.id === "scTitle"){ startAudio(); SFX.ok(); showMain(); } });
 }
 
+const MODE_DESC = {
+  champ:"Five cups: Summer, Fall, Winter, Desert and the Swamp Cup, four rounds each. Three laps a round against the same three drivers, points 10, 6, 4 and 3, saved between sessions.",
+  race:"Any circuit, five laps, the full field.",
+  trial:"Three laps with the road to yourself. Your best lap on each circuit is saved and comes back as a ghost to chase.",
+  exped:"No rivals, no laps, no map: a long day's climb. Wade the swamp, run up the creek, grind up the switchbacks and over the snow to the summit cairn, calling at every camp on the way; the compass points to the next one. The car is in low range, the mud holds you and anything steeper than about half is a wall, so pick your line."
+};
 function showMain(sel){
   const C = SAVE.champ;
   const champSub = C && !C.done ? CUPS[C.cup || 0].name + ", round " + (C.round+1) + " of " + CHAMP_ROUNDS.length : "";
   const DESC = {
-    champ:"Four cups: the Summer Cup over four rounds, the Fall Cup over four in the maples, the Winter Cup over four on snow and ice, and the Desert Cup over four in the red rock. Three laps a round against the same three drivers, points 10, 6, 4 and 3, saved between sessions.",
-    race:"Any circuit, five laps, the full field.",
-    trial:"Three laps with the road to yourself. Your best lap on each circuit is saved and comes back as a ghost to chase.",
-    exped:"No rivals, no laps, no map: a long day's climb. Wade the swamp, run up the creek, grind up the switchbacks and over the snow to the summit cairn, calling at every camp on the way; the compass points to the next one. The car is in low range, the mud holds you and anything steeper than about half is a wall, so pick your line.",
-    online:"Race your friends over the internet: host a room, share the code or the link, and everyone races the same circuit live. Three laps, and your best lap goes on the circuit's leaderboard.",
+    solo:"On your own against the computer: the championship cups, a quick race on any circuit, time trials against your own ghost, and the long expeditions.",
+    multi:"Race your friends over the internet: host a room, share the code or the link, see who has joined in the lobby, then the host picks the circuit and everyone races it live. Three laps, and your best lap goes on the circuit's leaderboard.",
     garage:"Pick your wagon (box, sport, woodie or safari), then its paint, roof, decals, lamps and underglow, its rims and tyres, and the kit: rack, tent, snorkel, ladder, lamps and more. Saved for every race.",
     opts:"Rival pace, sound, camera, gearbox and the arcade filter.",
     help:"Keyboard and gamepad controls, and how the drift turbo works."
@@ -15782,31 +15861,62 @@ function showMain(sel){
     '<div class="cols"><div class="left">' +
     '<div class="logo2" style="margin-bottom:22px">' + logoImg("small") + '</div>' +
     '<div class="menu">' +
-    '<button class="item" data-act="champ" data-k="champ"><span>CHAMPIONSHIP</span><small>' + champSub + '</small></button>' +
-    '<button class="item" data-act="race" data-k="race"><span>QUICK RACE</span></button>' +
-    '<button class="item" data-act="trial" data-k="trial"><span>TIME TRIAL</span></button>' +
-    '<button class="item" data-act="exped" data-k="exped"><span>EXPEDITION</span></button>' +
-    (NET_CFG.enabled ? '<button class="item" data-act="online" data-k="online"><span>ONLINE RACE</span><small>with friends</small></button>' : '') +
+    '<button class="item" data-act="solo" data-k="solo"><span>SINGLE PLAYER</span><small>' + (champSub || "championship, race, time trial, expedition") + '</small></button>' +
+    '<button class="item" data-act="multi" data-k="multi"><span>MULTIPLAYER</span><small>' + (NET.on ? "back to your room" : "race friends online") + '</small></button>' +
     '<button class="item" data-act="garage" data-k="garage"><span>GARAGE</span></button>' +
     '<button class="item" data-act="opts" data-k="opts"><span>OPTIONS</span></button>' +
     '<button class="item" data-act="help" data-k="help"><span>HOW TO DRIVE</span></button>' +
     '</div></div><div class="right"><div class="note detail" id="mainNote"></div></div></div>',
     { sel: sel || 0, back: showTitle,
       onSel: el => { const n = document.getElementById("mainNote"); if(n) n.innerHTML = '<p>' + DESC[el.dataset.k] + '</p>'; },
-      acts:{ champ:()=>{ SFX.ok(); showChamp(); },
-             race:()=>{ SFX.ok(); showTracks("race"); },
-             trial:()=>{ SFX.ok(); showTracks("trial"); },
-             exped:()=>{ SFX.ok(); showTracks("expedition"); },
-             online:()=>{ SFX.ok(); if(NET.on) showLobby(); else showOnline(); },
+      acts:{ solo:()=>{ SFX.ok(); showSolo(); },
+             multi:()=>{ SFX.ok(); if(NET.on) showLobby(); else if(NET_CFG.enabled) showOnline(); else showNetOff(); },
              garage:()=>{ SFX.ok(); showGarage(()=> showMain(MI("garage")), ()=> showMain(MI("garage"))); },
              opts:()=>{ SFX.ok(); showOptions(()=> showMain(MI("opts"))); },
              help:()=>{ SFX.ok(); showHelp(()=> showMain(MI("help"))); } } });
   MENU.onSel(MENU.items[MENU.sel]);
 }
+/* single player: the four ways to race the computer */
+function showSolo(sel){
+  const C = SAVE.champ;
+  const champSub = C && !C.done ? CUPS[C.cup || 0].name + ", round " + (C.round+1) + " of " + CHAMP_ROUNDS.length : "";
+  openScreen("scSolo",
+    '<div class="cols"><div class="left"><h2 class="head">Single player</h2>' +
+    '<div class="menu">' +
+    '<button class="item" data-act="champ" data-k="champ"><span>CHAMPIONSHIP</span><small>' + champSub + '</small></button>' +
+    '<button class="item" data-act="race" data-k="race"><span>QUICK RACE</span></button>' +
+    '<button class="item" data-act="trial" data-k="trial"><span>TIME TRIAL</span></button>' +
+    '<button class="item" data-act="exped" data-k="exped"><span>EXPEDITION</span></button>' +
+    '<button class="item back" data-act="back" data-k="back"><span>BACK</span></button>' +
+    '</div></div><div class="right"><div class="note detail" id="soloNote"></div></div></div>',
+    { sel: sel || 0, back: ()=> showMain(MI("solo")),
+      onSel: el => { const n = document.getElementById("soloNote"); if(n) n.innerHTML = MODE_DESC[el.dataset.k] ? '<p>' + MODE_DESC[el.dataset.k] + '</p>' : ''; },
+      acts:{ champ:()=>{ SFX.ok(); showChamp(); },
+             race:()=>{ SFX.ok(); showTracks("race"); },
+             trial:()=>{ SFX.ok(); showTracks("trial"); },
+             exped:()=>{ SFX.ok(); showTracks("expedition"); },
+             back:()=>{ SFX.back(); showMain(MI("solo")); } } });
+  MENU.onSel(MENU.items[MENU.sel]);
+}
+/* multiplayer where the page may not reach the room server (inside a Claude preview) */
+function showNetOff(){
+  openScreen("scNetOff",
+    '<div class="cols"><div class="left"><h2 class="head">Multiplayer</h2>' +
+    '<div class="menu">' +
+    '<button class="item" data-act="try"><span>TRY ANYWAY</span><small>it may not connect from here</small></button>' +
+    '<button class="item back" data-act="back"><span>BACK</span></button>' +
+    '</div></div><div class="right"><div class="note detail"><p>Online races need the game on a web page of its own, such as your own site. In this preview the page is boxed in and usually can\'t reach the race server, so it is switched off here. Put the game on your site and MULTIPLAYER goes straight to hosting and joining rooms.</p></div></div></div>',
+    { sel: 0, back: ()=> showMain(MI("multi")),
+      acts:{ try:()=>{ SFX.ok(); NET_CFG.enabled = true; showOnline(); },
+             back:()=>{ SFX.back(); showMain(MI("multi")); } } });
+}
 
-/* where each entry sits in the main menu (the online one is only there when it is switched on) */
-const MI = k => ["champ", "race", "trial", "exped"].concat(NET_CFG.enabled ? ["online"] : [], ["garage", "opts", "help"]).indexOf(k);
-const mainIdx = m => m === "champ" ? 0 : m === "race" ? 1 : m === "trial" ? 2 : m === "online" ? MI("online") : 3;
+/* where each entry sits in the main menu, and the menu a mode goes back to */
+const MI = k => ["solo", "multi", "garage", "opts", "help"].indexOf(k);
+function menuFor(m){
+  if(m === "online") return showMain(MI("multi"));
+  showSolo(m === "champ" ? 0 : m === "race" ? 1 : m === "trial" ? 2 : 3);
+}
 /* The circuits, grouped the way the championship runs them: one Grand Prix
    at a time, picked from a row of tabs, so the list is four circuits and
    not seventeen. Expeditions have their own list. */
@@ -15816,7 +15926,8 @@ const GP_GROUPS = (()=>{
   if(special.length) g.push({name: "Special stages", short: "SPECIAL", ids: special, kind:"special"});
   return g;
 })();
-const SEASON_COL = { summer:"#8fd06a", fall:"#f08a2a", winter:"#8fd3f4", desert:"#e56a3a", swamp:"#ff7ac8" };
+const SEASON_COL = { summer:"#8fd06a", fall:"#f08a2a", winter:"#8fd3f4", desert:"#e56a3a", swamp:"#3f8a4a" };
+const trackCol = t=> t && t.gator ? "#ff7ac8" : SEASON_COL[(t && t.season) || "summer"];
 function showTracks(mode, group){
   const exped = mode === "expedition";
   let ids, gi = 0;
@@ -15827,7 +15938,7 @@ function showTracks(mode, group){
     ids = GP_GROUPS[gi].ids;
   }
   const tabs = exped ? '' : '<div class="cuptabs">' + GP_GROUPS.map((x, k)=>
-      '<button class="cuptab hasTro' + (k === gi ? ' on' : '') + '" style="--tkc:' + SEASON_COL[(TRACKS[x.ids[0]] || {}).season || "summer"] + '" data-act="cup" data-cup="' + k + '">' +
+      '<button class="cuptab hasTro' + (k === gi ? ' on' : '') + '" style="--tkc:' + trackCol(TRACKS[x.ids[0]]) + '" data-act="cup" data-cup="' + k + '">' +
       trophySVG(x.kind, x.cup === undefined ? "special" : (cupMetal(x.cup) === "none" ? "gold" : cupMetal(x.cup))) +
       '<span class="ttx"><span>' + esc(x.short) + '</span><small>' + x.ids.length + (x.ids.length === 1 ? ' circuit' : ' circuits') + '</small></span></button>').join("") + '</div>';
   const at = ids.indexOf(pickCur);
@@ -15838,17 +15949,17 @@ function showTracks(mode, group){
     '<div class="tracks">' + ids.map(id =>{
       const rec = SAVE.records[TRACKS[id].name] || {};
       const best = exped ? (rec.summit != null ? "summit " + fmt(rec.summit) : "") : (rec.bestLap != null ? "best lap " + fmt(rec.bestLap) : "");
-      return '<button class="tk" style="--tkc:' + SEASON_COL[TRACKS[id].season || "summer"] + '" data-track="' + id + '"><canvas width="132" height="132"></canvas><span>' +
+      return '<button class="tk" style="--tkc:' + trackCol(TRACKS[id]) + '" data-track="' + id + '"><canvas width="132" height="132"></canvas><span>' +
       esc(TRACKS[id].name) + '</span><small>' + esc(TRACKS[id].shape.split(/\s+[\u2014-]\s+/)[0].toLowerCase()) +
       '</small>' + (best ? '<em>' + best + '</em>' : '') + '</button>'; }).join("") + '</div>' +
     '<div class="detail" id="tkDetail"></div>' +
     '<div class="menu" style="margin-top:14px;max-width:260px"><button class="item back" data-act="back"><span>BACK</span></button></div></div>',
-    { grid:true, sel: (exped ? 0 : GP_GROUPS.length) + Math.max(0, at), back: ()=> mode === "online" ? (NET.on ? showLobby() : showOnline()) : showMain(mainIdx(mode)),
+    { grid:true, sel: (exped ? 0 : GP_GROUPS.length) + Math.max(0, at), back: ()=> mode === "online" ? (NET.on ? showLobby() : showOnline()) : menuFor(mode),
       onSel: el => { if(el.dataset.track !== undefined)
                        document.getElementById("tkDetail").innerHTML = detailHTML(+el.dataset.track); },
       acts:{ track: el => startMode(mode, +el.dataset.track),
              cup: el => { SFX.move(); showTracks(mode, +el.dataset.cup); },
-             back: ()=>{ SFX.back(); mode === "online" ? (NET.on ? showLobby() : showOnline()) : showMain(mainIdx(mode)); } } });
+             back: ()=>{ SFX.back(); mode === "online" ? (NET.on ? showLobby() : showOnline()) : menuFor(mode); } } });
   MENU.mode = mode; MENU.group = gi;
   UIEL.querySelectorAll(".tk canvas").forEach((cv, i)=> drawThumb(cv, ids[i]));
   MENU.onSel(MENU.items[MENU.sel]);
@@ -15908,7 +16019,7 @@ function showChamp(){
     '<div class="right"><div id="cupNote"></div>' +
     (C ? standingsTable() : '<div class="note"><p>Three laps a round. Finish first for 10 points, then 6, 4 and 3. Most points at the end takes the cup.</p></div>') +
     '</div></div>',
-    { back: ()=> showMain(0),
+    { back: ()=> showSolo(0),
       onSel: el => {
         const k = el.dataset.k !== undefined ? +el.dataset.k : shown;
         const n = document.getElementById("cupNote");
@@ -15920,7 +16031,7 @@ function showChamp(){
              winter:()=> start(2),
              desert:()=> start(3),
              swamp:()=> start(4),
-             back:()=>{ SFX.back(); showMain(0); } } });
+             back:()=>{ SFX.back(); showSolo(0); } } });
   MENU.onSel(MENU.items[MENU.sel]);
 }
 function champRound(){
@@ -16051,7 +16162,7 @@ function showPause(sel){
       acts:{ resume: resumeGame,
              restart:()=>{ SFX.ok(); resetRace(); },
              opts:()=>{ SFX.ok(); showOptions(()=> showPause(2)); },
-             quit:()=>{ SFX.back(); enterMenuWorld(); showMain(mainIdx(MODE)); } } });
+             quit:()=>{ SFX.back(); enterMenuWorld(); menuFor(MODE); } } });
 }
 
 /* ==== ONLINE: race your friends =========================================
@@ -16437,7 +16548,7 @@ function netInputStyle(){ return 'style="font:inherit;font-size:22px;padding:8px
 function showOnline(prefill){
   const nick = netNick();
   openScreen("scOnline",
-    '<div class="cols"><div class="left"><h2 class="head">Online race</h2>' +
+    '<div class="cols"><div class="left"><h2 class="head">Multiplayer</h2>' +
     '<label class="dimtx" for="netName">YOUR NAME</label><input id="netName" maxlength="16" autocomplete="off" value="' + esc(nick) + '" ' + netInputStyle() + '>' +
     '<div class="menu" style="margin-top:14px">' +
     '<button class="item" data-act="host"><span>HOST A RACE</span><small>open a room, share the code, pick the circuit</small></button>' +
@@ -16446,12 +16557,12 @@ function showOnline(prefill){
     '<div class="menu" style="margin-top:14px"><button class="item back" data-act="back"><span>BACK</span></button></div>' +
     '<p class="dimtx" id="netMsg" style="margin-top:10px"></p></div>' +
     '<div class="right"><div class="note detail"><p>Race up to five friends. The host opens a room and shares the code (or the invite link). Everyone waits in the lobby, where you can see who has joined; then the host picks the circuit and starts, and the whole room goes there together. Three laps, no computer rivals, and your best lap goes on the circuit\'s leaderboard.</p></div></div></div>',
-    { sel: prefill ? 1 : 0, back: ()=> showMain(MI("online")),
+    { sel: prefill ? 1 : 0, back: ()=> showMain(MI("multi")),
       acts:{ host: ()=>{ if(!netSaveNick()) return; SFX.ok(); netEnter(netCode(), true); },
              join: ()=>{ if(!netSaveNick()) return; const c = (document.getElementById("netCode").value || "").toUpperCase().replace(/[^A-Z]/g, "");
                          if(c.length !== 4){ netMsg("Type the four letter code first."); document.getElementById("netCode").focus(); return; }
                          SFX.ok(); netEnter(c, false); },
-             back: ()=>{ SFX.back(); showMain(MI("online")); } } });
+             back: ()=>{ SFX.back(); showMain(MI("multi")); } } });
   if(prefill && nick){ const j = UIEL.querySelector('[data-act="join"]'); if(j) j.focus(); }
   else setTimeout(()=>{ const n = document.getElementById("netName"); if(n && !n.value) n.focus(); }, 30);
 }
@@ -16506,12 +16617,12 @@ function showLobby(sel){
     '<input id="netLinkBox" readonly value="' + esc(netLink()) + '" ' + netInputStyle().replace("text-transform:uppercase", "font-size:14px") + '></div>' +
     '<div class="right"><h2 class="head" style="font-size:18px">Drivers ' + n + '/' + NET_CFG.max + '</h2><table class="grid">' + rows.join("") + '</table>' +
     '<h2 class="head" style="margin-top:16px;font-size:18px">Best laps: ' + esc(pick) + '</h2><div id="netBoard"><p class="dimtx">Loading…</p></div></div></div>',
-    { sel: sel || 0, back: ()=>{ SFX.back(); netLeave(); showMain(MI("online")); },
+    { sel: sel || 0, back: ()=>{ SFX.back(); netLeave(); showMain(MI("multi")); },
       acts:{ go: ()=>{ SFX.ok(); netStart(); },
              track: ()=>{ SFX.ok(); showTracks("online"); },
              wait: ()=>{ SFX.move(); },
              copy: ()=>{ const b = document.getElementById("netLinkBox"); try{ navigator.clipboard.writeText(netLink()); }catch(e){ if(b){ b.select(); document.execCommand && document.execCommand("copy"); } } SFX.ok(); },
-             leave: ()=>{ SFX.back(); netLeave(); showMain(MI("online")); } } });
+             leave: ()=>{ SFX.back(); netLeave(); showMain(MI("multi")); } } });
   netBoard(pick).then(rows=>{ const el = document.getElementById("netBoard"); if(el) el.innerHTML = netBoardHTML(rows); });
 }
 /* redraw the lobby as people come and go, without losing the selection */
@@ -16520,7 +16631,7 @@ function netRefresh(){
 }
 function showOnlinePause(){
   openScreen("scPause",
-    '<div class="cols"><div class="left"><h2 class="head">Online race</h2><p class="dimtx">The race carries on while you are here.</p><div class="menu">' +
+    '<div class="cols"><div class="left"><h2 class="head">Multiplayer</h2><p class="dimtx">The race carries on while you are here.</p><div class="menu">' +
     '<button class="item" data-act="resume"><span>BACK TO THE RACE</span></button>' +
     (netIsHost() ? '<button class="item" data-act="abort"><span>END RACE FOR EVERYONE</span></button>' : '') +
     '<button class="item" data-act="lobby"><span>LEAVE RACE</span><small>back to the lobby</small></button>' +
@@ -16569,7 +16680,7 @@ function showResults(){
   if(MODE === "online"){
     items.push(['lobby', "BACK TO THE LOBBY"], ['leave', "LEAVE ROOM"]);
     acts.lobby = ()=>{ SFX.ok(); NET.racing = false; netTrackMe(); enterMenuWorld(); showLobby(); };
-    acts.leave = ()=>{ SFX.back(); netLeave(); enterMenuWorld(); showMain(MI("online")); };
+    acts.leave = ()=>{ SFX.back(); netLeave(); enterMenuWorld(); showMain(MI("multi")); };
   } else if(MODE === "champ"){
     items.push(['stand', SAVE.champ && SAVE.champ.done ? "FINAL STANDINGS" : "STANDINGS"]);
     acts.stand = ()=>{ SFX.ok(); showStandings(); };
@@ -16577,7 +16688,7 @@ function showResults(){
     items.push(['again', EXP.on ? "CLIMB AGAIN" : MODE === "trial" ? "GO AGAIN" : "RACE AGAIN"], ['tracks', EXP.on ? "CHOOSE MOUNTAIN" : "CHOOSE CIRCUIT"], ['menu', "MAIN MENU"]);
     acts.again = ()=>{ SFX.ok(); setMode(MODE); resetRace(); };
     acts.tracks = ()=>{ SFX.ok(); const m = MODE; enterMenuWorld(); showTracks(m); };
-    acts.menu = ()=>{ SFX.back(); const m = MODE; enterMenuWorld(); showMain(mainIdx(m)); };
+    acts.menu = ()=>{ SFX.back(); const m = MODE; enterMenuWorld(); menuFor(m); };
   }
   openScreen("scResults",
     '<div class="cols" style="align-items:flex-start"><div class="left">' +
