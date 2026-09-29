@@ -3897,6 +3897,8 @@ function caveOf(s){ for(const C of CAVES){ if(s >= C.a && s <= C.b) return C; } 
 /* A wade is the same pool with no deck over it: the road runs down off the bank into the
    water, a wheel deep through the middle, and back up out the far side. */
 MAIN.bwk = new Float32Array(MAIN.N);
+MAIN.bwDeck = new Uint8Array(MAIN.N);          // stations that are on a boardwalk's planks (not a wade)
+const DECK_SINK = 0.5, DECK_TOP = 0.105;       // the ground's road sunk under the deck; the planks' top over the road line
 (TRACK.boardwalks || []).map(d=> [d, false]).concat((TRACK.wades || []).map(d=> [d, true])).forEach(([d, wade])=>{
   const seg = MAIN.seg;
   let a = snapTo(MAIN, d[0]), b = snapTo(MAIN, d[1]);
@@ -3935,6 +3937,7 @@ MAIN.bwk = new Float32Array(MAIN.N);
     const u = k*seg, w = smoothstep(-12, 4, u)*(1 - smoothstep(L - 4, L + 12, u));
     const i = wrapIdx(MAIN, a + k); if(!wade) MAIN.bwk[i] = Math.max(MAIN.bwk[i], w);      // (a wade has no deck, and no rails)
   }
+  if(!wade) for(let k=0;k<=n;k++) MAIN.bwDeck[wrapIdx(MAIN, a + k)] = 1;
   if(wade){
     /* the wade's water reaches on past either end of the dip, over the road's banks, so it
        always stops at a shore (the road climbing out of it, the ground beside) and never
@@ -4147,7 +4150,10 @@ function bwPool(x, z){
           }
           if(P.noStamp[ia] || P.noStamp[ib]) continue;   // the bridge carries it
           let y = P.pts[ia].y*(1-f) + P.pts[ib].y*f + BED;
-          if(P.bank){
+          // under a boardwalk the ground's own road lies well below the planks, so it never shows through them
+          const onDeck = P.bwDeck && (P.bwDeck[ia] || P.bwDeck[ib]);
+          if(onDeck) y -= DECK_SINK;
+          if(P.bank && !onDeck){                   // (the planks lie flat: no banking under a boardwalk)
             const bk = P.bank[ia]*(1-f) + P.bank[ib]*f;
             if(bk) y += bk*Math.max(-(half + 3), Math.min(half + 3, tL[k]));
           }
@@ -4340,6 +4346,21 @@ function surfaceY(x, z){
   if(GORGE.on){
     const s = deckStation(x, z);
     if(s !== null) return pathY(MAIN, s) + BED;
+  }
+  // on a boardwalk: the planks themselves, from the road's own line
+  if(BOARDWALKS.length){
+    const c = cellAt(x, z);
+    if(c >= 0 && GD[c] < GHW[c] + 0.8 && paths[GP[c]] === MAIN && MAIN.bwDeck[wrapIdx(MAIN, Math.round(GS[c]))]){
+      // the exact station: this point projected onto the road line near the cell's own
+      let best = Infinity, st = GS[c];
+      for(let k=Math.floor(GS[c]) - 2; k<=Math.floor(GS[c]) + 2; k++){
+        const A = MAIN.pts[wrapIdx(MAIN, k)], B = MAIN.pts[wrapIdx(MAIN, k + 1)], ex = B.x - A.x, ez = B.z - A.z, L2 = ex*ex + ez*ez;
+        const t = L2 ? Math.max(0, Math.min(1, ((x - A.x)*ex + (z - A.z)*ez)/L2)) : 0, d2 = (x - A.x - ex*t)**2 + (z - A.z - ez*t)**2;
+        if(d2 < best){ best = d2; st = k + t; }
+      }
+      const top = pathY(MAIN, st) + BED + DECK_TOP;
+      if(!(SURF_HINT !== null && SURF_HINT < top - 2.5)) return top;
+    }
   }
   const h = gridH(x, z);
   if(WATERS){ const wt = waterTop(x, z); if(wt !== null && h < wt - WADE_DEPTH) return wt - WADE_DEPTH; }   // never deeper than the wheels
@@ -14607,7 +14628,7 @@ function hudNum(txt, x, y, size, col, align){
   return w;
 }
 function hudPlate(x, y, w, h, accent){
-  const sk = h*0.12, k = HK;
+  const sk = h*0.12, k = HK, PAD = 12*k, AW = accent ? 5*k : 0;
   const path = (dx, dy)=>{ hud.beginPath(); hud.moveTo(x + sk + dx, y + dy); hud.lineTo(x + w + sk + dx, y + dy);
     hud.lineTo(x + w - sk + dx, y + h + dy); hud.lineTo(x - sk + dx, y + h + dy); hud.closePath(); };
   path(3*k, 3*k); hud.fillStyle = "rgba(0,0,0,.55)"; hud.fill();
@@ -14616,6 +14637,10 @@ function hudPlate(x, y, w, h, accent){
   if(accent){                                      // a strip of the accent down the slanted leading edge
     hud.beginPath(); hud.moveTo(x + sk, y); hud.lineTo(x + sk + 5*k, y); hud.lineTo(x - sk + 5*k, y + h); hud.lineTo(x - sk, y + h); hud.closePath();
     hud.fillStyle = accent; hud.fill(); hud.lineWidth = 1.5*k; hud.strokeStyle = "#000"; hud.stroke(); }
+  // one left line and one right line for everything on the plate, set where the slant is tightest
+  // (the top for the left edge, the bottom for the right), clear of the accent and padded
+  const L = x + sk + AW + PAD, R = x + w - sk - PAD;
+  return { l: ()=> L, r: ()=> R, top: y, bottom: y + h };
 }
 function hudPill(txt, x, y, bg, align){
   hud.font = 'italic 800 ' + Math.round(UI.small*HK) + 'px ' + HUD_FONT;
@@ -14629,14 +14654,14 @@ function hudPill(txt, x, y, bg, align){
 const TACH_MAX = 7000;
 function drawTach(rpm, cx, cy, R){
   const c = hud, k = HK;
-  const a0 = Math.PI*0.80, a1 = Math.PI*2.20;
-  const ang = v => a0 + (v/9)*(a1-a0);
+  const a0 = Math.PI*0.80, a1 = Math.PI*2.20, v0 = Math.PI*0.86, v1 = Math.PI*2.14;
+  const ang = v => v0 + (v/9)*(v1-v0);             // (the scale sits inside the face's ends, never on its cut edges)
   // the face: a cream band with an ink rim
   c.beginPath(); c.arc(cx, cy, R+16*k, a0, a1); c.arc(cx, cy, R-12*k, a1, a0, true); c.closePath();
   c.fillStyle = "rgba(242,238,226,.94)"; c.fill();
   c.lineWidth = 3*k; c.strokeStyle = "#000"; c.stroke();
   // the red line: a band on the outer edge from 7.5, clear of the figures
-  c.beginPath(); c.arc(cx, cy, R+12.5*k, ang(7.5), ang(9)); c.lineWidth = 6*k; c.strokeStyle = "#d8261a"; c.stroke();
+  c.beginPath(); c.arc(cx, cy, R+12.5*k, ang(7.5), a1); c.lineWidth = 6*k; c.strokeStyle = "#d8261a"; c.stroke();
   // ticks: long at the thousands, short at the halves
   for(let v=0; v<=9; v+=0.5){
     const a = ang(v), major = v % 1 === 0, r0 = major ? R + 3*k : R + 8*k;
@@ -14651,9 +14676,6 @@ function drawTach(rpm, cx, cy, R){
     c.fillStyle = v >= 8 ? "#c41e12" : "#15181a";
     c.fillText(String(v), cx + Math.cos(a)*(R - 4*k), cy + Math.sin(a)*(R - 4*k) + 0.5*k);
   }
-  c.font = '700 ' + Math.round(7.5*k) + 'px ' + HUD_FONT; c.fillStyle = "#5a5a52";
-  if("letterSpacing" in c) c.letterSpacing = (0.8*k).toFixed(1) + "px";
-  c.fillText("RPM ×1000", cx, cy + R*0.42); if("letterSpacing" in c) c.letterSpacing = "0px";
   // the needle: tapered, with a short tail, on an ink hub
   const v = Math.max(0, Math.min(9, rpm/TACH_MAX*9)), a = ang(v), ca = Math.cos(a), sa = Math.sin(a), nx = -sa, ny = ca;
   c.beginPath();
@@ -14796,69 +14818,82 @@ function drawHUDInner(dt, alongNow){
   if(state.phase === "menu" || GAME.ui && !GAME.paused) return;
   const lapNo = Math.min(state.lap, LAPS);
 
+  /* The layout sits on one grid: 16px from the screen edge, 12px padding inside each plate
+     (measured from its slanted edge), 4px from a label to its figure, 10px between groups. */
+  const M = 16*k;
   /* top left: the clocks, on one plate. Total above, this lap below, the split to your best in a pill */
   if(EXP.on){
-    hudPlate(20*k, 10*k, 128*k, 50*k, UI.key);
-    hudLabel("TIME", 30*k, 24*k); hudNum(fmt(state.t), 29*k, 51*k, UI.value*0.9, UI.ink);
+    const T = hudPlate(M + 6*k, M, 150*k, 54*k, UI.key);
+    hudLabel("TIME", T.l(M + 18*k), M + 18*k); hudNum(fmt(state.t), T.l(M + 44*k), M + 44*k, UI.value*0.9, UI.ink);
     drawExpHUD(W, H, k);
   } else {
-  hudPlate(20*k, 10*k, 140*k, 92*k, UI.key);
-  hudLabel("TOTAL", 30*k, 24*k); hudNum(fmt(state.t), 29*k, 49*k, UI.value*0.78, "#dfe7df");
-  hudLabel("LAP", 30*k, 65*k);
+  const y0 = M, T = hudPlate(M + 6*k, y0, 176*k, 96*k, UI.key);
+  const b1 = y0 + 18*k, b2 = b1 + 22*k, b3 = b2 + 18*k, b4 = b3 + 27*k;
+  hudLabel("TOTAL", T.l(b1), b1); hudNum(fmt(state.t), T.l(b2), b2, UI.value*0.78, "#dfe7df");
+  hudLabel("LAP", T.l(b3), b3);
   { const d = traceDelta();
-    if(d !== null) hudPill((d < 0 ? "−" : "+") + Math.abs(d).toFixed(2), 150*k, 66*k, d < 0 ? "#5cf07a" : "#ff7a5a", "right"); }
-  hudNum(fmt(state.t - state.lapStart), 29*k, 93*k, UI.value, UI.ink);
+    if(d !== null) hudPill((d < 0 ? "−" : "+") + Math.abs(d).toFixed(2), T.r(b3), b3 + 2*k, d < 0 ? "#5cf07a" : "#ff7a5a", "right"); }
+  hudNum(fmt(state.t - state.lapStart), T.l(b4), b4, UI.value, UI.ink);
 
   /* top centre: the lap, compact, so the pace notes have the space under it */
-  { const pw = 92*k, px0 = W/2 - pw/2;
-    hudPlate(px0, 8*k, pw, 34*k);
-    hudLabel("LAP", px0 + 12*k, 30*k);
-    if(LAPS < 99){ const x1 = px0 + pw - 12*k; const w2 = hudNum("/" + LAPS, x1, 34*k, UI.small*1.15, "#dfe7df", "right"); hudNum(String(lapNo), x1 - w2 - 1*k, 35*k, UI.value*0.95, UI.key, "right"); }
-    else hudNum(String(lapNo), px0 + pw - 12*k, 35*k, UI.value*0.95, UI.key, "right"); }
+  { const pw = 96*k, px0 = W/2 - pw/2, L = hudPlate(px0, M, pw, 34*k), bl = M + 24*k;
+    hudLabel("LAP", L.l(bl), bl - 1*k);
+    const x1 = L.r(bl);
+    if(LAPS < 99){ const w2 = hudNum("/" + LAPS, x1, bl, UI.small*1.15, "#dfe7df", "right"); hudNum(String(lapNo), x1 - w2 - 1*k, bl + 1*k, UI.value*0.95, UI.key, "right"); }
+    else hudNum(String(lapNo), x1, bl + 1*k, UI.value*0.95, UI.key, "right"); }
   drawNotes(W, k);
 
   /* top right: position (or the record), then the best laps set this race */
   const field = FIELD.length + 1, top = state.lapTimes.slice().sort((x,y)=>x-y).slice(0,3);
-  { const pw = 132*k, px0 = W - pw - 22*k, ph = (top.length ? 62 + 16*top.length : 52)*k;
-    hudPlate(px0, 8*k, pw, ph, FIELD.length ? UI.key : null);
-    const xr = px0 + pw - 12*k;
+  { const pw = 150*k, ph = (top.length ? 60 + 18*top.length + 12 : 54)*k, px0 = W - M - pw - 6*k;
+    const P = hudPlate(px0, M, pw, ph, FIELD.length ? UI.key : null);
+    const b1 = M + 18*k, b2 = b1 + 26*k;
     if(FIELD.length){
-      hudLabel("POSITION", px0 + 14*k, 22*k);
-      const w2 = hudNum("/" + field, xr, 47*k, UI.small*1.15, "#dfe7df", "right");
-      hudNum(String(state.place), xr - w2 - 1*k, 48*k, UI.value, UI.ink, "right");
+      hudLabel("POSITION", P.l(b1), b1);
+      const w2 = hudNum("/" + field, P.r(b2), b2, UI.small*1.15, "#dfe7df", "right");
+      hudNum(String(state.place), P.r(b2) - w2 - 1*k, b2 + 1*k, UI.value, UI.ink, "right");
     } else {
-      const rb = recordFor().bestLap;
-      hudLabel("RECORD", px0 + 14*k, 22*k);
-      hudNum(rb != null ? fmt(rb) : "—", xr, 46*k, UI.value*0.72, UI.ink, "right");
+      hudLabel("RECORD", P.l(b1), b1);
+      hudNum(rb_or_dash(), P.r(b2), b2, UI.value*0.72, UI.ink, "right");
     }
     if(top.length){
-      hudLabel(top.length > 1 ? "BEST LAPS" : "BEST LAP", px0 + 14*k, 66*k);
-      top.forEach((t, i)=>{ const y = (82 + i*16)*k;
-        hudLabel(String(i + 1), px0 + 16*k, y, "left", UI.key);
-        hudNum(fmt(t), xr, y + 1*k, UI.small, i ? "#dfe7df" : UI.ink, "right"); });
+      const b3 = b2 + 20*k;
+      hudLabel(top.length > 1 ? "BEST LAPS" : "BEST LAP", P.l(b3), b3);
+      top.forEach((t, i)=>{ const y = b3 + (18 + i*18)*k;
+        hudLabel(String(i + 1), P.l(y), y, "left", UI.key);
+        hudNum(fmt(t), P.r(y), y + 1*k, UI.small, i ? "#dfe7df" : UI.ink, "right"); });
     }
   }
   }
   /* bottom left: the rev counter, and the gear and speed on a plate beside it */
-  drawTach(Math.min(DRIVE.redline*1.02, trans.rpm + (trans.spin || 0)), 74*k, H-58*k, 46*k);
-  { const bx = 146*k, by = H-74*k, bw = 138*k, bh = 56*k;
-    hudPlate(bx, by, bw, bh);
+  function rb_or_dash(){ const rb = recordFor().bestLap; return rb != null ? fmt(rb) : "\u2014"; }
+  drawTach(Math.min(DRIVE.redline*1.02, trans.rpm + (trans.spin || 0)), 78*k, H-62*k, 46*k);
+  { const bx = 150*k, bh = 56*k, by = H - 16*k - bh;
+    // the plate is as wide as what's on it: pad, gear box, gap, three digits, gap, unit, pad
+    hud.font = 'italic 800 ' + Math.round(UI.value*1.05*k*1.12) + 'px ' + HUD_FONT;
+    const col3w = hud.measureText("0").width*3;
+    hud.font = '700 ' + Math.round(UI.label*k) + 'px ' + HUD_FONT;
+    const unitW = hud.measureText(SAVE.settings.units === 1 ? "KM/H" : "MPH").width + 4*UI.label*k*0.14;
+    const bw = bh*0.24 + 12*k + 34*k + 12*k + col3w + 5*k + unitW + 12*k;          // (both slants, both pads, the content)
+    const G = hudPlate(bx, by, bw, bh);
     // the gear: an upright figure in a cream box, and how it's being changed under it
-    const gx = bx + 14*k, gy = by + 8*k, gw = 34*k, gh = 40*k;
+    const gw = 34*k, gh = 40*k, gy = by + (bh - gh)/2, gx = G.l(gy + gh);
     hud.fillStyle = "#f2eee2"; hud.fillRect(gx, gy, gw, gh - 11*k);
     hud.fillStyle = "#15181a"; hud.fillRect(gx, gy + gh - 11*k, gw, 11*k);
     hud.lineWidth = 2*k; hud.strokeStyle = "#000"; hud.strokeRect(gx, gy, gw, gh);
     hud.save(); hud.globalAlpha = trans.shiftT > 0 ? 0.45 : 1;
     hud.font = '800 ' + Math.round(24*k) + 'px ' + HUD_FONT; hud.textAlign = "center"; hud.textBaseline = "alphabetic";
     hud.fillStyle = "#15181a"; hud.fillText(gearLabel(), gx + gw/2, gy + 26*k); hud.restore();
-    hud.font = '700 ' + Math.round(7.5*k) + 'px ' + HUD_FONT; hud.textAlign = "center";
-    if("letterSpacing" in hud) hud.letterSpacing = (0.8*k).toFixed(1) + "px";
-    hud.fillStyle = trans.auto ? "#dfe7df" : UI.key; hud.fillText(trans.auto ? "AUTO" : "MANUAL", gx + gw/2, gy + gh - 3*k);
+    hud.font = '700 ' + Math.round(8*k) + 'px ' + HUD_FONT; hud.textAlign = "center";
+    if("letterSpacing" in hud) hud.letterSpacing = (0.6*k).toFixed(1) + "px";
+    hud.fillStyle = trans.auto ? "#dfe7df" : UI.key; hud.fillText(trans.auto ? "AUTO" : "MAN", gx + gw/2, gy + gh - 3*k);
     if("letterSpacing" in hud) hud.letterSpacing = "0px";
-    // the speed: big fixed-width figures, the unit set small beside their baseline
-    const kmh = SAVE.settings.units === 1, sp = Math.round(Math.abs(alongNow)*(kmh ? 3.6 : 2.23694));
-    hudNum(String(sp), bx + bw - 44*k, by + 40*k, UI.value*1.05, UI.ink, "right");
-    hudLabel(kmh ? "KM/H" : "MPH", bx + bw - 40*k, by + 40*k);
+    // the speed: fixed-width figures right-aligned in their own column (so 6 and 106 sit the same way), the unit after them
+    const kmh = SAVE.settings.units === 1, sp = Math.round(Math.abs(alongNow)*(kmh ? 3.6 : 2.23694)), sb = by + 38*k;
+    hud.font = 'italic 800 ' + Math.round(UI.value*1.05*k*1.12) + 'px ' + HUD_FONT;
+    const col3 = hud.measureText("0").width*3, xr = gx + gw + 12*k + col3;
+    hudNum(String(sp), xr, sb, UI.value*1.05, UI.ink, "right");
+    hudLabel(kmh ? "KM/H" : "MPH", xr + 5*k, sb);
   }
 
   /* drift charge: the bar fills toward the next tier and takes its colour */
@@ -14890,7 +14925,7 @@ function drawHUDInner(dt, alongNow){
   if(GATOR && state.phase !== "menu") GG.hud(hud, W, H, k);
   /* minimap, bottom right (not on an expedition: finding the way is the point) */
   if(!EXP.on){
-    const size = 96*k, mx = W - size - 12*k, my = H - size - 12*k;
+    const size = 96*k, mx = W - size - 16*k, my = H - size - 16*k;          // (on the same 16px edge as the plates)
     const sc = (size - 10*k)/MAP.span;
     const px = x => mx + size/2 + (x - MAP.cx)*sc;
     const pz = z => my + size/2 + (z - MAP.cz)*sc;
