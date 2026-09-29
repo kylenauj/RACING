@@ -8394,7 +8394,7 @@ if(GATOR){
   function knock(nx, nz, hard){
     const vn = pose.vx*nx + pose.vz*nz;
     if(vn < 0){ pose.vx -= nx*vn*1.6; pose.vz -= nz*vn*1.6; }
-    pose.vx *= 0.62; pose.vz *= 0.62; pose.vy = Math.max(pose.vy || 0, 3.5); pose.air = true; pose.airT = 0;
+    pose.vx *= 0.72; pose.vz *= 0.72; pose.vy = Math.max(pose.vy || 0, 3.0); pose.air = true; pose.airT = 0;
     GAME.shake = Math.max(GAME.shake || 0, 0.35);
     if(actx) SFX.bump(hard ? 9 : 6);
     GG.hit(hard ? 2 : 1);
@@ -8486,8 +8486,14 @@ if(GATOR){
     // the hazards
     for(const h of HAZ){
       if(h.kind === "barrel" && !h.live) continue;
-      const dx = pose.x - h.x, dz = pose.z - h.z, d = Math.hypot(dx, dz);
-      if(d < h.r + 1.4 && pose.y < h.y + h.h && pose.y > h.y - h.h - 1){ h.cool = 0.8; knock(dx/(d || 1), dz/(d || 1), h.kind === "swing"); }
+      h.cool = Math.max(0, (h.cool || 0) - dt);
+      const dx = pose.x - h.x, dz = pose.z - h.z, d = Math.hypot(dx, dz), reach = h.r + 1.4;
+      if(d < reach && pose.y < h.y + h.h && pose.y > h.y - h.h - 1){
+        // out of it first, so a car cannot be left inside one being knocked every frame
+        const nx = dx/(d || 1), nz = dz/(d || 1);
+        pose.x += nx*(reach - d); pose.z += nz*(reach - d);
+        if(h.cool <= 0){ h.cool = 0.9; knock(nx, nz, h.kind === "swing"); }
+      }
     }
     // the gator's jaws: shut on you and you bounce off its teeth
     if(GATORJ.on && GATORJ.open < 0.35){
