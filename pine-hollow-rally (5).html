@@ -1040,12 +1040,13 @@ const TRACKS = [
           [20,-60],[120,-150],[230,-230],[300,-280],[330,-330],[300,-370],[250,-345],[225,-295],[170,-240],[80,-220],[0,-250],
           [-100,-220],[-200,-160],[-300,-60],[-380,60],[-420,160],[-380,230]],
     hills:[[285,-330,150,32],[-350,0,160,8],[0,300,200,-4]],
-    jumps:[[[60,-110],2.0]], fords:[],
-    bigJumps:[[[-250,-110],3.4]],
+    jumps:[[[-40,260],1.6], [[180,272],2.2], [[60,-110],2.0], [[-60,-235],1.8]],
+    bigJumps:[[[-250,-110],3.4], [[110,-160],3.0]],
     mud:[[[150,170],[0,110]], [[0,-250],[-200,-160]]],
     boardwalks:[[[-150,255],[60,267]]],
-    wades:[[[-380,60],[-420,160]]],
+    wades:[[[-380,60],[-420,160]], [[170,-240],[60,-225]], [[260,280],[320,235]]],
     cabins:4,
+    widths:[[[20,-60],[230,-230],10.5], [[300,-280],[225,-295],3.1], [[-100,-220],[-200,-160],3.2]],
     branches:[
       // the fire road, round the outside of the drag up to the Corkscrew
       {a:[0,110], b:[230,-230], via:[[130,40],[240,-90]],
@@ -1060,13 +1061,14 @@ const TRACKS = [
           [-400,-160],[-395,-80],[-330,-30],[-260,-60],[-200,-15],[-150,50],[-200,120],[-230,195],[-160,230],[-60,185],
           [20,130],[90,150],[180,215],[300,215],[375,165]],
     hills:[[330,-100,160,14],[-380,-150,150,10],[250,260,120,6]],
-    jumps:[[[-60,185],2.2]], fords:[],
-    bigJumps:[[[240,215],3.2]],
+    jumps:[[[375,40],2.0], [[-110,-222],1.6], [[-60,185],2.2], [[-360,-190],1.8]],
+    bigJumps:[[[240,215],3.2], [[20,-205],3.0]],
     lake:{at:[60,20], rx:150, rz:75},
     mud:[[[-260,-60],[-150,50]], [[-230,195],[-160,230]]],
     boardwalks:[[[-40,-215],[-180,-230]]],
-    wades:[[[-395,-80],[-330,-30]]],
+    wades:[[[-395,-80],[-330,-30]], [[-200,-15],[-150,50]], [[20,130],[90,150]]],
     cabins:3,
+    widths:[[[120,190],[330,210],10.5], [[330,-120],[180,-150],3.1], [[-230,195],[-80,195],3.2]],
     branches:[]},
   { name:"BIGFOOT TRAIL", after:"Mount Panorama", relief:1.0, rollers:0.5, season:"swamp", cup:4,
     blurb:"Mount Panorama in the deep woods: the pit straight on the boardwalk, hard left and up the mountain, the cutting and the switchbacks to the top, the esses down, the elbow, then flat out down the long straight over the humps and straight into the water at the bottom. Keep an eye on the tree line up the mountain: folks say something walks it",
@@ -1077,13 +1079,14 @@ const TRACKS = [
           [60,-270],[100,-335],[50,-400],[0,-365],[-40,-405],[-90,-365],[-120,-300],[-165,-340],[-215,-300],[-240,-150],
           [-265,20],[-285,180],[-255,250],[-300,295],[-295,345]],
     hills:[[40,-250,230,50],[-250,-250,120,20]],
-    jumps:[[[-247,-80],1.8]], fords:[],
-    bigJumps:[[[-270,100],3.8]],
+    jumps:[[[40,371],1.6], [[185,200],1.8], [[125,95],2.2], [[-247,-80],1.8]],
+    bigJumps:[[[-270,100],3.8], [[-230,-220],2.8]],
     mud:[[[90,40],[60,-20]], [[-120,-300],[-215,-300]]],
     boardwalks:[[[-50,372],[120,370]]],
-    wades:[[[-283,190],[-257,248]]],
+    wades:[[[-283,190],[-257,248]], [[200,340],[215,262]], [[-298,300],[-294,340]]],
     cabins:3,
     bigfoot:0.2,
+    widths:[[[-240,-150],[-280,170],10], [[60,-20],[100,-200],3.1], [[-120,-300],[-215,-300],3.2]],
     branches:[
       // the old mountain track, out round the flank of the hill
       {a:[215,260], b:[60,-20], via:[[260,160],[200,20]],
@@ -1098,12 +1101,13 @@ const TRACKS = [
           [280,-40],[300,-130],[260,-190],[150,-230],[40,-200],[-20,-260],[-100,-240],[-160,-170],[-260,-160],[-340,-80],
           [-380,60],[-380,200]],
     hills:[[300,-100,150,18],[150,-230,120,12],[-300,-120,150,8]],
-    jumps:[[[290,-85],2.0]], fords:[],
-    bigJumps:[[[200,-225],3.4]],
+    jumps:[[[10,298],1.6], [[200,290],2.2], [[290,-85],2.0], [[-382,130],2.2]],
+    bigJumps:[[[200,-225],3.4], [[-300,-120],3.0]],
     mud:[[[-340,-80],[-380,60]], [[120,90],[140,30]]],
     boardwalks:[[[-100,300],[120,295]], [[-20,-260],[-100,-240]]],
-    wades:[[[-160,-170],[-260,-160]]],
+    wades:[[[-160,-170],[-260,-160]], [[330,170],[262,180]], [[130,-228],[45,-202]]],
     cabins:4,
+    widths:[[[-340,-80],[-380,200],11], [[180,140],[210,40],3.1], [[-100,-240],[-160,-170],3.2]],
     branches:[]}
 ];
 
@@ -1516,6 +1520,7 @@ if(SWAMPGP){
   TRACK.washes = (TRACK.washes||[]).map(mv);
   TRACK.boardwalks = (TRACK.boardwalks||[]).map(b=> [mv(b[0]), mv(b[1])]);
   TRACK.wades = (TRACK.wades||[]).map(b=> [mv(b[0]), mv(b[1])]);
+  TRACK.widths = (TRACK.widths||[]).map(b=> [mv(b[0]), mv(b[1]), b[2]]);
   if(TRACK.summit) TRACK.summit = mv(TRACK.summit);
   TRACK.camps = (TRACK.camps||[]).map(mv);
   TRACK.flats = (TRACK.flats||[]).map(f=> mv([f[0], f[1]]).concat([f[2]]));
@@ -3820,6 +3825,22 @@ function caveOf(s){ for(const C of CAVES){ if(s >= C.a && s <= C.b) return C; } 
    the land either side is dug out into the pool, right up to the edge of the
    deck, and the pool fades back to dry ground at either end, where the deck
    comes down off the bank. MAIN.bwk marks the stations (1 on the deck). */
+/* ---- the road's own width, stretch by stretch ----
+   widths: [[from, to, half]]: a single-lane dirt track squeezing through the
+   trees (half about 3), or a great wide graded road (half 10 or more), easing
+   from one to the other over 30 metres either end. */
+(TRACK.widths || []).forEach(d=>{
+  const seg = MAIN.seg;
+  let a = snapTo(MAIN, d[0]), b = snapTo(MAIN, d[1]);
+  let n = b - a; if(n < 0) n += MAIN.N;
+  if(n > MAIN.N/2){ const q = a; a = b; b = q; n = MAIN.N - n; }
+  const L = n*seg, E = 30;
+  for(let k=-Math.round(E/seg); k<=n + Math.round(E/seg); k++){
+    const u = k*seg, w = smoothstep(-E, 0, u)*(1 - smoothstep(L, L + E, u)), i = wrapIdx(MAIN, a + k);
+    const want = d[2] + Math.sin(i*0.11)*0.25*d[2]/5;
+    MAIN.half[i] = MAIN.half[i]*(1 - w) + want*w;
+  }
+});
 /* A wade is the same pool with no deck over it: the road runs down off the bank into the
    water, a wheel deep through the middle, and back up out the far side. */
 MAIN.bwk = new Float32Array(MAIN.N);
@@ -3843,7 +3864,7 @@ MAIN.bwk = new Float32Array(MAIN.N);
   const pts = []; let lo = Infinity, x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
   for(let k=0;k<=n;k+=Math.max(1, Math.round(2/seg))){
     const i = wrapIdx(MAIN, a + k), p = MAIN.pts[i];
-    pts.push({x:p.x, z:p.z, y:p.y + BED, i, u:k*seg});
+    pts.push({x:p.x, z:p.z, y:p.y + BED, i, u:k*seg, h:MAIN.half[i]});
     lo = Math.min(lo, p.y + BED);
     x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); z0 = Math.min(z0, p.z); z1 = Math.max(z1, p.z);
   }
@@ -3853,21 +3874,21 @@ MAIN.bwk = new Float32Array(MAIN.N);
     const i = wrapIdx(MAIN, a + k); if(!wade) MAIN.bwk[i] = Math.max(MAIN.bwk[i], w);      // (a wade has no deck, and no rails)
   }
   if(wade) BOARDWALKS.push({a, b, n, pts, L, E:Math.min(26, L*0.3), half:MAIN.baseHalf, level:wLevel, floor:wLevel - 1.6, wade:true,
-                            x0:x0 - 36, x1:x1 + 36, z0:z0 - 36, z1:z1 + 36});
+                            x0:x0 - 42, x1:x1 + 42, z0:z0 - 42, z1:z1 + 42});
   else BOARDWALKS.push({a, b, n, pts, L, E, half:MAIN.baseHalf, level:lo - 1.35, floor:lo - 2.9,
-                   x0:x0 - 36, x1:x1 + 36, z0:z0 - 36, z1:z1 + 36});
+                   x0:x0 - 42, x1:x1 + 42, z0:z0 - 42, z1:z1 + 42});
 });
 /* the ground round a boardwalk: dug down to the pool's bed from just past the deck's edge
    out to about thirty metres, shallowing back to the bank at either end */
 function carveBoardwalks(y, x, z){
   for(const W of BOARDWALKS){
     if(x < W.x0 || x > W.x1 || z < W.z0 || z > W.z1) continue;
-    let best = Infinity, bu = 0;
-    for(const p of W.pts){ const d = (p.x - x)**2 + (p.z - z)**2; if(d < best){ best = d; bu = p.u; } }
+    let best = Infinity, bu = 0, bh = W.half;
+    for(const p of W.pts){ const d = (p.x - x)**2 + (p.z - z)**2; if(d < best){ best = d; bu = p.u; bh = p.h; } }
     const d = Math.sqrt(best);
-    if(d > 34) continue;
+    if(d > 34 + bh) continue;
     const ends = smoothstep(0, W.E, bu)*smoothstep(0, W.E, W.L - bu);
-    const w = smoothstep(W.half + 0.6, W.half + 2.4, d)*(1 - smoothstep(22, 34, d + Math.sin(x*0.07 + z*0.05)*5))*ends;
+    const w = smoothstep(bh + 0.6, bh + 2.4, d)*(1 - smoothstep(16 + bh, 28 + bh, d + Math.sin(x*0.07 + z*0.05)*5))*ends;
     if(w <= 0) continue;
     const bed = W.floor + 0.35*Math.sin(x*0.19 + z*0.13) + 0.25*Math.sin(x*0.07 - z*0.11);
     y = y*(1 - w) + Math.min(y, bed)*w;
@@ -3879,10 +3900,10 @@ function bwPool(x, z){
   let out = 0;
   for(const W of BOARDWALKS){
     if(x < W.x0 || x > W.x1 || z < W.z0 || z > W.z1) continue;
-    let best = Infinity, bu = 0;
-    for(const p of W.pts){ const d = (p.x - x)**2 + (p.z - z)**2; if(d < best){ best = d; bu = p.u; } }
+    let best = Infinity, bu = 0, bh = W.half;
+    for(const p of W.pts){ const d = (p.x - x)**2 + (p.z - z)**2; if(d < best){ best = d; bu = p.u; bh = p.h; } }
     const d = Math.sqrt(best), ends = smoothstep(0, W.E, bu)*smoothstep(0, W.E, W.L - bu);
-    out = Math.max(out, smoothstep(W.half + 0.6, W.half + 2.4, d)*(1 - smoothstep(20, 30, d))*ends);
+    out = Math.max(out, smoothstep(bh + 0.6, bh + 2.4, d)*(1 - smoothstep(14 + bh, 24 + bh, d))*ends);
   }
   return out;
 }
@@ -10256,7 +10277,7 @@ courseBillboard();
       const jit = (Math.random()-0.5)*26;
       const x = P.pts[i].x + nx*side*off + t.x*jit;
       const z = P.pts[i].z + nz*side*off + t.z*jit;
-      if(nearest(x,z).dist < 9.4) return false;
+      { const nn = nearest(x,z); if(nn.dist < Math.max(9.4, nn.half + 3.7)) return false; }   // (a wide road keeps its trees further back)
       if(Math.hypot(x,z) > 620) return false;
       if(inWaterway(x,z) || barren(x,z)) return false;          // trees do not grow in the river
       if(TRACK.treeline && gradedY(x, z) > TRACK.treeline + (Math.random() - 0.7)*14) return false;   // nor above the treeline
@@ -10325,7 +10346,7 @@ courseBillboard();
       const x = P.pts[i].x + nx*side*off + t.x*(Math.random()-0.5)*18;
       const z = P.pts[i].z + nz*side*off + t.z*(Math.random()-0.5)*18;
       if(inWaterway(x,z) || barren(x,z)) return false;
-      if(nearest(x,z).dist < 7.4) return false;
+      { const nn = nearest(x,z); if(nn.dist < Math.max(7.4, nn.half + 1.7)) return false; }
       const s = 0.28 + Math.pow(Math.random(), 2.1)*3.3;   // mostly small, a few big
       rockSpots[(Math.random()*3)|0].push([x, gradedY(x,z) - s*0.28, z, s]);
       return true;
