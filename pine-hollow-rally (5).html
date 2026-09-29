@@ -91,12 +91,14 @@
 
   #scTitle{align-items:flex-end;justify-content:flex-start;
     background:linear-gradient(0deg,rgba(9,20,14,.85) 0%,rgba(9,20,14,0) 55%);}
+  /* the prompt: a signal-yellow plate like a selected menu item, breathing gently */
   #scTitle .press{
-    margin-top:28px;font-family:var(--display);font-size:clamp(16px,1.8vw,22px);
-    color:var(--signal);text-shadow:2px 2px 0 var(--ink);
-    animation:blink 1.1s steps(2,end) infinite;
+    display:inline-block;margin-top:30px;padding:10px 26px 9px;font-family:var(--display);font-weight:800;
+    font-size:clamp(16px,1.8vw,22px);color:var(--ink);background:var(--signal);cursor:pointer;
+    border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);transform:skewX(-9deg);
+    animation:breathe 1.6s ease-in-out infinite;
   }
-  @keyframes blink{50%{opacity:0}}
+  @keyframes breathe{0%,100%{opacity:1;transform:skewX(-9deg) scale(1)}50%{opacity:.72;transform:skewX(-9deg) scale(.97)}}
   @media (prefers-reduced-motion:reduce){#scTitle .press{animation:none}}
 
   /* two column menus: slanted plates on the left, detail on the right */
@@ -182,6 +184,9 @@
   table.grid tr.you td{background:rgba(255,210,61,.14);}
   table.grid tr.you td.n{color:var(--signal);font-weight:700;}
   .laps{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0;}
+  .rtime{font-family:var(--display);font-weight:800;font-style:italic;font-size:clamp(30px,3.6vw,48px);line-height:1.05;color:var(--cream);
+    margin-top:10px;text-shadow:3px 3px 0 var(--ink);font-variant-numeric:tabular-nums;}
+  .rsub{font-family:var(--display);font-size:clamp(13px,1.2vw,16px);letter-spacing:.1em;text-transform:uppercase;color:#b9cdb4;margin-top:8px;}
   .laps span{font-family:var(--display);font-size:14px;padding:4px 9px;background:rgba(10,24,16,.85);border:2px solid var(--ink);}
   .laps span.best{background:var(--signal);color:var(--ink);}
   .badge{display:inline-block;margin:10px 8px 0 0;padding:4px 10px;font-family:var(--display);
@@ -225,6 +230,15 @@
   .detail h3{color:var(--ink);letter-spacing:.02em;}
   .detail p,.note.detail p{color:#2c2516;}
   .facts{color:#5e4c2a;} .facts b{color:var(--ink);}
+  /* tables printed on the cream cards: ink on paper, one line a row, your row marked in yellow */
+  .detail table.grid td{border-bottom-color:rgba(26,20,16,.16);color:var(--ink);}
+  .detail table.grid td.n{white-space:nowrap;}
+  .detail table.grid td.p{color:#a0521c;}
+  .detail table.grid td.x{color:#6e6250;}
+  .detail table.grid tr.you td{background:rgba(255,210,61,.55);}
+  .detail table.grid tr.you td.n{color:var(--ink);}
+  .detail .laps span{color:var(--cream);}
+  .detail .laps span.best{color:var(--ink);}
   .tk{position:relative;border-top:7px solid var(--tkc,var(--accent));transition:transform .08s;}
   .tk.sel{transform:translateY(-4px);box-shadow:4px 8px 0 var(--ink);}
   .tk em{display:block;margin-top:3px;font-style:normal;font-family:var(--body);font-weight:700;font-size:12px;color:var(--signal);}
@@ -10491,6 +10505,7 @@ courseBillboard();
     });
     inst.instanceMatrix.needsUpdate = true;
     if(inst.instanceColor) inst.instanceColor.needsUpdate = true;
+    inst.userData.lod = "tree";                      // (gets a far version and near-only shadows: see chunkInstances)
     scene.add(inst);
   });
 
@@ -10530,6 +10545,7 @@ courseBillboard();
     });
     inst.instanceMatrix.needsUpdate = true;
     if(inst.instanceColor) inst.instanceColor.needsUpdate = true;
+    inst.userData.lod = "rock";
     scene.add(inst);
   });
 
@@ -10568,6 +10584,7 @@ courseBillboard();
     });
     inst.instanceMatrix.needsUpdate = true;
     if(inst.instanceColor) inst.instanceColor.needsUpdate = true;
+    inst.userData.lod = "stone";
     scene.add(inst);
   });
 
@@ -10614,6 +10631,7 @@ courseBillboard();
       });
       inst.instanceMatrix.needsUpdate = true;
       if(inst.instanceColor) inst.instanceColor.needsUpdate = true;
+      inst.userData.lod = "stone";
       scene.add(inst);
     });
   }
@@ -10656,6 +10674,7 @@ courseBillboard();
     });
     inst.instanceMatrix.needsUpdate = true;
     if(inst.instanceColor) inst.instanceColor.needsUpdate = true;
+    inst.userData.lod = "bush";
     scene.add(inst);
   });
 }
@@ -10746,6 +10765,102 @@ courseBillboard();
    from the middle of the map, and when it didn't, every tree was drawn
    every frame. Split them into cells with honest bounds and the camera,
    and the shadow pass, only touch what they can actually see. */
+/* A tree seen from far off: the same silhouette in a handful of faces. Its outline is read
+   off the full tree, band by band up its height (how far out it spreads and what colour it
+   is there), and turned into a seven sided spire of rings, about eighty triangles. */
+const FAR_TREE = new Map();
+function farTreeGeometry(geo){
+  if(FAR_TREE.has(geo)) return FAR_TREE.get(geo);
+  const P = geo.attributes.position, C = geo.attributes.color, B = 7, S = 7;
+  let y0 = Infinity, y1 = -Infinity;
+  for(let i=0;i<P.count;i++){ y0 = Math.min(y0, P.getY(i)); y1 = Math.max(y1, P.getY(i)); }
+  const rad = new Float32Array(B), cs = new Float32Array(B*3), cn = new Float32Array(B);
+  for(let i=0;i<P.count;i++){
+    const b = Math.min(B - 1, Math.floor((P.getY(i) - y0)/(y1 - y0 + 1e-6)*B)), r = Math.hypot(P.getX(i), P.getZ(i));
+    rad[b] = Math.max(rad[b], r);
+    if(C){ cs[b*3] += C.getX(i); cs[b*3+1] += C.getY(i); cs[b*3+2] += C.getZ(i); cn[b]++; }
+  }
+  // a ring at the foot and one between each band (the wider of the two it divides), and a tip
+  const rings = [];
+  for(let k=0;k<=B;k++){
+    const r = k === 0 ? rad[0]*0.35 : k === B ? 0 : Math.max(rad[k - 1], rad[k])*0.86;
+    const b = Math.min(B - 1, Math.max(0, k === B ? B - 1 : k)), n = cn[b] || 1;
+    rings.push({y: y0 + (y1 - y0)*k/B, r, c: C ? [cs[b*3]/n, cs[b*3+1]/n, cs[b*3+2]/n] : [0.3, 0.4, 0.25]});
+  }
+  const pos = [], col = [];
+  for(let k=0;k<B;k++){
+    const A = rings[k], U = rings[k + 1];
+    for(let j=0;j<S;j++){
+      const a0 = j/S*Math.PI*2, a1 = (j + 1)/S*Math.PI*2;
+      const p00 = [Math.cos(a0)*A.r, A.y, Math.sin(a0)*A.r], p01 = [Math.cos(a1)*A.r, A.y, Math.sin(a1)*A.r];
+      const p10 = [Math.cos(a0)*U.r, U.y, Math.sin(a0)*U.r], p11 = [Math.cos(a1)*U.r, U.y, Math.sin(a1)*U.r];
+      pos.push(...p00, ...p10, ...p11, ...p00, ...p11, ...p01);
+      col.push(...A.c, ...U.c, ...U.c, ...A.c, ...U.c, ...A.c);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  FAR_TREE.set(geo, g);
+  return g;
+}
+/* A car between the camera and yours (on the grid, most of all, where one is parked right
+   behind you) fades away so you can always see your own wagon, and comes back once it's clear. */
+function updateOccluders(dt){
+  const on = state.phase === "racing" || state.phase === "countdown" || state.phase === "done";
+  const cp = camera.position, tx = pose.x - cp.x, ty = pose.y + 0.9 - cp.y, tz = pose.z - cp.z, L2 = tx*tx + ty*ty + tz*tz;
+  FIELD.forEach(r=>{
+    const m = r.mesh; if(!m) return;
+    let want = 1;
+    if(on && L2 > 1){
+      const px = m.position.x - cp.x, py = m.position.y + 0.9 - cp.y, pz = m.position.z - cp.z;
+      const t = (px*tx + py*ty + pz*tz)/L2;
+      if(t > 0.02 && t < 0.97){
+        const dx = px - tx*t, dy = py - ty*t, dz = pz - tz*t;
+        if(dx*dx + dy*dy + dz*dz < 2.6*2.6) want = 0.22;
+      }
+    }
+    const a = r._fade === undefined ? 1 : r._fade;
+    if(a === 1 && want === 1) return;
+    let next = a + (want - a)*Math.min(1, dt*10);
+    if(want === 1 && next > 0.99) next = 1;
+    r._fade = next; setFade(m, next);
+  });
+}
+function setFade(m, a){
+  if(!m.userData.fadeMats){
+    const list = [];
+    m.traverse(o=>{ if(o.isMesh && !o.isSprite && o.material && !Array.isArray(o.material) && !o.material.isMeshBasicMaterial)
+      if(!list.some(e=> e.m === o.material)) list.push({m:o.material, t:o.material.transparent, o:o.material.opacity, dw:o.material.depthWrite}); });
+    m.userData.fadeMats = list;
+  }
+  const solid = a >= 0.999;
+  for(const e of m.userData.fadeMats){
+    const tr = solid ? e.t : true;
+    if(e.m.transparent !== tr){ e.m.transparent = tr; e.m.needsUpdate = true; }
+    e.m.opacity = solid ? e.o : e.o*a; e.m.depthWrite = solid ? e.dw : false;
+  }
+}
+/* every cell of trees, bushes and stones: trees and bushes swap to their far versions with
+   distance, small stones stop being drawn once the fog has them, and only the cells round the
+   car cast shadows (the shadow map covers a little over a hundred metres round it anyway) */
+const FOREST_LOD = [];
+const LOD_KIND = { tree:{far:260, cull:Infinity}, bush:{far:170, cull:620}, rock:{far:Infinity, cull:560}, stone:{far:Infinity, cull:230} };
+const LOD_SHADOW = 115;
+function updateForestLOD(){
+  if(!FOREST_LOD.length) return;
+  const cp = camera.position, fx = pose.x, fz = pose.z;
+  for(const L of FOREST_LOD){
+    const d = L.c.distanceTo(cp) - L.R, K = LOD_KIND[L.kind];
+    // (a little either way of each line so a cell sitting on it doesn't flicker)
+    const wasFar = L.far ? L.far.visible : false, far = wasFar ? d > K.far - 12 : d > K.far + 12;
+    const gone = d > K.cull;
+    L.near.visible = !far && !gone;
+    if(L.far) L.far.visible = far && !gone;
+    L.near.castShadow = L.near.visible && Math.hypot(L.c.x - fx, L.c.z - fz) - L.R < LOD_SHADOW;
+  }
+}
 function chunkInstances(){
   const CELL = 170;
   const list = [];
@@ -10795,6 +10910,20 @@ function chunkInstances(){
       im.receiveShadow = false;
       im.userData = Object.assign({}, src.userData, {chunk:true});
       scene.add(im);
+      const lk = src.userData.lod;
+      if(lk === "tree" || lk === "bush"){
+        // its far version: the same trees, in the few-faced silhouette, never casting a shadow
+        const fg = farTreeGeometry(geo), g3 = new THREE.BufferGeometry();
+        for(const name in fg.attributes) g3.setAttribute(name, fg.attributes[name]);
+        g3.boundingSphere = g2.boundingSphere;
+        const fm = new THREE.InstancedMesh(g3, src.material, ids.length);
+        fm.instanceMatrix.copy(im.instanceMatrix); fm.instanceMatrix.needsUpdate = true;
+        if(im.instanceColor){ fm.instanceColor = new THREE.InstancedBufferAttribute(im.instanceColor.array.slice(), 3); }
+        fm.castShadow = false; fm.receiveShadow = false; fm.visible = false;
+        fm.userData = {chunk:true, farTree:true}; fm.renderOrder = src.renderOrder;
+        scene.add(fm);
+        FOREST_LOD.push({kind:lk, near:im, far:fm, c:g2.boundingSphere.center, R:g2.boundingSphere.radius});
+      } else if(lk) FOREST_LOD.push({kind:lk, near:im, far:null, c:g2.boundingSphere.center, R:g2.boundingSphere.radius});
     });
     scene.remove(src);
   });
@@ -15881,8 +16010,7 @@ function logoImg(cls){
 }
 function showTitle(){
   openScreen("scTitle",
-    '<div><div class="logo2">' + logoImg("") +
-    '<span class="sub">Gravel, mud and river crossings in a very tired station wagon.</span></div>' +
+    '<div><div class="logo2">' + logoImg("") + '</div>' +
     '<div class="press" data-act="go">' + (TOUCH.on ? 'TAP TO START' : 'PRESS ENTER') + '</div></div>',
     { cls:"", acts:{ go: ()=>{ SFX.ok(); showMain(); } } });
   UIEL.firstChild.addEventListener("click", ()=>{ if(MENU.id === "scTitle"){ startAudio(); SFX.ok(); showMain(); } });
@@ -16141,15 +16269,13 @@ function showHelp(back){
              ["R","Restart the race"],["M","Mute"]];
   const P = [["RT / LT","Throttle, brake"],["Left stick","Steer"],["A","Drift"],["RB / LB","Shift"],
              ["B","Put the car back on the road"],["Y","Camera"],["Start","Pause"]];
+  const TIPS = [["Drift","Tap it into a corner and hold the slide"],["Turbo","Let go to cash in: blue, orange, violet"],
+                ["Perfect start","Throttle as the 1 lights up"],["Pace notes","6 nearly flat \u00b7 1 a crawl \u00b7 H hairpin"],
+                ["Water and mud","Less grip, less speed"],["Forks","Some routes are quicker, some just look it"]];
   const rows = L => '<div class="keys2">' + L.map(k => '<b>' + esc(k[0]) + '</b><span>' + esc(k[1]) + '</span>').join("") + '</div>';
   openScreen("scHelp",
     '<div class="cols" style="align-items:flex-start"><div class="left"><h2 class="head">How to drive</h2>' +
-    '<div class="note"><p>Tap drift going into a corner and the wagon hops into a slide. Steer through it and hold on: the charge bar goes blue, then orange, then violet.</p>' +
-    '<p>Let go to cash the charge in as a turbo. The longer the slide, the bigger the push.</p>' +
-    '<p>On the grid, hit the throttle as the 1 comes up for a perfect start. Hold it from before the 2 and the wheels just spin.</p>' +
-    '<p>Water and mud cost you grip and speed. Most circuits have alternate routes; some are quicker, some just look it.</p>' +
-    '<p>The pace notes read the road ahead: every corner by direction and how tight (6 nearly flat, 1 a crawl, H a hairpin), and a warning for jumps, crests, water, ice and mud.</p>' +
-    '<p>On a phone or tablet, the pads on the left steer; gas, brake and drift are on the right.</p></div>' +
+    rows(TIPS) +
     '<div class="menu" style="margin-top:20px;max-width:260px"><button class="item back" data-act="back"><span>BACK</span></button></div></div>' +
     '<div class="right"><h2 class="head" style="font-size:22px">Keyboard</h2>' + rows(K) +
     '<h2 class="head" style="font-size:22px;margin-top:22px">Gamepad</h2>' + rows(P) + '</div></div>',
@@ -16655,19 +16781,22 @@ function showLobby(sel){
     '<p style="margin:2px 0 6px">ROOM CODE <b style="font-size:30px;letter-spacing:4px;background:#000;color:#ffd23f;padding:0 8px;border-radius:4px">' + esc(NET.code) + '</b></p>' +
     '<p class="dimtx">Circuit: <b>' + esc(pick) + '</b> · ' + NET_CFG.laps + ' laps · ' + esc(NET.status) + '</p>' +
     '<div class="menu" style="margin-top:12px">' +
-    (host ? '<button class="item" data-act="go"><span>START RACE</span><small>' + esc(arriving || (pick + ' · ' + (n > 1 ? n + ' drivers' : 'nobody else yet: you can start alone'))) + '</small></button>' +
+    (host ? '<button class="item" data-act="go"><span>START RACE</span><small>' + esc(arriving || (n > 1 ? n + ' drivers' : 'solo')) + '</small></button>' +
             '<button class="item" data-act="track"><span>CHOOSE CIRCUIT</span><small>' + esc(pick) + '</small></button>'
-          : '<button class="item" data-act="wait"><span>WAITING FOR THE HOST</span><small>' + esc(arriving || ('they pick the circuit and start: ' + pick + ' so far')) + '</small></button>') +
-    '<button class="item" data-act="copy"><span>COPY INVITE LINK</span><small>or tell them the code</small></button>' +
-    '<button class="item back" data-act="leave"><span>LEAVE ROOM</span></button></div>' +
-    '<input id="netLinkBox" readonly value="' + esc(netLink()) + '" ' + netInputStyle().replace("text-transform:uppercase", "font-size:14px") + '></div>' +
+          : '<button class="item" data-act="wait"><span>WAITING FOR HOST</span>' + (arriving ? '<small>' + esc(arriving) + '</small>' : '') + '</button>') +
+    '<button class="item" data-act="copy"><span>COPY INVITE LINK</span>' + (NET.copiedAt && now - NET.copiedAt < 2500 ? '<small style="color:inherit">COPIED</small>' : '') + '</button>' +
+    '<button class="item back" data-act="leave"><span>LEAVE ROOM</span></button></div></div>' +
     '<div class="right"><h2 class="head" style="font-size:18px">Drivers ' + n + '/' + NET_CFG.max + '</h2><table class="grid">' + rows.join("") + '</table>' +
     '<h2 class="head" style="margin-top:16px;font-size:18px">Best laps: ' + esc(pick) + '</h2><div id="netBoard"><p class="dimtx">Loading…</p></div></div></div>',
     { sel: sel || 0, back: ()=>{ SFX.back(); netLeave(); showMain(MI("multi")); },
       acts:{ go: ()=>{ SFX.ok(); netStart(); },
              track: ()=>{ SFX.ok(); showTracks("online"); },
              wait: ()=>{ SFX.move(); },
-             copy: ()=>{ const b = document.getElementById("netLinkBox"); try{ navigator.clipboard.writeText(netLink()); }catch(e){ if(b){ b.select(); document.execCommand && document.execCommand("copy"); } } SFX.ok(); },
+             copy: ()=>{
+               const fallback = ()=>{ const t = document.createElement("textarea"); t.value = netLink(); t.style.cssText = "position:fixed;opacity:0";
+                 document.body.appendChild(t); t.select(); try{ document.execCommand("copy"); }catch(e){} t.remove(); };
+               try{ navigator.clipboard.writeText(netLink()).catch(fallback); }catch(e){ fallback(); }
+               SFX.ok(); NET.copiedAt = performance.now(); netRefresh(); setTimeout(netRefresh, 2600); },
              leave: ()=>{ SFX.back(); netLeave(); showMain(MI("multi")); } } });
   netBoard(pick).then(rows=>{ const el = document.getElementById("netBoard"); if(el) el.innerHTML = netBoardHTML(rows); });
 }
@@ -16706,7 +16835,7 @@ function showResults(){
   const table = FIELD.length ? '<table class="grid">' + rows.map((r, i)=>
       '<tr' + (r.you ? ' class="you"' : '') + '><td class="p">' + (i+1) + '</td><td class="n">' + esc(r.name) +
       '</td><td class="t">' + fmt(r.time) + '</td><td class="x">' +
-      (i ? '+' + (r.time - lead).toFixed(2) + (r.est ? ' est.' : '') : '') + '</td>' +
+      (i ? '+' + Math.max(0, r.time - lead).toFixed(2) + (r.est ? ' est.' : '') : '') + '</td>' +
       (gained ? '<td class="t">+' + gained[r.name] + '</td>' : '') + '</tr>').join("") + '</table>' : '';
   const laps = '<div class="laps">' + state.lapTimes.map((t, i)=>
       '<span' + (t === state.best ? ' class="best"' : '') + '>Lap ' + (i+1) + ' ' + fmt(t) + '</span>').join("") + '</div>';
@@ -16738,11 +16867,14 @@ function showResults(){
   }
   openScreen("scResults",
     '<div class="cols" style="align-items:flex-start"><div class="left">' +
-    '<div class="big">' + title + '</div><h2 class="head" style="margin-top:6px">' + esc(TRACK.name) +
-    (FIELD.length ? ' in ' + fmt(GAME.finishTime) : '') + '</h2>' + (EXP.on ? (GAME.raceRecord ? '<span class="badge">NEW BEST CLIMB</span>' : '') : badges) +
+    // the place, big; your time under it; then the circuit and your best lap in small capitals
+    '<div class="big">' + title + '</div>' +
+    (FIELD.length || EXP.on ? '<div class="rtime">' + fmt(GAME.finishTime) + '</div>' : '') +
+    '<div class="rsub">' + esc(TRACK.name) + (!EXP.on && state.best != null && isFinite(state.best) ? ' &middot; best lap ' + fmt(state.best) : '') + '</div>' +
+    (EXP.on ? (GAME.raceRecord ? '<span class="badge">NEW BEST CLIMB</span>' : '') : badges) +
     '<div class="menu" style="margin-top:22px">' +
     items.map(x => '<button class="item" data-act="' + x[0] + '"><span>' + x[1] + '</span></button>').join("") +
-    '</div></div><div class="right">' + right + '</div></div>',
+    '</div></div><div class="right"><div class="detail" style="margin:0">' + right + '</div></div></div>',
     { cls:"dim", acts });
 }
 function showStandings(){
@@ -17162,6 +17294,8 @@ function frame(now){
     }
   }
   skyDome.position.set(camera.position.x, 0, camera.position.z);  // horizon stays put
+  updateForestLOD();
+  updateOccluders(dt);
   stepAudio(info, dt);
   stepAmbience(run ? dt : 0);
 
