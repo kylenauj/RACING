@@ -1789,12 +1789,22 @@ function limitBend(y, closed, seg, fixed){
 }
 profileFromLand(MAIN);
 /* the causeway: across the lake the road is held a metre over the water */
+/* Gator Gulch's lagoon: a pier from the start, then the road runs off the
+   end of it and down into the water, a wade across the shallows with the
+   lily pads floating on it, and out up the far shore. */
+const LILY = {a:-1, b:-1};
 function causeway(P){
   if(!LAKE.on || LAKE.frozen) return;
+  if(GATOR && P === MAIN){
+    let last = -1;
+    for(let i=0;i<P.N/2;i++){ const p = P.pts[i]; if(Math.hypot((p.x - LAKE.x)/LAKE.rx, (p.z - LAKE.z)/LAKE.rz) < 0.9) last = i; }
+    LILY.a = Math.round(175/P.seg); LILY.b = last;
+    if(LILY.b > LILY.a) paint(P, LILY.a, LILY.b, SURF.WATER);
+  }
   const lift = new Float64Array(P.N);
   for(let i=0;i<P.N;i++){
     const p = P.pts[i], e = Math.hypot((p.x - LAKE.x)/LAKE.rx, (p.z - LAKE.z)/LAKE.rz);
-    const want = LAKE.level + 1.1;
+    const want = P === MAIN && i >= LILY.a && i <= LILY.b ? LAKE.level - 0.35 : LAKE.level + 1.1;
     lift[i] = Math.max(0, want - p.y)*(1 - smoothstep(1.02, 1.3, e));
   }
   const sm = Array.from(lift); smoothAlong(sm, P.closed, Math.round(10/P.seg));
@@ -5494,7 +5504,7 @@ if(TRACK.special && !GATOR && (SPANS.length || CRATER.on)){
 /* ---- ice pillars all over the glacier: clusters of blue crystal standing
    up out of the snow, in the fields and the forest edges, away from the
    heat of the lava ---- */
-if(TRACK.special && TRACK.spikes){
+if(TRACK.special && TRACK.spikes && TRACK.spikes.length && !GATOR){
   const mats = [0x4f9ccc, 0x7cc0e6, 0x3a86b8, 0x9ad4ee].map(c=> new THREE.MeshPhongMaterial({color:c, emissive:0x0a2230, shininess:140, specular:0xffffff, flatShading:true}));
   const g = new THREE.Group();
   const crystal = (x, z, y, h, r, lx, lz, m)=>{
@@ -7508,7 +7518,27 @@ if(GATOR){
     g.strokeStyle = "#3ff2ff"; g.lineWidth = 5; g.strokeRect(3, 3, 58, 122);
     const t = new THREE.CanvasTexture(c); return t; })();
   const padMat = new THREE.MeshBasicMaterial({map:arrowTex, transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
+  /* A boost throws you well past the car's own top speed, and the car turns
+     no better for it: the course has to give it room. Every boost (a pad, a
+     bounce chain, a landed trick) is only handed out where the next 150m has
+     no bend tighter than 170m radius, which the car takes at boosted speed on
+     half lock. A pad asked for in a bend moves to the nearest stretch that
+     qualifies, or is left out. */
+  const RADII = new Map();
+  const straightAhead = (P, k)=>{
+    if(!RADII.has(P)) RADII.set(P, radiiOf(P));
+    const R = RADII.get(P);
+    for(let m=0; m<=150; m+=3){ const j = byM(P, k, m); if(!P.closed && j >= P.N - 1){ if(P !== MAIN) return straightAhead(MAIN, wrapIdx(MAIN, P.mainTo)); break; } if(R[j] < 170) return false; }
+    return true;
+  };
+  GG.roomAhead = ()=>{ const n = nearest(pose.x, pose.z); return straightAhead(n.path, n.pi); };
   function boostPad(P, i, lane){
+    if(!straightAhead(P, i)){
+      let found = -1;
+      for(let d=3; d<=70 && found < 0; d+=3) for(const sg of [1, -1]){ const j = byM(P, i, sg*d); if(straightAhead(P, j)){ found = j; break; } }
+      if(found < 0) return;
+      i = found;
+    }
     const f = frm(P, i), x = f.p.x + f.nx*lane, z = f.p.z + f.nz*lane, y = surfaceY(x, z);
     const m = new THREE.Mesh(padGeo, padMat);
     m.scale.set(3.0, 4.6, 1); m.rotation.order = "YXZ"; m.rotation.set(-Math.PI/2, Math.atan2(f.t.x, f.t.z) + Math.PI, 0);
@@ -7517,12 +7547,13 @@ if(GATOR){
     m.rotation.x = -Math.PI/2 + Math.atan2(y2 - y1, 4);
     m.position.set(x, y + 0.06, z); m.renderOrder = 2; scene.add(m);
     PADS.push({kind:"boost", P, i:f.i, lane, x, z, y, r:2.3, cool:0, mesh:m, tx:f.t.x, tz:f.t.z});
+    GG.pads = PADS;
   }
   // a bounce pad: a lily pad on the pier, a mushroom cap on the hill
   const lilyGeo = new THREE.CircleGeometry(1, 20, 0.3, Math.PI*2 - 0.6); lilyGeo.rotateX(-Math.PI/2);
   const capGeo = new THREE.SphereGeometry(1, 16, 8, 0, Math.PI*2, 0, Math.PI/2);
   function bouncePad(P, i, lane, kind){
-    const f = frm(P, i), x = f.p.x + f.nx*lane, z = f.p.z + f.nz*lane, y = surfaceY(x, z);
+    const f = frm(P, i), x = f.p.x + f.nx*lane, z = f.p.z + f.nz*lane, y = kind === "lily" ? Math.max(surfaceY(x, z), LAKE.level) : surfaceY(x, z);
     const g = new THREE.Group(); g.position.set(x, y + 0.05, z); g.rotation.y = rnd()*6;
     if(kind === "lily"){
       addTo(g, new THREE.Mesh(lilyGeo, lam(0x3fae3a, 0x1c5a10, 0.5)), 0, 0.04, 0).scale.set(3.1, 1, 3.1);
@@ -7557,32 +7588,36 @@ if(GATOR){
     const plank = lam(0x8a6040), post = lam(0x5a3e28), rope = new THREE.LineBasicMaterial({color:0xe8d8b0});
     const posts = new THREE.Group(), lines = [];
     let onLake = [];
-    for(let i=0;i<P0.N;i++){ const p = P0.pts[i]; if(lakeE(p.x, p.z) < 0.97) onLake.push(i); }
+    for(let i=0;i<P0.N;i++){ const p = P0.pts[i]; if(lakeE(p.x, p.z) < 0.97 && !(i >= LILY.a - Math.round(4/seg) && i <= LILY.b)) onLake.push(i); }
     for(const i of onLake){
       if(i % Math.max(1, Math.round(4/seg))) continue;
       const f = frm(P0, i);
       for(const sd of [-1, 1]){
         const off = f.half + 1.6, x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off, y = surfaceY(f.p.x, f.p.z);
         addTo(posts, new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.3 + 3.5, 0.3), post), x, y - 1.7, z);
-        lines.push([x, y + 0.75, z, sd]);
+        lines.push([x, y + 0.75, z, sd, i]);
         // a piling out in the water every so often
         if(i % Math.round(12/seg) === 0) addTo(posts, new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.4, 5, 7), post), x + f.nx*sd*1.4, LAKE.level + 0.6, z + f.nz*sd*1.4);
       }
     }
     mergeStatic(posts); scene.add(posts);
+    // the rope rail, post to post (and not across the gap where the pier ends)
     for(const sd of [-1, 1]){
-      const pts3 = []; lines.filter(l=> l[3] === sd).forEach(l=> pts3.push(l[0], l[1], l[2]));
+      const L = lines.filter(l=> l[3] === sd), pts3 = [];
+      for(let k=1;k<L.length;k++) if(L[k][4] - L[k-1][4] <= Math.round(4/seg) + 1) pts3.push(L[k-1][0], L[k-1][1], L[k-1][2], L[k][0], L[k][1], L[k][2]);
       const gg = new THREE.BufferGeometry(); gg.setAttribute("position", new THREE.Float32BufferAttribute(pts3, 3));
-      scene.add(new THREE.Line(gg, rope));
+      scene.add(new THREE.LineSegments(gg, rope));
     }
     // the pier's planking: boards across the road, drawn over it
     {
       const pos = [], col = [], idx = [];
+      let prev = -9;
       for(const i of onLake){
         const f = frm(P0, i), y = surfaceY(f.p.x, f.p.z) + 0.03, w = f.half + 1.1, b = pos.length/3, k = 0.8 + 0.2*((i*7919)%13)/13;
         for(const s of [-1, 1]) pos.push(f.p.x + f.nx*s*w, y, f.p.z + f.nz*s*w);
         for(let q=0;q<2;q++) col.push(0.55*k, 0.38*k, 0.24*k);
-        if(i !== onLake[0]) idx.push(b - 2, b - 1, b, b - 1, b + 1, b);
+        if(i === prev + 1) idx.push(b - 2, b - 1, b, b - 1, b + 1, b);        // boards only between neighbours: no sheet over the wade
+        prev = i;
       }
       const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx);
       g.computeVertexNormals();
@@ -7615,10 +7650,10 @@ if(GATOR){
       mergeStatic(fl); scene.add(fl);
     }
     // the bouncing pads down the pier, in time with each other: a jump every 24m
-    const first = onLake.find(i=> i*seg > 170), last = onLake[onLake.length - 1];
-    if(first !== undefined){
+    // the pads float on the water of the wade, a jump apart: bounce pad to pad and you never touch the water
+    if(LILY.b > LILY.a){
       let k = 0;
-      for(let i=first; i < last - Math.round(30/seg); i += Math.round(24/seg), k++) bouncePad(P0, i, [0, -1.6, 1.6, 0, 1.6, -1.6][k % 6], "lily");
+      for(let i=LILY.a + Math.round(18/seg); i < LILY.b - Math.round(12/seg); i += Math.round(24/seg), k++) bouncePad(P0, i, [0, -1.6, 1.6, 0, 1.6, -1.6][k % 6], "lily");
     }
   }
 
@@ -7749,8 +7784,7 @@ if(GATOR){
     ANIMS.push(t=>{ const n = nearest(pose.x, pose.z), inside = n.path === P0 && n.pi >= LOG.a - 6 && n.pi <= LOG.b + 6;
       lg.intensity = inside ? 1.4 : 0; if(inside) lg.position.set(pose.x, pose.y + 3.2, pose.z); });
     // boost pads down the log, first on the right, then the left, then the middle
-    const L = LOG.b - LOG.a;
-    boostPad(P0, LOG.a + Math.round(L*0.25), 2.2); boostPad(P0, LOG.a + Math.round(L*0.55), -2.2); boostPad(P0, LOG.a + Math.round(L*0.85), 0);
+    const L = LOG.b - LOG.a;                  // (no boost in here: the canyon's bends start right after it)
     orbRow(P0, LOG.a + Math.round(L*0.3), 0, 5, 6);
   }
 
@@ -7863,7 +7897,7 @@ if(GATOR){
     void snout;
     head.traverse(o=>{ if(o.isMesh) o.castShadow = true; });
     Object.assign(GATORJ, {on:true, P, lip, head, upper, eyes, x:f.p.x, z:f.p.z, y:ly, tx:f.t.x, tz:f.t.z, hw, t:0, open:1, snapped:false});
-    boostPad(P, lip - Math.round(45/seg), 0);
+    // (no boost pad: you leave its snout at your own speed, and the rejoin bends away soon after)
     orbRow(P, lip - Math.round(38/seg), 0, 4, 6);
   }
 
@@ -7876,7 +7910,7 @@ if(GATOR){
     }
     for(let r=0;r<NR;r++) for(let a=0;a<NA;a++){ const i0 = r*(NA + 1) + a; idx.push(i0, i0 + NA + 1, i0 + 1, i0 + 1, i0 + NA + 1, i0 + NA + 2); }
     const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
-    const mat = new THREE.ShaderMaterial({ uniforms:{uTime:{value:0}, uR:{value:WHIRL_R}},
+    const mat = new THREE.ShaderMaterial({ uniforms:{uTime:{value:0}, uR:{value:WHIRL_R}}, side:THREE.DoubleSide,
       vertexShader:"varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }",
       fragmentShader:[
         "uniform float uTime, uR; varying vec2 vUv;",
@@ -7916,6 +7950,7 @@ if(GATOR){
   /* ---- 6. the grotto: puddles of glowing water on the floor, and drips ---- */
   if(CAVE){
     orbRow(P0, CAVE.a + Math.round((CAVE.b - CAVE.a)*0.4), 0, 5, 7);
+    boostPad(P0, CAVE.a - Math.round(40/seg), 0);                                    // down the chute into the grotto
     ANIMS.push(t=>{
       if(!SPRAY || state.phase === "menu") return;
       const n = nearest(pose.x, pose.z);
@@ -7939,6 +7974,7 @@ if(GATOR){
       GEYS.push({x, z, y, i, lane, t:1 + k*0.55, on:0, pool, emit:0});
     }
     orbRow(P0, a + Math.round(span*0.15), 0, 3, 8); orbRow(P0, a + Math.round(span*0.6), 0, 3, 8);
+    boostPad(P0, byM(P0, CAVE.b, 12), 0);                                            // out of the grotto and across the geysers
   }
 
   /* ---- 8a. the sunken riverboat (the main road through the second split) ---- */
@@ -8370,14 +8406,14 @@ if(GATOR){
     GG.orbs -= lost;
     for(let k=0;k<lost*6;k++) spawnDust(pose.x, pose.y + 1, pose.z, [0.85, 1.0, 0.35], 0.4, (Math.random() - 0.5)*9, (Math.random() - 0.5)*9, 5 + Math.random()*4);
   };
-  GG.dragK = ()=> 1 - GG.orbs*0.016;
-  GG.ceil = ()=> GG.orbs*0.55;
+  GG.dragK = ()=> 1 - GG.orbs*0.012;
+  GG.ceil = ()=> GG.orbs*0.35;
   GG.reset = ()=>{ GG.orbs = 0; trick = 0; tricked = false; chain = 0; ORBS.forEach(o=>{ o.live = true; o.g.visible = true; });
     HAZ.forEach(h=>{ if(h.kind === "barrel"){ h.live = false; h.g.visible = false; } }); };
   GG.onLand = landed=>{
     if(!tricked) return;
     tricked = false;
-    if(trick <= 0.06){ kick(10, 1.3); if(actx){ SFX.boost(2); tone(660, 0.18, "triangle", 0.12, 990); }
+    if(trick <= 0.06 && GG.roomAhead()){ kick(10, 1.3); if(actx){ SFX.boost(2); tone(660, 0.18, "triangle", 0.12, 990); }
       for(let k=0;k<24;k++) spawnDust(pose.x, pose.y + 0.5, pose.z, [1.0, 0.4 + Math.random()*0.5, 0.9], 0.5, (Math.random() - 0.5)*8, (Math.random() - 0.5)*8, 3 + Math.random()*4); }
     else { GAME.shake = Math.max(GAME.shake || 0, 0.3); pose.vx *= 0.85; pose.vz *= 0.85; }      // came down mid spin
     trick = 0; GG.trickRoll = GG.trickYaw = 0;
@@ -8414,11 +8450,14 @@ if(GATOR){
         kick(13, 1.1); pose.vx += c.nfx*2.5; pose.vz += c.nfz*2.5;
         if(actx) SFX.boost(1);
       } else {
-        if(pose.air && pose.vy > 2) continue;
+        // only a wheel coming down onto it counts: flying over one on the way down is no bounce
+        if(pose.air && (pose.vy > 0 || pose.y - p.y > 0.6)){ p.cool = 0; continue; }
         chain = T - lastBounce < 1.9 ? chain + 1 : 1; lastBounce = T;
-        pose.vy = 8.6 + Math.min(4, chain)*0.4; pose.air = true; pose.airT = 0; p.sq = 1;
+        // thrown just high enough to come down on the next pad at the speed you are doing: that is the rhythm
+        const v = Math.max(12, Math.hypot(pose.vx, pose.vz)), gap = p.P === B2 ? 22 : 24;
+        pose.vy = Math.max(5, Math.min(10.5, 13*gap/v)); pose.air = true; pose.airT = 0; p.sq = 1;
         pose.vx += c.nfx*2.0; pose.vz += c.nfz*2.0;
-        if(chain >= 2) kick(5 + Math.min(6, chain)*1.6, 0.8);
+        if(chain >= 2 && straightAhead(p.P, p.i)) kick(5 + Math.min(6, chain)*1.6, 0.8);
         if(actx){ tone(200 + chain*40, 0.28, "sine", 0.18, 520 + chain*60); SFX.pop(0.6); }
         for(let k=0;k<14;k++) spawnDust(p.x, p.y + 0.3, p.z, p.P === B2 ? [1.0, 0.4, 0.9] : [0.6, 1.0, 0.4], 0.4, (Math.random() - 0.5)*6, (Math.random() - 0.5)*6, 3 + Math.random()*3);
       }
@@ -9438,6 +9477,7 @@ courseBillboard();
       else if(DESERT){ if(kind === 0){ const k = 0.9 + Math.random()*0.3; tint.setRGB(k, k, k*0.9); }
                        else tint.setHSL(0.2 + Math.random()*0.05, 0.22, 0.42 + Math.random()*0.1); }
       else if(FALL && kind > 0) fallTint(tint);
+      else if(GATOR) tint.setHSL(0.26 + Math.random()*0.14, 0.45 + Math.random()*0.2, 0.52 + Math.random()*0.14);   // lush swamp greens, some teal
       else if(roll < 0.09)      tint.setHSL(0.10 + Math.random()*0.05, 0.55, 0.52);  // autumn
       else if(roll < 0.15) tint.setHSL(0.13 + Math.random()*0.03, 0.35, 0.55);  // dry
       else if(roll < 0.20) tint.setHSL(0.42 + Math.random()*0.06, 0.16, 0.52);  // bluish
