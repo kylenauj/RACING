@@ -15019,7 +15019,9 @@ const NET_CFG = {
   lib: "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js",
   ice: [{urls:["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]}],
   max: 6, laps: 3, hz: 20,
-  enabled: /(^|[#&])(online|mocknet)=1/.test(location.hash)      // shown in the menu once it is finished and tested
+  // in the menu wherever the game is hosted as a web page (your own site); inside a Claude
+  // artifact the page may not reach the room server, so there it hides unless asked for
+  enabled: /(^|[#&])(online|mocknet)=1/.test(location.hash) || !/(^|\.)(claude\.ai|claudeusercontent\.com|anthropic\.com)$/.test(location.hostname)
 };
 const NET = { on:false, code:null, id:null, name:"", host:false, tx:null, peers:new Map(), metas:[], racing:false,
               sb:null, status:"", joinedAt:0, sendAcc:0, relayAcc:0, board:null, wantTrack:null,
@@ -15066,7 +15068,7 @@ async function netTransport(code, meta, h){
       else if(m.k === "ev") h.event(m.event, m.payload);
     };
     const tick = setInterval(()=>{ hello(); const now = performance.now(); let gone = false;
-      for(const [id, v] of seen) if(now - v.t > 3500){ seen.delete(id); gone = true; }
+      for(const [id, v] of seen) if(now - v.t > 12000){ seen.delete(id); gone = true; }
       if(gone) sync(); }, 1000);
     setTimeout(()=>{ hello(); sync(); h.ready(); }, 50);
     return {
@@ -15119,13 +15121,14 @@ function netLeave(quiet){
   NET.peers.forEach(p=> netDropPeer(p));
   NET.peers.clear();
   if(NET.tx) NET.tx.leave();
-  NET.tx = null; NET.on = false; NET.racing = false; NET.metas = [];
+  NET.tx = null; NET.on = false; NET.racing = false; NET.metas = []; NET.ids = null;
   try{ history.replaceState(null, "", "#track=" + TRACK_ID); }catch(e){}
   if(!quiet){ FIELD = []; }
 }
-/* whoever has been in the room longest runs it, if its host has gone */
+/* the one who made the room runs it; if they have gone, whoever has been in it longest */
 function netHostId(){
-  const list = NET.metas.slice().sort((a, b)=> (b.host - a.host) || (a.at - b.at) || (a.id < b.id ? -1 : 1));
+  const all = NET.metas.some(m=> m.id === NET.id) ? NET.metas : NET.metas.concat([netMeta()]);
+  const list = all.slice().sort((a, b)=> (b.host - a.host) || (a.at - b.at) || (a.id < b.id ? -1 : 1));
   return list.length ? list[0].id : NET.id;
 }
 function netIsHost(){ return netHostId() === NET.id; }
@@ -15134,7 +15137,9 @@ function netSync(list){
   const ids = new Set(NET.metas.map(m=> m.id));
   // new faces: a car for each, and a direct line to them
   NET.metas.forEach(m=>{ if(m.id !== NET.id && !NET.peers.has(m.id)) netAddPeer(m); else if(NET.peers.has(m.id)) netUpdatePeer(NET.peers.get(m.id), m); });
-  NET.peers.forEach((p, id)=>{ if(!ids.has(id)) netDropPeer(p); });
+  // gone from the room: dropped, unless their car is still talking to us directly (the room blinked)
+  NET.ids = ids;
+  NET.peers.forEach((p, id)=>{ if(!ids.has(id) && !netAlive(p)) netDropPeer(p); });
   // a friend who joined by link lands on whatever circuit the host is on
   const hostM = NET.metas.find(m=> m.id === netHostId());
   if(hostM && hostM.id !== NET.id && hostM.track !== TRACK_ID && !NET.racing && !NET.wantTrack){
@@ -15163,8 +15168,11 @@ function netAddPeer(m){
   const p = { id:m.id, meta:m, car, pc:null, dc:null, open:false, relay:false, since:performance.now(), last:null, recv:0,
               sx:0, sy:0, sz:0, sh:0, pend:[] };
   NET.peers.set(m.id, p);
+  // back mid-race (their connection hiccuped): straight back into the field
+  if(NET.racing && !m.spectate){ FIELD = FIELD.concat([car]); mesh.visible = true; }
   if(NET.id < m.id) netCall(p);                        // one side of each pair makes the offer
 }
+function netAlive(p){ return p.open && performance.now() - p.recv < 8000; }
 function netUpdatePeer(p, m){ p.meta = m; p.car.def.name = m.name || "Friend"; }
 function netDropPeer(p){
   try{ if(p.dc) p.dc.close(); }catch(e){}
@@ -15225,7 +15233,8 @@ function netEvent(ev, d){
   if(!d || typeof d !== "object") return;
   if(ev === "sig") return netSignal(d);
   if(ev === "pos"){ const p = NET.peers.get(d.from); if(p){ p.relay = p.relay || !p.open; netPose(p, d); } return; }
-  const fromHost = d.from === netHostId();
+  // (a friend who has only just arrived may not have seen the host yet: the host says so itself)
+  const fromHost = d.from === netHostId() || d.host === true;
   if(ev === "track" && fromHost && typeof d.id === "number" && TRACKS[d.id] && d.id !== TRACK_ID){
     NET.wantTrack = d.id; travel(d.id, {mode:"online", room:NET.code, name:NET.name, at:NET.joinedAt});
   }
@@ -15245,14 +15254,16 @@ function netBegin(grid){
   setMode("online");
   FIELD = [...NET.peers.values()].filter(p=> p.meta && !p.meta.spectate).map(p=> p.car);
   FIELD.forEach(r=>{ r.finish = null; r.lap = 0; r.s = 0; r.mesh.visible = true; });
-  NET.slot = Math.max(0, grid.indexOf(NET.id));
+  // your slot; anyone the host had not seen yet lines up behind
+  const at = grid.indexOf(NET.id);
+  NET.slot = at >= 0 ? at : grid.length + [...NET.peers.keys()].filter(id=> !grid.includes(id) && id < NET.id).length;
   resetRace();
 }
 function netStart(){
   if(!netIsHost()) return;
   // the grid: host on pole, then everyone in the order they came
   const grid = NET.metas.slice().sort((a, b)=> (b.id === NET.id) - (a.id === NET.id) || a.at - b.at).map(m=> m.id);
-  NET.tx.send("start", {from:NET.id, track:TRACK_ID, grid});
+  NET.tx.send("start", {from:NET.id, host:true, track:TRACK_ID, grid});
   netBegin(grid);
 }
 function netTrackMe(){ if(NET.tx) NET.tx.track(netMeta()); }
@@ -15264,6 +15275,7 @@ function netGridSpot(slot){
 /* every frame: send yourself, move everyone else */
 function netFrame(dt){
   if(!NET.on) return;
+  if(NET.ids) NET.peers.forEach((p, id)=>{ if(!NET.ids.has(id) && !netAlive(p)) netDropPeer(p); });
   const racing = NET.racing && (state.phase === "racing" || state.phase === "countdown" || state.phase === "done");
   if(racing){
     NET.sendAcc += dt; NET.relayAcc += dt;
@@ -15373,7 +15385,7 @@ function netEnter(code, host){
 /* the host picked a circuit: go there with the room */
 function netPickTrack(id){
   const code = NET.on ? NET.code : (NET.pendingHost || netCode());
-  if(NET.on && NET.tx) NET.tx.send("track", {from:NET.id, id});
+  if(NET.on && NET.tx) NET.tx.send("track", {from:NET.id, host:true, id});
   if(id === TRACK_ID){ if(NET.on) showLobby(); else netEnter(code, true); return; }
   travel(id, {mode:"online", room:code, name:netNick(), host:true, at:NET.on ? NET.joinedAt : Date.now()});
 }
@@ -15419,7 +15431,7 @@ function showOnlinePause(){
     '</div></div><div class="right"></div></div>',
     { cls:"veil", back: ()=>{ closeUI(); },
       acts:{ resume: ()=>{ SFX.ok(); closeUI(); },
-             abort: ()=>{ SFX.back(); NET.tx && NET.tx.send("abort", {from:NET.id}); NET.racing = false; netTrackMe(); enterMenuWorld(); showLobby(); },
+             abort: ()=>{ SFX.back(); NET.tx && NET.tx.send("abort", {from:NET.id, host:true}); NET.racing = false; netTrackMe(); enterMenuWorld(); showLobby(); },
              lobby: ()=>{ SFX.back(); NET.racing = false; netTrackMe(); enterMenuWorld(); showLobby(); } } });
 }
 
@@ -15881,6 +15893,7 @@ function frame(now){
     stepCritters(dt);
     stepLava(dt);
     if(state.phase === "racing" || state.phase === "done") state.place = computePlace();
+    else if(state.phase === "countdown" && MODE === "online") state.place = (NET.slot |0) + 1;     // on the grid: your slot
     stepRaceEvents(dt, info);
     stepGhost();
     stepNotes(info); stepTrace();
