@@ -913,11 +913,13 @@ const TRACKS = [
     kit:["crest","rhythm","kicker"],
     shape:"THE OAK \u2014 through the roots of a giant",
     feature:"a lap round a giant oak, under and over its roots",
-    ctrl:[[0,-430],[-110,-450],[-215,-400],[-250,-300],[-185,-245],[-240,-175],[-305,-95],[-250,-20],[-300,70],[-230,140],
-          [-150,110],[-105,40],[-80,-15],
+    // (the switchbacks up to the oak and down from it swing half as far as they used to:
+    //  quick flicks through the maples rather than long wide hairpins)
+    ctrl:[[0,-430],[-110,-450],[-215,-400],[-248,-300],[-218,-245],[-246,-175],[-276,-95],[-252,-20],[-276,70],[-230,140],
+          [-165,115],[-118,50],[-80,-15],
           // round the oak, under the arches of its roots
           [-48,0],[-42,24],[-24,42],[0,48],[24,42],[42,24],[48,0],[42,-24],[28,-39],
-          [75,-80],[150,-50],[225,-110],[180,-205],[250,-280],[160,-360],[80,-400]],
+          [85,-75],[150,-65],[200,-115],[180,-200],[215,-280],[160,-355],[80,-400]],
     hills:[[0,0,250,74],[-260,-150,130,16],[210,-220,120,14],[-230,110,110,10]],
     jumps:[], fords:[[-110,-450]],
     mud:[[[-250,-20],[-300,70]]],
@@ -1026,6 +1028,78 @@ const TRACKS = [
       // the mushroom forest: a flowing run down the side of the falls, under the caps, with one jump
       {a:[-358,-40], b:[-225,-420], via:[[-392,-112],[-440,-205],[-428,-312],[-330,-440]],
        half:5.4, jumps:[[0.5,26,7,2.6,46]], tune:0, mushrooms:true, label:"MUSHROOM FOREST", mainLabel:"WATERFALL"}
+    ]},
+
+  /* ---- THE SWAMP CUP: the bayou, boardwalks, mud and willows ---- */
+  { name:"BAYOU BEND", after:"a bayou in the delta", relief:0.6, rollers:0.5, season:"swamp", cup:4,
+    blurb:"along the bayou under the willows: out over the black water on the long boardwalk, through four stretches of deep mud, past the old trappers' cabins and home over a second boardwalk",
+    kit:["crest","rhythm","kicker"],
+    shape:"BAYOU BEND — two boardwalks over the black water",
+    feature:"two boardwalks over the black water, deep mud and the trappers' cabins",
+    ctrl:[[0,-380],[120,-400],[240,-360],[330,-280],[360,-170],[300,-90],[330,10],[400,90],[380,200],[290,260],[180,240],[90,300],
+          [-20,330],[-140,290],[-230,200],[-250,90],[-320,10],[-360,-100],[-300,-200],[-200,-260],[-100,-330]],
+    hills:[[0,0,320,5],[330,-300,140,6],[-300,250,150,5]],
+    jumps:[], fords:[[-320,10]],
+    mud:[[[300,-90],[330,10]], [[380,200],[290,260]], [[-140,290],[-230,200]], [[-360,-100],[-300,-200]]],
+    boardwalks:[[[150,-395],[250,-355]], [[70,305],[-60,322]]],
+    cabins:4,
+    branches:[
+      // the levee road, out along the top of the bank while the main road winds through the trees
+      {a:[330,-280], b:[330,10], via:[[430,-190],[430,-60]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, label:"LEVEE", mainLabel:"BAYOU ROAD"}
+    ]},
+  { name:"CYPRESS HOLLOW", after:"a cypress swamp round a lake", relief:0.7, rollers:0.5, season:"swamp", cup:4,
+    blurb:"all the way round Cypress Lake through the bald cypress and the knees at their feet: two boardwalks across the inlets, mud in the hollows, and a cabin or three back in the moss",
+    kit:["crest","kicker","rhythm"],
+    shape:"CYPRESS HOLLOW — round the lake",
+    feature:"a lap round a cypress lake, with boardwalks across two inlets",
+    ctrl:[[-300,-150],[-150,-195],[0,-175],[150,-205],[300,-140],[385,-20],[350,110],[250,215],[100,250],[-40,280],
+          [-180,230],[-300,150],[-385,40],[-365,-70]],
+    hills:[[300,250,150,8],[-300,-250,160,8]],
+    jumps:[], fords:[],
+    lake:{at:[0,40], rx:190, rz:95},
+    mud:[[[-150,-195],[0,-175]], [[250,215],[100,250]], [[-385,40],[-365,-70]]],
+    boardwalks:[[[160,-203],[295,-143]], [[-185,228],[-298,152]]],
+    cabins:3,
+    branches:[
+      // the pipeline track, wide round the east end of the lake
+      {a:[300,-140], b:[350,110], via:[[440,-70],[440,60]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, label:"PIPELINE", mainLabel:"LAKE ROAD"}
+    ]},
+  { name:"BIGFOOT TRAIL", after:"a trail in the deep woods", relief:1.0, rollers:0.7, season:"swamp", cup:4,
+    blurb:"up and down the ridges through the deep woods, a boardwalk over the beaver pond and mud in every bottom. Keep an eye on the tree line: folks say something walks it",
+    kit:["crest","tabletop","kicker"],
+    shape:"BIGFOOT TRAIL — something in the trees",
+    feature:"a boardwalk over the beaver pond, and something walking the tree line",
+    ctrl:[[0,-420],[140,-380],[220,-280],[200,-170],[280,-80],[330,40],[260,150],[300,260],[200,340],[60,320],
+          [-40,230],[-160,280],[-280,220],[-300,100],[-220,0],[-300,-110],[-260,-240],[-140,-330]],
+    hills:[[250,-150,160,20],[-250,150,170,16],[0,-100,220,8]],
+    jumps:[], fords:[[-220,0]],
+    mud:[[[200,-170],[280,-80]], [[-160,280],[-280,220]], [[-300,-110],[-260,-240]]],
+    boardwalks:[[[70,322],[-35,238]]],
+    cabins:3,
+    bigfoot:0.3,
+    branches:[
+      // the logging road, over the ridge while the trail goes round it
+      {a:[220,-280], b:[330,40], via:[[330,-230],[390,-100]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, label:"LOGGING ROAD", mainLabel:"THE TRAIL"}
+    ]},
+  { name:"WILLOW MARSH", after:"an open marsh", relief:0.5, rollers:0.4, season:"swamp", cup:4,
+    blurb:"out across the open marsh on three boardwalks, weeping willows all along the dry ground between them, and more mud than road in places",
+    kit:["crest","rhythm","double"],
+    shape:"WILLOW MARSH — three boardwalks",
+    feature:"three boardwalks across the open marsh, and weeping willows all the way",
+    ctrl:[[-420,-60],[-340,-200],[-200,-260],[-60,-220],[60,-280],[200,-260],[330,-180],[400,-50],[350,80],[410,200],
+          [300,300],[150,260],[20,320],[-120,280],[-220,180],[-330,150],[-430,60]],
+    hills:[[0,0,300,4]],
+    jumps:[], fords:[],
+    mud:[[[60,-280],[200,-260]], [[300,300],[150,260]], [[-330,150],[-430,60]]],
+    boardwalks:[[[-190,-257],[-70,-223]], [[395,-40],[355,70]], [[10,318],[-110,283]]],
+    cabins:4,
+    branches:[
+      // the duck hunters' track, through the reeds on the inside of the bend
+      {a:[-60,-220], b:[330,-180], via:[[40,-150],[210,-130]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, label:"HUNTERS' TRACK", mainLabel:"MARSH ROAD"}
     ]}
 ];
 
@@ -1281,18 +1355,20 @@ function respaceOpen(P){
   for(let i=0;i<P.N;i++) P.half[i] = P.baseHalf + Math.sin(i*0.11)*0.35 + Math.cos(i*0.037)*0.3;
   retangent(P);
 }
-function easeOpen(P, floor){
+function easeOpen(P, floor, zoneM){
   const PIN = Math.round(26/P.seg);
+  // (zoneM: only the first and last that many metres, the ways in and out of a fork)
+  const inZone = i=> !zoneM || Math.min(i, P.N - 1 - i)*P.seg < zoneM;
   respaceOpen(P);
   for(let pass=0; pass<30; pass++){
     const R = radiiOpen(P);
     let tight = 0;
-    for(let i=PIN;i<P.N-PIN;i++) if(R[i] < floor) tight++;
+    for(let i=PIN;i<P.N-PIN;i++) if(R[i] < floor && inZone(i)) tight++;
     if(!tight) return;
     // how much each point wants moving, spread along the road so the
     // smoothing fades in and out instead of kinking the line
     const want = new Float64Array(P.N);
-    for(let i=PIN;i<P.N-PIN;i++) want[i] = 1 - smoothstep(floor, floor*1.5, R[i]);
+    for(let i=PIN;i<P.N-PIN;i++) if(inZone(i)) want[i] = 1 - smoothstep(floor, floor*1.5, R[i]);
     const wsm = Array.from(want); smoothAlong(wsm, false, 8);
     const nx = P.pts.map(p=>p.x), nz = P.pts.map(p=>p.z);
     for(let i=PIN;i<P.N-PIN;i++){
@@ -1369,10 +1445,39 @@ if(DESERT){
 const GATOR = !!TRACK.gator;
 const ANIMS_LATE = [];                // per frame, for set pieces built before the prop kit exists
 const WHIRL_R = 48;                   // the whirlpool: a funnel sunk in the middle of the banked ring, its lip at the road's inside edge
+/* the lip, all the way round: just inside the ring road's inner edge (and a little short of
+   the road where it comes in and goes out), as a table of radii by angle */
+const WHIRL_LIP = new Float32Array(120).fill(WHIRL_R);
+function whirlLipBuild(){
+  const n = WHIRL_LIP.length, raw = new Float32Array(n).fill(1e9);
+  for(let i=0;i<MAIN.N;i++){
+    const p = MAIN.pts[i], d = Math.hypot(p.x - BOWL.x, p.z - BOWL.z);
+    if(d > BOWL.r + 60) continue;
+    const b = Math.floor(((Math.atan2(p.z - BOWL.z, p.x - BOWL.x)/(Math.PI*2)) + 1)*n) % n;
+    for(const q of [b - 1, b, b + 1]){ const k = (q + n) % n; raw[k] = Math.min(raw[k], d - MAIN.half[i] - 0.4); }
+  }
+  for(let k=0;k<n;k++) WHIRL_LIP[k] = Math.min(raw[k], BOWL.r - 3);
+  // eased round, never past the road
+  for(let pass=0; pass<3; pass++){ const c = Array.from(WHIRL_LIP);
+    for(let k=0;k<n;k++) WHIRL_LIP[k] = Math.min(raw[k], (c[(k + n - 1) % n] + c[k]*2 + c[(k + 1) % n])/4); }
+}
+function whirlLip(x, z){
+  const n = WHIRL_LIP.length, a = ((Math.atan2(z - BOWL.z, x - BOWL.x)/(Math.PI*2)) + 1)*n, k = Math.floor(a), f = a - k;
+  return WHIRL_LIP[k % n]*(1 - f) + WHIRL_LIP[(k + 1) % n]*f;
+}
 if(GATOR){
   scene.fog.color.set(0xe9a2a6); SKY.set(0xf2b08c); scene.fog.near = 220; scene.fog.far = 1150;
   hemi.color.set(0xffc6dc); hemi.groundColor.set(0x3c4a5e); hemi.intensity = 0.98;
   sun.color.set(0xffb07a); sun.intensity = 1.25;
+}
+/* The Swamp Cup: the bayou as it really is, not a theme park. Hazy green-gold
+   air, late sun through the moss, willows and cypress, boardwalks over black
+   water, deep mud, and old log cabins going back to the woods. */
+const SWAMPGP = TRACK.season === "swamp" && !GATOR;
+if(SWAMPGP){
+  scene.fog.color.set(0xb9c48e); SKY.set(0xd8d9a4); scene.fog.near = 150; scene.fog.far = 880;
+  hemi.color.set(0xeef2c8); hemi.groundColor.set(0x44523a); hemi.intensity = 0.92;
+  sun.color.set(0xffdc9a); sun.intensity = 1.12;
 }
 /* The maps are drawn wherever was convenient; the world is built around
    the origin, so move the whole map (every coordinate in it) to sit there. */
@@ -1405,6 +1510,7 @@ if(GATOR){
   ["bowl","lake","washout","pit","dunes","swamp","giantTree"].forEach(k=>{ if(TRACK[k]) TRACK[k] = Object.assign({}, TRACK[k], {at: mv(TRACK[k].at)}); });
   ["canyon","gallery"].forEach(k=>{ if(TRACK[k]) TRACK[k] = Object.assign({}, TRACK[k], {from: mv(TRACK[k].from), to: mv(TRACK[k].to)}); });
   TRACK.washes = (TRACK.washes||[]).map(mv);
+  TRACK.boardwalks = (TRACK.boardwalks||[]).map(b=> [mv(b[0]), mv(b[1])]);
   if(TRACK.summit) TRACK.summit = mv(TRACK.summit);
   TRACK.camps = (TRACK.camps||[]).map(mv);
   TRACK.flats = (TRACK.flats||[]).map(f=> mv([f[0], f[1]]).concat([f[2]]));
@@ -1442,11 +1548,15 @@ function macro(x, z){
     const F = FLATS[k], d = Math.hypot(x - F[0], z - F[1]);
     if(d < F[2] && F[3] !== null){ const w = 1 - smoothstep(F[2]*0.6, F[2], d); h = h*(1 - w) + F[3]*w; }
   }
-  /* Gator Gulch's whirlpool: a funnel in the middle of the ring road, deepest at the drain */
+  /* Gator Gulch's whirlpool: a funnel whose lip is the inside edge of the ring road. It
+     drops away steeply right off the tarmac, so all the way round there is nothing between
+     you and the drain but the banking */
   if(GATOR && BOWL.on){
-    const d = Math.hypot(x - BOWL.x, z - BOWL.z);
-    // steep at the lip, so the road runs round the rim of it, then down to the drain
-    if(d < WHIRL_R + 1.5){ const u = 1 - smoothstep(2, WHIRL_R + 1.5, d); h -= 16*Math.pow(u, 0.75); }
+    const d = Math.hypot(x - BOWL.x, z - BOWL.z), lip = whirlLip(x, z);
+    if(d < lip + 1.2){
+      const u = Math.max(0, 1 - d/lip);
+      h -= d >= lip ? 5*(lip + 1.2 - d)/1.2 : 5 + 25*Math.sqrt(u);
+    }
   }
   /* the lake: a basin sunk below a level taken from the lowest point of its
      shore, so the water can never spill over */
@@ -1633,6 +1743,8 @@ if(TRACK.gallery){
 const FLATS = [];
 const LAKE = {on:false};
 const SWAMP = {on:false};
+const BOARDWALKS = [];                // the Swamp Cup's boardwalks: stretches of main road on planks over pools (filled in once the road is final)
+const PROP_KEEP = [];                 // [x, z, r]: ground a set piece stands on, that the forest keeps off
 const PIT = {on:false};
 const BOWL = {on:false};
 (TRACK.flats || []).forEach(f=>{ const F = [f[0], f[1], f[2], null]; F[3] = macro(f[0], f[1]); FLATS.push(F); });
@@ -1690,6 +1802,7 @@ if(TRACK.giantTree){
 if(TRACK.bowl){
   const B = TRACK.bowl;
   Object.assign(BOWL, {on:true, x:B.at[0], z:B.at[1], r:B.r, bank:B.bank});
+  if(GATOR) whirlLipBuild();
   for(let i=0;i<MAIN.N;i+=4){
     const p = MAIN.pts[i];
     if(Math.hypot(p.x - BOWL.x, p.z - BOWL.z) < BOWL.r + 40) CALM.push([i, 30]);
@@ -1832,47 +1945,255 @@ causeway(MAIN);
    lifts the outside of the bend. */
 paths.forEach(P=> P.bank = null);
 if(BOWL.on){
+  /* Only the carousel itself is banked: the long turn round the middle, one way. The
+     wiggles on the way in and out used to be banked too, each its own way, so the road
+     rocked from one bank to the other every few lengths and none of them could be used. */
   const P = MAIN, W = Math.max(3, Math.round(8/P.seg));
   P.bank = new Float32Array(P.N);
+  const leftAt = i=>{ const a = P.tans[wrapIdx(P, i - W)], b = P.tans[wrapIdx(P, i + W)], t = P.tans[i];
+    return (b.x - a.x)*(-t.z) + (b.z - a.z)*t.x; };                // + turning left
+  // which way the road goes round the middle
+  let round = 0;
+  for(let i=0;i<P.N;i++){ const p = P.pts[i]; if(Math.abs(Math.hypot(p.x - BOWL.x, p.z - BOWL.z) - BOWL.r) < 10) round += Math.sign(leftAt(i)); }
+  round = Math.sign(round) || 1;
   for(let i=0;i<P.N;i++){
     const p = P.pts[i], d = Math.hypot(p.x - BOWL.x, p.z - BOWL.z);
-    const w = 1 - smoothstep(BOWL.r + 8, BOWL.r + 30, d);
+    const w = 1 - smoothstep(10, 24, Math.abs(d - BOWL.r));
     if(w <= 0) continue;
-    const a = P.tans[wrapIdx(P, i - W)], b = P.tans[wrapIdx(P, i + W)], t = P.tans[i];
-    const left = (b.x - a.x)*(-t.z) + (b.z - a.z)*t.x;          // + turning left
-    if(Math.abs(left) < 0.02) continue;
-    P.bank[i] = -Math.sign(left)*BOWL.bank*w;                    // inside (the turn side) goes down
+    const left = leftAt(i);
+    if(Math.sign(left) !== round || Math.abs(left) < 0.015) continue;
+    P.bank[i] = -round*BOWL.bank*w;                                 // inside (the turn side) goes down
   }
-  const sm = Array.from(P.bank); smoothAlong(sm, true, Math.round(10/P.seg));
+  // eased in and out over a good length of road, so the bank comes on and goes off gently
+  const sm = Array.from(P.bank); smoothAlong(sm, true, Math.round(18/P.seg));
   P.bank = Float32Array.from(sm);
 }
 
 /* ---- the alternate routes ----
-   Each one leaves along the main road's own heading, drifts a few metres
-   aside, runs its own line through the trees and merges back the same way,
-   so a fork is a Y and not a T. */
+   A fork is a Y: the branch comes off the main road on its own heading and
+   drifts aside so gently that you can take it flat out, the two roads side
+   by side for the first stretch, and it merges back the same way. And a
+   branch is another way round, not a short cut: where its line would save
+   time over the road it leaves, it gets flowing S-bends through the trees
+   until the two take about as long, so neither is the one to take. */
 const BRANCHES = [];
 const mainAt = s => MAIN.pts[wrapIdx(MAIN, s)];
-TRACK.branches.forEach(def=>{
+const FORK_PEEL = 90, FORK_SPREAD = 20;             // metres along, metres aside by the end of the peel
+/* what a line of points takes to drive, from the same corner speeds the routing test uses */
+function lineTime(pts, v0, v1){
+  const N = pts.length, W = 8, v = new Float64Array(N), ds = new Float64Array(N);
+  for(let i=1;i<N;i++) ds[i] = Math.hypot(pts[i].x - pts[i-1].x, pts[i].z - pts[i-1].z);
+  const hd = i=>{ const a = pts[Math.max(0, i-1)], b = pts[Math.min(N-1, i+1)]; return Math.atan2(b.x - a.x, b.z - a.z); };
+  for(let i=0;i<N;i++){
+    const ia = Math.max(0, i-W), ib = Math.min(N-1, i+W);
+    let d = hd(ib) - hd(ia); while(d > Math.PI) d -= 2*Math.PI; while(d < -Math.PI) d += 2*Math.PI;
+    let L = 0; for(let k=ia+1;k<=ib;k++) L += ds[k];
+    const kap = Math.abs(d)/Math.max(1, L);
+    v[i] = Math.min(44, cornerHoldSpeed(kap < 1e-5 ? 9999 : 1/kap));
+  }
+  v[0] = Math.min(v[0], v0); v[N-1] = Math.min(v[N-1], v1);
+  for(let i=N-2;i>=0;i--) v[i] = Math.min(v[i], Math.sqrt(v[i+1]*v[i+1] + 2*22*ds[i+1]));
+  for(let i=1;i<N;i++){ const pv = v[i-1]; v[i] = Math.min(v[i], Math.sqrt(Math.max(0, pv*pv + 2*(7 - 0.0006*pv*pv)*ds[i]))); }
+  let t = 0;
+  for(let i=1;i<N;i++) t += ds[i]/Math.max(4, 0.5*(v[i] + v[i-1]));
+  return t;
+}
+const MAIN_V = routingTest(MAIN).v;
+/* things a branch's bends keep away from: other roads, the lake, the set pieces */
+const FORK_KEEP = [];
+{
+  const T = TRACK, add = (xz, r)=> xz && FORK_KEEP.push([xz[0], xz[1], r]);
+  (T.caves || []).forEach(c=>{ add(c.from, 45); add(c.to, 45); });
+  (T.tunnels || []).forEach(c=>{ add(c.from, 40); add(c.to, 40); });
+  (T.leaps || []).forEach(l=> add(l.at, 40));
+  (T.spans || []).forEach(l=> add(l.at, (l.reach || 30) + 15));
+  (T.flats || []).forEach(f=> add([f[0], f[1]], f[2]));
+  if(T.crater) add(T.crater.at, T.crater.r + 40);
+  if(T.gorge) add(T.gorge.at, (T.gorge.reach || 100)*0.6);
+  if(T.drop) add(T.drop.at, 60);
+  if(T.town) add(T.town.at || T.town, 90);
+}
+/* (bx, bz: where that bit of the branch was before it was bent: near the fork it is bound to be
+   close to the main road, and that is fine so long as the bend does not take it closer) */
+function forkClear(x, z, own, bx, bz, skip){
+  if(LAKE.on && Math.hypot((x - LAKE.x)/(LAKE.rx*1.12 + 14), (z - LAKE.z)/(LAKE.rz*1.12 + 14)) < 1) return false;
+  for(const k of FORK_KEEP) if((x - k[0])**2 + (z - k[1])**2 < k[2]*k[2]) return false;
+  const roads = [MAIN].concat(BRANCHES);
+  for(const P of roads){
+    if(P === own) continue;
+    const lim = (P.baseHalf || 5) + 16;
+    let dn = 1e9, db = 1e9;
+    for(let i=0;i<P.N;i+=3){ const q = P.pts[i];
+      // (skip: the stretch of main road a road alongside it is alongside)
+      if(skip && P === MAIN){ let d = i - skip[0]; if(d < 0) d += MAIN.N; if(d <= skip[1]) continue; }
+      dn = Math.min(dn, (q.x - x)**2 + (q.z - z)**2);
+      if(bx !== undefined) db = Math.min(db, (q.x - bx)**2 + (q.z - bz)**2); }
+    dn = Math.sqrt(dn); db = Math.sqrt(db);
+    if(dn < lim && dn < db - 0.5) return false;
+  }
+  return true;
+}
+/* the main road from station A for span stations, set off to one side by o(u), which rises
+   from nothing at either end (no slope there: a Y) to O in the middle, kept inside the
+   radius of any bend it is on the inside of */
+function parallelLine(A, span, back, v0, v1, tm, own){
+  const seg = MAIN.seg, n = span + 2*back, R = radiiOf(MAIN);
+  const make = (O, side)=>{
+    const o = new Float64Array(n + 1);
+    for(let k=0;k<=n;k++){
+      const u = Math.max(0, Math.min(1, (k - back)/span)), i = wrapIdx(MAIN, A - back + k);
+      let w = O*Math.pow(Math.sin(Math.PI*u), 2);
+      const ta = MAIN.tans[wrapIdx(MAIN, i - 6)], tb = MAIN.tans[wrapIdx(MAIN, i + 6)];
+      const left = (tb.x - ta.x)*(-MAIN.tans[i].z) + (tb.z - ta.z)*MAIN.tans[i].x;     // + bending left
+      if(Math.sign(left) === side) w = Math.min(w, 0.55*R[i]);                            // on the inside of it
+      o[k] = w;
+    }
+    const sm = Array.from(o); smoothAlong(sm, false, Math.round(18/seg));
+    const q = [];
+    for(let k=0;k<=n;k++){ const i = wrapIdx(MAIN, A - back + k), p = MAIN.pts[i], t = MAIN.tans[i], d = side*Math.min(o[k], sm[k] + 0.01);
+      q.push({x:p.x - t.z*d, z:p.z + t.x*d}); }
+    return q;
+  };
+  const clear = q=>{
+    const skip = [wrapIdx(MAIN, A - back - Math.round(40/seg)), n + Math.round(80/seg)];
+    // (it keeps clear of the rest of the course: where the main road doubles back on
+    //  itself, the far side is another road)
+    for(let k=0;k<q.length;k+=4) if(!forkClear(q[k].x, q[k].z, own, undefined, undefined, skip)) return false;
+    return true;
+  };
+  let best = null;
+  for(const side of [1, -1]){
+    let lo = 28, hi = 110;                            // (never less than a clear strip of woods between)
+    // the most it can go out that way before it meets anything
+    while(hi > lo && !clear(make(hi, side))) hi -= 12;
+    if(hi <= lo) continue;
+    const tHi = lineTime(make(hi, side), v0, v1);
+    let O = hi;
+    if(tHi > tm){ for(let it=0; it<12; it++){ const m = (lo + hi)/2; if(lineTime(make(m, side), v0, v1) < tm) lo = m; else hi = m; } O = hi; }
+    const q = make(O, side), r = lineTime(q, v0, v1)/tm;
+    if(!best || Math.abs(r - 1) < Math.abs(best.r - 1)) best = {q, r, O, side};
+  }
+  return best && best.r > 0.9 ? best : null;
+}
+TRACK.branches.forEach((def, bi)=>{
   const A = snapTo(MAIN, def.a), B = snapTo(MAIN, def.b);
   const seg = MAIN.seg, lead = Math.round(30/seg), back = Math.round(12/seg);
-  const off = (s, toward)=>{
-    const p = mainAt(s), t = MAIN.tans[wrapIdx(MAIN, s)];
-    const nx = -t.z, nz = t.x;
-    const side = Math.sign((toward[0]-p.x)*nx + (toward[1]-p.z)*nz) || 1;
-    return new THREE.Vector3(p.x + nx*side*4.5, 0, p.z + nz*side*4.5);
-  };
-  const ctrl = [mainAt(A-back).clone(), mainAt(A).clone(), off(A+lead, def.via[0])]
-    .concat(def.via.map(vec))
-    .concat([off(B-lead, def.via[def.via.length-1]), mainAt(B).clone(), mainAt(B+back).clone()]);
+  let span = B - A; if(span < 0) span += MAIN.N;
+  // a branch something else is built on (a bridge on it, the braided routes) keeps its drawn line
+  const pinned = def.hug || def.fixed || (TRACK.spans || []).some(sp=> sp.road === bi || sp.under === bi);
+  const side = (xz, s)=>{ const k = snapTo(MAIN, xz), p = mainAt(k), t = MAIN.tans[k];
+    return Math.sign((xz[0]-p.x)*(-t.z) + (xz[1]-p.z)*t.x) || 1; };
+  let ctrl;
+  if(pinned){
+    const off = (s, toward)=>{
+      const p = mainAt(s), t = MAIN.tans[wrapIdx(MAIN, s)];
+      const nx = -t.z, nz = t.x;
+      const sd = Math.sign((toward[0]-p.x)*nx + (toward[1]-p.z)*nz) || 1;
+      return new THREE.Vector3(p.x + nx*sd*4.5, 0, p.z + nz*sd*4.5);
+    };
+    ctrl = [mainAt(A-back).clone(), mainAt(A).clone(), off(A+lead, def.via[0])]
+      .concat(def.via.map(vec))
+      .concat([off(B-lead, def.via[def.via.length-1]), mainAt(B).clone(), mainAt(B+back).clone()]);
+  } else {
+    /* the peel: alongside the main road, easing out to one side on a long parabola */
+    const L = Math.min(FORK_PEEL, span*seg*0.3), D = FORK_SPREAD*L/FORK_PEEL, n = Math.round(L/seg);
+    const along = xz=>{ let d = snapTo(MAIN, xz) - A; if(d < 0) d += MAIN.N; return d; };
+    // the drawn line, less any of it the peels now cover
+    let via = def.via.filter(v=>{ const d = along(v); return d > n + 15/seg && d < span - n - 15/seg; });
+    if(!via.length) via = [def.via[Math.floor(def.via.length/2)]];
+    const s0 = side(via[0]), s1 = side(via[via.length-1]);
+    const peel = (k, sd, far)=>{ const i = wrapIdx(MAIN, k), p = MAIN.pts[i], t = MAIN.tans[i], o = sd*D*far*far;
+      return new THREE.Vector3(p.x - t.z*o, 0, p.z + t.x*o); };
+    const out = [], inn = [];
+    for(let m=10; m<=L; m+=10) out.push(peel(A + Math.round(m/seg), s0, m/L));
+    for(let m=L; m>=10; m-=10) inn.push(peel(B - Math.round(m/seg), s1, m/L));
+    ctrl = [mainAt(A-back).clone(), mainAt(A).clone()].concat(out, via.map(vec), inn, [mainAt(B).clone(), mainAt(B+back).clone()]);
+  }
   ctrl.forEach(p=> p.y = 0);
   const P = makePath(ctrl, false, def.half || 4.8);
   retangent(P);
+  if(!pinned){
+    // the drawn line's own kinks ironed out, between the peels
+    const z0 = Math.round(Math.min(FORK_PEEL, P.len*0.3)/P.seg), z1 = P.N - 1 - z0;
+    const bx = P.pts.map(p=> p.x), bz = P.pts.map(p=> p.z), R = Math.round(14/P.seg);
+    smoothAlong(bx, false, R); smoothAlong(bz, false, R);
+    for(let i=0;i<P.N;i++){ const u = (i - z0)/Math.max(1, z1 - z0), k = smoothstep(-0.1, 0.08, u)*smoothstep(-0.1, 0.08, 1 - u);
+      P.pts[i].x += (bx[i] - P.pts[i].x)*k; P.pts[i].z += (bz[i] - P.pts[i].z)*k; }
+    retangent(P);
+  }
   easeOpen(P, 17);
-  let span = B - A; if(span < 0) span += MAIN.N;
+  if(!pinned) easeOpen(P, 42, FORK_PEEL + 20);         // the ways in and out: no tight corner near the fork
   P.mainFrom = A - back; P.mainTo = A - back + span + 2*back;
   P.splitAt = A;
   P.def = def;
+  /* the balance: as long to drive as the main road it leaves out */
+  let tm = 0; for(let k=P.mainFrom; k<=P.mainTo; k++) tm += seg/Math.max(4, MAIN_V[wrapIdx(MAIN, k)]);
+  const v0 = MAIN_V[wrapIdx(MAIN, P.mainFrom)], v1 = MAIN_V[wrapIdx(MAIN, P.mainTo)];
+  const t0 = lineTime(P.pts, v0, v1);
+  P.balance = {before:+(t0/tm).toFixed(2), after:+(t0/tm).toFixed(2), mainT:+tm.toFixed(1)};
+  /* A line drawn straight across a loop in the main road is a short cut however it is
+     bent. Those become a road of their own alongside the main one instead: off it on a Y,
+     out through the trees up to a hundred metres aside, back on a Y, as far out as makes
+     the two take the same time (Ember Glacier's high and low routes, everywhere). */
+  let t1 = t0;
+  if(!pinned && t0 < tm*0.93){
+    const alt = parallelLine(A, span, back, v0, v1, tm, P);
+    if(alt){
+      P.pts = alt.q.map(p=> new THREE.Vector3(p.x, 0, p.z)); P.N = P.pts.length;
+      respaceOpen(P); easeOpen(P, 17); easeOpen(P, 42, FORK_PEEL + 20);
+      t1 = lineTime(P.pts, v0, v1);
+      P.balance.after = +(t1/tm).toFixed(2); P.balance.bends = "side"; P.balance.amp = Math.round(alt.O);
+    }
+  }
+  if(!pinned && t1 < tm*0.97){
+    const z0 = Math.round((Math.min(FORK_PEEL, P.len*0.3) + 10)/P.seg), z1 = P.N - 1 - z0;
+    if(z1 - z0 > Math.round(60/P.seg)){
+      const Lm = (z1 - z0)*P.seg;
+      /* the bends go on a smoothed line, so they come out even rather than stacked on the
+         drawn line's own wobbles */
+      const base = P.pts.map(p=> ({x:p.x, z:p.z}));
+      { const bx = base.map(p=> p.x), bz = base.map(p=> p.z), R = Math.round(35/P.seg);
+        smoothAlong(bx, false, R); smoothAlong(bz, false, R); smoothAlong(bx, false, R); smoothAlong(bz, false, R);
+        for(let i=0;i<P.N;i++){ const u = (i - z0)/Math.max(1, z1 - z0), k = smoothstep(-0.08, 0.1, u)*smoothstep(-0.08, 0.1, 1 - u);
+          base[i].x += (bx[i] - base[i].x)*k; base[i].z += (bz[i] - base[i].z)*k; } }
+      const btan = base.map((p, i)=>{ const a = base[Math.max(0, i-2)], b = base[Math.min(P.N-1, i+2)], L = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+        return {x:(b.x - a.x)/L, z:(b.z - a.z)/L}; });
+      let best = null;
+      /* long sweeping bends first; a branch that is a lot shorter gets tighter ones, a
+         twisty technical way round against the fast one */
+      for(const [hw, rMin] of [[95, 30], [80, 30], [68, 28], [58, 24], [48, 21], [40, 20]]){
+        const h = Math.max(1, Math.round(Lm/hw)), amax = Math.pow(Lm/h/Math.PI, 2)/rMin;
+        const shape = a=>{
+          const q = base.map(p=> ({x:p.x, z:p.z}));
+          for(let i=z0;i<=z1;i++){
+            const u = (i - z0)/(z1 - z0), env = smoothstep(0, 0.14, u)*smoothstep(0, 0.14, 1 - u);
+            const d = a*Math.sin(Math.PI*h*u)*env, t = btan[i];
+            q[i].x += -t.z*d; q[i].z += t.x*d;
+          }
+          return q;
+        };
+        /* where a bend would come too near something, it is flattened there, and eased into */
+        const room = new Float64Array(P.N).fill(1), full = shape(amax);
+        for(let i=z0;i<=z1;i+=2) if(!forkClear(full[i].x, full[i].z, P, base[i].x, base[i].z)){ room[i] = 0; if(i + 1 <= z1) room[i + 1] = 0; }
+        // (blocked stretches flatten whole bends, eased in and out, rather than denting them)
+        const rs = Array.from(room);
+        for(let pass=0; pass<2; pass++){ const m = Array.from(rs); const W = Math.round(40/P.seg);
+          for(let i=z0;i<=z1;i++){ let lo = 1; for(let k=Math.max(z0, i-W); k<=Math.min(z1, i+W); k++) lo = Math.min(lo, m[k]); rs[i] = lo; } }
+        smoothAlong(rs, false, Math.round(30/P.seg));
+        const shaped = a=>{ const q = shape(a); for(let i=z0;i<=z1;i++){ const k = rs[i]; q[i].x = base[i].x + (q[i].x - base[i].x)*k; q[i].z = base[i].z + (q[i].z - base[i].z)*k; } return q; };
+        let lo = 0, hi = amax;
+        for(let it=0; it<14; it++){ const mid = (lo + hi)/2; if(lineTime(shaped(mid), v0, v1) < tm) lo = mid; else hi = mid; }
+        const a = hi, q = shaped(a), r = lineTime(q, v0, v1)/tm;
+        if(!best || Math.abs(r - 1) < Math.abs(best.r - 1) - 0.01) best = {r, q, a, h};
+        if(Math.abs(r - 1) < 0.02) break;
+      }
+      if(best && best.r > t0/tm + 0.01){
+        for(let i=0;i<P.N;i++){ P.pts[i].x = best.q[i].x; P.pts[i].z = best.q[i].z; }
+        respaceOpen(P); easeOpen(P, 19); easeOpen(P, 40, FORK_PEEL + 15);
+        P.balance.after = +(lineTime(P.pts, v0, v1)/tm).toFixed(2); P.balance.bends = best.h; P.balance.amp = Math.round(best.a);
+      }
+    }
+  }
   BRANCHES.push(P);
 });
 
@@ -3183,6 +3504,8 @@ function inWaterway(x, z){
   if(TOWN.on && Math.hypot(x - TOWN.x, z - TOWN.z) < TOWN.r*0.85) return true;   // the village keeps its own ground
   if(LAKE.on && Math.hypot((x - LAKE.x)/LAKE.rx, (z - LAKE.z)/LAKE.rz) < 1.05) return true;
   if(SWAMP.on && Math.hypot(x - SWAMP.x, z - SWAMP.z) < SWAMP.r*1.0) return true;
+  if(BOARDWALKS.length && bwPool(x, z) > 0.25) return true;
+  for(let k=0;k<PROP_KEEP.length;k++){ const q = PROP_KEEP[k]; if((x - q[0])**2 + (z - q[1])**2 < q[2]*q[2]) return true; }
   if(PIT.on && Math.hypot(x - PIT.x, z - PIT.z) < PIT.r*1.02) return true;
   if(BOWL.on && Math.hypot(x - BOWL.x, z - BOWL.z) < BOWL.r + 38) return true;
   for(let i=0;i<FORDS.length;i++){
@@ -3438,6 +3761,7 @@ function naturalBase(x, z){ return carveGorge(carveWater(macro(x, z) + vergeRoll
 function naturalY(x, z){
   const y = naturalBase(x, z);
   let y2 = SPANS.length ? carveSpans(y, x, z) : y;
+  if(BOARDWALKS.length) y2 = carveBoardwalks(y2, x, z);
   if(CRATER.on){
     // the cone's summit hollowed into a crater, a lip standing round it
     const d = Math.hypot(x - CRATER.x, z - CRATER.z), r = CRATER.r;
@@ -3486,6 +3810,61 @@ const CAVE_W = 44;
 function caveRoof(nat, yr, R, av){ return nat + Math.max(0, yr + BED + R*0.95 + 3.2 - nat)*(1 - smoothstep(R + 3, R + 30, av)); }
 function caveYAt(s){ const i0 = Math.floor(s), f = s - i0, A = MAIN.pts[wrapIdx(MAIN, i0)], B = MAIN.pts[wrapIdx(MAIN, i0 + 1)]; return A.y + (B.y - A.y)*f; }
 function caveOf(s){ for(const C of CAVES){ if(s >= C.a && s <= C.b) return C; } return null; }
+/* ---- the boardwalks ----
+   A stretch of the main road carried on planks over a pool of black water:
+   the land either side is dug out into the pool, right up to the edge of the
+   deck, and the pool fades back to dry ground at either end, where the deck
+   comes down off the bank. MAIN.bwk marks the stations (1 on the deck). */
+MAIN.bwk = new Float32Array(MAIN.N);
+(TRACK.boardwalks || []).forEach(d=>{
+  const seg = MAIN.seg;
+  let a = snapTo(MAIN, d[0]), b = snapTo(MAIN, d[1]);
+  let n = b - a; if(n < 0) n += MAIN.N;
+  if(n > MAIN.N/2){ const q = a; a = b; b = q; n = MAIN.N - n; }         // the short way along
+  const pts = []; let lo = Infinity, x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for(let k=0;k<=n;k+=Math.max(1, Math.round(2/seg))){
+    const i = wrapIdx(MAIN, a + k), p = MAIN.pts[i];
+    pts.push({x:p.x, z:p.z, y:p.y + BED, i, u:k*seg});
+    lo = Math.min(lo, p.y + BED);
+    x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); z0 = Math.min(z0, p.z); z1 = Math.max(z1, p.z);
+  }
+  const L = n*seg, E = Math.min(20, L*0.2);
+  for(let k=-Math.round(12/seg); k<=n + Math.round(12/seg); k++){
+    const u = k*seg, w = smoothstep(-12, 4, u)*(1 - smoothstep(L - 4, L + 12, u));
+    const i = wrapIdx(MAIN, a + k); MAIN.bwk[i] = Math.max(MAIN.bwk[i], w);
+  }
+  BOARDWALKS.push({a, b, n, pts, L, E, half:MAIN.baseHalf, level:lo - 1.35, floor:lo - 2.9,
+                   x0:x0 - 36, x1:x1 + 36, z0:z0 - 36, z1:z1 + 36});
+});
+/* the ground round a boardwalk: dug down to the pool's bed from just past the deck's edge
+   out to about thirty metres, shallowing back to the bank at either end */
+function carveBoardwalks(y, x, z){
+  for(const W of BOARDWALKS){
+    if(x < W.x0 || x > W.x1 || z < W.z0 || z > W.z1) continue;
+    let best = Infinity, bu = 0;
+    for(const p of W.pts){ const d = (p.x - x)**2 + (p.z - z)**2; if(d < best){ best = d; bu = p.u; } }
+    const d = Math.sqrt(best);
+    if(d > 34) continue;
+    const ends = smoothstep(0, W.E, bu)*smoothstep(0, W.E, W.L - bu);
+    const w = smoothstep(W.half + 0.6, W.half + 2.4, d)*(1 - smoothstep(22, 34, d + Math.sin(x*0.07 + z*0.05)*5))*ends;
+    if(w <= 0) continue;
+    const bed = W.floor + 0.35*Math.sin(x*0.19 + z*0.13) + 0.25*Math.sin(x*0.07 - z*0.11);
+    y = y*(1 - w) + Math.min(y, bed)*w;
+  }
+  return y;
+}
+/* how far into a boardwalk's pool a point is (0 on dry land, 1 out in the water) */
+function bwPool(x, z){
+  let out = 0;
+  for(const W of BOARDWALKS){
+    if(x < W.x0 || x > W.x1 || z < W.z0 || z > W.z1) continue;
+    let best = Infinity, bu = 0;
+    for(const p of W.pts){ const d = (p.x - x)**2 + (p.z - z)**2; if(d < best){ best = d; bu = p.u; } }
+    const d = Math.sqrt(best), ends = smoothstep(0, W.E, bu)*smoothstep(0, W.E, W.L - bu);
+    out = Math.max(out, smoothstep(W.half + 0.6, W.half + 2.4, d)*(1 - smoothstep(20, 30, d))*ends);
+  }
+  return out;
+}
 {
   const NAT = new Float32Array(GCELLS);
   for(let b=0;b<GN;b++) for(let a=0;a<GN;a++){
@@ -3608,7 +3987,12 @@ function caveOf(s){ for(const C of CAVES){ if(s >= C.a && s <= C.b) return C; } 
                           Math.hypot(-GHALF + a*GSTEP - PIT.x, -GHALF + b*GSTEP - PIT.z)) : 0;
           // in the slot canyon the rock stands straight up off the verge
           const inCan = CANYON.on && P === MAIN ? canyonAt(-GHALF + a*GSTEP, -GHALF + b*GSTEP) : 0;
-          const E = Math.max(3, Math.min(RMAX - half - 2 - top, 4 + (1.8 - 1.3*inPit - 1.75*inCan)*Math.abs(y + Math.max(bank, berm) - nat)));
+          // over the whirlpool's lip the land falls away at once: a sheer drop off the road's edge, not an embankment
+          const inWh = GATOR && BOWL.on && P === MAIN ? (()=>{ const xg = -GHALF + a*GSTEP, zg = -GHALF + b*GSTEP;
+            return 1 - smoothstep(-1, 1.5, Math.hypot(xg - BOWL.x, zg - BOWL.z) - whirlLip(xg, zg)); })()
+            // (and off the edge of a boardwalk the pool starts at once)
+            : P === MAIN && BOARDWALKS.length ? MAIN.bwk[ia]*(1 - f) + MAIN.bwk[ib]*f : 0;
+          const E = Math.max(3 - 1.8*inWh, Math.min(RMAX - half - 2 - top, (4 - 2.8*inWh) + (1.8 - 1.3*inPit - 1.75*inCan - 1.78*inWh)*Math.abs(y + Math.max(bank, berm) - nat)));
           const w = 1 - smoothstep(top, top + E, r);
           if(w <= 0) continue;
           // where two roads overlap at a fork the main road has the say, so a
@@ -7475,6 +7859,246 @@ if(BOWL.on && !GATOR){
   }
 }
 
+/* ==== THE SWAMP CUP: boardwalks, old cabins, and something in the trees ====
+   The bayou circuits' own pieces. Boardwalks: planks laid across the road
+   where it crosses a pool of black water, on pilings, with a rail each side
+   that keeps you on the deck. Trappers' cabins back in the trees, their logs
+   gone grey, roofs sagging under moss. And on one of them, by the trail, a
+   big hairy figure walking the tree line, who looks round as you go by. */
+if(SWAMPGP){
+  const seg = MAIN.seg;
+  const atS = s=>{ const i0 = Math.floor(s), f = s - i0, A = MAIN.pts[wrapIdx(MAIN, i0)], B = MAIN.pts[wrapIdx(MAIN, i0 + 1)], T = MAIN.tans[wrapIdx(MAIN, Math.round(s))];
+    return {x:A.x + (B.x - A.x)*f, z:A.z + (B.z - A.z)*f, y:pathY(MAIN, s) + BED, tx:T.x, tz:T.z, half:MAIN.half[wrapIdx(MAIN, Math.round(s))]}; };
+  const plankM = [PM(0x80694c), PM(0x735e44), PM(0x8a7657), PM(0x6a563f)];
+  const pileM = PM(0x3e3226), railM = PM(0x6e5a42), mossM = PM(0x5d7a34), lampM = new THREE.MeshLambertMaterial({color:0xffe2a0, emissive:0xffa840, emissiveIntensity:1.1});
+  const rnd = seeded(9127);
+
+  /* ---- the boardwalks ---- */
+  BOARDWALKS.forEach((W, n)=>{
+    // the pool: one sheet of black water at its level, drawn only where it lies over the ground
+    const STEP = 2, nx = Math.ceil((W.x1 - W.x0)/STEP) + 1, nz = Math.ceil((W.z1 - W.z0)/STEP) + 1;
+    const pos = [], uv = [], dep = [], idx = [];
+    for(let r=0;r<nz;r++) for(let q=0;q<nx;q++){
+      const x = W.x0 + q*STEP, z = W.z0 + r*STEP;
+      pos.push(x, W.level, z); uv.push(x, z);
+      dep.push(Math.max(-1, Math.min(3, W.level - gradedY(x, z))));
+    }
+    for(let r=0;r<nz-1;r++) for(let q=0;q<nx-1;q++){
+      const a2 = r*nx + q, b2 = a2 + 1, d2 = a2 + nx, e2 = d2 + 1;
+      if(dep[a2] <= 0 && dep[b2] <= 0 && dep[d2] <= 0 && dep[e2] <= 0) continue;
+      idx.push(a2, d2, e2, a2, e2, b2);
+    }
+    const wg = new THREE.BufferGeometry();
+    wg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    wg.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+    wg.setAttribute("aDepth", new THREE.Float32BufferAttribute(dep, 1));
+    wg.setIndex(idx);
+    const wm = new THREE.Mesh(wg, waterMaterial()); wm.material.uniforms.uMurk.value = 1; wm.renderOrder = 3; wm.frustumCulled = false; scene.add(wm);
+
+    // the deck: planks across the road, a stringer under each edge, pilings down into the water
+    const g = new THREE.Group();
+    for(let u=0; u<=W.L; u+=0.62){
+      const q = atS(W.a + u/seg), w = (q.half + 0.55)*2;
+      const pl = pbox(g, w, 0.09, 0.52, plankM[Math.floor(rnd()*plankM.length)], q.x, q.y + 0.06 + (rnd() - 0.5)*0.03, q.z);
+      pl.rotation.y = Math.atan2(q.tx, q.tz) + (rnd() - 0.5)*0.03;
+    }
+    const post = 3.0;
+    let prev = null;
+    for(let u=0; u<=W.L + 0.01; u+=post){
+      const q = atS(W.a + Math.min(W.L, u)/seg), nx2 = -q.tz, nz2 = q.tx, yaw = Math.atan2(q.tx, q.tz);
+      for(const sd of [-1, 1]){
+        const off = q.half + 0.45, x = q.x + nx2*sd*off, z = q.z + nz2*sd*off, bed = Math.min(gradedY(x, z), W.floor) - 0.6;
+        const top = q.y + 1.1, h = top - bed;
+        const pile = pcyl(g, 0.15, 0.18, h, 7, pileM, x, bed + h/2, z); pile.rotation.y = rnd()*3;
+        if(rnd() < 0.3) pbox(g, 0.34, 0.12, 0.34, mossM, x, W.level + 0.25 + rnd()*0.4, z);          // weed round it at the water
+        if(prev){
+          const px = prev.x + (-prev.tz)*sd*off, pz = prev.z + prev.tx*sd*off;
+          const mx = (x + px)/2, mz = (z + pz)/2, L = Math.hypot(x - px, z - pz), ry = Math.atan2(x - px, z - pz);
+          pbox(g, 0.12, 0.14, L, railM, mx, q.y + 1.02, mz).rotation.y = ry;          // the top rail
+          pbox(g, 0.06, 0.06, L, railM, mx, q.y + 0.55, mz).rotation.y = ry;          // the lower rail
+          pbox(g, 0.22, 0.3, L, pileM, mx, q.y - 0.22, mz).rotation.y = ry;           // the stringer
+        }
+        if(Math.round(u/post) % 5 === 2 && sd > 0){ const l = pbox(g, 0.28, 0.36, 0.28, lampM, x, top + 0.3, z); l.rotation.y = yaw; }
+      }
+      prev = q;
+    }
+    g.traverse(o=>{ if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+    mergeStatic(g); scene.add(g);
+
+    // the pool's edges: reeds and cattails, lily pads out on the water, dead snags standing in it
+    const reedM = PM(0x7a8a3a), tailM = PM(0x5a3a1e), padM = PM(0x4e7a34), snagM = PM(0x6e665a);
+    const pg = new THREE.Group();
+    for(let k=0, made=0; k<2500 && made<170; k++){
+      const x = W.x0 + rnd()*(W.x1 - W.x0), z = W.z0 + rnd()*(W.z1 - W.z0), w = bwPool(x, z);
+      if(w < 0.1 || !clearOf(x, z, 1.4)) continue;
+      const deep = W.level - gradedY(x, z);
+      if(deep > 0.4 && rnd() < 0.5){
+        const lp = pcyl(pg, 0.45 + rnd()*0.5, 0.45, 0.03, 9, padM, x, W.level + 0.03, z); lp.rotation.y = rnd()*6;
+      } else if(w < 0.85){
+        const hgt = 1.2 + rnd()*1.2, yb = Math.max(gradedY(x, z), W.level - 0.3);
+        pcyl(pg, 0.03, 0.05, hgt, 4, reedM, x, yb + hgt/2, z);
+        if(rnd() < 0.5) pcyl(pg, 0.09, 0.09, 0.32, 6, tailM, x, yb + hgt - 0.1, z);
+      } else continue;
+      made++;
+    }
+    for(let k=0, made=0; k<400 && made<7; k++){
+      const x = W.x0 + rnd()*(W.x1 - W.x0), z = W.z0 + rnd()*(W.z1 - W.z0);
+      if(bwPool(x, z) < 0.7 || !clearOf(x, z, 5)) continue;
+      const tg = new THREE.Group(), h = 4 + rnd()*6;
+      pcyl(tg, 0.1, 0.3, h, 6, snagM, 0, h/2, 0);
+      for(let q=0;q<3;q++){ const br = pcyl(tg, 0.04, 0.09, 1.2 + rnd()*1.6, 5, snagM, Math.sin(q*2.1)*0.3, h*(0.45 + q*0.17), 0); br.rotation.set(0.9 + rnd()*0.5, rnd()*6.28, 0); }
+      tg.rotation.z = (rnd() - 0.5)*0.25; setDown(tg, x, z, rnd()*6.28); made++;
+    }
+    mergeStatic(pg); scene.add(pg);
+    roadSign(wrapIdx(MAIN, W.a - Math.round(70/seg)), 1, ["BOARDWALK", "planks for the next " + Math.round(W.L/10)*10 + "m"], "#4a3a26", "#efe4c4");
+  });
+
+  /* ---- the cabins ---- */
+  const logMs = [PM(0x7a6a58), PM(0x6c5e4e), PM(0x857563)], roofM = PM(0x4a4038), stoneM = PM(0x6f6b64), darkM = PM(0x1c1712), boardM = PM(0x6a5a46);
+  function cabin(){
+    const outer = new THREE.Group(), g = new THREE.Group(); outer.add(g);
+    const Wd = 6.4 + rnd()*1.2, D = 5.0 + rnd()*0.8, H = 2.5, r = 0.18, rise = 1.7;
+    // the walls: logs stacked and notched at the corners, the side walls half a log up
+    for(let row=0; ; row++){
+      const y = r + row*2*r*0.9; if(y > H) break;
+      for(const sz of [-1, 1]){
+        if(rnd() < 0.04) continue;                                           // one fallen out
+        const pieces = sz > 0 && y < 2.0 ? [[-Wd/2 - 0.35, -0.6], [0.6, Wd/2 + 0.35]] : [[-Wd/2 - 0.35, Wd/2 + 0.35]];
+        for(const [a, b] of pieces){ const m = pcyl(g, r, r*1.05, b - a, 7, logMs[(row + (a > 0 ? 1 : 0)) % 3], (a + b)/2, y, sz*D/2); m.rotation.z = Math.PI/2; }
+      }
+      for(const sx of [-1, 1]){
+        if(rnd() < 0.04 || y + r*0.9 > H) continue;
+        const m = pcyl(g, r, r*1.05, D + 0.7, 7, logMs[(row + 1) % 3], sx*Wd/2, y + r*0.9, 0); m.rotation.x = Math.PI/2;
+      }
+    }
+    // the gables, boarded, and the roof: two slopes, sagging in the middle, moss all over it, a hole in it
+    const gShape = new THREE.Shape(); gShape.moveTo(-Wd/2 - 0.3, 0); gShape.lineTo(Wd/2 + 0.3, 0); gShape.lineTo(0, rise); gShape.lineTo(-Wd/2 - 0.3, 0);
+    for(const sz of [-1, 1]){ const gm = new THREE.Mesh(new THREE.ShapeGeometry(gShape), new THREE.MeshLambertMaterial({color:0x6a5a46, side:THREE.DoubleSide})); gm.position.set(0, H, sz*D/2); g.add(gm); }
+    const slope = Math.hypot(Wd/2 + 0.6, rise), tilt = Math.atan2(rise, Wd/2 + 0.6);
+    for(const sx of [-1, 1]) for(let k=0;k<3;k++){
+      const zc = (k - 1)*(D + 1.4)/3, sag = k === 1 ? 0.16 : 0;
+      const p = pbox(g, slope, 0.14, (D + 1.4)/3 + 0.02, roofM, sx*(Wd/2 + 0.6)/2, H + rise/2 - sag, zc); p.rotation.z = -sx*tilt;
+    }
+    for(let k=0;k<10;k++){                                                    // moss in cushions on the slopes
+      const sx = rnd() < 0.5 ? -1 : 1, u = 0.2 + rnd()*0.7, zc = (rnd() - 0.5)*(D + 1);
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.4 + rnd()*0.5, 7, 5), mossM); m.scale.y = 0.3;
+      m.position.set(sx*u*(Wd/2 + 0.6), H + rise*(1 - u) + 0.1, zc); m.rotation.z = -sx*tilt; g.add(m);
+    }
+    { const h = pbox(g, 1.1, 0.16, 0.9, darkM, -(Wd/2 + 0.6)*0.45, H + rise*0.55 + 0.02, 0.4); h.rotation.z = tilt; }   // the hole
+    // the chimney, stone, leaning a little
+    { const ch = pbox(g, 0.9, H + rise + 1.2, 0.8, stoneM, Wd/2 + 0.5, (H + rise + 1.2)/2, -D/2 + 1.1); ch.rotation.z = 0.035; }
+    // the door hanging open, the windows boarded up
+    pbox(g, 1.1, 1.9, 0.12, darkM, 0, 0.95, D/2 - 0.02);
+    { const dr = pbox(g, 0.95, 1.85, 0.07, boardM, 0.52, 0.95, D/2 + 0.42); dr.rotation.y = -1.1; }
+    for(const sx of [-1, 1]){
+      pbox(g, 0.1, 0.8, 1.0, darkM, sx*(Wd/2 + 0.12), 1.35, 0);
+      for(const a of [0.6, -0.6]){ const b = pbox(g, 0.06, 0.14, 1.25, boardM, sx*(Wd/2 + 0.2), 1.35, 0); b.rotation.x = a; }
+    }
+    // the porch: a plank floor on stones, three posts (the fourth is gone), its roof sagging to that corner
+    pbox(g, Wd + 0.6, 0.12, 1.9, boardM, 0, 0.32, D/2 + 0.95);
+    for(const x of [-Wd/2, -Wd/6, Wd/6]) pcyl(g, 0.09, 0.1, 2.1, 6, logMs[0], x, 1.35, D/2 + 1.75);
+    { const pr = pbox(g, Wd + 0.8, 0.1, 2.1, roofM, 0, 2.3, D/2 + 1.0); pr.rotation.x = 0.16; pr.rotation.z = -0.07; }
+    for(const [x, z] of [[-Wd/2, -D/2], [Wd/2, -D/2], [-Wd/2, D/2], [Wd/2, D/2]]) pcyl(g, 0.3, 0.35, 1.2, 6, stoneM, x, -0.3, z);
+    // a rain barrel and a woodpile
+    pcyl(g, 0.4, 0.36, 0.95, 9, PM(0x5a3a22), -Wd/2 - 0.7, 0.47, D/2 - 0.6);
+    for(let k=0;k<9;k++){ const m = pcyl(g, 0.13, 0.13, 0.9, 6, logMs[k % 3], Wd/2 + 0.8, 0.14 + Math.floor(k/3)*0.24, 0.6 + (k % 3)*0.27); m.rotation.x = Math.PI/2; }
+    // moss up the bottom logs
+    for(let k=0;k<14;k++){ const m = new THREE.Mesh(new THREE.SphereGeometry(0.3 + rnd()*0.3, 6, 4), mossM); m.scale.y = 0.5;
+      const side = k % 4, t = rnd() - 0.5;
+      m.position.set(side < 2 ? t*Wd : (side === 2 ? -1 : 1)*Wd/2, 0.15, side < 2 ? (side ? 1 : -1)*D/2 : t*D); g.add(m); }
+    g.rotation.set((rnd() - 0.5)*0.05, 0, (rnd() - 0.5)*0.05);              // gone out of true
+    return outer;
+  }
+  const want = TRACK.cabins || 0;
+  for(let k=0, made=0; k<want*12 && made<want; k++){
+    const i = wrapIdx(MAIN, Math.round((made + 0.5 + (k % 12)*0.04)/want*MAIN.N)), p = MAIN.pts[i], t = MAIN.tans[i];
+    const sd = (made + Math.floor(k/12)) % 2 ? 1 : -1, off = MAIN.half[i] + 16 + (k % 4)*3;
+    const x = p.x - t.z*sd*off, z = p.z + t.x*sd*off;
+    if(!clearOf(x, z, 11) || bwPool(x, z) > 0.02 || (LAKE.on && Math.hypot((x - LAKE.x)/LAKE.rx, (z - LAKE.z)/LAKE.rz) < 1.15)) continue;
+    let lo = Infinity, hi = -Infinity;
+    for(const [ox, oz] of [[-5, -4], [5, -4], [-5, 4], [5, 4], [0, 0]]){ const y = gradedY(x + ox, z + oz); lo = Math.min(lo, y); hi = Math.max(hi, y); }
+    if(hi - lo > 2.2) continue;                                              // no cabin on a slope
+    setDown(cabin(), x, z, Math.atan2(p.x - x, p.z - z));
+    PROP_KEEP.push([x, z, 9]); made++;
+  }
+
+  /* ---- Bigfoot ---- */
+  if(TRACK.bigfoot){
+    const fur = PM(0x4a3526), fur2 = PM(0x3a2a1e), skin = PM(0x2b211a);
+    const i0 = Math.round(TRACK.bigfoot*MAIN.N), p0 = MAIN.pts[i0], t0 = MAIN.tans[i0];
+    let bx = null, bz = null, sd = 1;
+    for(const off of [20, 24, 28, 32]) for(const s of [1, -1]){
+      if(bx !== null) break;
+      const x = p0.x - t0.z*s*(MAIN.half[i0] + off), z = p0.z + t0.x*s*(MAIN.half[i0] + off);
+      if(clearOf(x, z, 12) && bwPool(x, z) < 0.02 && clearOf(x + t0.x*14, z + t0.z*14, 12) && clearOf(x - t0.x*14, z - t0.z*14, 12)){ bx = x; bz = z; sd = s; }
+    }
+    if(bx !== null){
+      PROP_KEEP.push([bx, bz, 20]);
+      const root = new THREE.Group(), body = new THREE.Group(); root.add(body); scene.add(root);
+      const legs = [], arms = [];
+      for(const s of [-1, 1]){
+        const hip = new THREE.Group(); hip.position.set(s*0.28, 1.15, 0); body.add(hip);
+        pcyl(hip, 0.21, 0.17, 0.62, 8, fur, 0, -0.31, 0);
+        const knee = new THREE.Group(); knee.position.set(0, -0.62, 0); hip.add(knee);
+        pcyl(knee, 0.16, 0.12, 0.55, 8, fur, 0, -0.27, 0);
+        pbox(knee, 0.26, 0.1, 0.48, skin, 0, -0.57, 0.1);
+        legs.push({hip, knee, s});
+      }
+      const chest = new THREE.Group(); chest.position.set(0, 1.12, 0); chest.rotation.x = 0.22; body.add(chest);
+      { const tm = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10), fur); tm.scale.set(0.58, 0.72, 0.42); tm.position.set(0, 0.62, 0); chest.add(tm); }
+      { const bl = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), fur2); bl.scale.set(0.46, 0.5, 0.36); bl.position.set(0, 0.35, 0.08); chest.add(bl); }
+      for(const s of [-1, 1]){
+        const sh = new THREE.Group(); sh.position.set(s*0.56, 1.08, 0); chest.add(sh);
+        pcyl(sh, 0.14, 0.12, 0.72, 8, fur, 0, -0.36, 0);
+        const el = new THREE.Group(); el.position.set(0, -0.72, 0); sh.add(el);
+        pcyl(el, 0.12, 0.09, 0.68, 8, fur, 0, -0.34, 0);
+        pbox(el, 0.17, 0.3, 0.11, skin, 0, -0.76, 0);
+        arms.push({sh, el, s});
+      }
+      const head = new THREE.Group(); head.position.set(0, 1.36, 0.18); chest.add(head);
+      { const hm = new THREE.Mesh(new THREE.SphereGeometry(0.27, 10, 8), fur); hm.scale.set(1, 1.08, 1); head.add(hm); }
+      pcyl(head, 0.02, 0.14, 0.22, 6, fur2, 0, 0.3, -0.04);                   // the crest
+      pbox(head, 0.3, 0.28, 0.06, skin, 0, -0.03, 0.24);                      // the face
+      pbox(head, 0.36, 0.07, 0.1, fur2, 0, 0.1, 0.26);                        // the brow
+      root.traverse(o=>{ if(o.isMesh) o.castShadow = true; });
+      // up and down the tree line, and a look over the shoulder at whoever is passing
+      const tx = t0.x, tz = t0.z, span = 14;
+      ANIMS.push(tt=>{
+        const u = (tt*0.045) % 2, fw = u < 1, pos = (fw ? u : 2 - u)*2 - 1;
+        const x = bx + tx*pos*span, z = bz + tz*pos*span;
+        root.position.set(x, gradedY(x, z), z);
+        root.rotation.y = Math.atan2(tx, tz) + (fw ? 0 : Math.PI);
+        const ph = tt*3.1;
+        legs.forEach(L=>{ const a = Math.sin(ph + (L.s > 0 ? 0 : Math.PI)); L.hip.rotation.x = a*0.45; L.knee.rotation.x = Math.max(0, -Math.cos(ph + (L.s > 0 ? 0 : Math.PI)))*0.7; });
+        arms.forEach(A=>{ const a = Math.sin(ph + (A.s > 0 ? Math.PI : 0)); A.sh.rotation.x = a*0.5; A.el.rotation.x = -0.25 - Math.max(0, a)*0.35; A.sh.rotation.z = A.s*0.12; });
+        body.position.y = Math.abs(Math.sin(ph))*0.05;
+        // the look back: the head swings round toward the camera when it is near
+        const dx = camera.position.x - x, dz = camera.position.z - z, d = Math.hypot(dx, dz);
+        let want = 0;
+        if(d < 90){ let a = Math.atan2(dx, dz) - root.rotation.y; while(a > Math.PI) a -= 2*Math.PI; while(a < -Math.PI) a += 2*Math.PI; want = Math.max(-1.3, Math.min(1.3, a)); }
+        head.rotation.y += (want - head.rotation.y)*0.06; chest.rotation.y = head.rotation.y*0.35;
+      });
+      roadSign(wrapIdx(MAIN, i0 - Math.round(110/seg)), sd, ["BIGFOOT CROSSING", "next 2 miles"], "#f2c230", "#1a1410");
+    }
+  }
+}
+/* the boardwalk's rails: a car that runs out to the edge of the deck is held on it, and bounces off */
+function swampStep(dt){
+  if(!BOARDWALKS.length || pose.air) return;
+  const n = nearest(pose.x, pose.z);
+  if(n.path !== MAIN || !(MAIN.bwk[n.pi] > 0.6)) return;
+  const i = n.pi, p = MAIN.pts[i], t = MAIN.tans[i], nx = -t.z, nz = t.x;
+  const l = (pose.x - p.x)*nx + (pose.z - p.z)*nz, lim = MAIN.half[i] - 0.45;
+  if(Math.abs(l) <= lim) return;
+  const sd = Math.sign(l), over = Math.abs(l) - lim;
+  pose.x -= nx*sd*over; pose.z -= nz*sd*over;
+  const vn = (pose.vx*nx + pose.vz*nz)*sd;
+  if(vn > 0){
+    pose.vx -= nx*sd*vn*1.3; pose.vz -= nz*sd*vn*1.3;
+    if(vn > 2.5 && (GAME.bumpCool || 0) <= 0){ SFX.bump(vn*0.6); GAME.shake = Math.max(GAME.shake || 0, Math.min(0.3, vn*0.03)); GAME.bumpCool = 0.3; }
+  }
+}
+
 /* ==== GATOR GULCH: the swamp theme park ==================================
    Everything on the special stage that is not in the other circuits: the
    set pieces (the pier, the hollow log, the gator, the whirlpool, the
@@ -7828,87 +8452,41 @@ if(GATOR){
       boostPad(P0, k, turn > 0 ? 2.0 : -2.0);
     });
     orbRow(P0, a + Math.round(30/seg), 0, 5, 7);
-    // the giant turtles, plodding across
+    // (the turtles that plodded across are gone: nothing on this course stops you dead)
     const tMid = Math.round((a + (b < a ? b + P0.N : b))/2);
-    for(const off of [-0.22, 0.22]){
-      const i = wrapIdx(P0, tMid + Math.round(off*((b < a ? b + P0.N : b) - a)));
-      const g = new THREE.Group(), shell = lam(0x2f6a3a), skin = lam(0x8aba5a);
-      addTo(g, new THREE.Mesh(new THREE.SphereGeometry(1.8, 12, 8, 0, Math.PI*2, 0, Math.PI/2), shell), 0, 0.35, 0).scale.set(1, 0.8, 1.25);
-      for(let q=0;q<6;q++) addTo(g, new THREE.Mesh(new THREE.CircleGeometry(0.5, 6), lam(0x4f8a3a)), Math.cos(q)*0.9, 1.35, Math.sin(q)*1.2).rotation.x = -Math.PI/2;
-      addTo(g, new THREE.Mesh(new THREE.SphereGeometry(0.55, 8, 6), skin), 0, 0.7, 2.3);
-      for(const s of [-1, 1]){ addTo(g, new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 4), basic(0x111111)), s*0.25, 0.9, 2.7);
-        for(const e of [-1, 1]) addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.6, 6), skin), s*1.3, 0.3, e*1.2); }
-      g.traverse(o=>{ if(o.isMesh) o.castShadow = true; }); scene.add(g);
-      HAZ.push({kind:"turtle", g, i, u:-(P0.half[i] + 6)*(off < 0 ? 1 : -1), dir: off < 0 ? 1 : -1, r:2.4, h:1.6, x:0, y:0, z:0, cool:0});
-    }
+    orbRow(P0, wrapIdx(P0, tMid - Math.round(15/seg)), 0, 5, 7);
   }
 
   /* ---- 4b. the gator's back (the first shortcut) ---- */
   const GATORJ = {on:false};
   if(B0 && B0.rampSpans && B0.rampSpans.length){
     const sp = B0.rampSpans[0], lip = sp[0] + (B0.def.jumps[0][1] || 30), P = B0;
-    const skin = lam(0x3f8a3a, 0x0a2a08, 0.35), dark = lam(0x2a5a2a), belly = lam(0xd8d27a);
-    const body = new THREE.Group();
-    // the flanks: either side of the road from the tip of the tail to the snout, rising with the road
-    const t0 = Math.max(1, lip - Math.round(70/seg));
-    for(let k=t0; k<=lip; k++){
-      const f = frm(P, k), y = f.p.y + BED, u = (k - t0)/(lip - t0);           // 0 at the tail, 1 at the head
-      const wid = 0.8 + 2.6*Math.sin(Math.min(1, u*1.25)*Math.PI*0.5), top = y + 0.35;
-      for(const sd of [-1, 1]){
-        const off = f.half + wid*0.5 - 0.2, x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off, g0 = gradedY(x, z);
-        const h = Math.max(0.6, top - g0 + 0.2);
-        const m = addTo(body, new THREE.Mesh(new THREE.BoxGeometry(wid, h, seg*1.02), skin), x, g0 + h/2 - 0.2, z); m.rotation.y = Math.atan2(f.t.x, f.t.z);
-        // the scutes: a ridge of knobs along the top of each flank
-        if(k % 2 === 0){ const s = addTo(body, new THREE.Mesh(new THREE.ConeGeometry(0.28 + 0.25*u, 0.6 + 0.4*u, 4), dark), x, top + 0.25 + 0.2*u, z); s.rotation.y = Math.atan2(f.t.x, f.t.z) + Math.PI/4; }
-      }
-      // the belly's pale edge down low
-      if(k % 3 === 0) for(const sd of [-1, 1]){ const off = f.half + wid - 0.3, x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off; addTo(body, new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.5, seg*3), belly), x, gradedY(x, z) + 0.2, z).rotation.y = Math.atan2(f.t.x, f.t.z); }
-    }
-    // four stubby legs splayed out
-    for(const u of [0.55, 0.85]) for(const sd of [-1, 1]){
-      const f = frm(P, t0 + Math.round(u*(lip - t0))), off = f.half + 4.2, x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off;
-      const leg = addTo(body, new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 2.2, 8), skin), x, gradedY(x, z) + 0.8, z); leg.rotation.z = sd*0.9;
-      for(let q=-1;q<=1;q++) addTo(body, new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.6, 4), basic(0xf2f0e0)), x + f.nx*sd*1.0 + f.t.x*q*0.35, gradedY(x, z) + 0.2, z + f.nz*sd*1.0 + f.t.z*q*0.35).rotation.x = Math.PI/2;
-    }
-    mergeStatic(body); body.traverse(o=>{ if(o.isMesh) o.castShadow = true; }); scene.add(body);
-    // the head at the lip: the lower jaw is the snout you launch off, the upper one snaps shut on a timer
-    const f = frm(P, lip), ly = f.p.y + BED, yaw = Math.atan2(f.t.x, f.t.z);
-    const head = new THREE.Group(); head.position.set(f.p.x, ly, f.p.z); head.rotation.y = yaw; scene.add(head);
-    const hw = f.half + 1.0, eyeMat = new THREE.MeshBasicMaterial({color:0xffe24a});
-    addTo(head, new THREE.Mesh(new THREE.BoxGeometry(hw*2, 1.0, 9), skin), 0, -1.2, 4.2).rotation.x = 0.22;                  // lower jaw, falling away under the flight
-    for(const sd of [-1, 1]) addTo(head, new THREE.Mesh(new THREE.SphereGeometry(1.4, 10, 8), skin), sd*(hw - 0.2), 0.6, -1.4);      // the jowls, at the hinge
-    const eyes = [{material:eyeMat}];
-    const upper = new THREE.Group(); upper.position.set(0, 1.6, -0.6); head.add(upper);                                  // hinged at the back of the head
-    // the snout: wide at the hinge, narrowing to the nose, lumpy on top, pink inside
-    const snout = new THREE.CylinderGeometry(1, 1, 1, 4, 1); snout.rotateY(Math.PI/4);
-    for(let q=0;q<4;q++){
-      const z0 = 1.0 + q*2.0, w = (hw + 0.2)*(1 - q*0.12);
-      addTo(upper, new THREE.Mesh(new THREE.BoxGeometry(w*2, 1.1 - q*0.1, 2.1), skin), 0, 0.3, z0);
-      addTo(upper, new THREE.Mesh(new THREE.BoxGeometry(w*2 - 0.3, 0.12, 2.1), lam(0xe8607a)), 0, -0.3, z0);          // the roof of the mouth
-      for(let b=0;b<3;b++) addTo(upper, new THREE.Mesh(new THREE.SphereGeometry(0.35, 6, 4), dark), (b - 1)*w*0.55, 0.9, z0 + (b % 2)*0.6).scale.y = 0.5;
-      for(const sd of [-1, 1]) for(let k=0;k<2;k++){ const th = addTo(upper, new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.75, 4), basic(0xffffff)), sd*(w - 0.15), -0.55, z0 - 0.5 + k*1.0); th.rotation.x = Math.PI; }
-    }
-    for(let k=0;k<5;k++){ const w = (hw + 0.2)*0.64, th = addTo(upper, new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.75, 4), basic(0xffffff)), -w + 0.4 + k*(2*w - 0.8)/4, -0.55, 7.9); th.rotation.x = Math.PI; }
-    for(const sd of [-1, 1]) addTo(upper, new THREE.Mesh(new THREE.SphereGeometry(0.32, 6, 4), dark), sd*0.8, 0.85, 7.6);           // nostrils
-    // the eyes ride on the back of the upper jaw, bulging up either side
-    for(const sd of [-1, 1]){
-      addTo(upper, new THREE.Mesh(new THREE.SphereGeometry(1.0, 10, 8), skin), sd*(hw - 0.6), 1.0, 0.6);
-      addTo(upper, new THREE.Mesh(new THREE.SphereGeometry(0.72, 10, 8), eyeMat), sd*(hw - 0.6), 1.35, 0.9);
-      addTo(upper, new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.8, 0.3), basic(0x111111)), sd*(hw - 0.6), 1.35, 1.55);
-    }
-    void snout;
-    head.traverse(o=>{ if(o.isMesh) o.castShadow = true; });
-    Object.assign(GATORJ, {on:true, P, lip, head, upper, eyes, x:f.p.x, z:f.p.z, y:ly, tx:f.t.x, tz:f.t.z, hw, t:0, open:1, snapped:false});
-    // (no boost pad: you leave its snout at your own speed, and the rejoin bends away soon after)
+    // (the gator that snapped shut on you is gone: the kicker is just a kicker, with
+    //  fireflies up the run in and strung along the flight off it, to catch in the air)
     orbRow(P, lip - Math.round(38/seg), 0, 4, 6);
+    { const f = frm(P, lip);
+      for(let q=1;q<=4;q++){ const g2 = frm(P, byM(P, lip, q*6)), x = g2.p.x, z = g2.p.z, y = f.p.y + BED + 2.2 + 2.6*Math.sin(q/5*Math.PI);
+        const g = new THREE.Group(); g.position.set(x, y, z); g.add(new THREE.Mesh(orbGeo, orbMat)); g.add(new THREE.Mesh(haloGeo, haloMat)); scene.add(g);
+        ORBS.push({x, y, z, g, live:true, t:0, ph:rnd()*6}); } }
   }
 
   /* ---- 5. the whirlpool, in the middle of the banked ring ---- */
   if(BOWL.on){
-    const NR = 26, NA = 48, pos = [], uv = [], idx = [];
+    const NR = 40, NA = 160, pos = [], uv = [], idx = [];
+    // the road's inside edge, all the way round: where the water hangs from
+    const rim = [];
+    for(let a=0;a<NA;a++){ const th = a/NA*Math.PI*2, L = whirlLip(BOWL.x + Math.cos(th), BOWL.z + Math.sin(th)) + 2.5;
+      rim.push(gradedY(BOWL.x + Math.cos(th)*L, BOWL.z + Math.sin(th)*L)); }
     for(let r=0;r<=NR;r++) for(let a=0;a<=NA;a++){
-      const rr = 2 + r/NR*(WHIRL_R - 2), th = a/NA*Math.PI*2, x = BOWL.x + Math.cos(th)*rr, z = BOWL.z + Math.sin(th)*rr;
-      pos.push(x, gradedY(x, z) + 0.35 + (r === NR ? -0.3 : 0), z); uv.push(rr, th);
+      // the water's own funnel: a couple of metres down off the road's edge, then plunging to the
+      // drain (the rings bunched up toward the rim, where it is steepest)
+      const th = a/NA*Math.PI*2, lip = whirlLip(BOWL.x + Math.cos(th), BOWL.z + Math.sin(th)) - 0.4;
+      const f = Math.sqrt(r/NR), rr = 1.5 + f*(lip - 1.5);
+      const x = BOWL.x + Math.cos(th)*rr, z = BOWL.z + Math.sin(th)*rr;
+      const rimY = rim[a % NA], u = 1 - rr/lip;
+      // (over the highest of the ground round the vertex, so no rock pokes up between them)
+      let gnd = gradedY(x, z); for(const [ox, oz] of [[1.4, 0], [-1.4, 0], [0, 1.4], [0, -1.4]]) gnd = Math.max(gnd, gradedY(x + ox, z + oz));
+      pos.push(x, Math.max(gnd + 0.45, rimY - 2.2 - 22*Math.sqrt(Math.max(0, u))), z); uv.push(rr/lip*WHIRL_R, th);
     }
     for(let r=0;r<NR;r++) for(let a=0;a<NA;a++){ const i0 = r*(NA + 1) + a; idx.push(i0, i0 + NA + 1, i0 + 1, i0 + 1, i0 + NA + 1, i0 + NA + 2); }
     const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
@@ -7924,7 +8502,10 @@ if(GATOR){
         "  vec3 deep = vec3(0.02, 0.10, 0.16), mid = vec3(0.10, 0.45, 0.55), foam = vec3(0.85, 0.98, 1.0);",
         "  vec3 col = mix(deep, mid, smoothstep(0.1, 0.9, r));",
         "  col = mix(col, foam, smoothstep(0.72, 0.95, arm)*(0.35 + 0.65*r)*(0.6 + 0.4*fine));",
-        "  col += vec3(0.1, 0.9, 1.0)*0.25*(1.0 - smoothstep(0.0, 0.25, r));",
+        // dark down the throat, a white churn round the rim where it pours over
+        "  col *= 0.35 + 0.65*smoothstep(0.0, 0.85, r);",
+        "  col = mix(col, foam, smoothstep(0.93, 1.0, r)*(0.55 + 0.45*fine));",
+        "  col += vec3(0.1, 0.9, 1.0)*0.18*(1.0 - smoothstep(0.0, 0.2, r));",
         "  gl_FragColor = vec4(col, 1.0);",
         "}"].join("\n") });
     const wm = new THREE.Mesh(g, mat); wm.frustumCulled = false; wm.renderOrder = 2; scene.add(wm);
@@ -8053,15 +8634,6 @@ if(GATOR){
       const v = new THREE.Vector3(9.5, 21, 2.2).applyMatrix4(boat.matrixWorld);
       STEAM.spawn(v.x, v.y, v.z, 1.0, 2.2, 0.5, {life:5, size:[2, 9], col:[0.35, 0.3, 0.38], alpha:0.45, heat:0.2, drag:0.4, grav:-0.4}); });
     orbRow(P, byM(P, FORD_I, -40), 0, 5, 7);
-    // logs drifting across the water of the ford in front of the boat
-    const FD = FORDS.find(F=> F.path === P0 && Math.abs(F.at - FORD_I) < 4), wl = FD ? FD.level : -1e9;
-    for(const k of [0, 1]){
-      const f = frm(P, FORD_I + (k ? 2 : -2)), g = new THREE.Group();
-      addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.6, 5.5, 8), lam(0x5a3e28)), 0, 0, 0).rotation.x = Math.PI/2;
-      for(const e of [-1, 1]) addTo(g, new THREE.Mesh(new THREE.CircleGeometry(0.55, 8), lam(0xc49a6a)), 0, 0, e*2.76).rotation.y = e > 0 ? 0 : Math.PI;
-      scene.add(g);
-      HAZ.push({kind:"log", g, i:f.i, u:(k ? -1 : 1)*(f.half + 4), dir:k ? 1 : -1, r:2.2, h:1.4, x:0, y:0, z:0, cool:0, spd:2.2, wl});
-    }
   }
 
   /* ---- 8b. the treetops (the second shortcut): cypress trunks, rope rails, swinging logs ---- */
@@ -8096,17 +8668,8 @@ if(GATOR){
       const A = railPts[sd], seg2 = []; let prev = null;
       for(let q=0; q<A.length; ){ if(A[q] === null){ prev = null; q++; continue; } const cur = [A[q], A[q+1], A[q+2]]; q += 3; if(prev) seg2.push(...prev, ...cur); prev = cur; }
       const gg = new THREE.BufferGeometry(); gg.setAttribute("position", new THREE.Float32BufferAttribute(seg2, 3)); scene.add(new THREE.LineSegments(gg, rail)); }
-    // logs on chains, swinging across the road from beams between the trunks
-    for(const u of [0.3, 0.62]){
-      const f = frm(P, Math.round(u*P.N)), y = f.p.y + BED, g2 = new THREE.Group();
-      for(const sd of [-1, 1]) addTo(g2, new THREE.Mesh(new THREE.BoxGeometry(0.6, 12, 0.6), trunk), f.nx*sd*(f.half + 2.5), y + 6, f.nz*sd*(f.half + 2.5));
-      const beam = addTo(g2, new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 1), trunk), 0, y + 12, 0); beam.scale.z = (f.half + 3)*2; beam.rotation.y = Math.atan2(f.nx, f.nz);
-      g2.position.set(f.p.x, 0, f.p.z); scene.add(g2);
-      const pend = new THREE.Group(); pend.position.set(f.p.x, y + 12, f.p.z); pend.rotation.y = Math.atan2(f.t.x, f.t.z); scene.add(pend);
-      addTo(pend, new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 9.5, 4), black0()), 0, -4.75, 0);
-      const log = addTo(pend, new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 4.2, 10), lam(0x5a3e28)), 0, -10.2, 0); log.rotation.x = Math.PI/2;
-      HAZ.push({kind:"swing", pend, i:f.i, P, r:2.0, h:1.8, x:0, y:0, z:0, cool:0, ph:u*7, nx:f.nx, nz:f.nz, cx:f.p.x, cz:f.p.z, top:y + 12});
-    }
+    // (no swinging logs: the treetops are for the view, and for flying along)
+    orbRow(P, Math.round(P.N*0.3), 0, 5, 7);
     boostPad(P, Math.round(P.N*0.45), 0); boostPad(P, Math.round(P.N*0.8), 1.5);
     orbRow(P, Math.round(P.N*0.5), 0, 5, 6);
   }
@@ -8410,6 +8973,7 @@ if(GATOR){
           if(rnd() < 0.35) continue;
           const off = f.half + 2.5 + rnd()*7, x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off;
           if(!clearOf(x, z, 2) || lakeE(x, z) < 1.05 || (CAVE && P === P0 && k >= CAVE.a - 3 && k <= CAVE.b + 3)) continue;
+          if(BOWL.on && Math.hypot(x - BOWL.x, z - BOWL.z) < whirlLip(x, z) + 4) continue;              // (nothing grows on the whirlpool's lip)
           const n = 1 + Math.floor(rnd()*3);
           for(let q=0;q<n;q++) spots.push([x + (rnd() - 0.5)*1.6, z + (rnd() - 0.5)*1.6, 0.4 + rnd()*0.9]);
         }
@@ -8503,6 +9067,19 @@ if(GATOR){
     else { GAME.shake = Math.max(GAME.shake || 0, 0.3); pose.vx *= 0.85; pose.vz *= 0.85; }      // came down mid spin
     trick = 0; GG.trickRoll = GG.trickYaw = 0;
   };
+  let spit = 0;
+  function whirlSpit(){
+    const x = pose.x, y = pose.y, z = pose.z;
+    for(let k=0;k<30;k++){ const a = Math.random()*6.28; spawnDust(x, y + 0.4, z, [0.5, 0.95, 1.0], 0.6, Math.cos(a)*7, Math.sin(a)*7, 4 + Math.random()*6); }
+    if(actx){ burst(1.0, "highpass", 1500, 0.3, 0.7, 0, 4000); tone(300, 0.5, "sine", 0.12, 900); }
+    banner("WHIRLPOOL!", "#3ccfff", 1.4);
+    // back on the ring a way further round, still going, tossed up out of the water
+    const i = wrapIdx(MAIN, state.idx + Math.round(35/MAIN.seg)), p = MAIN.pts[i], t = MAIN.tans[i];
+    pose.x = p.x; pose.z = p.z; pose.h = Math.atan2(t.x, t.z); pose.y = surfaceY(p.x, p.z) + 1.2; pose.lastGy = pose.y - 1.2;
+    const v = 17; pose.vx = t.x*v; pose.vz = t.z*v; pose.vy = 5; pose.air = true; pose.airT = 0;
+    camH = pose.h; GAME.shake = Math.max(GAME.shake || 0, 0.3);
+    GG.hit(1);
+  }
   GG.stepCar = (dt, c)=>{
     const T = state.t, racing = state.phase === "racing";
     hitCool = Math.max(0, hitCool - dt);
@@ -8547,6 +9124,12 @@ if(GATOR){
         for(let k=0;k<14;k++) spawnDust(p.x, p.y + 0.3, p.z, p.P === B2 ? [1.0, 0.4, 0.9] : [0.6, 1.0, 0.4], 0.4, (Math.random() - 0.5)*6, (Math.random() - 0.5)*6, 3 + Math.random()*3);
       }
     }
+    // over the lip: the whirlpool spins you round and spits you back up onto the ring
+    if(BOWL.on && spit <= 0){
+      const d = Math.hypot(pose.x - BOWL.x, pose.z - BOWL.z), lip = whirlLip(pose.x, pose.z);
+      if(d < lip - 1.5 && !pose.air && pose.y < gradedY(BOWL.x + (pose.x - BOWL.x)*(lip + 3)/d, BOWL.z + (pose.z - BOWL.z)*(lip + 3)/d) - 3){ spit = 1.2; whirlSpit(); }
+    }
+    spit = Math.max(0, spit - dt);
     // the geysers
     for(const G of GEYS){
       if(G.on > 0 && Math.hypot(pose.x - G.x, pose.z - G.z) < 3.4 && pose.y < G.y + 3){
@@ -9300,6 +9883,81 @@ function snowify(g){
   }
   return g;
 }
+/* ---- the Swamp Cup's trees (unit height, vertex coloured, like the conifers) ---- */
+/* a weeping willow: a short leaning trunk forking into a few limbs, a loose dome
+   of crown, and a curtain of long strands hanging from its rim almost to the ground */
+function willowGeometry(){
+  const pos = [], col = [], c = new THREE.Color(), R = (a, b)=> a + Math.random()*(b - a);
+  const put = (geo, shade)=>{ const g = geo.index ? geo.toNonIndexed() : geo, a = g.attributes.position;
+    for(let i=0;i<a.count;i++){ pos.push(a.getX(i), a.getY(i), a.getZ(i)); shade(a.getY(i)); col.push(c.r, c.g, c.b); } };
+  const lean = R(-0.06, 0.06);
+  const trunk = new THREE.CylinderGeometry(0.035, 0.06, 0.34, 7); trunk.translate(lean*0.5, 0.17, 0);
+  put(trunk, ()=> c.setHSL(0.08, 0.22, 0.17 + Math.random()*0.05));
+  for(let k=0;k<4;k++){                                   // the limbs, forking out and up
+    const a = k/4*Math.PI*2 + R(0, 0.8), l = new THREE.CylinderGeometry(0.012, 0.028, 0.34, 5);
+    l.translate(0, 0.17, 0); l.rotateZ(0.55 + R(0, 0.25)); l.rotateY(a); l.translate(lean, 0.3, 0);
+    put(l, ()=> c.setHSL(0.08, 0.2, 0.2));
+  }
+  for(let k=0;k<9;k++){                                   // the crown, a loose dome of blobs
+    const a = k/9*Math.PI*2 + R(0, 0.5), rr = k === 0 ? 0 : R(0.12, 0.3), r = R(0.14, 0.22);
+    const b = new THREE.IcosahedronGeometry(r, 0); b.scale(1, 0.7, 1);
+    b.translate(lean + Math.cos(a)*rr, 0.56 + R(0, 0.1) - rr*0.25, Math.sin(a)*rr);
+    put(b, y=> c.setHSL(0.19 + Math.random()*0.06, 0.45, 0.30 + Math.random()*0.1));
+  }
+  // the curtain: long thin strands, each a narrow blade hanging from the rim and swaying out
+  for(let k=0;k<70;k++){
+    const a = Math.random()*Math.PI*2, rr = R(0.2, 0.42), top = R(0.5, 0.66), len = R(0.32, 0.5), w = R(0.02, 0.035);
+    const x = lean + Math.cos(a)*rr, z = Math.sin(a)*rr, out = R(0.02, 0.06), ox = Math.cos(a)*out, oz = Math.sin(a)*out;
+    const tx = -Math.sin(a)*w, tz = Math.cos(a)*w;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute([
+      x - tx, top, z - tz,  x + tx, top, z + tz,  x + ox*2, top - len, z + oz*2,
+      x + tx, top, z + tz,  x + ox*2 + tx*0.3, top - len*0.96, z + oz*2 + tz*0.3,  x + ox*2, top - len, z + oz*2], 3));
+    put(g, y=> c.setHSL(0.2 + Math.random()*0.05, 0.5, 0.36 + (y - top + len)*0.4 + Math.random()*0.06));
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  return g;
+}
+/* a bald cypress: a trunk flared into a wide fluted foot, knees round it, a straight
+   bole, a flat topped crown in feathery tiers, and grey Spanish moss hanging off it */
+function cypressGeometry(){
+  const pos = [], col = [], c = new THREE.Color(), R = (a, b)=> a + Math.random()*(b - a);
+  const put = (geo, shade)=>{ const g = geo.index ? geo.toNonIndexed() : geo, a = g.attributes.position;
+    for(let i=0;i<a.count;i++){ pos.push(a.getX(i), a.getY(i), a.getZ(i)); shade(a.getY(i)); col.push(c.r, c.g, c.b); } };
+  const prof = [[0.075, 0], [0.05, 0.03], [0.03, 0.09], [0.022, 0.2], [0.018, 0.5], [0.01, 0.8]].map(p=> new THREE.Vector2(p[0], p[1]));
+  const lg = new THREE.LatheGeometry(prof, 8), lp = lg.attributes.position;
+  for(let v=0; v<lp.count; v++){ const x = lp.getX(v), y = lp.getY(v), z = lp.getZ(v), a = Math.atan2(z, x), n = 1 + (y < 0.1 ? 0.35*Math.max(0, Math.sin(a*5)) : 0);
+    lp.setXYZ(v, x*n, y, z*n); }
+  put(lg, ()=> c.setHSL(0.07, 0.12, 0.34 + Math.random()*0.06));
+  for(let k=0;k<5;k++){                                   // the knees, poking up round the foot
+    const a = Math.random()*Math.PI*2, d = R(0.09, 0.16), kn = new THREE.ConeGeometry(0.012, R(0.03, 0.06), 5);
+    kn.translate(Math.cos(a)*d, 0.02, Math.sin(a)*d); put(kn, ()=> c.setHSL(0.07, 0.12, 0.36));
+  }
+  for(let t=0;t<5;t++){                                   // the crown: flat feathery tiers up top
+    const y = 0.56 + t*0.085, r = 0.26 - t*0.035;
+    for(let k=0;k<4;k++){
+      const a = k/4*Math.PI*2 + t*0.7 + R(0, 0.4), b = new THREE.IcosahedronGeometry(R(0.09, 0.14), 0); b.scale(1.3, 0.45, 1.3);
+      b.translate(Math.cos(a)*r*0.6, y, Math.sin(a)*r*0.6);
+      put(b, ()=> c.setHSL(0.22 + Math.random()*0.08, 0.38, 0.28 + Math.random()*0.1));
+    }
+  }
+  // Spanish moss: grey-green beards hanging off the lower tiers
+  for(let k=0;k<26;k++){
+    const a = Math.random()*Math.PI*2, rr = R(0.08, 0.24), top = R(0.5, 0.72), len = R(0.08, 0.2), w = 0.018;
+    const x = Math.cos(a)*rr, z = Math.sin(a)*rr, tx = -Math.sin(a)*w, tz = Math.cos(a)*w;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute([x - tx, top, z - tz, x + tx, top, z + tz, x, top - len, z], 3));
+    put(g, ()=> c.setHSL(0.18, 0.12, 0.58 + Math.random()*0.1));
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  return g;
+}
 /* a saguaro: a ribbed column with two or three arms turned up at the elbow */
 function cactusGeometry(){
   const pos = [], col = [], c = new THREE.Color();
@@ -9549,6 +10207,7 @@ courseBillboard();
     if(!list.length) return;
     const inst = new THREE.InstancedMesh(
       DESERT ? (kind === 0 ? cactusGeometry() : kind === 1 ? hardwoodGeometry(1) : coniferGeometry(2))
+      : SWAMPGP ? (kind === 0 ? willowGeometry() : kind === 1 ? cypressGeometry() : hardwoodGeometry(1))
       : WINTER ? snowify(coniferGeometry(kind))
       : FALL && kind > 0 ? hardwoodGeometry(kind) : coniferGeometry(kind),
       new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide}),
@@ -9569,6 +10228,7 @@ courseBillboard();
                        else tint.setHSL(0.2 + Math.random()*0.05, 0.22, 0.42 + Math.random()*0.1); }
       else if(FALL && kind > 0) fallTint(tint);
       else if(GATOR) tint.setHSL(0.26 + Math.random()*0.14, 0.45 + Math.random()*0.2, 0.52 + Math.random()*0.14);   // lush swamp greens, some teal
+      else if(SWAMPGP){ const k = 0.85 + Math.random()*0.35; tint.setRGB(k*0.98, k, k*0.86); }                   // the trees' own colours, a little varied
       else if(roll < 0.09)      tint.setHSL(0.10 + Math.random()*0.05, 0.55, 0.52);  // autumn
       else if(roll < 0.15) tint.setHSL(0.13 + Math.random()*0.03, 0.35, 0.55);  // dry
       else if(roll < 0.20) tint.setHSL(0.42 + Math.random()*0.06, 0.16, 0.52);  // bluish
@@ -9776,6 +10436,7 @@ courseBillboard();
       const sx = P.pts[i].x + nx*outside*off, sz = P.pts[i].z + nz*outside*off;
       const n = nearest(sx, sz);
       if(n.dist < n.half + 1.2) continue;           // never standing in another road (at a fork)
+      if(GATOR && BOWL.on && Math.hypot(sx - BOWL.x, sz - BOWL.z) < whirlLip(sx, sz) + 5) continue;   // nor down the side of the whirlpool
       spots.push([sx, sz]);
     }
   });
@@ -11941,7 +12602,7 @@ const ZYDECO = {
 const mtof = m => 440*Math.pow(2, (m-69)/12);
 function tickMusic(){
   if(!actx || actx.state !== "running") return;
-  if(GATOR) return tickZydeco();
+  if(GATOR || SWAMPGP) return tickZydeco();     // (the bayou dances to the same band)
   const spb = 60/MUSIC.bpm/4;                  // seconds per 16th
   while(AUD.seqNext < actx.currentTime + 0.12){
     const t = AUD.seqNext, s = AUD.step % 16, bar = Math.floor(AUD.step/16) % 4;
@@ -12972,6 +13633,7 @@ function stepCarInner(dt){
     splash.mud = Math.min(1, splash.mud + k2*dt*0.12);
   }
   if(GATOR) GG.stepCar(dt, {hand, steer, nfx, nfz});
+  if(SWAMPGP) swampStep(dt);
   car.position.set(pose.x, pose.y - (pose.sink || 0), pose.z);
   car.rotation.order = "YXZ";
   car.rotation.set(pose.pitch, pose.h + pose.yawVis + GG.trickYaw, pose.roll + GG.trickRoll);
@@ -13499,8 +14161,9 @@ function drawHUDInner(dt, alongNow){
     hud.fillRect(mx, my, size, size);
     hud.strokeStyle = "#000"; hud.lineWidth = 2*k;
     hud.strokeRect(mx, my, size, size);
-    /* the main road muted, the shortcuts over it in white with a black edge, so they stand out */
-    paths.forEach((P, pi)=>{
+    /* every road in one colour: the ways round are all just the course. Two passes (all the
+       edges, then all the roads) so the forks join without seams */
+    const trace = P=>{
       hud.beginPath();
       const step = Math.max(1, Math.round(P.N/90));
       for(let i=0;i<P.N;i+=step){
@@ -13509,14 +14172,10 @@ function drawHUDInner(dt, alongNow){
       }
       if(!P.closed){ const p = P.pts[P.N-1]; hud.lineTo(px(p.x), pz(p.z)); }
       if(P.closed) hud.closePath();
-      hud.lineJoin = "round"; hud.lineCap = "round";
-      if(pi){
-        hud.lineWidth = 4.4*k; hud.strokeStyle = "#000"; hud.stroke();
-        hud.lineWidth = 2.4*k; hud.strokeStyle = "#ffffff"; hud.stroke();
-      } else {
-        hud.lineWidth = 3.4*k; hud.strokeStyle = "rgba(120,150,170,.9)"; hud.stroke();
-      }
-    });
+    };
+    hud.lineJoin = "round"; hud.lineCap = "round";
+    paths.forEach(P=>{ trace(P); hud.lineWidth = 4.6*k; hud.strokeStyle = "#000"; hud.stroke(); });
+    paths.forEach(P=>{ trace(P); hud.lineWidth = 2.6*k; hud.strokeStyle = "#e9eef0"; hud.stroke(); });
     hud.fillStyle = UI.key;
     hud.fillRect(px(pts[0].x)-2*k, pz(pts[0].z)-2*k, 4*k, 4*k);
     if(EXP.on){
@@ -13630,10 +14289,11 @@ const MODES = {
 const CUPS = [ {name:"Summer Cup", rounds:[0, 1, 2, 4]},       // every summer circuit but the test yard
                {name:"Fall Cup",   rounds:[5, 6, 7, 17]},
                {name:"Winter Cup", rounds:[8, 9, 10, 11]},
-               {name:"Desert Cup", rounds:[12, 13, 14, 15]} ];
+               {name:"Desert Cup", rounds:[12, 13, 14, 15]},
+               {name:"Swamp Cup",  rounds:[20, 21, 22, 23]} ];
 /* ---- the trophies: one cup for each Grand Prix, its emblem on the bowl,
    in gold, silver or bronze once you have placed in it, grey until then ---- */
-const CUP_KIND = ["summer", "fall", "winter", "desert"];
+const CUP_KIND = ["summer", "fall", "winter", "desert", "swamp"];
 const TRO_METAL = {
   gold:  ["#fff3a8", "#f4c531", "#a8740f"], silver:["#ffffff", "#c9d3dc", "#7d8a96"],
   bronze:["#ffd9b0", "#d08a4a", "#7a4418"], none:  ["#8d9690", "#5d6660", "#353c38"],
@@ -13653,6 +14313,9 @@ const TRO_EMBLEM = {
     return '<line x1="' + (32-x).toFixed(1) + '" y1="' + (23-y).toFixed(1) + '" x2="' + (32+x).toFixed(1) + '" y2="' + (23+y).toFixed(1) + '"/>' + tick(bx, by) + tick(-bx, -by); }).join("") + '</g>',
   // a saguaro
   desert:'<path d="M29.5 34 V15 a2.5 2.5 0 0 1 5 0 V34 z M29.5 26 h-3.5 a2.3 2.3 0 0 1 -2.3-2.3 V19 a1.8 1.8 0 0 1 3.6 0 v3.4 h2.2 z M34.5 23 h3 v-4.5 a1.8 1.8 0 0 1 3.6 0 v4.8 a2.3 2.3 0 0 1 -2.3 2.3 h-4.3 z"/>',
+  // three cattails in the reeds
+  swamp:'<g stroke-width="2" stroke-linecap="round" fill="none"><path d="M25 35 C25 27 24.5 22 24 15"/><path d="M32 35 V12"/><path d="M39 35 C39 28 39.5 22 40 16"/></g>' +
+        '<rect x="22.5" y="15" width="3" height="8" rx="1.5"/><rect x="30.5" y="12" width="3" height="9" rx="1.5"/><rect x="38.5" y="16" width="3" height="8" rx="1.5"/>',
   // a volcano, erupting
   special:'<path d="M20 33 L28 19 h8 L44 33 z"/><path d="M30 17 c-2-3 1-4 0-7 c3 1 4 4 2 6 c2-1 2-3 1-5 c3 2 3 5 1 7 z" opacity=".95"/>'
 };
@@ -13693,7 +14356,7 @@ function setMode(m){
   LAPS = TRACK.test ? 99 : MODES[m].laps;
   FIELD = MODES[m].rivals ? rivals : [];
   rivals.forEach(r=>{ const on = FIELD.includes(r); r.mesh.visible = on; r.shadow.visible = on; });
-  GHOST.data = (MODES[m].ghost && recordFor().ghost) ? recordFor().ghost : null;
+  GHOST.data = MODES[m].ghost ? ghostFor(recordFor()) : null;
 }
 
 /* ------------------------------------------------------------------ *
@@ -13881,6 +14544,8 @@ function stepRivals(dt){
           r.laneT += (want - r.laneT)*Math.min(1, dt*0.4);
         }
       }
+      // being shoved along from behind: it goes with it instead of braking against you
+      if(r.shoved > 0){ r.shoved -= dt; target = Math.max(target, r.v); }
       r.mesh.userData.tail.emissiveIntensity = target < r.v - 1.0 ? 1.7 : 0.22;
       r.v += Math.max(-17*dt, Math.min(7.2*dt, target - r.v));
       r.s += Math.max(0, r.v)*dt/segLen;
@@ -13891,6 +14556,8 @@ function stepRivals(dt){
     }
     const prevLane = r.lane;
     r.lane += (r.laneT - r.lane)*Math.min(1, dt*1.4);
+    // shoved sideways by the player: it slides over, and the shove dies away
+    if(r.push){ r.lane = Math.max(-4, Math.min(4, r.lane + r.push*dt)); r.push *= Math.exp(-dt*3.2); if(Math.abs(r.push) < 0.05) r.push = 0; }
     r.laneRate = dt > 0 ? (r.lane - prevLane)/dt : 0;
 
     const i = Math.floor(r.s)%NS, f = r.s - Math.floor(r.s);
@@ -13930,8 +14597,11 @@ function stepRivals(dt){
   });
 }
 
-/* Two boxes, resolved along whichever axis overlaps least. The player
-   takes most of the shove; a rival hit from behind gets pushed on. */
+/* Two boxes, resolved along whichever axis overlaps least. A rival weighs
+   what you do: the overlap is shared half and half, and the knock is a
+   soft one (little bounce), shared the same way, so running into the back
+   of one pushes it on and costs you only what it takes to get it going,
+   and leaning on one alongside shoves it over rather than stopping you. */
 function collideRival(r, t, nx, nz){
   const dx = pose.x - r.mesh.position.x, dz = pose.z - r.mesh.position.z;
   if(Math.abs(pose.y - r.mesh.position.y) > 2.2) return;
@@ -13941,17 +14611,32 @@ function collideRival(r, t, nx, nz){
   const pa = LA - Math.abs(da), pl = LL - Math.abs(dl);
   let ix, iz, pen, side;
   if(pl*1.6 < pa){ side = Math.sign(dl)||1; ix = nx*side; iz = nz*side; pen = pl;
-                   r.lane -= side*pen*0.4; r.laneT = r.lane - side*1.4; }
+                   r.lane -= side*pen*0.5; r.laneT = Math.max(-3.4, Math.min(3.4, r.lane - side*0.8)); r.home = 0; }
   else           { side = Math.sign(da)||1; ix = t.x*side; iz = t.z*side; pen = pa;
-                   r.s = (r.s - side*pen*0.35/segLen + NS) % NS; }
-  pose.x += ix*pen*0.65; pose.z += iz*pen*0.65;
-  const rel = (pose.vx - t.x*r.v)*ix + (pose.vz - t.z*r.v)*iz;
+                   r.s = (r.s - side*pen*0.5/segLen + NS) % NS; }
+  pose.x += ix*pen*0.5; pose.z += iz*pen*0.5;
+  // how fast the two are closing along the line between them (the rival's own sideways drift counts)
+  const lat = (r.laneRate || 0) + (r.push || 0);
+  const rel = (pose.vx - t.x*r.v - nx*lat)*ix + (pose.vz - t.z*r.v - nz*lat)*iz;
   if(rel < 0){
-    const j = -rel;
-    pose.vx += ix*j*0.75; pose.vz += iz*j*0.75;
-    r.v -= (ix*t.x + iz*t.z)*j*0.45;
-    if(j > 1.2 && (GAME.bumpCool||0) <= 0){
-      SFX.bump(j); GAME.shake = Math.max(GAME.shake, Math.min(0.5, j*0.05));
+    const j = -rel*(1 + 0.3)/2;                       // equal weights, a soft knock
+    pose.vx += ix*j; pose.vz += iz*j;
+    r.v -= (ix*t.x + iz*t.z)*j;                       // shoved on (or held back)
+    if(ix*t.x + iz*t.z < -0.5){
+      r.shoved = 0.7;
+      /* coming through from behind (a turbo, a slipstream): it is shouldered aside, away from
+         whichever side you are on, and you are nudged the other way, so you push past it
+         rather than parking in its boot */
+      if(!r.net && j > 2.5){
+        const sd = Math.abs(dl) > 0.15 ? Math.sign(dl) : (r.lane > 0 ? -1 : 1);     // + you are to its left
+        r.push = Math.max(-6, Math.min(6, (r.push || 0) - sd*Math.min(4.5, j*0.45)));
+        r.laneT = Math.max(-3.4, Math.min(3.4, r.lane - sd*2.4)); r.home = 0;
+        pose.vx += nx*sd*Math.min(2.2, j*0.2); pose.vz += nz*sd*Math.min(2.2, j*0.2);
+      }
+    }
+    if(!r.net) r.push = Math.max(-6, Math.min(6, (r.push || 0) - (ix*nx + iz*nz)*j));   // shoved over
+    if(j > 1.0 && (GAME.bumpCool||0) <= 0){
+      SFX.bump(j); GAME.shake = Math.max(GAME.shake, Math.min(0.35, j*0.035));
       GAME.bumpCool = 0.25;
     }
   }
@@ -13981,23 +14666,47 @@ const GHOST = (()=>{
   scene.add(g);
   return { mesh:g, rec:[], data:null };
 })();
+/* A ghost is only good for the course it was driven on: each one carries a
+   print of the layout (the main road and every branch), and one from before
+   the course was changed is dropped rather than sent through the trees. */
+let TRACK_SIG = null;
+function trackSig(){
+  if(TRACK_SIG) return TRACK_SIG;
+  let h = 2166136261;
+  const mix = v=>{ h ^= (Math.round(v) & 0xffff); h = Math.imul(h, 16777619) >>> 0; };
+  paths.forEach(P=>{ mix(P.N); for(let i=0;i<P.N;i+=25){ mix(P.pts[i].x); mix(P.pts[i].z); } });
+  return (TRACK_SIG = h.toString(36));
+}
+function ghostFor(rec){ return rec && rec.ghost && rec.ghostSig === trackSig() && rec.ghost[0] && rec.ghost[0].length >= 6 ? rec.ghost : null; }
 function stepGhost(){
   const lt = state.t - state.lapStart;
   if(state.phase === "racing"){
-    while(GHOST.rec.length*0.1 <= lt && GHOST.rec.length < 3000){
-      GHOST.rec.push([+pose.x.toFixed(2), +pose.y.toFixed(2), +pose.z.toFixed(2), +pose.h.toFixed(3)]);
+    // the car as drawn, not just where it is: height, heading, pitch and roll
+    while(GHOST.rec.length*0.1 <= lt && GHOST.rec.length < 4000){
+      GHOST.rec.push([+pose.x.toFixed(2), +(pose.y - (pose.sink || 0)).toFixed(2), +pose.z.toFixed(2),
+                      +(pose.h + (pose.yawVis || 0)).toFixed(3), +(pose.pitch || 0).toFixed(3), +(pose.roll || 0).toFixed(3)]);
     }
   }
   const D = GHOST.data;
   if(!D || state.phase !== "racing"){ GHOST.mesh.visible = false; return; }
   const u = lt/0.1, i = Math.floor(u), f = u - i;
   if(i+1 >= D.length){ GHOST.mesh.visible = false; return; }
-  const a = D[i], b = D[i+1];
-  let dh = b[3] - a[3];
-  while(dh >  Math.PI) dh -= Math.PI*2;
-  while(dh < -Math.PI) dh += Math.PI*2;
-  GHOST.mesh.position.set(a[0]+(b[0]-a[0])*f, a[1]+(b[1]-a[1])*f, a[2]+(b[2]-a[2])*f);
-  GHOST.mesh.rotation.set(0, a[3] + dh*f, 0);
+  /* a smooth curve through the samples (Catmull-Rom), so it follows the line you drove
+     round a bend instead of cutting straight across it from one sample to the next */
+  const p0 = D[Math.max(0, i-1)], a = D[i], b = D[i+1], p3 = D[Math.min(D.length-1, i+2)];
+  const cr = (k, un)=>{
+    const unwrap = (v, ref)=>{ if(!un) return v; while(v - ref > Math.PI) v -= Math.PI*2; while(v - ref < -Math.PI) v += Math.PI*2; return v; };
+    const A = unwrap(p0[k], a[k]), B = a[k], C = unwrap(b[k], a[k]), E = unwrap(p3[k], C);
+    const f2 = f*f, f3 = f2*f;
+    return 0.5*((2*B) + (-A + C)*f + (2*A - 5*B + 4*C - E)*f2 + (-A + 3*B - 3*C + E)*f3);
+  };
+  GHOST.mesh.position.set(cr(0), cr(1), cr(2));
+  GHOST.mesh.rotation.order = "YXZ";
+  GHOST.mesh.rotation.set(cr(4), cr(3, true), cr(5));
+  // the wheels turn at the speed it is going
+  const sp = Math.hypot(b[0] - a[0], b[2] - a[2])/0.1;
+  GHOST.spin = (GHOST.spin || 0) + sp*(1/60)/(GHOST.mesh.userData.wheelR || WHEEL_R);
+  (GHOST.mesh.userData.wheels || []).forEach(w=> w.mesh.rotation.x = GHOST.spin);
   // fade it out when it sits on top of you, or you can't see your own car
   const near = Math.hypot(GHOST.mesh.position.x - pose.x, GHOST.mesh.position.z - pose.z);
   GHOST.mesh.visible = near > 3.5;
@@ -14026,14 +14735,14 @@ function onLap(lt, prevBest){
   // the lap to beat, 10m at a time: a clean full lap only (not one cut short across a branch start)
   if(TRACE.cur.length > 5 && (TRACE.best === null || lt < TRACE.bestLap)){
     TRACE.best = TRACE.cur.slice(); TRACE.bestLap = lt;
-    if(!TRACK.test && (rec.bestLap == null || lt < rec.bestLap)) rec.trace = TRACE.best;
+    if(!TRACK.test && (rec.bestLap == null || lt < rec.bestLap)){ rec.trace = TRACE.best; rec.ghostSig = trackSig(); }
   }
   TRACE.cur = [];
   if(!TRACK.test && (rec.bestLap == null || lt < rec.bestLap)){
     const first = rec.bestLap == null;
     rec.bestLap = lt;
     if(GHOST.rec.length > 20){
-      rec.ghost = GHOST.rec;
+      rec.ghost = GHOST.rec; rec.ghostSig = trackSig();
       if(MODE === "trial") GHOST.data = rec.ghost;       // chase the lap you just set
     }
     persist();
@@ -14385,8 +15094,9 @@ function resetRace(){
   GAME.wrongT = 0; GAME.stuckT = 0; GAME.placePrev = 0; GAME.placeT = 0;
   GAME.lapRecord = false; GAME.raceRecord = false; GAME.orbitA = 0;
   BANNER.dur = 0; SPLIT.t = 0; GHOST.rec = [];
-  if(MODE === "trial") GHOST.data = recordFor().ghost || null;
-  TRACE.cur = []; TRACE.best = recordFor().trace || null; TRACE.bestLap = recordFor().bestLap;
+  if(MODE === "trial") GHOST.data = ghostFor(recordFor());
+  // (the splits to beat are from the same lap as the ghost: gone with it if the course has changed)
+  TRACE.cur = []; TRACE.best = recordFor().ghostSig === trackSig() ? recordFor().trace || null : null; TRACE.bestLap = recordFor().bestLap;
   NOTES.forEach(n=> n.calledLap = 0);
   if(window.speechSynthesis) try{ speechSynthesis.cancel(); }catch(e){}
   AUD.musicMode = "race";
@@ -14770,16 +15480,17 @@ const SEASON_COL = { summer:"#8fd06a", fall:"#f08a2a", winter:"#8fd3f4", desert:
 function showTracks(mode, group){
   const exped = mode === "expedition";
   let ids, gi = 0;
+  const pickCur = mode === "online" && NET.on && NET.pick != null ? NET.pick : TRACK_ID;
   if(exped) ids = TRACKS.map((t,i)=>i).filter(i=> TRACKS[i].expedition);
   else {
-    gi = group !== undefined ? group : Math.max(0, GP_GROUPS.findIndex(x=> x.ids.includes(TRACK_ID)));
+    gi = group !== undefined ? group : Math.max(0, GP_GROUPS.findIndex(x=> x.ids.includes(pickCur)));
     ids = GP_GROUPS[gi].ids;
   }
   const tabs = exped ? '' : '<div class="cuptabs">' + GP_GROUPS.map((x, k)=>
       '<button class="cuptab hasTro' + (k === gi ? ' on' : '') + '" style="--tkc:' + SEASON_COL[(TRACKS[x.ids[0]] || {}).season || "summer"] + '" data-act="cup" data-cup="' + k + '">' +
       trophySVG(x.kind, x.cup === undefined ? "special" : (cupMetal(x.cup) === "none" ? "gold" : cupMetal(x.cup))) +
       '<span class="ttx"><span>' + esc(x.short) + '</span><small>' + x.ids.length + (x.ids.length === 1 ? ' circuit' : ' circuits') + '</small></span></button>').join("") + '</div>';
-  const at = ids.indexOf(TRACK_ID);
+  const at = ids.indexOf(pickCur);
   openScreen("scTracks",
     '<div style="width:100%;max-width:980px;margin:auto 0">' +
     '<h2 class="head">' + esc(MODES[mode].label) + (exped ? ': choose a mountain' : ': choose a circuit') + '</h2>' + tabs +
@@ -14852,6 +15563,7 @@ function showChamp(){
     '<button class="item" data-act="fall" data-k="1">' + trophySVG("fall", cupMetal(1)) + '<span>' + (C ? 'NEW ' : 'START ') + 'FALL CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds in the maples') + '</small></button>' +
     '<button class="item" data-act="winter" data-k="2">' + trophySVG("winter", cupMetal(2)) + '<span>' + (C ? 'NEW ' : 'START ') + 'WINTER CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds on snow and ice') + '</small></button>' +
     '<button class="item" data-act="desert" data-k="3">' + trophySVG("desert", cupMetal(3)) + '<span>' + (C ? 'NEW ' : 'START ') + 'DESERT CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds in the red rock') + '</small></button>' +
+    '<button class="item" data-act="swamp" data-k="4">' + trophySVG("swamp", cupMetal(4)) + '<span>' + (C ? 'NEW ' : 'START ') + 'SWAMP CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds in the bayou') + '</small></button>' +
     '<button class="item back" data-act="back"><span>BACK</span></button></div></div>' +
     '<div class="right"><div id="cupNote"></div>' +
     (C ? standingsTable() : '<div class="note"><p>Three laps a round. Finish first for 10 points, then 6, 4 and 3. Most points at the end takes the cup.</p></div>') +
@@ -14867,6 +15579,7 @@ function showChamp(){
              fall:()=> start(1),
              winter:()=> start(2),
              desert:()=> start(3),
+             swamp:()=> start(4),
              back:()=>{ SFX.back(); showMain(0); } } });
   MENU.onSel(MENU.items[MENU.sel]);
 }
@@ -15098,12 +15811,15 @@ async function netTransport(code, meta, h){
 
 /* ---- joining, leaving ---- */
 function netMeta(){
-  return { id:NET.id, name:NET.name, paint:NET_PAINT(), host:NET.host, track:TRACK_ID, racing:NET.racing, at:NET.joinedAt };
+  return { id:NET.id, name:NET.name, paint:NET_PAINT(), host:NET.host, track:TRACK_ID, pick:NET.pick, racing:NET.racing, at:NET.joinedAt };
 }
 async function netJoin(code, opts){
   if(NET.on) netLeave(true);
   Object.assign(NET, { on:true, code, id:netNewId(), name:opts.name, host:!!opts.host, racing:false, status:"connecting",
-                       joinedAt:opts.at || Date.now(), metas:[], wantTrack:null });
+                       joinedAt:opts.at || Date.now(), metas:[], wantTrack:null, pick:TRACK_ID,
+                       // (after the host took everyone to a new circuit: start once they have all arrived)
+                       auto: opts.auto ? {n:opts.auto, t:performance.now()} : null });
+  clearInterval(NET.autoTimer); NET.autoTimer = setInterval(netAutoStart, 500);
   try{ history.replaceState(null, "", "#track=" + TRACK_ID + "&room=" + code + (NET.mock ? "&mocknet=1" : "")); }catch(e){}
   try{
     NET.tx = await netTransport(code, netMeta(), {
@@ -15114,6 +15830,22 @@ async function netJoin(code, opts){
     });
   } catch(e){ NET.status = "offline: " + (e.message || e); netRefresh(); }
   addEventListener("beforeunload", netBye);
+}
+/* Everyone travelled to the new circuit: the host starts as soon as they are all back in the
+   room here (or after 25 seconds, for anyone whose page is slow), with a moment to connect */
+function netAutoStart(){
+  // (and the lobby's JUST JOINED marks wear off)
+  if(NET.on && MENU.id === "scLobby"){
+    const fresh = [...NET.peers.values()].filter(p=> performance.now() - p.since < 5000).length;
+    if(fresh !== NET.freshN){ NET.freshN = fresh; if(!NET.auto) netRefresh(); }
+  }
+  if(!NET.on || !NET.auto || NET.racing) return;
+  if(!netIsHost()){ NET.auto = null; return; }
+  const here = NET.metas.filter(m=> m.track === TRACK_ID && !m.racing).length;
+  const waited = (performance.now() - NET.auto.t)/1000;
+  NET.auto.here = here;
+  if((here >= NET.auto.n && waited > 3) || waited > 25){ NET.auto = null; netStart(); }
+  else netRefresh();
 }
 function netBye(){ if(NET.tx) NET.tx.leave(); }
 function netLeave(quiet){
@@ -15136,7 +15868,9 @@ function netSync(list){
   NET.metas = list.filter(m=> m && m.id).slice(0, NET_CFG.max + 2);
   const ids = new Set(NET.metas.map(m=> m.id));
   // new faces: a car for each, and a direct line to them
-  NET.metas.forEach(m=>{ if(m.id !== NET.id && !NET.peers.has(m.id)) netAddPeer(m); else if(NET.peers.has(m.id)) netUpdatePeer(NET.peers.get(m.id), m); });
+  let arrived = false;
+  NET.metas.forEach(m=>{ if(m.id !== NET.id && !NET.peers.has(m.id)){ netAddPeer(m); arrived = true; } else if(NET.peers.has(m.id)) netUpdatePeer(NET.peers.get(m.id), m); });
+  if(arrived && MENU.id === "scLobby") SFX.ok();
   // gone from the room: dropped, unless their car is still talking to us directly (the room blinked)
   NET.ids = ids;
   NET.peers.forEach((p, id)=>{ if(!ids.has(id) && !netAlive(p)) netDropPeer(p); });
@@ -15239,6 +15973,9 @@ function netEvent(ev, d){
     NET.wantTrack = d.id; travel(d.id, {mode:"online", room:NET.code, name:NET.name, at:NET.joinedAt});
   }
   if(ev === "start" && fromHost && d.track === TRACK_ID) netBegin(d.grid || []);
+  if(ev === "go" && fromHost && typeof d.track === "number" && TRACKS[d.track] && d.track !== TRACK_ID && !NET.wantTrack){
+    NET.wantTrack = d.track; travel(d.track, {mode:"online", room:NET.code, name:NET.name, at:NET.joinedAt});
+  }
   if(ev === "abort" && fromHost && NET.racing){ NET.racing = false; enterMenuWorld(); showLobby(); }
   if(ev === "fin"){ const p = NET.peers.get(d.from); if(p && typeof d.time === "number") p.car.finish = d.time; }
 }
@@ -15261,6 +15998,13 @@ function netBegin(grid){
 }
 function netStart(){
   if(!netIsHost()) return;
+  // another circuit: everyone goes there, and the race starts once they have all arrived
+  if(NET.pick != null && NET.pick !== TRACK_ID && TRACKS[NET.pick]){
+    const n = Math.max(1, NET.metas.length);
+    NET.tx && NET.tx.send("go", {from:NET.id, host:true, track:NET.pick});
+    travel(NET.pick, {mode:"online", room:NET.code, name:NET.name, host:true, at:NET.joinedAt, auto:n});
+    return;
+  }
   // the grid: host on pole, then everyone in the order they came
   const grid = NET.metas.slice().sort((a, b)=> (b.id === NET.id) - (a.id === NET.id) || a.at - b.at).map(m=> m.id);
   NET.tx.send("start", {from:NET.id, host:true, track:TRACK_ID, grid});
@@ -15332,10 +16076,10 @@ async function netPostLap(lapS, raceS, online){
     await sb.from("laps").insert({ track:TRACK.name, name, lap_ms:Math.round(lapS*1000), race_ms: raceS ? Math.round(raceS*1000) : null, online:!!online });
   } catch(e){}
 }
-async function netBoard(){
+async function netBoard(name){
   try{
     const sb = await netClient(); if(!sb) return null;
-    const { data } = await sb.from("laps").select("name,lap_ms").eq("track", TRACK.name).order("lap_ms", {ascending:true}).limit(40);
+    const { data } = await sb.from("laps").select("name,lap_ms").eq("track", name || TRACK.name).order("lap_ms", {ascending:true}).limit(40);
     // one line per driver: their best
     const best = new Map(); (data || []).forEach(r=>{ if(!best.has(r.name)) best.set(r.name, r.lap_ms); });
     return [...best.entries()].slice(0, 10);
@@ -15356,14 +16100,14 @@ function showOnline(prefill){
     '<div class="cols"><div class="left"><h2 class="head">Online race</h2>' +
     '<label class="dimtx" for="netName">YOUR NAME</label><input id="netName" maxlength="16" autocomplete="off" value="' + esc(nick) + '" ' + netInputStyle() + '>' +
     '<div class="menu" style="margin-top:14px">' +
-    '<button class="item" data-act="host"><span>HOST A RACE</span><small>pick a circuit, get a code to share</small></button>' +
+    '<button class="item" data-act="host"><span>HOST A RACE</span><small>open a room, share the code, pick the circuit</small></button>' +
     '<button class="item" data-act="join"><span>JOIN WITH CODE</span></button>' +
     '</div><input id="netCode" maxlength="4" autocomplete="off" placeholder="CODE" value="' + esc(prefill || "") + '" ' + netInputStyle() + '>' +
     '<div class="menu" style="margin-top:14px"><button class="item back" data-act="back"><span>BACK</span></button></div>' +
     '<p class="dimtx" id="netMsg" style="margin-top:10px"></p></div>' +
-    '<div class="right"><div class="note detail"><p>Race up to five friends. The host picks the circuit and starts; everyone else joins with the code, or with the link the lobby shows. Three laps, no computer rivals, and your best lap goes on the circuit\'s leaderboard.</p></div></div></div>',
+    '<div class="right"><div class="note detail"><p>Race up to five friends. The host opens a room and shares the code (or the invite link). Everyone waits in the lobby, where you can see who has joined; then the host picks the circuit and starts, and the whole room goes there together. Three laps, no computer rivals, and your best lap goes on the circuit\'s leaderboard.</p></div></div></div>',
     { sel: prefill ? 1 : 0, back: ()=> showMain(MI("online")),
-      acts:{ host: ()=>{ if(!netSaveNick()) return; SFX.ok(); NET.pendingHost = netCode(); showTracks("online"); },
+      acts:{ host: ()=>{ if(!netSaveNick()) return; SFX.ok(); netEnter(netCode(), true); },
              join: ()=>{ if(!netSaveNick()) return; const c = (document.getElementById("netCode").value || "").toUpperCase().replace(/[^A-Z]/g, "");
                          if(c.length !== 4){ netMsg("Type the four letter code first."); document.getElementById("netCode").focus(); return; }
                          SFX.ok(); netEnter(c, false); },
@@ -15384,39 +16128,51 @@ function netEnter(code, host){
 }
 /* the host picked a circuit: go there with the room */
 function netPickTrack(id){
-  const code = NET.on ? NET.code : (NET.pendingHost || netCode());
-  if(NET.on && NET.tx) NET.tx.send("track", {from:NET.id, host:true, id});
-  if(id === TRACK_ID){ if(NET.on) showLobby(); else netEnter(code, true); return; }
-  travel(id, {mode:"online", room:code, name:netNick(), host:true, at:NET.on ? NET.joinedAt : Date.now()});
+  if(!NET.on){ netEnter(netCode(), true); }
+  NET.pick = id; netTrackMe();
+  showLobby(1);
+}
+function netPickName(){
+  const hm = NET.metas.find(m=> m.id === netHostId());
+  const id = netIsHost() ? NET.pick : hm && typeof hm.pick === "number" ? hm.pick : TRACK_ID;
+  return (TRACKS[id] || TRACK).name;
 }
 function netLink(){ return location.origin + location.pathname + "#room=" + NET.code; }
 function showLobby(sel){
   if(!NET.on) return showOnline();
-  const host = netIsHost(), me = NET.id;
-  const rows = NET.metas.slice().sort((a, b)=> a.at - b.at).map(m=>{
+  const host = netIsHost(), me = NET.id, now = performance.now();
+  const list = NET.metas.slice().sort((a, b)=> a.at - b.at);
+  if(!list.some(m=> m.id === me)) list.unshift(netMeta());
+  const rows = list.map(m=>{
     const p = NET.peers.get(m.id);
-    const link = m.id === me ? "you" : p ? (p.open ? "direct" : p.relay ? "relay" : "connecting") : "";
+    const fresh = p && now - p.since < 5000;
+    const link = m.id === me ? "you" : m.racing ? "racing" : m.track !== TRACK_ID ? "on the way" : p ? (p.open ? "ready" : p.relay ? "ready (relay)" : "connecting") : "";
     return '<tr' + (m.id === me ? ' class="you"' : '') + '><td class="p"><span style="display:inline-block;width:14px;height:14px;border:2px solid #000;border-radius:50%;background:' + esc(m.paint || "#ccc") + '"></span></td>' +
-      '<td class="n">' + esc(m.name || "Friend") + (m.id === netHostId() ? ' (host)' : '') + '</td><td class="x">' + (m.racing ? 'racing' : link) + '</td></tr>';
-  }).join("");
+      '<td class="n">' + esc(m.name || "Friend") + (m.id === netHostId() ? ' (host)' : '') + (fresh ? ' <b style="color:#ffd23f">JUST JOINED</b>' : '') + '</td><td class="x">' + link + '</td></tr>';
+  });
+  for(let k=list.length; k<Math.min(NET_CFG.max, list.length + 2); k++) rows.push('<tr><td class="p"></td><td class="n dimtx">waiting for a friend…</td><td class="x"></td></tr>');
+  const n = list.length, pick = netPickName();
+  const arriving = NET.auto ? 'everyone is on their way: ' + (NET.auto.here || 1) + ' of ' + NET.auto.n + ' here' : '';
   openScreen("scLobby",
-    '<div class="cols" style="align-items:flex-start"><div class="left"><h2 class="head">Room ' + esc(NET.code) + '</h2>' +
-    '<p class="dimtx">' + esc(TRACK.name) + ' · ' + NET_CFG.laps + ' laps · ' + esc(NET.status) + '</p>' +
+    '<div class="cols" style="align-items:flex-start"><div class="left"><h2 class="head">Lobby</h2>' +
+    '<p style="margin:2px 0 6px">ROOM CODE <b style="font-size:30px;letter-spacing:4px;background:#000;color:#ffd23f;padding:0 8px;border-radius:4px">' + esc(NET.code) + '</b></p>' +
+    '<p class="dimtx">Circuit: <b>' + esc(pick) + '</b> · ' + NET_CFG.laps + ' laps · ' + esc(NET.status) + '</p>' +
     '<div class="menu" style="margin-top:12px">' +
-    (host ? '<button class="item" data-act="go"><span>START RACE</span><small>' + (NET.metas.length > 1 ? NET.metas.length + ' drivers' : 'waiting for friends: you can start alone') + '</small></button>' +
-            '<button class="item" data-act="track"><span>CHANGE CIRCUIT</span></button>'
-          : '<button class="item" data-act="wait"><span>WAITING FOR THE HOST</span><small>the race starts when they press start</small></button>') +
-    '<button class="item" data-act="copy"><span>COPY INVITE LINK</span></button>' +
+    (host ? '<button class="item" data-act="go"><span>START RACE</span><small>' + esc(arriving || (pick + ' · ' + (n > 1 ? n + ' drivers' : 'nobody else yet: you can start alone'))) + '</small></button>' +
+            '<button class="item" data-act="track"><span>CHOOSE CIRCUIT</span><small>' + esc(pick) + '</small></button>'
+          : '<button class="item" data-act="wait"><span>WAITING FOR THE HOST</span><small>' + esc(arriving || ('they pick the circuit and start: ' + pick + ' so far')) + '</small></button>') +
+    '<button class="item" data-act="copy"><span>COPY INVITE LINK</span><small>or tell them the code</small></button>' +
     '<button class="item back" data-act="leave"><span>LEAVE ROOM</span></button></div>' +
     '<input id="netLinkBox" readonly value="' + esc(netLink()) + '" ' + netInputStyle().replace("text-transform:uppercase", "font-size:14px") + '></div>' +
-    '<div class="right"><table class="grid">' + rows + '</table><h2 class="head" style="margin-top:16px;font-size:18px">Best laps here</h2><div id="netBoard"><p class="dimtx">Loading…</p></div></div></div>',
+    '<div class="right"><h2 class="head" style="font-size:18px">Drivers ' + n + '/' + NET_CFG.max + '</h2><table class="grid">' + rows.join("") + '</table>' +
+    '<h2 class="head" style="margin-top:16px;font-size:18px">Best laps: ' + esc(pick) + '</h2><div id="netBoard"><p class="dimtx">Loading…</p></div></div></div>',
     { sel: sel || 0, back: ()=>{ SFX.back(); netLeave(); showMain(MI("online")); },
       acts:{ go: ()=>{ SFX.ok(); netStart(); },
              track: ()=>{ SFX.ok(); showTracks("online"); },
              wait: ()=>{ SFX.move(); },
              copy: ()=>{ const b = document.getElementById("netLinkBox"); try{ navigator.clipboard.writeText(netLink()); }catch(e){ if(b){ b.select(); document.execCommand && document.execCommand("copy"); } } SFX.ok(); },
              leave: ()=>{ SFX.back(); netLeave(); showMain(MI("online")); } } });
-  netBoard().then(rows=>{ const el = document.getElementById("netBoard"); if(el) el.innerHTML = netBoardHTML(rows); });
+  netBoard(pick).then(rows=>{ const el = document.getElementById("netBoard"); if(el) el.innerHTML = netBoardHTML(rows); });
 }
 /* redraw the lobby as people come and go, without losing the selection */
 function netRefresh(){
@@ -15525,7 +16281,7 @@ function boot(){
   try{ b = JSON.parse(sessionStorage.getItem(BOOT_KEY) || "null"); sessionStorage.removeItem(BOOT_KEY); }catch(e){}
   document.getElementById("loading").classList.add("gone");
   const roomLink = (location.hash.match(/(?:^|[#&])room=([A-Za-z]{4})/) || [])[1];
-  if(b && b.mode === "online" && b.room){ netJoin(b.room, {name:b.name || netNick(), host:!!b.host, at:b.at}); showLobby(); }
+  if(b && b.mode === "online" && b.room){ netJoin(b.room, {name:b.name || netNick(), host:!!b.host, at:b.at, auto:b.auto}); showLobby(); }
   else if(roomLink){ showOnline(roomLink.toUpperCase()); }
   else if(b && b.mode === "champ" && SAVE.champ && !SAVE.champ.done) showChampIntro();
   else if(b && b.then === "ready" && MODES[b.mode]) showReady(b.mode);
