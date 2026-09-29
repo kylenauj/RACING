@@ -10989,8 +10989,10 @@ function buildWagon(opts){
     bodyColor: opt.paint || "#7a3b2e",
     beater: !!opt.beat || (opt.rust || 0) >= 50,   // junkyard door, rust, tape, bare wheel
     sport: opt.model === 1,                        // the low sporty wagon instead of the box
+    woodie: opt.model === 2,                       // the box, with wood down its flanks and across the tailgate
+    safari: opt.model === 3,                       // the box, jacked up, on steel bumpers, with a snorkel and running boards
     fender: opt.fender | 0,                        // 0 stock, 1 flares, 2 wide off-road with flaps
-    rim: opt.rim | 0,                              // 0 steel, 1 five spoke, 2 rally white, 3 gold
+    rim: opt.rim | 0,                              // 0 steel, 1 five spoke, 2 rally white, 3 gold, 4 black steel, 5 chrome dish, 6 bronze
     ws: [0.9, 1, 1.14][opt.wheel === undefined ? 1 : opt.wheel],
     livery: opt.livery | 0,                        // 0 plain, 1 stripes, 2 rally number
     acc: acc || { rack: true, spare: cargo, cans: cargo }
@@ -11001,7 +11003,7 @@ function buildWagon(opts){
   g.name = "stationWagon";
   const shell = new THREE.Group();
   // bigger wheels lift the whole body, and the garage's ride height sets it lower or higher on its springs
-  const TWR = WHEEL_R*o.ws, LIFT = TWR - WHEEL_R + [-0.06, 0, 0.08][opt.ride === undefined ? 1 : (opt.ride | 0)];
+  const TWR = WHEEL_R*o.ws, LIFT = TWR - WHEEL_R + [-0.06, 0, 0.08][opt.ride === undefined ? 1 : (opt.ride | 0)] + (o.safari ? 0.12 : 0);
   shell.position.y = RIDE + LIFT;          // body sits up on its springs
   g.add(shell);
   // the model is drawn from the ground up; the shell's rest height is RIDE,
@@ -11054,6 +11056,22 @@ function buildWagon(opts){
   M.stripe.color.set(STRIPES[opt.stripe | 0] ? STRIPES[opt.stripe | 0].hex : "#f2efe6");
   if(opt.tint) M.glass.color.set(0x07090b);
   M.pod = mat(0x23262b, { roughness: 0.45, metalness: 0.25 });
+  // the newer garage options: a two-tone roof, a matte hood, the extra rims, the whitewalls,
+  // the wood trim, the tent, the stickers, and the lamps' colour
+  const ROOFS = [null, 0xefece4, 0x1d1d1d, 0xe3d7b0, 0x8a5a34];
+  M.roof = ROOFS[opt.roof | 0] === null || ROOFS[opt.roof | 0] === undefined ? M.paint : mat(ROOFS[opt.roof | 0], { roughness: 0.7 });
+  M.matte = mat(0x1a1a1a, { roughness: 1 });
+  M.rimB = mat(0x1d1d1f, { roughness: 0.55, metalness: 0.5 });
+  M.rimC = mat(0xe6e6e2, { roughness: 0.15, metalness: 0.95, envMapIntensity: 1.3 });
+  M.rimBr = mat(0x8a6232, { roughness: 0.35, metalness: 0.8, envMapIntensity: 1.1 });
+  M.white = mat(0xeeebe2, { roughness: 0.8 });
+  M.ash = mat(0xd8c69c, { roughness: 0.8 });
+  M.woodP = mat(0x7a4a26, { roughness: 0.85 });
+  M.tent = mat([0x3f4a36, 0x8a3a24, 0x2a3a4e][(opt.tent | 0) > 0 ? (opt.tent | 0) - 1 : 0], { roughness: 0.9 });
+  M.decA = mat(0xe0b21e, { roughness: 0.7 }); M.decB = mat(0xc2382a, { roughness: 0.7 }); M.decC = mat(0x2f6fa8, { roughness: 0.7 });
+  M.flameO = mat(0xe0601e, { roughness: 0.6, side: THREE.DoubleSide }); M.flameY = mat(0xf2c23a, { roughness: 0.6, side: THREE.DoubleSide });
+  if((opt.lamps | 0) === 1){ M.head.color.set(0xffd84a); M.head.emissive.set(0xffc020); }            // French yellow
+  if((opt.lamps | 0) === 2){ M.head.color.set(0xdff0ff); M.head.emissive.set(0xa8d4ff); M.head.emissiveIntensity = 1.0; }   // cold white
   if(opt.dirt) ["paint","door","rust","trim","under","plastic","stripe","wood","tire","rim","rimW","rimG","rimS","steelB","chrome","jerry","jerryR","jerryX","jerryRX","plate","strap","pod",
                 "head","headDim","tail","amber","reverse","plateInk"]
     .forEach(k=>{ if(M[k]) dirtify(M[k]); });
@@ -11110,7 +11128,7 @@ function buildWagon(opts){
 
   // ---- Greenhouse ----
   extrude([[WSB, BELT], [WST, ROOF - 0.02], [RT, ROOF], [RB, BELT]], 1.58, M.glass);
-  box(1.66, 0.06, WST - RT + 0.2, M.paint, 0, ROOF + 0.01, (WST + RT)/2);
+  box(1.66, 0.06, WST - RT + 0.2, M.roof, 0, ROOF + 0.01, (WST + RT)/2);
   const BP = o.sport ? 0.25 : 0;
   const pillars = [
     [[WSB + 0.02, BELT], [WSB - 0.12, BELT], [WST - 0.06, ROOF - 0.01], [WST + 0.06, ROOF - 0.01]],
@@ -11141,7 +11159,11 @@ function buildWagon(opts){
     box(0.3, 0.16, 0.04, o.beater ? M.headDim : M.head, -0.6, 0.64, 2.35);
     box(0.12, 0.08, 0.04, M.amber, 0.8, 0.5, 2.34);
     box(0.12, 0.08, 0.04, M.amber, -0.8, 0.5, 2.34);
-    box(1.86, 0.14, 0.14, M.chrome, 0, 0.36, 2.38);
+    if(o.safari){
+      // a black steel bumper, deep and square, with recovery eyes and a guard over each lamp
+      box(1.98, 0.22, 0.22, M.matte, 0, 0.36, 2.42);
+      for (const s of [1, -1]) { cyl(0.05, 0.03, 8, M.decB, 'x', s * 0.5, 0.36, 2.55); for (let i = 0; i < 3; i++) box(0.02, 0.2, 0.02, M.matte, s * 0.6 + (i - 1)*0.1, 0.64, 2.4); }
+    } else box(1.86, 0.14, 0.14, M.chrome, 0, 0.36, 2.38);
   }
   for (const s of [1, -1]) {
     if(!o.sport){
@@ -11208,12 +11230,12 @@ function buildWagon(opts){
     box(1.5, 0.05, 0.34, M.paint, 0, ROOF + 0.13, RT - 0.05).rotation.x = -0.1;
     for (const s of [1, -1]) box(0.05, 0.12, 0.12, M.plastic, s * 0.55, ROOF + 0.06, RT + 0.02);
   } else {
-    box(1.62, 0.03, 0.2, M.paint, 0, ROOF + 0.04, RT - 0.12).rotation.x = -0.12;
+    box(1.62, 0.03, 0.2, M.roof, 0, ROOF + 0.04, RT - 0.12).rotation.x = -0.12;
   }
 
   const rearBumper = new THREE.Group();
   car.add(rearBumper);
-  box(1.86, 0.14, 0.14, o.sport ? M.plastic : M.chrome, 0, 0.36, -2.38, rearBumper);
+  box(o.safari ? 1.98 : 1.86, o.safari ? 0.22 : 0.14, o.safari ? 0.22 : 0.14, o.sport ? M.plastic : o.safari ? M.matte : M.chrome, 0, 0.36, -2.38, rearBumper);
   box(1.5, 0.025, 0.16, M.trim, 0, 0.44, -2.38, rearBumper);
   for (const s of [1, -1]) box(0.14, 0.14, 0.26, M.chrome, s * 0.86, 0.36, -2.25, rearBumper);
 
@@ -11337,6 +11359,87 @@ function buildWagon(opts){
     for (const s of [1, -1]) for (const k of [1, -1])
       box(len, 0.024, 0.008, M.trim, s * lp.x, lp.y, lp.z).rotation.z = k * a;
   }
+  // ---- the woodie: wood panels down both flanks and across the tailgate, framed in ash ----
+  if (o.woodie) {
+    for (const s of [1, -1]) {
+      const x = s * (SIDE + 0.008);
+      box(0.012, 0.3, 3.3, M.woodP, x, 0.64, -0.3);
+      for (const y of [0.49, 0.79]) box(0.02, 0.05, 3.36, M.ash, s * (SIDE + 0.014), y, -0.3);
+      for (const z of [1.34, 0.06, -1.14, -1.94]) box(0.02, 0.34, 0.05, M.ash, s * (SIDE + 0.014), 0.64, z);
+    }
+    box(1.2, 0.3, 0.012, M.woodP, 0, 0.66, REAR - 0.004);
+    for (const y of [0.5, 0.82]) box(1.26, 0.04, 0.02, M.ash, 0, y, REAR - 0.01);
+  }
+  // ---- the safari: running boards, and a snorkel up the passenger's pillar ----
+  if (o.safari) {
+    for (const s of [1, -1]) {
+      box(0.22, 0.04, 2.0, M.matte, s * (SIDE + 0.12), 0.28, 0.05);
+      for (const z of [0.8, -0.7]) box(0.14, 0.12, 0.05, M.matte, s * (SIDE + 0.06), 0.33, z);
+    }
+  }
+  if (o.safari || A.snorkel) {
+    const sx = -(SIDE + 0.07), sz = WSB - 0.22;
+    cyl(0.055, ROOF + 0.12 - 0.62, 8, M.plastic, 'y', sx, (ROOF + 0.12 + 0.62)/2, sz);
+    box(0.16, 0.12, 0.2, M.plastic, sx, ROOF + 0.16, sz + 0.05);
+    box(0.12, 0.06, 0.3, M.plastic, sx + 0.04, 0.62, sz + 0.1);
+  }
+  // ---- the hood ----
+  if ((opt.hood | 0) === 1) box(1.5, 0.01, o.sport ? 0.9 : 1.05, M.matte, 0, BELT + 0.014, o.sport ? 1.65 : 1.72).rotation.x = 0.08;
+  if ((opt.hood | 0) === 2 && !o.sport) { box(0.5, 0.09, 0.55, M.paint, 0, BELT + 0.02, 1.62); box(0.42, 0.05, 0.04, M.plastic, 0, BELT + 0.03, 1.9); }
+  if ((opt.hood | 0) === 3) for (const s of [1, -1]) box(0.3, 0.012, 0.9, M.matte, s * 0.45, BELT + 0.016, 1.72).rotation.x = 0.08;   // louvred vents
+  // ---- decals ----
+  const decal = opt.decal | 0;
+  if (decal === 1) {
+    // sponsor stickers on the doors and the back glass
+    for (const s of [1, -1]) {
+      const x = s * (SIDE + 0.01);
+      box(0.01, 0.12, 0.5, M.decA, x, 0.74, 0.3); box(0.01, 0.08, 0.34, M.decB, x, 0.58, 0.25);
+      box(0.01, 0.1, 0.4, M.decC, x, 0.72, -0.75); box(0.01, 0.07, 0.28, M.white, x, 0.58, -0.8);
+    }
+    box(0.6, 0.08, 0.01, M.decA, 0, BELT + 0.12, RB - 0.02);
+  } else if (decal === 2) {
+    // hot rod flames licking back from the front wheels
+    const fl = new THREE.Shape(); fl.moveTo(0, 0);
+    [[0.35, 0.12], [0.55, 0.02], [0.8, 0.16], [1.05, 0.05], [1.35, 0.2], [1.1, 0.26], [0.85, 0.22], [0.6, 0.3], [0.3, 0.24], [0, 0.3]].forEach(p=> fl.lineTo(p[0], p[1]));
+    const flG = new THREE.ShapeGeometry(fl);
+    for (const s of [1, -1]) for (const [m, k, dy] of [[M.flameO, 1, 0], [M.flameY, 0.7, 0.05]]) {
+      const f = add(flG, m, s * (SIDE + 0.012 + (k < 1 ? 0.004 : 0)), 0.5 + dy, 2.2, car);
+      f.rotation.y = s > 0 ? Math.PI/2 : -Math.PI/2; f.scale.set(k, k, 1);
+      if (s < 0) { f.rotation.y = -Math.PI/2; f.position.z = 2.2; f.scale.x = -k; }
+    }
+  } else if (decal === 3) {
+    // a chequered band along each sill
+    for (const s of [1, -1]) for (let i = 0; i < 26; i++) for (const r of [0, 1])
+      box(0.01, 0.06, 0.13, (i + r) % 2 ? M.trim : M.white, s * (SIDE + 0.01), 0.42 + r*0.06, -1.7 + i*0.13);
+  }
+  // ---- the kit: ladder, tent, exhaust, whip aerial ----
+  if (A.ladder) {
+    const lx = -(SIDE + 0.05);
+    for (const z of [-1.95, -1.65]) cyl(0.02, ROOF - 0.35, 6, M.trim, 'y', lx, (ROOF + 0.45)/2 + 0.05, z);
+    for (let y = 0.5; y < ROOF; y += 0.18) cyl(0.015, 0.3, 6, M.trim, 'z', lx, y, -1.8);
+  }
+  if ((opt.tent | 0) > 0) {
+    // a folded rooftop tent in its hard cover, on the back half of the roof
+    const ty = A.rack ? RY + 0.05 : ROOF + 0.05, z0 = RZ1 + 0.35, z1 = RZ1 + 1.25;
+    box(1.34, 0.26, z1 - z0, M.tent, 0, ty + 0.13, (z0 + z1)/2);
+    box(1.36, 0.03, z1 - z0 + 0.02, M.matte, 0, ty + 0.27, (z0 + z1)/2);
+    box(1.36, 0.02, 0.02, M.white, 0, ty + 0.14, z1 + 0.005);
+    for (const zz of [z0 + 0.15, z1 - 0.15]) box(1.38, 0.28, 0.03, M.strap, 0, ty + 0.13, zz);
+  }
+  const ex = opt.exhaust | 0;
+  if (ex === 1) for (const s of [1, -1]) for (const d of [-0.06, 0.06]) cyl(0.045, 0.2, 10, M.chrome, 'z', s * 0.55 + d, 0.22, -2.5);
+  if (ex === 2) for (const s of [1, -1]) {
+    // side pipes along the sills, chrome, with a heat shield over them
+    cyl(0.055, 1.6, 10, M.chrome, 'z', s * (SIDE + 0.1), 0.3, -0.1);
+    box(0.08, 0.03, 1.2, M.matte, s * (SIDE + 0.1), 0.37, -0.1);
+    cyl(0.065, 0.08, 10, M.trim, 'z', s * (SIDE + 0.1), 0.3, -0.92);
+  }
+  if (A.whip) {
+    // a whip aerial on the back corner with a pennant on top, for being seen over the dunes
+    const wx = SIDE - 0.1, wz = RT + 0.1;
+    cyl(0.008, 2.2, 4, M.trim, 'y', wx, ROOF + 1.1, wz);
+    add(new THREE.PlaneGeometry(0.34, 0.2), new THREE.MeshLambertMaterial({color:0xff6a1a, side:THREE.DoubleSide}), wx, ROOF + 2.08, wz - 0.18).rotation.y = Math.PI/2;
+  }
   // ---- fenders ----
   if (o.fender > 0 || A.flaps) {
     const t = o.fender === 2 ? 0.2 : 0.12, out = o.fender === 2 ? 0.13 : 0.07;
@@ -11395,7 +11498,10 @@ function buildWagon(opts){
   const capGeo = new THREE.CylinderGeometry(0.08, 0.08, TW + 0.02, 6);
   capGeo.rotateZ(Math.PI / 2);
   const lugGeo = new THREE.BoxGeometry(0.255, 0.025, 0.025);
-  const rimMat = [M.rim, M.rimS, M.rimW, M.rimG][o.rim];
+  const rimMat = [M.rim, M.rimS, M.rimW, M.rimG, M.rimB, M.rimC, M.rimBr][o.rim] || M.rim;
+  const tyre = opt.tyre | 0;                        // 0 all terrain, 1 whitewall, 2 knobbly
+  const wwGeo = new THREE.CylinderGeometry(TWR*0.8, TWR*0.8, TW + 0.004, 16); wwGeo.rotateZ(Math.PI / 2);
+  const knobGeo = new THREE.BoxGeometry(TW + 0.03, 0.06, 0.1);
   const wheels = [];
   [[-TRACK, AXLE_F, true, true], [TRACK, AXLE_F, true, true],
    [-TRACK, AXLE_R, false, !o.beater], [TRACK, AXLE_R, false, true]].forEach(w=>{
@@ -11405,6 +11511,11 @@ function buildWagon(opts){
     const spin = new THREE.Group();
     pivot.add(spin);
     add(tireGeo, M.tire, 0, 0, 0, spin);
+    if (tyre === 1) add(wwGeo, M.white, 0, 0, 0, spin);
+    if (tyre === 2) for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2, k = add(knobGeo, M.tire, 0, Math.cos(a)*TWR, Math.sin(a)*TWR, spin);
+      k.rotation.x = -a;
+    }
     add(rimGeo, rimMat, 0, 0, 0, spin);
     if (o.rim === 0) {
       if (w[3]) add(capGeo, M.chrome, 0, 0, 0, spin);
@@ -11414,13 +11525,13 @@ function buildWagon(opts){
       }
     } else {
       // spokes: dark windows between them so the pattern reads as it turns
-      const n = o.rim === 1 ? 5 : o.rim === 2 ? 8 : 6;
+      const n = o.rim === 1 ? 5 : o.rim === 2 || o.rim === 4 ? 8 : o.rim === 5 ? 10 : 6;
       const hole = new THREE.CylinderGeometry(rr*0.2, rr*0.2, TW + 0.03, 8); hole.rotateZ(Math.PI/2);
       for (let i = 0; i < n; i++) {
         const a = (i / n) * Math.PI * 2 + Math.PI/n;
         add(hole, M.plastic, 0, Math.cos(a)*rr*0.6, Math.sin(a)*rr*0.6, spin);
       }
-      add(capGeo, o.rim === 3 ? M.rimG : M.chrome, 0, 0, 0, spin).scale.set(1, 0.7, 0.7);
+      add(capGeo, o.rim === 3 ? M.rimG : o.rim === 6 ? M.rimBr : o.rim === 4 ? M.trim : M.chrome, 0, 0, 0, spin).scale.set(1, 0.7, 0.7);
     }
     mergeStatic(spin);
     wheels.push({pivot, mesh: spin, steer: w[2]});
@@ -11461,6 +11572,14 @@ function buildWagon(opts){
   g.userData.flameCore = flameCore;
   g.userData.rearAxle = rearAxle;
   g.userData.wr = TWR; g.userData.lift = LIFT;
+  // the backfire's colour (the drift turbo keeps its own colours, which tell you the boost you have)
+  g.userData.flameBase = [[1.0, 0.64, 0.17], [0.35, 0.6, 1.0], [0.4, 1.0, 0.35], [0.85, 0.4, 1.0]][opt.flame | 0] || [1.0, 0.64, 0.17];
+  // underglow: a pool of coloured light under the body
+  const glowCol = [null, 0x2a7bff, 0x2aff6a, 0xff3ab8, 0xffa020][opt.glow | 0];
+  if (glowCol) for (const [w, l, op] of [[1.7, 4.0, 0.55], [2.6, 5.2, 0.22]]) {
+    const gp = new THREE.Mesh(new THREE.PlaneGeometry(w, l), new THREE.MeshBasicMaterial({color:glowCol, transparent:true, opacity:op, blending:THREE.AdditiveBlending, depthWrite:false}));
+    gp.rotation.x = -Math.PI/2; gp.position.set(0, 0.06 - LIFT*0.5, 0); gp.renderOrder = 5; g.add(gp);
+  }
   mergeStatic(car);
   return g;
 }
@@ -13625,7 +13744,7 @@ function stepCarInner(dt){
     if(drift.boostT > 0) want = Math.max(want, 0.75);
     const lvl = drift.on && drift.tier >= 0 ? drift.tier : drift.boostT > 0 ? drift.boostTier : -1;
     if(drift.on && drift.tier >= 0) want = Math.max(want, 0.5 + drift.tier*0.2);
-    const fc = lvl >= 0 ? DRIFT_TIERS[lvl].col : [1.0, 0.64, 0.17];
+    const fc = lvl >= 0 ? DRIFT_TIERS[lvl].col : (car.userData.flameBase || [1.0, 0.64, 0.17]);
     fl.material.color.setRGB(fc[0], fc[1], fc[2]);
     flc.material.color.setRGB(0.75 + fc[0]*0.25, 0.75 + fc[1]*0.25, 0.75 + fc[2]*0.25);
     if(sp > MAXV*0.92 && thr && Math.random() < 0.06) want = Math.max(want, 0.8);
@@ -14341,7 +14460,8 @@ const SAVE = (()=>{
                            res:1, hud:1, diff:1, units:1, gfx:0, look:0, paint:0, notes:1,
                            car:{ model:0, fender:0, rim:0, wheel:1, livery:0, beat:1,
                                  rack:1, spare:1, cans:1, shovel:0, lights:0, flaps:0, bull:0,
-                                 stripe:0, tint:0, pod:0, tape:0, ride:1 } },
+                                 stripe:0, tint:0, pod:0, tape:0, ride:1,
+                                 roof:0, hood:0, decal:0, lamps:0, glow:0, tyre:0, tent:0, exhaust:0, flame:0, snorkel:0, ladder:0, whip:0 } },
                 records:{}, champ:null };
   try{
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
@@ -14365,8 +14485,10 @@ function carOpts(){
   return { dirt: true, paint: PAINTS[Math.max(0, Math.min(PAINTS.length-1, S.paint|0))].hex, beat: !!C.beat, rust: C.beat ? 38 : 0,
            model: C.model, fender: C.fender, rim: C.rim, wheel: C.wheel, livery: C.livery,
            stripe: C.stripe | 0, tint: !!C.tint, ride: C.ride === undefined ? 1 : C.ride | 0,
+           roof: C.roof | 0, hood: C.hood | 0, decal: C.decal | 0, lamps: C.lamps | 0, glow: C.glow | 0, tyre: C.tyre | 0,
+           tent: C.tent | 0, exhaust: C.exhaust | 0, flame: C.flame | 0,
            acc: { rack: !!C.rack, spare: !!C.spare, cans: !!C.cans, shovel: !!C.shovel, lights: !!C.lights, flaps: !!C.flaps, bull: !!C.bull,
-                  pod: !!C.pod, tape: !!C.tape } };
+                  pod: !!C.pod, tape: !!C.tape, snorkel: !!C.snorkel, ladder: !!C.ladder, whip: !!C.whip } };
 }
 let carBuilt = "";
 function rebuildCar(){
@@ -15404,18 +15526,25 @@ const GCATS = [
 ];
 const withCat = (cat, O)=> Object.assign(O, {cat});
 const GOPTS = [
-  withCat(0, carKey("model",  "Wagon", ["Box wagon", "Sport wagon"],
-         "The box: a tall, square Swedish estate, all glass and chrome. The sport: low and raked, a hood scoop, a roof spoiler and fog lamps. They drive the same; pick the one you like.")),
+  withCat(0, carKey("model",  "Wagon", ["Box wagon", "Sport wagon", "Woodie", "Safari 4x4"],
+         "The box: a tall, square Swedish estate, all glass and chrome. The sport: low and raked, a hood scoop, a roof spoiler and fog lamps. The woodie: the box with real wood down its flanks and across the tailgate, framed in ash. The safari: the box jacked up on black steel bumpers, running boards and a snorkel. They all drive the same; pick the one you like.")),
   withCat(0, carKey("ride",   "Ride height", ["Lowered", "Stock", "Raised"], "How high the body sits on its springs. It is only the look: every setting drives the same.")),
   withCat(0, carKey("fender", "Fenders", ["Stock", "Box flares", "Wide off-road"], "Black plastic arches. The wide set pushes the wheels out and hangs mud flaps behind them.")),
   withCat(0, carKey("beat",   "Condition", ["Clean", "Patina"], "Patina is how it came from the lot: a junkyard door, rust, taped lights, one hubcap gone.")),
+  withCat(0, carKey("hood",   "Hood", ["Stock", "Matte black", "Scoop", "Vents"], "A flat black panel against the glare, a scoop (the sport has its own), or a pair of louvred vents.")),
+  withCat(0, carKey("exhaust","Exhaust", ["Stock", "Twin tips", "Side pipes"], "Twin chrome tips out the back, or pipes run down the sills.")),
   withCat(1, { key:"paint", label:"Paint", vals:PAINTS.map(p=>p.name), swatch:true, desc:"Factory colours, faded the way they would be after fifty winters.",
     get: ()=> SAVE.settings.paint | 0, set: v=>{ SAVE.settings.paint = v; } }),
   withCat(1, carKey("livery", "Livery", ["Plain", "Stripes", "Rally number"], "Twin stripes over the hood and roof, or a roundel on the doors and a stripe down the sills.")),
   withCat(1, Object.assign(carKey("stripe", "Stripe colour", STRIPES.map(s=>s.name), "What colour the stripes and the roundel are painted, for the Stripes and Rally number liveries."),
                            {swatch:true, swatchList:STRIPES})),
   withCat(1, carKey("tint",   "Windows", ["Clear", "Tinted"], "Tinted glass, nearly black from the outside.")),
-  withCat(2, carKey("rim",    "Rims", ["Steel", "Five spoke", "Rally white", "Gold"], "What the tyres are wrapped round.")),
+  withCat(1, carKey("roof",   "Roof", ["Body colour", "White", "Black", "Cream", "Wood grain"], "A two-tone roof: the roof panel and the lip at the back in a colour of its own.")),
+  withCat(1, carKey("decal",  "Decals", ["None", "Sponsor stickers", "Flames", "Chequers"], "Stickers on the doors and the back glass, hot rod flames off the front wheels, or a chequered band along the sills.")),
+  withCat(1, carKey("lamps",  "Headlamps", ["Warm", "Yellow", "Cold white"], "The colour of the lamps: yellow, the old French rally way, or a hard blue-white.")),
+  withCat(1, carKey("glow",   "Underglow", ["Off", "Blue", "Green", "Pink", "Amber"], "Coloured light on the ground under the car.")),
+  withCat(2, carKey("rim",    "Rims", ["Steel", "Five spoke", "Rally white", "Gold", "Black steel", "Chrome dish", "Bronze"], "What the tyres are wrapped round.")),
+  withCat(2, carKey("tyre",   "Tyres", ["All terrain", "Whitewall", "Knobbly"], "A white band on the sidewall for the woodie, or big knobbly blocks for the mud.")),
   withCat(2, carKey("wheel",  "Wheel size", ["Small", "Stock", "Big"], "Big wheels lift the whole car on its springs.")),
   withCat(2, carKey("flaps",  "Mud flaps", onoff, "Behind every wheel.")),
   withCat(3, carKey("rack",   "Roof rack", onoff, "Bars on the roof. Without them the spare and the cans ride on the back.")),
@@ -15425,7 +15554,12 @@ const GOPTS = [
   withCat(3, carKey("shovel", "Shovel", onoff, "For the day it gets stuck.")),
   withCat(3, carKey("lights", "Rally lights", onoff, "Four spot lamps on a bar across the roof.")),
   withCat(3, carKey("tape",   "Lamp tape", onoff, "A black X of tape over each headlamp, the way rally cars keep the glass in one piece.")),
-  withCat(3, carKey("bull",   "Bull bar", onoff, "A push bar across the front."))
+  withCat(3, carKey("bull",   "Bull bar", onoff, "A push bar across the front.")),
+  withCat(3, carKey("snorkel","Snorkel", onoff, "An air intake run up the passenger's pillar, for the deep water. The safari always has one.")),
+  withCat(3, carKey("ladder", "Roof ladder", onoff, "A ladder up the back corner to the roof.")),
+  withCat(3, carKey("tent",   "Roof tent", ["Off", "Olive", "Rust", "Navy"], "A folded tent in its hard cover on the back of the roof.")),
+  withCat(3, carKey("whip",   "Whip aerial", onoff, "A tall aerial on the back corner with a pennant on top.")),
+  withCat(3, carKey("flame",  "Backfire", ["Orange", "Blue", "Green", "Violet"], "The colour of the flame out of the tailpipe on a shift. The drift turbo still burns its own colours, which tell you how much boost you have."))
 ];
 function optValue(O){
   if(O.get){
@@ -15556,7 +15690,7 @@ function showMain(sel){
     trial:"Three laps with the road to yourself. Your best lap on each circuit is saved and comes back as a ghost to chase.",
     exped:"No rivals, no laps, no map: a long day's climb. Wade the swamp, run up the creek, grind up the switchbacks and over the snow to the summit cairn, calling at every camp on the way; the compass points to the next one. The car is in low range, the mud holds you and anything steeper than about half is a wall, so pick your line.",
     online:"Race your friends over the internet: host a room, share the code or the link, and everyone races the same circuit live. Three laps, and your best lap goes on the circuit's leaderboard.",
-    garage:"Pick the box wagon or the sport wagon, then its paint, livery, fenders, rims, wheel size and the kit on the roof. Saved for every race.",
+    garage:"Pick your wagon (box, sport, woodie or safari), then its paint, roof, decals, lamps and underglow, its rims and tyres, and the kit: rack, tent, snorkel, ladder, lamps and more. Saved for every race.",
     opts:"Rival pace, sound, camera, gearbox and the arcade filter.",
     help:"Keyboard and gamepad controls, and how the drift turbo works."
   };
