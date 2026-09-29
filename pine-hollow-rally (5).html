@@ -13059,13 +13059,35 @@ function startAudio(){
   AUD.road = { mid:loop("bandpass", 900, 0.9), low:loop("lowpass", 140, 0.7), high:loop("highpass", 3200, 0.6),
                slide:loop("bandpass", 1500, 1.6), wade:loop("bandpass", 1100, 0.5) };
   AUD.wind = loop("lowpass", 500, 0.4);
+  // straight-cut gears: a thin whine that climbs with road speed in each gear, loudest on the overrun
+  { const o = actx.createOscillator(); o.type = "triangle"; const o2 = actx.createOscillator(); o2.type = "sine";
+    const bp = actx.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 2.2; const g = actx.createGain(); g.gain.value = 0;
+    const g2 = actx.createGain(); g2.gain.value = 0.35; o.connect(bp); o2.connect(g2); g2.connect(bp); bp.connect(g); g.connect(AUD.sfx); o.start(); o2.start();
+    AUD.whine = {o, o2, bp, g}; }
+  /* gravel: not a hiss but stones. A buffer of sparse ticks (each a tiny decaying click), looped
+     and played faster the faster you go, so you hear the stones pinging off the tyres and arches */
+  { const n = actx.sampleRate*3, b = actx.createBuffer(1, n, actx.sampleRate), d0 = b.getChannelData(0);
+    for(let i=0; i<n; ){ const len = 30 + Math.floor(Math.random()*160), a = Math.pow(Math.random(), 2.2)*(Math.random() < 0.08 ? 1 : 0.45);
+      for(let j=0;j<len && i + j < n;j++) d0[i + j] += (Math.random()*2 - 1)*a*Math.exp(-j/(len*0.25));
+      i += Math.floor(-Math.log(1 - Math.random())*actx.sampleRate/260); }
+    const src = actx.createBufferSource(); src.buffer = b; src.loop = true;
+    const hp = actx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 900; hp.Q.value = 0.6;
+    const pk = actx.createBiquadFilter(); pk.type = "peaking"; pk.frequency.value = 2600; pk.gain.value = 6; pk.Q.value = 0.8;
+    const g = actx.createGain(); g.gain.value = 0; src.connect(hp); hp.connect(pk); pk.connect(g); g.connect(AUD.sfx); src.start();
+    AUD.grit = {src, g, pk}; }
+  // the hollow under a deck: a low drum that swells as the plank knocks run together at speed
+  AUD.deck = loop("bandpass", 210, 1.4);
 
   // the three rivals, each a smaller engine panned to where it is
   for(let k=0;k<3;k++){
     const pan = actx.createStereoPanner ? actx.createStereoPanner() : null;
     const out = actx.createGain(); out.gain.value = 0;
-    if(pan){ out.connect(pan); pan.connect(AUD.sfx); } else out.connect(AUD.sfx);
-    AUD.rivals.push({e: makeEngine(out, false), out, pan});
+    // far off, the air takes the top off it
+    const air = actx.createBiquadFilter(); air.type = "lowpass"; air.frequency.value = 6000; air.Q.value = 0.5;
+    out.connect(air);
+    if(pan){ air.connect(pan); pan.connect(AUD.sfx); } else air.connect(AUD.sfx);
+    const e = makeEngine(out, false); e.voice = [0.86, 1.0, 1.16][k];          // each regular's car has its own note
+    AUD.rivals.push({e, out, pan, air});
   }
   AUD.seqNext = actx.currentTime + 0.1;
   setLevels();
@@ -13114,8 +13136,10 @@ function makeEngine(dest, full){
   return e;
 }
 function setEngine(e, rpm, load, vol, now, lag){
-  const fire = Math.max(24, rpm/20);               // six cylinders: three firings a turn
-  const f = fire*0.5*(1 + (Math.random() - 0.5)*0.018);   // the voice, an octave down, never quite steady
+  const fire = Math.max(24, rpm/20)*(e.voice || 1);          // six cylinders: three firings a turn
+  // never quite steady, but a slow drift (two slow sines), not a new random pitch every frame, which buzzed
+  e.ph = e.ph === undefined ? Math.random()*10 : e.ph;
+  const f = fire*0.5*(1 + 0.005*Math.sin(now*1.7 + e.ph) + 0.003*Math.sin(now*4.9 + e.ph*2));
   const r = Math.min(1.1, rpm/DRIVE.redline);
   e.a.frequency.setTargetAtTime(f, now, lag);
   e.b.frequency.setTargetAtTime(f, now, lag);
@@ -13274,8 +13298,17 @@ const SFX = {
   scrape(k){ burst(0.35, "bandpass", 2200, 0.2*k, 4, 0, 1500); burst(0.25, "bandpass", 700, 0.18*k, 2); },
   // a backfire on the upshift, or popping on the overrun
   pop(k){ burst(0.06, "lowpass", 900, 0.35*k, 0.8); tone(110, 0.07, "sine", 0.25*k, 60); },
-  crackle(k){ burst(0.03, "highpass", 1800, 0.12*k, 0.7); }
+  crackle(k){ burst(0.03, "highpass", 1800, 0.12*k, 0.7); },
+  // a tyre over a board: a hollow wooden knock
+  plank(k){ const f = 150 + Math.random()*70; tone(f, 0.06, "sine", 0.12 + 0.18*k, f*0.7); burst(0.035, "bandpass", 700 + Math.random()*400, 0.05 + 0.08*k, 2.2); }
 };
+/* on wood: a boardwalk's planks or a log bridge's deck */
+function onPlanks(){
+  if(BOARDWALKS.length){ const c = cellAt(pose.x, pose.z);
+    if(c >= 0 && paths[GP[c]] === MAIN && GD[c] < GHW[c] + 0.6 && MAIN.bwDeck[wrapIdx(MAIN, Math.round(GS[c]))]) return true; }
+  if(SPANS.length){ const f = spanFind(pose.x, pose.z, 0.6); if(f && !f[0].leap && Math.abs(pose.y - (pathY(f[0].P, f[1]) + BED)) < 0.8) return true; }
+  return false;
+}
 
 /* ---- music: a little arcade loop, sequenced ahead of the clock -------
    A minor, i - VI - III - VII, four on the floor. The menu gets all of
@@ -13402,6 +13435,24 @@ function stepAudio(info, dt){
     const crunch = Math.max(0, 1 - mud - ice*0.9 - wet*0.6);
     R.mid.g.gain.setTargetAtTime(ground*crunch*v*(0.16 + off*0.1)*(1 - sand*0.35), now, 0.06);
     R.mid.f.frequency.setTargetAtTime((sand ? 450 : snow ? 1300 : 700) + sp*(snow ? 30 : 22), now, 0.1);
+    // the stones themselves: sparse pings, faster and louder with speed, gone in mud, snow and water
+    const planks = onPlanks();
+    AUD.grit.g.gain.setTargetAtTime(planks ? 0 : ground*crunch*Math.pow(v, 0.8)*(0.22 + off*0.12)*(1 - snow*0.6)*(1 - sand*0.5), now, 0.06);
+    AUD.grit.src.playbackRate.setTargetAtTime(0.55 + v*1.1, now, 0.1);
+    AUD.grit.pk.frequency.setTargetAtTime(sand ? 1600 : 2600 + v*800, now, 0.1);
+    if(planks) R.mid.g.gain.setTargetAtTime(0, now, 0.04);
+    // on the planks: a knock for every board under the front and back wheels, and a hollow drum under them
+    AUD.plankAcc = (AUD.plankAcc || 0) + (planks && ground ? sp*dt/0.62 : 0);
+    const knockEvery = Math.max(1, Math.ceil(sp/0.62/22));                 // (no more than ~22 knocks a second; the drum covers the rest)
+    while(AUD.plankAcc >= knockEvery){ AUD.plankAcc -= knockEvery; SFX.plank(Math.min(1, sp/25)); }
+    AUD.deck.g.gain.setTargetAtTime(planks && ground ? Math.min(1, sp/20)*0.16 : 0, now, 0.05);
+    AUD.deck.f.frequency.setTargetAtTime(170 + sp*2.2, now, 0.1);
+    // the gearbox: its whine rides the road speed times the gear, louder off the throttle
+    { const along = Math.abs(pose.vx*Math.sin(pose.h) + pose.vz*Math.cos(pose.h)), gi = Math.max(0, Math.min(DRIVE.totals.length - 1, trans.gear - 1));
+      const shaft = along/(2*Math.PI*DRIVE.R)*DRIVE.totals[gi], wf = Math.max(60, shaft*7.3);
+      AUD.whine.o.frequency.setTargetAtTime(wf, now, 0.04); AUD.whine.o2.frequency.setTargetAtTime(wf*2.01, now, 0.04);
+      AUD.whine.bp.frequency.setTargetAtTime(wf*1.4, now, 0.05);
+      AUD.whine.g.gain.setTargetAtTime(Math.min(1, along/6)*(gas ? 0.012 : 0.03)*(1 + (4 - gi)*0.12)*(trans.shiftT > 0 ? 0.2 : 1), now, 0.05); }
     // rumble through the body, much more off the road
     R.low.g.gain.setTargetAtTime(ground*v*(0.10 + off*0.22 + mud*0.12), now, 0.08);
     R.low.f.frequency.setTargetAtTime(90 + sp*2.5 + mud*60, now, 0.1);
@@ -13421,6 +13472,7 @@ function stepAudio(info, dt){
     AUD.eng.out.gain.setTargetAtTime(0, now, 0.05);
     for(const k in R) R[k].g.gain.setTargetAtTime(0, now, 0.05);
     AUD.wind.g.gain.setTargetAtTime(0, now, 0.05);
+    AUD.grit.g.gain.setTargetAtTime(0, now, 0.05); AUD.whine.g.gain.setTargetAtTime(0, now, 0.05); AUD.deck.g.gain.setTargetAtTime(0, now, 0.05);
   }
   // the room: echo off the canyon walls and the snow shed's roof
   let room = 0.06;
@@ -13439,9 +13491,17 @@ function stepAudio(info, dt){
     if(!r || !r.mesh.visible || muted || GAME.paused || state.phase === "menu"){ A.out.gain.setTargetAtTime(0, now, 0.1); return; }
     const dx = r.mesh.position.x - pose.x, dz = r.mesh.position.z - pose.z, d = Math.hypot(dx, dz);
     const vol = 0.09/(1 + (d/14)*(d/14));
-    const rv = Math.max(0, r.v || 0), rpm = 1800 + (rv % 12)/12*3800 + rv*25;
-    setEngine(A.e, rpm, 0.8, 1, now, 0.08);
+    // their revs from their speed and the same gearbox, changing up at the same point yours does
+    const rv = Math.max(0, r.v || 0);
+    let rpm = DRIVE.idle + 400;
+    for(let g=0; g<DRIVE.totals.length; g++){ const rg = rv/DRIVE.R*DRIVE.totals[g]*RPM_PER; rpm = Math.max(1500, rg); if(rg <= DRIVE.up) break; }
+    // the Doppler swing as one comes past: pitch up closing, down going away
+    const rh = r.mesh.rotation.y, rvx = Math.sin(rh)*rv, rvz = Math.cos(rh)*rv, ux = dx/Math.max(1, d), uz = dz/Math.max(1, d);
+    const vrad = (rvx - pose.vx)*ux + (rvz - pose.vz)*uz;                  // + moving apart
+    const dop = Math.max(0.8, Math.min(1.25, 343/(343 + vrad)));
+    setEngine(A.e, rpm*dop, 0.8, 1, now, 0.08);
     A.out.gain.setTargetAtTime(vol, now, 0.1);
+    A.air.frequency.setTargetAtTime(Math.max(700, 7000/(1 + d/35)), now, 0.15);
     if(A.pan) A.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, (dx*rx + dz*rz)/Math.max(6, d))), now, 0.1);
   });
 }
