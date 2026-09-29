@@ -971,6 +971,60 @@ const TRACKS = [
       // the low route: braided under the high one, over the lava streams
       {a:[400,200], b:[-420,200], via:[[359,196],[318,176],[277,147],[236,132],[195,147],[154,177],[113,212],[72,244],[31,267],[-10,275],[-51,267],[-92,244],[-133,212],[-174,177],[-215,147],[-256,132],[-297,147],[-338,176],[-379,196]],
        half:5.0, jumps:[], tune:0, flush:30, hug:true, island:true, label:"LOW ROUTE", mainLabel:"HIGH ROUTE"}
+    ]},
+
+  /* ---- SPECIAL: a swamp theme park at sunset ----
+     Start on the pier over the lagoon, bounce down the lily pads, through the
+     hollow log, the gator's back or the cattail canyon, round the whirlpool
+     and down into the glowworm grotto, out across the mud geysers, the
+     riverboat or the treetops, over the vine gorge, down the festival
+     straight, off the waterfall or over the mushroom hill, round the giant
+     cypress, and over the frog band's stage to the flag. */
+  { name:"GATOR GULCH", special:true, gator:true, season:"swamp", after:"a swamp theme park at sunset", relief:0.8, rollers:0.7,
+    blurb:"a swamp theme park at sunset: lily pads that bounce you down the lagoon, a hollow log, a whirlpool, a glowworm grotto, mud geysers, a sunken riverboat, a waterfall and a giant cypress, with boost pads all the way. Grab the fireflies for top speed (up to ten; knocks cost you some), and tap drift in the air to pull a trick: land it for a boost",
+    kit:["crest"],
+    shape:"GATOR GULCH — a swamp at sunset",
+    feature:"lily pads, a whirlpool, a glowworm grotto, mud geysers, a riverboat and a waterfall",
+    ctrl:[[-60,-450],[40,-450],[140,-450],[240,-450],[340,-450],[420,-435],[470,-390],[490,-330],[495,-260],[495,-200],
+          // the cattail canyon: tight S bends between walls of reeds
+          [460,-140],[505,-80],[458,-20],[500,40],[470,100],[460,140],
+          // round the whirlpool
+          [476,178],[523,182],[549,211],[545,258],[505,286],[457,274],[439,242],[405,195],
+          // down into the grotto and out across the geyser field
+          [340,215],[270,245],[190,258],[110,262],[40,266],[-30,270],[-100,272],
+          // the riverboat
+          [-170,268],[-240,255],[-300,220],[-330,160],
+          // the vine gorge, the festival straight, the waterfall
+          [-345,90],[-355,10],[-360,-70],[-362,-150],[-360,-215],[-330,-262],
+          // round the giant cypress
+          [-300,-292],[-324,-298],[-342,-316],[-348,-340],[-342,-364],[-324,-382],[-300,-388],[-276,-382],[-261,-368],
+          // over the band stand and home along the pier
+          [-225,-420],[-170,-446],[-110,-450]],
+    hills:[[190,262,95,26],[-240,340,110,12],[560,-40,120,8],[-470,-200,150,10]],
+    jumps:[], fords:[[-200,262]],
+    mud:[[[40,266],[-30,270]]],
+    flats:[[495,230,120],[-300,-340,95]],
+    lake:{at:[200,-450], rx:255, rz:85},
+    bowl:{at:[495,230], r:55, bank:0.42},
+    giantTree:{at:[-300,-340], ring:48, cypress:true},
+    drop:{at:[-362,-150], height:30, top:40, back:220, width:70},
+    leaps:[{at:[-345,90], height:2.8, gap:18, reach:80}],
+    bigJumps:[[[-160,-448],3.6]],
+    tunnels:[{from:[490,-330], to:[495,-230]}],
+    caves:[{from:[270,245], to:[110,262]}],
+    spans:[{at:[-190,352], road:1, span:18, depth:4, wall:11, reach:90},
+           {at:[-285,318], road:1, span:16, depth:4, wall:10, reach:80}],
+    geysers:8,
+    branches:[
+      // the gator's back: up its tail, along its spine and off its snout
+      {a:[495,-200], b:[470,100], via:[[560,-130],[580,-30],[545,60]],
+       half:5.0, jumps:[[0.5,30,8,3.4,48]], tune:0.1, label:"GATOR BACK", mainLabel:"CATTAIL CANYON"},
+      // the treetop road: rope bridges between the cypress trunks
+      {a:[-100,272], b:[-330,160], via:[[-140,340],[-230,355],[-310,300]],
+       half:4.6, jumps:[], tune:0.1, label:"TREETOPS", mainLabel:"RIVERBOAT"},
+      // the mushroom hill: down the side of the falls, bouncing cap to cap
+      {a:[-358,-40], b:[-225,-420], via:[[-430,-90],[-455,-200],[-430,-310],[-330,-440]],
+       half:5.0, jumps:[], tune:0, mushrooms:true, label:"MUSHROOM HILL", mainLabel:"WATERFALL"}
     ]}
 ];
 
@@ -1309,6 +1363,16 @@ if(DESERT){
   hemi.color.set(0xf4e2c4); hemi.groundColor.set(0x9a6a44); hemi.intensity = 0.95;
   sun.color.set(0xffdcae); sun.intensity = 1.3;
 }
+/* Gator Gulch: a swamp theme park at sunset. Candy sky, warm low sun, pink
+   air, and everything that is lava on the volcano is glowing swamp water. */
+const GATOR = !!TRACK.gator;
+const ANIMS_LATE = [];                // per frame, for set pieces built before the prop kit exists
+const WHIRL_R = 36;                   // the whirlpool: a funnel sunk in the middle of the banked ring
+if(GATOR){
+  scene.fog.color.set(0xe9a2a6); SKY.set(0xf2b08c); scene.fog.near = 220; scene.fog.far = 1150;
+  hemi.color.set(0xffc6dc); hemi.groundColor.set(0x3c4a5e); hemi.intensity = 0.98;
+  sun.color.set(0xffb07a); sun.intensity = 1.25;
+}
 /* The maps are drawn wherever was convenient; the world is built around
    the origin, so move the whole map (every coordinate in it) to sit there. */
 {
@@ -1376,6 +1440,11 @@ function macro(x, z){
   for(let k=0;k<FLATS.length;k++){
     const F = FLATS[k], d = Math.hypot(x - F[0], z - F[1]);
     if(d < F[2] && F[3] !== null){ const w = 1 - smoothstep(F[2]*0.6, F[2], d); h = h*(1 - w) + F[3]*w; }
+  }
+  /* Gator Gulch's whirlpool: a funnel in the middle of the ring road, deepest at the drain */
+  if(GATOR && BOWL.on){
+    const d = Math.hypot(x - BOWL.x, z - BOWL.z);
+    if(d < WHIRL_R + 4) h -= 12*Math.pow(1 - smoothstep(3, WHIRL_R + 4, d), 1.6);
   }
   /* the lake: a basin sunk below a level taken from the lowest point of its
      shore, so the water can never spill over */
@@ -1677,7 +1746,7 @@ if(!TRACK.test){
     }
     return best;
   };
-  const want = DESERT || TRACK.expedition ? 0 : Math.max(0, 2 - (TRACK.fords || []).length);
+  const want = DESERT || TRACK.expedition || GATOR ? 0 : Math.max(0, 2 - (TRACK.fords || []).length);
   for(let k=0;k<want;k++){ const i = pick(35, 70, 0); if(i < 0) break;
     const p = MAIN.pts[i]; TRACK.fords = (TRACK.fords || []).concat([[p.x, p.z]]); taken.push([i, 120]); }
   if(DESERT) for(let k=(TRACK.washes || []).length; k<3; k++){ const i = pick(25, 50, 0); if(i < 0) break;
@@ -3904,7 +3973,7 @@ function paintCanvas(base, rustAmt){
 /* ---- where the lava fissures run on the volcano: jagged cracks a few
    metres off the verge, on the flat, clear of the set pieces ---- */
 const FISS_ROWS = [];
-if(TRACK.special && (SPANS.length || CRATER.on)){
+if(TRACK.special && !GATOR && (SPANS.length || CRATER.on)){
   const P = MAIN, seg = P.seg, clear = (i, x, z)=>{
     if(i*seg < 160 || (P.N - i)*seg < 60) return false;
     if(SPANS.some(sp=> Math.hypot(x - sp.x, z - sp.z) < 55)) return false;
@@ -4096,6 +4165,11 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
             if(leaf && t > 0.15) c.setHSL(0.02 + Math.random()*0.09, 0.55 + Math.random()*0.2, 0.30 + Math.random()*0.08);
             else c.setHSL(0.078 + t*0.07 + Math.random()*0.02, 0.30 + t*0.12 - steep*0.10,
                           0.33 - t*0.02 + Math.random()*0.03 - steep*0.03);
+          } else if(GATOR){
+            // lush swamp grass, blue-green and saturated, with dark moss in the hollows and warm mud by the road
+            const r0 = Math.random(), moss = 0.5 + 0.5*Math.sin(x*0.043 + Math.sin(z*0.031)*2.2)*Math.sin(z*0.037 + x*0.012);
+            c.setHSL(0.07 + t*0.25 + r0*0.015 + moss*0.03*t, 0.34 + t*0.22 - steep*0.12,
+                     0.30 - t*0.04 - moss*0.05*t + r0*0.03 - steep*0.04);
           } else
           c.setHSL(0.078 + t*0.172 + Math.random()*0.012,
                    0.25 + t*0.08 - steep*0.10,
@@ -4139,7 +4213,7 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
           }
           /* on the volcano the snow is thin: drifts of black ash and scree
              show through it in patches, more of them on the steeper ground */
-          if(TRACK.special && t > 0.35){
+          if(TRACK.special && !GATOR && t > 0.35){
             const nz = Math.sin(x*0.031 + Math.sin(z*0.023)*2.1) + Math.sin(z*0.027 + Math.sin(x*0.019)*1.7) + 0.5*Math.sin((x + z)*0.071);
             const k = smoothstep(0.7, 1.35, nz + steep*0.8 + (Math.random() - 0.5)*0.45);
             if(k > 0) c.lerp(new THREE.Color().setHSL(0.04 + Math.random()*0.03, 0.09, 0.12 + Math.random()*0.09), k*0.9);
@@ -4277,7 +4351,13 @@ const SKYS = {
            layers:[ {kind:"mesa", y:-30, amp:150, step:420, col:[196,128,126], haze:[244,190,160], hz:0.55},
                     {kind:"mesa", y:-10, amp:120, step:320, col:[178,94,72], haze:[240,170,130], hz:0.4},
                     {kind:"mesa", y:10, amp:84, step:240, col:[140,64,46], haze:[226,150,110], hz:0.3},
-                    {kind:"round", y:30, amp:30, step:200, col:[110,50,36], haze:[210,140,100], hz:0.2} ] }
+                    {kind:"round", y:30, amp:30, step:200, col:[110,50,36], haze:[210,140,100], hz:0.2} ] },
+  // the swamp: a candy sunset, violet overhead to tangerine at the horizon, over cypress woods
+  swamp: { sky:[[0,"#2b1554"],[0.18,"#5b2c8c"],[0.32,"#b1479e"],[0.42,"#f06f7c"],[0.48,"#ffa36a"],[0.5,"#ffc48a"],[1,"#ffd8a8"]],
+           halo:[255,196,120], sunR:44, cloud:"cumulus", cloudLit:[255,196,206], cloudShade:[152,92,176],
+           layers:[ {kind:"round", y:-26, amp:110, step:440, col:[128,74,150], haze:[244,156,168], hz:0.55},
+                    {kind:"forest", y:6, amp:86, step:84, col:[76,52,108], haze:[226,132,156], hz:0.38},
+                    {kind:"forest", y:28, amp:52, step:56, col:[34,62,74], haze:[196,112,136], hz:0.2} ] }
 };
 function paintSky(g, w, h){
   const B = SKYS[TRACK.season] || SKYS.summer, hz = h*0.5;
@@ -4586,6 +4666,8 @@ function lavaMaterial(flow){
       // it throws off heat: brighter where you look across it
       "  float gl = pow(1.0 - abs(normalize(cameraPosition - vWorld).y), 3.0);",
       "  col += vec3(0.5, 0.14, 0.02)*gl*smoothstep(0.2, 0.8, vDepth);",
+      // in the swamp the same rivers are glowing water: the molten seams cyan, the crust deep teal
+      GATOR ? "  col = vec3(col.b*0.55 + col.g*0.08, col.g*0.85 + col.r*0.38, col.r*1.05 + col.g*0.1);" : "",
       "  float fd = length(cameraPosition - vWorld);",
       "  col = mix(col, fogColor, smoothstep(fogNear, fogFar, fd)*0.55);",
       "  gl_FragColor = vec4(col, 1.0);",
@@ -4965,6 +5047,7 @@ iceTex.wrapS = iceTex.wrapT = THREE.RepeatWrapping;
 const iceTube = new THREE.MeshPhongMaterial({map:iceTex, color:0xffffff, emissive:0x10303e, shininess:110, specular:0xe6f6ff, transparent:true, opacity:0.9, side:THREE.DoubleSide});
 TUNNELS.forEach(T=>{
   if(T.cave) return;                     // a lava cave is built on its own
+  if(GATOR) return;                      // Gator Gulch's is a hollow log, built with the swamp's set pieces
   const P = MAIN, seg = P.seg, pos = [], idx = [], uvs = [], NA = 14;
   const ring = k=>{
     const i = wrapIdx(P, k), p = P.pts[i], t = P.tans[i], nx = -t.z, nz = t.x, R = P.half[i] + 2.6, y0 = p.y + BED - 0.3;
@@ -5028,10 +5111,12 @@ CAVES.forEach(C=>{
   };
   // daylight in at the mouths
   const spill = k=> Math.max(Math.exp(-(k - a)*seg/6), Math.exp(-(b - k)*seg/6));
-  const rock = new THREE.Color(), hot = new THREE.Color(1.0, 0.36, 0.08), day = new THREE.Color(0.55, 0.58, 0.64);
+  // (in the swamp it is the glowworm grotto: blue-black rock lit cyan by glowing water)
+  const rock = new THREE.Color(), hot = GATOR ? new THREE.Color(0.12, 0.62, 1.0) : new THREE.Color(1.0, 0.36, 0.08), day = new THREE.Color(0.55, 0.58, 0.64);
   const shade = (k, v, h, base)=>{
     const r0 = Math.random();
-    rock.setRGB(base*(0.8 + 0.4*r0), base*(0.72 + 0.35*r0), base*(0.7 + 0.3*r0));
+    if(GATOR) rock.setRGB(base*(0.5 + 0.3*r0), base*(0.72 + 0.35*r0), base*(1.0 + 0.4*r0));
+    else rock.setRGB(base*(0.8 + 0.4*r0), base*(0.72 + 0.35*r0), base*(0.7 + 0.3*r0));
     const g = glowAt(k, v, h), sp = spill(k);
     return [rock.r + hot.r*g*0.6 + day.r*sp*0.32, rock.g + hot.g*g*0.6 + day.g*sp*0.32, rock.b + hot.b*g*0.6 + day.b*sp*0.32];
   };
@@ -5144,9 +5229,41 @@ CAVES.forEach(C=>{
     CAVE_FX.push({x:bx, z:bz, y:gridH(bx, bz) + 0.3, kind:"fall"});
   });
   leaps.forEach(sp=> CAVE_FX.push({x:sp.x, z:sp.z, y:sp.lava, kind:"leap", tx:sp.tx, tz:sp.tz}));
+  /* the grotto's roof, alive with glowworms: thousands of blue points of
+     light, thickest over the middle, each one hanging on its silk thread */
+  if(GATOR){
+    const pos = [], col = [], lines = [];
+    for(let k=a + 2; k<b - 2; k++){
+      const f0 = frame(k), Rk = R(k);
+      for(let n=0;n<26;n++){
+        const th = (0.12 + Math.random()*0.76)*Math.PI, cx = Math.cos(th)*(Rk - 0.25), hy = Math.sin(th)*Rk*0.9;
+        const drop = Math.random() < 0.3 ? 0.3 + Math.random()*1.4 : 0.05;
+        const x = f0.p.x + f0.nx*cx + f0.t.x*(Math.random() - 0.5)*seg*1.2, z = f0.p.z + f0.nz*cx + f0.t.z*(Math.random() - 0.5)*seg*1.2, y = f0.y0 + hy - 0.2;
+        pos.push(x, y - drop, z);
+        const b0 = 0.6 + Math.random()*0.4; col.push(0.35*b0, 0.85*b0, 1.0*b0);
+        if(drop > 0.2) lines.push(x, y, z, x, y - drop, z);
+      }
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+    const pm = new THREE.Points(g, new THREE.PointsMaterial({size:0.32, vertexColors:true, sizeAttenuation:true, transparent:true, opacity:0.95,
+                                                            blending:THREE.AdditiveBlending, depthWrite:false}));
+    pm.frustumCulled = false; scene.add(pm);
+    const lg = new THREE.BufferGeometry(); lg.setAttribute("position", new THREE.Float32BufferAttribute(lines, 3));
+    const lm = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({color:0x6fc8ff, transparent:true, opacity:0.35})); lm.frustumCulled = false; scene.add(lm);
+    // and a blue light that travels with you under the roof
+    const gl = new THREE.PointLight(0x46b4ff, 0, 40, 1.4); scene.add(gl);
+    const mid = frame(Math.round((a + b)/2));
+    ANIMS_LATE.push(t=>{
+      const n = nearest(pose.x, pose.z), inside = n.path === P && n.pi >= a && n.pi <= b;
+      gl.intensity = inside ? 1.7 + 0.2*Math.sin(t*1.3) : 0;
+      if(inside) gl.position.set(pose.x, pose.y + 4.5, pose.z);
+      pm.material.size = 0.3 + 0.05*Math.sin(t*0.9);
+    });
+    void mid;
+  }
   // hanging teeth of black rock, few and far between
   {
-    const g = new THREE.Group(), m = new THREE.MeshBasicMaterial({color:0x1a1210});
+    const g = new THREE.Group(), m = new THREE.MeshBasicMaterial({color: GATOR ? 0x0e1a26 : 0x1a1210});
     for(let k=a + 4; k<b - 4; k+=Math.round(4.5/seg)){
       if(Math.random() < 0.35) continue;
       const f0 = frame(k), Rk = R(k), th = (0.3 + Math.random()*0.4)*Math.PI, L = 0.8 + Math.random()*2.2;
@@ -5256,7 +5373,7 @@ function caveRoom(x, z){
    fissures steaming in the snow beside the road, the charred skeletons of
    trees the lava has reached, and black basalt tumbled over the snowfields
    round the cone ---- */
-if(TRACK.special && (SPANS.length || CRATER.on)){
+if(TRACK.special && !GATOR && (SPANS.length || CRATER.on)){
   const P = MAIN, seg = P.seg, clear = (i, x, z)=>{
     if(i*seg < 160 || (P.N - i)*seg < 60) return false;                                   // the start
     if(SPANS.some(sp=> Math.hypot(x - sp.x, z - sp.z) < 55)) return false;
@@ -5588,7 +5705,7 @@ if(TRACK.geysers && LAKE.on && LAKE.lava){
   }
 
 }
-if(SPANS.length && TRACK.geysers){
+if(SPANS.length && TRACK.geysers && !GATOR){
   for(let k=0;k<10;k++){
     const i = wrapIdx(MAIN, Math.round((80 + k*110)/MAIN.seg)), p = MAIN.pts[i], t = MAIN.tans[i], sd = k % 2 ? 1 : -1, off = MAIN.half[i] + 5 + Math.random()*4;
     const x = p.x - t.z*sd*off, z = p.z + t.x*sd*off;
@@ -5783,15 +5900,15 @@ function stepSetPieces(dt){
     }
     if(E.kind === "fall"){
       if(Math.random() < dt*10) SPRAY.spawn(E.x + (Math.random() - 0.5)*2, E.y, E.z + (Math.random() - 0.5)*2, (Math.random() - 0.5)*3, 2 + Math.random()*4, (Math.random() - 0.5)*3,
-                                            {life:0.9 + Math.random()*0.6, size:[0.7, 0.3], col:[1.0, 0.5 + Math.random()*0.3, 0.1], heat:1, grav:9});
-      if(Math.random() < dt*3) STEAM.spawn(E.x, E.y + 0.5, E.z, 0, 1.5 + Math.random(), 0, {life:3, size:[1.5, 5], col:[0.35, 0.33, 0.32], alpha:0.35, heat:1.2, drag:0.8, grav:-0.4});
+                                            {life:0.9 + Math.random()*0.6, size:[0.7, 0.3], col:HOT_RGB(), heat:1, grav:9});
+      if(Math.random() < dt*3) STEAM.spawn(E.x, E.y + 0.5, E.z, 0, 1.5 + Math.random(), 0, {life:3, size:[1.5, 5], col: GATOR ? [0.7, 0.85, 0.95] : [0.35, 0.33, 0.32], alpha:0.35, heat:GATOR ? 0.3 : 1.2, drag:0.8, grav:-0.4});
     } else {
       if(Math.random() < dt*22){ const v = (Math.random() - 0.5)*18;
         SPRAY.spawn(E.x - E.tz*v, E.y + 0.3, E.z + E.tx*v, (Math.random() - 0.5), 3 + Math.random()*5, (Math.random() - 0.5),
-                    {life:1.4 + Math.random()*1.2, size:[0.6, 0.25], col:[1.0, 0.45 + Math.random()*0.35, 0.08], heat:1, grav:-0.5, drag:0.6}); }
+                    {life:1.4 + Math.random()*1.2, size:[0.6, 0.25], col:HOT_RGB(), heat:1, grav:-0.5, drag:0.6}); }
       if(Math.random() < dt*2.5){ const v = (Math.random() - 0.5)*14;
         for(let q=0;q<8;q++) SPRAY.spawn(E.x - E.tz*v, E.y + 0.3, E.z + E.tx*v, (Math.random() - 0.5)*4, 5 + Math.random()*6, (Math.random() - 0.5)*4,
-                    {life:1 + Math.random()*0.5, size:[1, 0.4], col:[1.0, 0.4 + Math.random()*0.3, 0.06], heat:1, grav:12}); }
+                    {life:1 + Math.random()*0.5, size:[1, 0.4], col:HOT_RGB(), heat:1, grav:12}); }
     }
   });
   VENTS.forEach(V=>{
@@ -5802,7 +5919,8 @@ function stepSetPieces(dt){
   });
 }
 /* the lava's own light: one warm lamp, kept on the nearest lava to the car */
-const LAVA_LIGHT = (SPANS.length || (LAKE.on && LAKE.lava)) ? new THREE.PointLight(0xff6a20, 0, 70, 1.6) : null;
+const LAVA_LIGHT = (SPANS.length || (LAKE.on && LAKE.lava)) ? new THREE.PointLight(GATOR ? 0x3ccfff : 0xff6a20, 0, 70, 1.6) : null;
+const HOT_RGB = GATOR ? ()=> [0.35 + Math.random()*0.2, 0.85 + Math.random()*0.15, 1.0] : ()=> [1.0, 0.45 + Math.random()*0.35, 0.08];
 if(LAVA_LIGHT) scene.add(LAVA_LIGHT);
 function stepLava(dt){
   stepSetPieces(dt);
@@ -5825,7 +5943,7 @@ function stepLava(dt){
   if(state.phase !== "menu" && best < 90 && Math.random() < dt*14){
     const jx = bx + (Math.random() - 0.5)*14, jz = bz + (Math.random() - 0.5)*14;
     if(lavaLevelAt(jx, jz) !== null)
-      spawnDust(jx, by - 2.2, jz, [1.0, 0.45 + Math.random()*0.3, 0.1], 0.25, (Math.random() - 0.5)*1.5, (Math.random() - 0.5)*1.5, 3 + Math.random()*4);
+      spawnDust(jx, by - 2.2, jz, HOT_RGB(), 0.25, (Math.random() - 0.5)*1.5, (Math.random() - 0.5)*1.5, 3 + Math.random()*4);
     else if(Math.random() < 0.5)
       spawnDust(jx, gridH(jx, jz) + 0.3, jz, 4, 0.8, (Math.random() - 0.5)*1, (Math.random() - 0.5)*1, 1.5 + Math.random()*2);
   }
@@ -6191,7 +6309,7 @@ if(RIVER.on){
    past the grid, the course's name on it in the season's colours ---- */
 function courseBillboard(){
   const P = MAIN, pal = { summer:["#2f6a3a", "#8fd06a"], fall:["#6a2c12", "#f08a2a"], winter:["#1f4a6e", "#8fd3f4"], desert:["#6a2a16", "#e56a3a"] };
-  const c0 = TRACK.special ? ["#3a1208", "#ff7a2a"] : pal[TRACK.season || "summer"] || pal.summer;
+  const c0 = GATOR ? ["#3a1a5a", "#ff8a6a"] : TRACK.special ? ["#3a1208", "#ff7a2a"] : pal[TRACK.season || "summer"] || pal.summer;
   // the spot: past the grid, on whichever side the ground sits nearer the road
   let best = null;
   for(let d=100; d<=220; d+=15){
@@ -6728,8 +6846,9 @@ if(DROP.on && TRACK.skijump){
    from them) and lie across it where they have sunk into the ground. */
 if(GIANT.on){
   const gy = gradedY(GIANT.x, GIANT.z), g = new THREE.Group();
-  const bark = new THREE.MeshLambertMaterial({color:0x5c4632});
-  const bark2 = new THREE.MeshLambertMaterial({color:0x6e5640});
+  // (Gator Gulch's is a bald cypress: grey fluted bark, feathery blue-green crown)
+  const bark = new THREE.MeshLambertMaterial({color: GATOR ? 0x6e6258 : 0x5c4632});
+  const bark2 = new THREE.MeshLambertMaterial({color: GATOR ? 0x80746a : 0x6e5640});
   const prof = [[17,-3],[16,0],[13,3],[11,8],[9.5,16],[9,28],[8.4,42],[7.2,56],[5.5,68],[3,76]].map(p=> new THREE.Vector2(p[0], p[1]));
   const tg = new THREE.LatheGeometry(prof, 18), tp = tg.attributes.position;
   for(let v=0; v<tp.count; v++){
@@ -6821,7 +6940,7 @@ if(GIANT.on){
       const sc = 13 + Math.random()*10;
       v3.set(Math.cos(a)*rr, y, Math.sin(a)*rr); s3.set(sc, sc*0.8, sc);
       q4.setFromEuler(new THREE.Euler(Math.random(), Math.random()*6, Math.random())); m4.compose(v3, q4, s3);
-      crown.setMatrixAt(k, m4); fallTint(cc); crown.setColorAt(k, cc);
+      crown.setMatrixAt(k, m4); if(GATOR) cc.setHSL(0.33 + Math.random()*0.12, 0.45, 0.30 + Math.random()*0.12); else fallTint(cc); crown.setColorAt(k, cc);
     }
     crown.instanceMatrix.needsUpdate = true; crown.instanceColor.needsUpdate = true;
     crown.castShadow = true; g.add(crown);
@@ -7233,7 +7352,7 @@ if(DESERT){
 }
 
 /* ---- Maple Fair: the ferris wheel in the infield, grandstands, tents, bales ---- */
-if(BOWL.on){
+if(BOWL.on && !GATOR){
   // the wheel
   {
     const g = new THREE.Group(), R = 15, steel = 0xe8e2d4, red = 0xc2382a;
@@ -7344,6 +7463,1087 @@ if(BOWL.on){
   }
 }
 
+/* ==== GATOR GULCH: the swamp theme park ==================================
+   Everything on the special stage that is not in the other circuits: the
+   set pieces (the pier, the hollow log, the gator, the whirlpool, the
+   riverboat, the treetops, the vine gorge, the festival, the waterfall, the
+   mushroom hill, the frog choir, the band stand), and what you can hit on
+   the way round: boost pads, bouncing lily pads and mushroom caps, mud
+   geysers, firefly orbs, and the things that move (the gator's jaws,
+   turtles, barrels, swinging logs, drifting logs). The play is in GG. */
+const GG = { on:false, orbs:0, trickRoll:0, trickYaw:0,
+  stepCar(){}, onLand(){}, hit(){}, rival(r, i0, target){ return target; }, reset(){}, hud(){}, dragK(){ return 1; }, ceil(){ return 0; } };
+if(GATOR){
+  GG.on = true;
+  const seg = MAIN.seg, P0 = MAIN;
+  const frm = (P, i)=>{ i = wrapIdx(P, i); const p = P.pts[i], t = P.tans[i]; return {i, p, t, nx:-t.z, nz:t.x, half:P.half[i]}; };
+  const at = (P, i, lane)=>{ const f = frm(P, i); return [f.p.x + f.nx*lane, f.p.z + f.nz*lane]; };
+  const byM = (P, i, m)=> P.closed ? wrapIdx(P, i + Math.round(m/P.seg)) : Math.max(0, Math.min(P.N - 1, i + Math.round(m/P.seg)));
+  const NEON = [0xff3fd2, 0x3ff2ff, 0x9dff3f, 0xb45cff, 0xffd23f, 0xff6a3f];
+  // one material per colour, shared, so the merged set pieces stay a handful of draw calls
+  const MC = {};
+  const basic = c=> MC["b" + c] || (MC["b" + c] = new THREE.MeshBasicMaterial({color:c}));
+  const lam = (c, e, k)=>{ const key = "l" + c + "_" + (e || 0) + "_" + (k === undefined ? 1 : k);
+    return MC[key] || (MC[key] = new THREE.MeshLambertMaterial({color:c, emissive:e === undefined ? 0x000000 : e, emissiveIntensity:k === undefined ? 1 : k})); };
+  const rnd = seeded(4711);
+  const addTo = (g, m, x, y, z)=>{ m.position.set(x, y, z); g.add(m); return m; };
+  const bR = ()=> BRANCHES;
+
+  /* ---- where each piece sits, from the map's own features ---- */
+  const B0 = BRANCHES[0], B1 = BRANCHES[1], B2 = BRANCHES[2];
+  const LEAP = SPANS.find(sp=> sp.leap && sp.P === MAIN);
+  const CAVE = CAVES[0], LOG = TUNNELS.find(T=> !T.cave);
+  const FORD_I = (TRACK.fords || []).length ? snapTo(MAIN, TRACK.fords[0]) : -1;
+  const JUMP_I = (TRACK.bigJumps || []).length ? snapTo(MAIN, TRACK.bigJumps[0][0]) : -1;
+  const lakeE = (x, z)=> LAKE.on ? Math.hypot((x - LAKE.x)/LAKE.rx, (z - LAKE.z)/LAKE.rz) : 9;
+
+  /* ---- the things you hit: pads (boost, bounce), geysers, orbs, hazards ---- */
+  const PADS = [], GEYS = [], ORBS = [], HAZ = [];
+  const padGeo = new THREE.PlaneGeometry(1, 1);
+  const arrowTex = (()=>{ const c = document.createElement("canvas"); c.width = 64; c.height = 128; const g = c.getContext("2d");
+    const gr = g.createLinearGradient(0, 128, 0, 0); gr.addColorStop(0, "#ff3fd2"); gr.addColorStop(1, "#ffe24a");
+    g.fillStyle = "rgba(20,10,40,0.55)"; g.fillRect(0, 0, 64, 128);
+    g.fillStyle = gr;
+    for(let k=0;k<3;k++){ const y = 108 - k*40; g.beginPath(); g.moveTo(8, y); g.lineTo(32, y - 26); g.lineTo(56, y); g.lineTo(56, y + 12); g.lineTo(32, y - 14); g.lineTo(8, y + 12); g.closePath(); g.fill(); }
+    g.strokeStyle = "#3ff2ff"; g.lineWidth = 5; g.strokeRect(3, 3, 58, 122);
+    const t = new THREE.CanvasTexture(c); return t; })();
+  const padMat = new THREE.MeshBasicMaterial({map:arrowTex, transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
+  function boostPad(P, i, lane){
+    const f = frm(P, i), x = f.p.x + f.nx*lane, z = f.p.z + f.nz*lane, y = surfaceY(x, z);
+    const m = new THREE.Mesh(padGeo, padMat);
+    m.scale.set(3.0, 4.6, 1); m.rotation.order = "YXZ"; m.rotation.set(-Math.PI/2, Math.atan2(f.t.x, f.t.z) + Math.PI, 0);
+    // lie it on the slope of the road
+    const y2 = surfaceY(x + f.t.x*2, z + f.t.z*2), y1 = surfaceY(x - f.t.x*2, z - f.t.z*2);
+    m.rotation.x = -Math.PI/2 + Math.atan2(y2 - y1, 4);
+    m.position.set(x, y + 0.06, z); m.renderOrder = 2; scene.add(m);
+    PADS.push({kind:"boost", P, i:f.i, lane, x, z, y, r:2.3, cool:0, mesh:m, tx:f.t.x, tz:f.t.z});
+  }
+  // a bounce pad: a lily pad on the pier, a mushroom cap on the hill
+  const lilyGeo = new THREE.CircleGeometry(1, 20, 0.3, Math.PI*2 - 0.6); lilyGeo.rotateX(-Math.PI/2);
+  const capGeo = new THREE.SphereGeometry(1, 16, 8, 0, Math.PI*2, 0, Math.PI/2);
+  function bouncePad(P, i, lane, kind){
+    const f = frm(P, i), x = f.p.x + f.nx*lane, z = f.p.z + f.nz*lane, y = surfaceY(x, z);
+    const g = new THREE.Group(); g.position.set(x, y + 0.05, z); g.rotation.y = rnd()*6;
+    if(kind === "lily"){
+      addTo(g, new THREE.Mesh(lilyGeo, lam(0x3fae3a, 0x1c5a10, 0.5)), 0, 0.04, 0).scale.set(3.1, 1, 3.1);
+      const rim = addTo(g, new THREE.Mesh(new THREE.TorusGeometry(3.0, 0.12, 5, 28), basic(0x9dff3f)), 0, 0.1, 0); rim.rotation.x = Math.PI/2;
+      const fl = new THREE.Group(); fl.position.set(1.4, 0.1, 0.8); g.add(fl);
+      for(let k=0;k<6;k++){ const pt = addTo(fl, new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.6, 5), basic(0xff7ad8)), Math.cos(k)*0.25, 0.25, Math.sin(k)*0.25); pt.rotation.set(Math.sin(k)*0.7, 0, Math.cos(k)*0.7); }
+      addTo(fl, new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 4), basic(0xffe24a)), 0, 0.35, 0);
+    } else {
+      const c = NEON[Math.floor(rnd()*NEON.length)];
+      addTo(g, new THREE.Mesh(capGeo, basic(c)), 0, -0.1, 0).scale.set(2.7, 0.55, 2.7);
+      for(let k=0;k<7;k++){ const a = k/7*6.28 + rnd(), r = 0.7 + rnd()*1.3;
+        addTo(g, new THREE.Mesh(new THREE.SphereGeometry(0.28, 6, 4), basic(0xffffff)), Math.cos(a)*r, 0.33 - r*0.08, Math.sin(a)*r).scale.y = 0.4; }
+    }
+    scene.add(g);
+    PADS.push({kind:"bounce", P, i:f.i, lane, x, z, y, r:2.8, cool:0, mesh:g, sq:0});
+  }
+  // the fireflies you collect: a row of glowing orbs down the racing line
+  const orbGeo = new THREE.SphereGeometry(0.42, 10, 8), orbMat = basic(0xe8ff6a), haloMat = new THREE.MeshBasicMaterial({color:0x9dff3f, transparent:true, opacity:0.35, depthWrite:false});
+  const haloGeo = new THREE.SphereGeometry(0.85, 10, 8);
+  function orbRow(P, i, lane, n, step){
+    for(let k=0;k<n;k++){
+      const f = frm(P, byM(P, i, k*(step || 7))), x = f.p.x + f.nx*lane, z = f.p.z + f.nz*lane, y = surfaceY(x, z) + 1.3;
+      const g = new THREE.Group(); g.position.set(x, y, z);
+      g.add(new THREE.Mesh(orbGeo, orbMat)); g.add(new THREE.Mesh(haloGeo, haloMat));
+      scene.add(g);
+      ORBS.push({x, y, z, g, live:true, t:0, ph:rnd()*6});
+    }
+  }
+
+  /* ---- 1. the pier and the lily pads: the causeway over the lagoon ---- */
+  if(LAKE.on){
+    const plank = lam(0x8a6040), post = lam(0x5a3e28), rope = new THREE.LineBasicMaterial({color:0xe8d8b0});
+    const posts = new THREE.Group(), lines = [];
+    let onLake = [];
+    for(let i=0;i<P0.N;i++){ const p = P0.pts[i]; if(lakeE(p.x, p.z) < 0.97) onLake.push(i); }
+    for(const i of onLake){
+      if(i % Math.max(1, Math.round(4/seg))) continue;
+      const f = frm(P0, i);
+      for(const sd of [-1, 1]){
+        const off = f.half + 1.6, x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off, y = surfaceY(f.p.x, f.p.z);
+        addTo(posts, new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.3 + 3.5, 0.3), post), x, y - 1.7, z);
+        lines.push([x, y + 0.75, z, sd]);
+        // a piling out in the water every so often
+        if(i % Math.round(12/seg) === 0) addTo(posts, new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.4, 5, 7), post), x + f.nx*sd*1.4, LAKE.level + 0.6, z + f.nz*sd*1.4);
+      }
+    }
+    mergeStatic(posts); scene.add(posts);
+    for(const sd of [-1, 1]){
+      const pts3 = []; lines.filter(l=> l[3] === sd).forEach(l=> pts3.push(l[0], l[1], l[2]));
+      const gg = new THREE.BufferGeometry(); gg.setAttribute("position", new THREE.Float32BufferAttribute(pts3, 3));
+      scene.add(new THREE.Line(gg, rope));
+    }
+    // the pier's planking: boards across the road, drawn over it
+    {
+      const pos = [], col = [], idx = [];
+      for(const i of onLake){
+        const f = frm(P0, i), y = surfaceY(f.p.x, f.p.z) + 0.03, w = f.half + 1.1, b = pos.length/3, k = 0.8 + 0.2*((i*7919)%13)/13;
+        for(const s of [-1, 1]) pos.push(f.p.x + f.nx*s*w, y, f.p.z + f.nz*s*w);
+        for(let q=0;q<2;q++) col.push(0.55*k, 0.38*k, 0.24*k);
+        if(i !== onLake[0]) idx.push(b - 2, b - 1, b, b - 1, b + 1, b);
+      }
+      const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx);
+      g.computeVertexNormals();
+      const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:-1, polygonOffsetUnits:-1}));
+      m.receiveShadow = true; m.renderOrder = 1; scene.add(m);
+      // the joints between the boards
+      const jp = [];
+      for(const i of onLake){ if(i % 1) continue; const f = frm(P0, i), y = surfaceY(f.p.x, f.p.z) + 0.05, w = f.half + 1.1;
+        jp.push(f.p.x - f.nx*w, y, f.p.z - f.nz*w, f.p.x + f.nx*w, y, f.p.z + f.nz*w); }
+      const jg = new THREE.BufferGeometry(); jg.setAttribute("position", new THREE.Float32BufferAttribute(jp, 3));
+      scene.add(new THREE.LineSegments(jg, new THREE.LineBasicMaterial({color:0x3a2616})));
+    }
+    // giant lily pads floating on the lagoon, some flowering
+    {
+      const spots = [];
+      for(let k=0;k<900 && spots.length<220;k++){
+        const a = rnd()*6.28, e = Math.sqrt(rnd())*0.95, x = LAKE.x + Math.cos(a)*LAKE.rx*e, z = LAKE.z + Math.sin(a)*LAKE.rz*e;
+        if(!clearOf(x, z, 3) || LAKE.level - surfaceY(x, z) < 0.3) continue;
+        spots.push([x, z, 1.2 + rnd()*3.4]);
+      }
+      const inst = new THREE.InstancedMesh(lilyGeo, new THREE.MeshLambertMaterial({}), spots.length);
+      const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), cc = new THREE.Color();
+      spots.forEach((s, k)=>{ v3.set(s[0], LAKE.level + 0.04, s[1]); s3.set(s[2], 1, s[2]); q4.setFromEuler(new THREE.Euler(0, rnd()*6, 0)); m4.compose(v3, q4, s3);
+        inst.setMatrixAt(k, m4); inst.setColorAt(k, cc.setHSL(0.27 + rnd()*0.08, 0.55, 0.32 + rnd()*0.12)); });
+      inst.instanceMatrix.needsUpdate = true; inst.instanceColor.needsUpdate = true; scene.add(inst);
+      const fl = new THREE.Group();
+      spots.forEach((s, k)=>{ if(k % 4) return; const c = [0xff7ad8, 0xffffff, 0xffb0e8][k % 3];
+        for(let q=0;q<5;q++){ const pt = addTo(fl, new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.7, 4), basic(c)), s[0] + Math.cos(q*1.26)*0.3, LAKE.level + 0.35, s[1] + Math.sin(q*1.26)*0.3);
+          pt.rotation.set(Math.sin(q*1.26)*0.6, 0, -Math.cos(q*1.26)*0.6); } });
+      mergeStatic(fl); scene.add(fl);
+    }
+    // the bouncing pads down the pier, in time with each other: a jump every 24m
+    const first = onLake.find(i=> i*seg > 170), last = onLake[onLake.length - 1];
+    if(first !== undefined){
+      let k = 0;
+      for(let i=first; i < last - Math.round(30/seg); i += Math.round(24/seg), k++) bouncePad(P0, i, [0, -1.6, 1.6, 0, 1.6, -1.6][k % 6], "lily");
+    }
+  }
+
+  /* ---- 2. the gator arch over the start and finish, the GO sign, the crowd, the confetti cannons ---- */
+  const START = frm(P0, 0);
+  {
+    const g = new THREE.Group(), hw = START.half + 2.6, green = lam(0x3fae3a, 0x0a3a08, 0.4), belly = lam(0xf2e27a);
+    const arch = addTo(g, new THREE.Mesh(new THREE.TorusGeometry(hw, 1.5, 10, 28, Math.PI), green), 0, 0, 0);
+    for(let k=1;k<6;k++){ const a = k/6*Math.PI, band = addTo(g, new THREE.Mesh(new THREE.TorusGeometry(1.52, 0.2, 5, 12), belly), Math.cos(a)*hw, Math.sin(a)*hw, 0); band.rotation.y = Math.PI/2; band.rotation.x = a; }
+    // the head on top, grinning down the pier
+    const head = new THREE.Group(); head.position.set(0, hw + 1.2, 0); g.add(head);
+    addTo(head, new THREE.Mesh(new THREE.SphereGeometry(2.2, 12, 8), green), 0, 0, 0).scale.set(1.2, 0.8, 1.1);
+    addTo(head, new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.9, 5.5), green), 0, -0.3, 3.2);
+    for(const s of [-1, 1]){
+      addTo(head, new THREE.Mesh(new THREE.SphereGeometry(0.75, 10, 8), basic(0xffffff)), s*1.1, 1.2, 0.9);
+      addTo(head, new THREE.Mesh(new THREE.SphereGeometry(0.38, 8, 6), basic(0x111111)), s*1.1, 1.35, 1.5);
+      for(let k=0;k<6;k++){ const th = addTo(head, new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.5, 4), basic(0xffffff)), s*1.25, -0.9, 1.2 + k*0.8); th.rotation.x = Math.PI; }
+    }
+    head.rotation.y = 0;
+    g.position.set(START.p.x, surfaceY(START.p.x, START.p.z), START.p.z); g.rotation.y = Math.atan2(START.t.x, START.t.z);
+    g.traverse(o=>{ if(o.isMesh) o.castShadow = true; }); scene.add(g);
+    // it sways, being full of air
+    ANIMS.push(t=>{ arch.scale.set(1 + Math.sin(t*1.7)*0.02, 1 + Math.sin(t*1.7 + 1)*0.02, 1); head.rotation.z = Math.sin(t*1.1)*0.06; head.position.y = hw + 1.2 + Math.sin(t*1.7)*0.2; });
+    // the spinning GO sign on its pole, by the grid
+    const cv = document.createElement("canvas"); cv.width = 256; cv.height = 128; const cg = cv.getContext("2d");
+    cg.fillStyle = "#2b1554"; cg.fillRect(0, 0, 256, 128); cg.strokeStyle = "#3ff2ff"; cg.lineWidth = 10; cg.strokeRect(6, 6, 244, 116);
+    cg.font = "italic 900 96px Arial"; cg.textAlign = "center"; cg.textBaseline = "middle"; cg.fillStyle = "#ff3fd2"; cg.fillText("GO!", 128, 68);
+    const sm = new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cv)});
+    const f = frm(P0, byM(P0, 0, 26)), sx = f.p.x + f.nx*(f.half + 5), sz = f.p.z + f.nz*(f.half + 5), sy = surfaceY(f.p.x, f.p.z);
+    const pole = addTo(scene, new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 9, 8), lam(0x444444)), sx, sy + 4.5 - 2, sz);
+    const sign = new THREE.Group(); sign.position.set(sx, sy + 9, sz); scene.add(sign);
+    const b1 = addTo(sign, new THREE.Mesh(new THREE.BoxGeometry(6, 3, 0.3), [lam(0x3ff2ff), lam(0x3ff2ff), lam(0x3ff2ff), lam(0x3ff2ff), sm, sm]), 0, 0, 0);
+    ANIMS.push(t=>{ sign.rotation.y = t*1.6; });
+    void pole; void b1;
+  }
+  // confetti: a burst from the cannons at the lights, and again at the flag
+  const cannons = [];
+  {
+    const f = frm(P0, byM(P0, 0, 8));
+    for(const sd of [-1, 1]){
+      const x = f.p.x + f.nx*sd*(f.half + 3), z = f.p.z + f.nz*sd*(f.half + 3), y = surfaceY(f.p.x, f.p.z);
+      const g = new THREE.Group(); g.position.set(x, y, z);
+      addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 1.2, 10), lam(0x2b1554)), 0, 0.6, 0);
+      const bar = addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.6, 2.8, 10), lam(0xff3fd2, 0x55104a)), 0, 2.0, 0); bar.rotation.z = sd*0.5;
+      scene.add(g); cannons.push({x, y: y + 3, z, vx:-f.nx*sd, vz:-f.nz*sd});
+    }
+  }
+  function confetti(n){
+    if(!SPRAY) return;
+    cannons.forEach(c=>{ for(let k=0;k<n;k++){ const col = [[1,0.25,0.8],[0.25,0.95,1],[0.6,1,0.25],[1,0.85,0.25],[0.7,0.35,1]][k % 5];
+      SPRAY.spawn(c.x, c.y, c.z, c.vx*(4 + Math.random()*6) + (Math.random() - 0.5)*5, 12 + Math.random()*10, c.vz*(4 + Math.random()*6) + (Math.random() - 0.5)*5,
+                  {life:2.6 + Math.random()*1.5, size:[0.5, 0.35], col, heat:0.6, grav:5, drag:1.2}); } });
+    if(actx){ burst(0.3, "lowpass", 300, 0.35, 1, 0); burst(0.6, "highpass", 3000, 0.12, 0.8, 0.05); }
+  }
+  // the crowd in the stands at the start: frogs, turtles and raccoons, all waving
+  const critters = [];
+  {
+    const f = frm(P0, byM(P0, 0, -30)), sd = 1, off = f.half + 14;
+    const x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off;
+    // the stands only on dry ground: move back along the shore until there is some
+    const g = new THREE.Group();
+    for(let r=0;r<5;r++) pbox(g, 26, 0.5, 1.4, r%2 ? 0x6a3fa0 : 0x4a2a80, 0, 0.5 + r*0.8, -r*1.4);
+    for(const s of [-1, 1]) pbox(g, 0.4, 7, 0.4, 0x333333, s*12.5, 3.5, -6.5);
+    const roof = pbox(g, 27, 0.3, 8.5, 0xff3fd2, 0, 7.2, -3.4); roof.rotation.x = 0.1;
+    const face = Math.atan2(-f.nx*sd, -f.nz*sd);
+    g.position.set(x, gradedY(x, z), z); g.rotation.y = face; scene.add(g);
+    const kinds = [[0x5ec94a, 0.55], [0x3b6b3a, 0.6], [0x8a8a92, 0.5], [0xe0a21e, 0.5]];
+    for(let n=0;n<44;n++){
+      const r = Math.floor(rnd()*5), K = kinds[n % 4], c = new THREE.Group();
+      addTo(c, new THREE.Mesh(new THREE.SphereGeometry(K[1], 8, 6), lam(K[0])), 0, 0.5, 0).scale.set(1, 0.85, 0.9);
+      for(const s of [-1, 1]){ addTo(c, new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 4), basic(0xffffff)), s*0.2, 0.9, 0.35); addTo(c, new THREE.Mesh(new THREE.SphereGeometry(0.08, 5, 4), basic(0x111111)), s*0.2, 0.93, 0.48); }
+      const arm = addTo(c, new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.6, 0.12), lam(K[0])), 0.45, 0.8, 0.1);
+      c.position.set(-12 + rnd()*24, 0.8 + r*0.8, -r*1.4); g.add(c);
+      critters.push({c, arm, ph:rnd()*6, y0:c.position.y});
+    }
+    ANIMS.push(t=>{ const loud = state.phase === "racing" || state.phase === "done" ? 1 : 0.4;
+      critters.forEach(k=>{ k.c.position.y = k.y0 + Math.abs(Math.sin(t*5 + k.ph))*0.25*loud; k.arm.rotation.z = Math.sin(t*9 + k.ph)*0.9*loud; }); });
+  }
+
+  /* ---- 3. the hollow log ---- */
+  if(LOG){
+    const pos = [], col = [], idx = [], NA = 20, pa = LOG.a - Math.round(3/seg), pb = LOG.b + Math.round(3/seg);
+    let rows = 0;
+    const Rk = i=> P0.half[wrapIdx(P0, i)] + 3.4;
+    for(let k=pa; k<=pb; k++){
+      const f = frm(P0, k), R = Rk(k), y0 = f.p.y + BED - 1.0;
+      for(let q=0;q<=NA;q++){
+        const a = -0.18*Math.PI + q/NA*1.36*Math.PI, j = 1 + 0.03*Math.sin(k*0.9 + q*2.1);
+        pos.push(f.p.x + f.nx*Math.cos(a)*R*j, y0 + Math.sin(a)*R*j, f.p.z + f.nz*Math.cos(a)*R*j);
+        const grain = 0.8 + 0.2*Math.sin(q*3.1 + k*0.05) + (rnd() - 0.5)*0.08;
+        col.push(0.78*grain, 0.56*grain, 0.34*grain);
+      }
+      rows++;
+    }
+    for(let r=0;r<rows-1;r++) for(let q=0;q<NA;q++){ const i0 = r*(NA + 1) + q; idx.push(i0, i0 + 1, i0 + NA + 1, i0 + 1, i0 + NA + 2, i0 + NA + 1); }
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals();
+    // pale heartwood inside, dark bark out
+    const inner = new THREE.Mesh(g, new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.BackSide})); inner.frustumCulled = false; scene.add(inner);
+    const outer = new THREE.Mesh(g, new THREE.MeshLambertMaterial({color:0x4a3222, side:THREE.FrontSide})); outer.scale.setScalar(1); outer.frustumCulled = false; outer.castShadow = true; scene.add(outer);
+    // the cut ends: rings of the tree, moss on top, and the bark's ridges
+    const decor = new THREE.Group();
+    for(const k of [pa, pb]){
+      const f = frm(P0, k), R = Rk(k), y0 = f.p.y + BED - 1.0;
+      for(let n=0;n<4;n++){ const ring = addTo(decor, new THREE.Mesh(new THREE.TorusGeometry(R + 0.3 + n*0.35, 0.22, 5, 28, 1.36*Math.PI), lam(n % 2 ? 0xc49a6a : 0xa47a4a)), f.p.x, y0, f.p.z);
+        ring.rotation.y = Math.atan2(-f.nz, f.nx); ring.rotation.z = -0.18*Math.PI; }
+    }
+    for(let k=pa; k<=pb; k+=Math.max(1, Math.round(2.4/seg))){
+      const f = frm(P0, k), R = Rk(k) + 0.35, y0 = f.p.y + BED - 1.0;
+      for(let q=0;q<9;q++){ const a = 0.1*Math.PI + q/8*0.8*Math.PI;
+        const m = addTo(decor, new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 2.2), lam(q === 4 || q === 3 || q === 5 ? 0x4f7a2a : 0x3a2618)), f.p.x + f.nx*Math.cos(a)*R, y0 + Math.sin(a)*R, f.p.z + f.nz*Math.cos(a)*R);
+        m.rotation.y = Math.atan2(f.t.x, f.t.z); }
+    }
+    // inside: glowing mushrooms along the walls and up round the roof, and fireflies
+    for(let k=pa + 3; k<=pb - 3; k+=Math.max(1, Math.round(3.2/seg))){
+      const f = frm(P0, k), R = Rk(k) - 0.2, y0 = f.p.y + BED - 1.0;
+      for(let n=0;n<3;n++){
+        const a = (0.12 + rnd()*0.76)*Math.PI, c = NEON[Math.floor(rnd()*NEON.length)], s = 0.35 + rnd()*0.5;
+        const mg = new THREE.Group(); mg.position.set(f.p.x + f.nx*Math.cos(a)*R, y0 + Math.sin(a)*R, f.p.z + f.nz*Math.cos(a)*R);
+        addTo(mg, new THREE.Mesh(capGeo, basic(c)), 0, s*0.9, 0).scale.set(s*1.4, s*0.8, s*1.4);
+        addTo(mg, new THREE.Mesh(new THREE.CylinderGeometry(s*0.25, s*0.3, s*1.0, 6), basic(0xf2f0e0)), 0, s*0.45, 0);
+        // point the stalk in toward the middle of the log
+        mg.lookAt(f.p.x, y0 + 1.2, f.p.z); mg.rotateX(Math.PI/2);
+        decor.add(mg);
+      }
+    }
+    mergeStatic(decor); scene.add(decor);
+    const lg = new THREE.PointLight(0xff7ad8, 0, 28, 1.5); scene.add(lg);
+    ANIMS.push(t=>{ const n = nearest(pose.x, pose.z), inside = n.path === P0 && n.pi >= LOG.a - 6 && n.pi <= LOG.b + 6;
+      lg.intensity = inside ? 1.4 : 0; if(inside) lg.position.set(pose.x, pose.y + 3.2, pose.z); });
+    // boost pads down the log, first on the right, then the left, then the middle
+    const L = LOG.b - LOG.a;
+    boostPad(P0, LOG.a + Math.round(L*0.25), 2.2); boostPad(P0, LOG.a + Math.round(L*0.55), -2.2); boostPad(P0, LOG.a + Math.round(L*0.85), 0);
+    orbRow(P0, LOG.a + Math.round(L*0.3), 0, 5, 6);
+  }
+
+  /* ---- 4a. the cattail canyon (the main road through the first split) ---- */
+  if(B0){
+    const a = byM(P0, B0.splitAt, 25), b = wrapIdx(P0, B0.mainTo - Math.round(25/seg));
+    const stalks = [], heads = [];
+    for(let k=a; k!==b; k=wrapIdx(P0, k + 1)){
+      const f = frm(P0, k);
+      for(let n=0;n<6;n++){
+        const sd = rnd() < 0.5 ? -1 : 1, off = f.half + 1.2 + rnd()*10, x = f.p.x + f.nx*sd*off + f.t.x*(rnd() - 0.5)*seg, z = f.p.z + f.nz*sd*off + f.t.z*(rnd() - 0.5)*seg;
+        if(!clearOf(x, z, 1.0)) continue;
+        const h = 3.2 + rnd()*3.8 - (off > 8 ? 0 : 0.8);
+        stalks.push([x, z, h, (rnd() - 0.5)*0.25, (rnd() - 0.5)*0.25]); if(rnd() < 0.7) heads.push([x, z, h]);
+      }
+    }
+    const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), cc = new THREE.Color();
+    const sg = new THREE.CylinderGeometry(0.05, 0.08, 1, 4); sg.translate(0, 0.5, 0);
+    const leafG = new THREE.PlaneGeometry(0.35, 1, 1, 1); leafG.translate(0, 0.5, 0);
+    const si = new THREE.InstancedMesh(sg, new THREE.MeshLambertMaterial({}), stalks.length);
+    const li = new THREE.InstancedMesh(leafG, new THREE.MeshLambertMaterial({side:THREE.DoubleSide}), stalks.length*2);
+    stalks.forEach((s, k)=>{ const y = gradedY(s[0], s[1]);
+      v3.set(s[0], y, s[1]); q4.setFromEuler(new THREE.Euler(s[3], 0, s[4])); s3.set(1, s[2], 1); m4.compose(v3, q4, s3); si.setMatrixAt(k, m4);
+      si.setColorAt(k, cc.setHSL(0.24 + rnd()*0.06, 0.45, 0.30 + rnd()*0.1));
+      for(let q=0;q<2;q++){ q4.setFromEuler(new THREE.Euler(s[3]*2 + (rnd() - 0.5)*0.8, rnd()*6, s[4]*2 + (rnd() - 0.5)*0.8)); s3.set(1, s[2]*(0.55 + rnd()*0.3), 1); m4.compose(v3, q4, s3);
+        li.setMatrixAt(k*2 + q, m4); li.setColorAt(k*2 + q, cc.setHSL(0.22 + rnd()*0.08, 0.5, 0.28 + rnd()*0.12)); } });
+    const hg = new THREE.CylinderGeometry(0.17, 0.17, 0.9, 6);
+    const hi = new THREE.InstancedMesh(hg, new THREE.MeshLambertMaterial({color:0x6a3a1c}), heads.length);
+    heads.forEach((s, k)=>{ v3.set(s[0], gradedY(s[0], s[1]) + s[2] - 0.4, s[1]); q4.identity(); s3.set(1, 1, 1); m4.compose(v3, q4, s3); hi.setMatrixAt(k, m4); });
+    [si, li, hi].forEach(m=>{ m.instanceMatrix.needsUpdate = true; if(m.instanceColor) m.instanceColor.needsUpdate = true; m.castShadow = true; scene.add(m); });
+    // boost pads on the apex of the three tightest bends
+    const R = radiiOf(P0), cand = [];
+    for(let k=a; k!==b; k=wrapIdx(P0, k + 1)) cand.push(k);
+    cand.sort((x, y)=> R[x] - R[y]);
+    const chosen = [];
+    for(const k of cand){ if(chosen.length >= 3) break; if(chosen.every(c=> Math.abs(c - k)*seg > 40)) chosen.push(k); }
+    chosen.forEach(k=>{
+      const f0 = frm(P0, k - 3), f1 = frm(P0, k + 3), turn = f0.t.x*f1.t.z - f0.t.z*f1.t.x;       // + one way, - the other
+      boostPad(P0, k, turn > 0 ? 2.0 : -2.0);
+    });
+    orbRow(P0, a + Math.round(30/seg), 0, 5, 7);
+    // the giant turtles, plodding across
+    const tMid = Math.round((a + (b < a ? b + P0.N : b))/2);
+    for(const off of [-0.22, 0.22]){
+      const i = wrapIdx(P0, tMid + Math.round(off*((b < a ? b + P0.N : b) - a)));
+      const g = new THREE.Group(), shell = lam(0x2f6a3a), skin = lam(0x8aba5a);
+      addTo(g, new THREE.Mesh(new THREE.SphereGeometry(1.8, 12, 8, 0, Math.PI*2, 0, Math.PI/2), shell), 0, 0.35, 0).scale.set(1, 0.8, 1.25);
+      for(let q=0;q<6;q++) addTo(g, new THREE.Mesh(new THREE.CircleGeometry(0.5, 6), lam(0x4f8a3a)), Math.cos(q)*0.9, 1.35, Math.sin(q)*1.2).rotation.x = -Math.PI/2;
+      addTo(g, new THREE.Mesh(new THREE.SphereGeometry(0.55, 8, 6), skin), 0, 0.7, 2.3);
+      for(const s of [-1, 1]){ addTo(g, new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 4), basic(0x111111)), s*0.25, 0.9, 2.7);
+        for(const e of [-1, 1]) addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.6, 6), skin), s*1.3, 0.3, e*1.2); }
+      g.traverse(o=>{ if(o.isMesh) o.castShadow = true; }); scene.add(g);
+      HAZ.push({kind:"turtle", g, i, u:-(P0.half[i] + 6)*(off < 0 ? 1 : -1), dir: off < 0 ? 1 : -1, r:2.4, h:1.6, x:0, y:0, z:0, cool:0});
+    }
+  }
+
+  /* ---- 4b. the gator's back (the first shortcut) ---- */
+  const GATORJ = {on:false};
+  if(B0 && B0.rampSpans && B0.rampSpans.length){
+    const sp = B0.rampSpans[0], lip = sp[0] + (B0.def.jumps[0][1] || 30), P = B0;
+    const skin = lam(0x3f8a3a, 0x0a2a08, 0.35), dark = lam(0x2a5a2a), belly = lam(0xd8d27a);
+    const body = new THREE.Group();
+    // the flanks: either side of the road from the tip of the tail to the snout, rising with the road
+    const t0 = Math.max(1, lip - Math.round(70/seg));
+    for(let k=t0; k<=lip; k++){
+      const f = frm(P, k), y = f.p.y + BED, u = (k - t0)/(lip - t0);           // 0 at the tail, 1 at the head
+      const wid = 0.8 + 2.6*Math.sin(Math.min(1, u*1.25)*Math.PI*0.5), top = y + 0.35;
+      for(const sd of [-1, 1]){
+        const off = f.half + wid*0.5 - 0.2, x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off, g0 = gradedY(x, z);
+        const h = Math.max(0.6, top - g0 + 0.2);
+        const m = addTo(body, new THREE.Mesh(new THREE.BoxGeometry(wid, h, seg*1.02), skin), x, g0 + h/2 - 0.2, z); m.rotation.y = Math.atan2(f.t.x, f.t.z);
+        // the scutes: a ridge of knobs along the top of each flank
+        if(k % 2 === 0){ const s = addTo(body, new THREE.Mesh(new THREE.ConeGeometry(0.28 + 0.25*u, 0.6 + 0.4*u, 4), dark), x, top + 0.25 + 0.2*u, z); s.rotation.y = Math.atan2(f.t.x, f.t.z) + Math.PI/4; }
+      }
+      // the belly's pale edge down low
+      if(k % 3 === 0) for(const sd of [-1, 1]){ const off = f.half + wid - 0.3, x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off; addTo(body, new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.5, seg*3), belly), x, gradedY(x, z) + 0.2, z).rotation.y = Math.atan2(f.t.x, f.t.z); }
+    }
+    // four stubby legs splayed out
+    for(const u of [0.55, 0.85]) for(const sd of [-1, 1]){
+      const f = frm(P, t0 + Math.round(u*(lip - t0))), off = f.half + 4.2, x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off;
+      const leg = addTo(body, new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 2.2, 8), skin), x, gradedY(x, z) + 0.8, z); leg.rotation.z = sd*0.9;
+      for(let q=-1;q<=1;q++) addTo(body, new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.6, 4), basic(0xf2f0e0)), x + f.nx*sd*1.0 + f.t.x*q*0.35, gradedY(x, z) + 0.2, z + f.nz*sd*1.0 + f.t.z*q*0.35).rotation.x = Math.PI/2;
+    }
+    mergeStatic(body); body.traverse(o=>{ if(o.isMesh) o.castShadow = true; }); scene.add(body);
+    // the head at the lip: the lower jaw is the snout you launch off, the upper one snaps shut on a timer
+    const f = frm(P, lip), ly = f.p.y + BED, yaw = Math.atan2(f.t.x, f.t.z);
+    const head = new THREE.Group(); head.position.set(f.p.x, ly, f.p.z); head.rotation.y = yaw; scene.add(head);
+    const hw = f.half + 1.0, eyeMat = new THREE.MeshBasicMaterial({color:0xffe24a});
+    addTo(head, new THREE.Mesh(new THREE.BoxGeometry(hw*2, 1.0, 9), skin), 0, -1.2, 4.2).rotation.x = 0.22;                  // lower jaw, falling away under the flight
+    for(const sd of [-1, 1]) addTo(head, new THREE.Mesh(new THREE.SphereGeometry(1.4, 10, 8), skin), sd*(hw - 0.2), 0.6, -1.4);      // the jowls, at the hinge
+    const eyes = [{material:eyeMat}];
+    const upper = new THREE.Group(); upper.position.set(0, 1.6, -0.6); head.add(upper);                                  // hinged at the back of the head
+    // the snout: wide at the hinge, narrowing to the nose, lumpy on top, pink inside
+    const snout = new THREE.CylinderGeometry(1, 1, 1, 4, 1); snout.rotateY(Math.PI/4);
+    for(let q=0;q<4;q++){
+      const z0 = 1.0 + q*2.0, w = (hw + 0.2)*(1 - q*0.12);
+      addTo(upper, new THREE.Mesh(new THREE.BoxGeometry(w*2, 1.1 - q*0.1, 2.1), skin), 0, 0.3, z0);
+      addTo(upper, new THREE.Mesh(new THREE.BoxGeometry(w*2 - 0.3, 0.12, 2.1), lam(0xe8607a)), 0, -0.3, z0);          // the roof of the mouth
+      for(let b=0;b<3;b++) addTo(upper, new THREE.Mesh(new THREE.SphereGeometry(0.35, 6, 4), dark), (b - 1)*w*0.55, 0.9, z0 + (b % 2)*0.6).scale.y = 0.5;
+      for(const sd of [-1, 1]) for(let k=0;k<2;k++){ const th = addTo(upper, new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.75, 4), basic(0xffffff)), sd*(w - 0.15), -0.55, z0 - 0.5 + k*1.0); th.rotation.x = Math.PI; }
+    }
+    for(let k=0;k<5;k++){ const w = (hw + 0.2)*0.64, th = addTo(upper, new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.75, 4), basic(0xffffff)), -w + 0.4 + k*(2*w - 0.8)/4, -0.55, 7.9); th.rotation.x = Math.PI; }
+    for(const sd of [-1, 1]) addTo(upper, new THREE.Mesh(new THREE.SphereGeometry(0.32, 6, 4), dark), sd*0.8, 0.85, 7.6);           // nostrils
+    // the eyes ride on the back of the upper jaw, bulging up either side
+    for(const sd of [-1, 1]){
+      addTo(upper, new THREE.Mesh(new THREE.SphereGeometry(1.0, 10, 8), skin), sd*(hw - 0.6), 1.0, 0.6);
+      addTo(upper, new THREE.Mesh(new THREE.SphereGeometry(0.72, 10, 8), eyeMat), sd*(hw - 0.6), 1.35, 0.9);
+      addTo(upper, new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.8, 0.3), basic(0x111111)), sd*(hw - 0.6), 1.35, 1.55);
+    }
+    void snout;
+    head.traverse(o=>{ if(o.isMesh) o.castShadow = true; });
+    Object.assign(GATORJ, {on:true, P, lip, head, upper, eyes, x:f.p.x, z:f.p.z, y:ly, tx:f.t.x, tz:f.t.z, hw, t:0, open:1, snapped:false});
+    boostPad(P, lip - Math.round(45/seg), 0);
+    orbRow(P, lip - Math.round(38/seg), 0, 4, 6);
+  }
+
+  /* ---- 5. the whirlpool, in the middle of the banked ring ---- */
+  if(BOWL.on){
+    const NR = 26, NA = 48, pos = [], uv = [], idx = [];
+    for(let r=0;r<=NR;r++) for(let a=0;a<=NA;a++){
+      const rr = 2 + r/NR*(WHIRL_R - 2), th = a/NA*Math.PI*2, x = BOWL.x + Math.cos(th)*rr, z = BOWL.z + Math.sin(th)*rr;
+      pos.push(x, gradedY(x, z) + 0.35 + (r === NR ? -0.3 : 0), z); uv.push(rr, th);
+    }
+    for(let r=0;r<NR;r++) for(let a=0;a<NA;a++){ const i0 = r*(NA + 1) + a; idx.push(i0, i0 + NA + 1, i0 + 1, i0 + 1, i0 + NA + 1, i0 + NA + 2); }
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+    const mat = new THREE.ShaderMaterial({ uniforms:{uTime:{value:0}, uR:{value:WHIRL_R}},
+      vertexShader:"varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }",
+      fragmentShader:[
+        "uniform float uTime, uR; varying vec2 vUv;",
+        "void main(){",
+        "  float r = vUv.x/uR, th = vUv.y;",
+        // the spiral arms turn faster toward the drain
+        "  float sw = th*3.0 + log(max(0.05, r))*7.0 + uTime*(2.2/(0.25 + r));",
+        "  float arm = 0.5 + 0.5*sin(sw), fine = 0.5 + 0.5*sin(sw*3.7 + r*20.0);",
+        "  vec3 deep = vec3(0.02, 0.10, 0.16), mid = vec3(0.10, 0.45, 0.55), foam = vec3(0.85, 0.98, 1.0);",
+        "  vec3 col = mix(deep, mid, smoothstep(0.1, 0.9, r));",
+        "  col = mix(col, foam, smoothstep(0.72, 0.95, arm)*(0.35 + 0.65*r)*(0.6 + 0.4*fine));",
+        "  col += vec3(0.1, 0.9, 1.0)*0.25*(1.0 - smoothstep(0.0, 0.25, r));",
+        "  gl_FragColor = vec4(col, 1.0);",
+        "}"].join("\n") });
+    const wm = new THREE.Mesh(g, mat); wm.frustumCulled = false; wm.renderOrder = 2; scene.add(wm);
+    waterMats.push(mat);
+    // spray thrown up off the rim, and a roar that grows as you come round
+    ANIMS.push(t=>{
+      if(!STEAM || state.phase === "menu") return;
+      const d = Math.hypot(camera.position.x - BOWL.x, camera.position.z - BOWL.z);
+      if(d < 180 && Math.random() < 0.5){ const a = Math.random()*6.28, r = WHIRL_R*(0.6 + Math.random()*0.35);
+        STEAM.spawn(BOWL.x + Math.cos(a)*r, gradedY(BOWL.x + Math.cos(a)*r, BOWL.z + Math.sin(a)*r) + 0.6, BOWL.z + Math.sin(a)*r, -Math.sin(a)*6, 2 + Math.random()*2, Math.cos(a)*6,
+                    {life:2 + Math.random(), size:[1.5, 5], col:[0.85, 0.95, 1.0], alpha:0.35, heat:0.2, drag:0.8, grav:-0.3}); }
+    });
+    // boost pads round the outside line of the ring
+    const ring = [];
+    for(let i=0;i<P0.N;i++){ const p = P0.pts[i]; if(Math.abs(Math.hypot(p.x - BOWL.x, p.z - BOWL.z) - BOWL.r) < 6) ring.push(i); }
+    if(ring.length > 20){
+      for(const u of [0.2, 0.5, 0.8]){
+        const i = ring[Math.floor(u*ring.length)], f = frm(P0, i), outward = (f.p.x - BOWL.x)*f.nx + (f.p.z - BOWL.z)*f.nz > 0 ? 1 : -1;
+        boostPad(P0, i, outward*2.2);
+      }
+      orbRow(P0, ring[Math.floor(ring.length*0.35)], 0, 5, 7);
+    }
+  }
+
+  /* ---- 6. the grotto: puddles of glowing water on the floor, and drips ---- */
+  if(CAVE){
+    orbRow(P0, CAVE.a + Math.round((CAVE.b - CAVE.a)*0.4), 0, 5, 7);
+    ANIMS.push(t=>{
+      if(!SPRAY || state.phase === "menu") return;
+      const n = nearest(pose.x, pose.z);
+      if(n.path !== P0 || n.pi < CAVE.a || n.pi > CAVE.b) return;
+      if(Math.random() < 0.6){ const f = frm(P0, n.pi + Math.round((10 + Math.random()*30)/seg)), v = (Math.random() - 0.5)*2*(f.half + 2);
+        SPRAY.spawn(f.p.x + f.nx*v, f.p.y + 7, f.p.z + f.nz*v, 0, -2, 0, {life:0.7, size:[0.18, 0.12], col:[0.5, 0.9, 1.0], heat:1, grav:14}); }
+    });
+  }
+
+  /* ---- 7. the mud geysers, right in the road, on a timer ---- */
+  if(CAVE && B1){
+    const a = byM(P0, CAVE.b, 45), b = wrapIdx(P0, B1.splitAt - Math.round(30/seg));
+    const n = 7, span = ((b - a) % P0.N + P0.N) % P0.N;
+    for(let k=0;k<n;k++){
+      const i = wrapIdx(P0, a + Math.round((k + 0.5)/n*span)), lane = [2.2, -2.2, 0.3, -2.4, 2.4, -0.3, 2.0][k];
+      const f = frm(P0, i), x = f.p.x + f.nx*lane, z = f.p.z + f.nz*lane, y = surfaceY(x, z);
+      const g = new THREE.Group(); g.position.set(x, y, z);
+      const ring = addTo(g, new THREE.Mesh(new THREE.TorusGeometry(1.9, 0.45, 6, 16), lam(0x5a3a22)), 0, 0.1, 0); ring.rotation.x = Math.PI/2;
+      const pool = addTo(g, new THREE.Mesh(new THREE.CircleGeometry(1.8, 16), new THREE.MeshLambertMaterial({color:0x6a4428, emissive:0x3a1a08})), 0, 0.08, 0); pool.rotation.x = -Math.PI/2;
+      scene.add(g);
+      GEYS.push({x, z, y, i, lane, t:1 + k*0.55, on:0, pool, emit:0});
+    }
+    orbRow(P0, a + Math.round(span*0.15), 0, 3, 8); orbRow(P0, a + Math.round(span*0.6), 0, 3, 8);
+  }
+
+  /* ---- 8a. the sunken riverboat (the main road through the second split) ---- */
+  if(FORD_I >= 0){
+    const c = byM(P0, FORD_I, 46), L = Math.round(30/seg), P = P0;
+    const white = lam(0xf2efe6), red = lam(0xc2382a), wood = lam(0x8a6040), black = lam(0x1b1b1b), gold = basic(0xffd27a);
+    const hull = new THREE.Group();
+    for(let k=c - L; k<=c + L; k++){
+      const f = frm(P, k), u = (k - c)/L, taper = u > 0.7 ? (u - 0.7)/0.3 : 0, half = f.half + 2.6 - taper*1.5, y0 = f.p.y + BED;
+      const yaw = Math.atan2(f.t.x, f.t.z), H = 6.6;
+      for(const sd of [-1, 1]){
+        const x = f.p.x + f.nx*sd*half, z = f.p.z + f.nz*sd*half;
+        const w = addTo(hull, new THREE.Mesh(new THREE.BoxGeometry(0.5, H + 1.2, seg*1.03), white), x, y0 + H/2 - 0.8, z); w.rotation.y = yaw;
+        if(k % 1 === 0){ const st = addTo(hull, new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, seg*1.05), red), x, y0 + 1.1, z); st.rotation.y = yaw; }
+        if(k % Math.round(4/seg) === 0){ const ph = addTo(hull, new THREE.Mesh(new THREE.CircleGeometry(0.42, 10), gold), x + f.nx*sd*0.27, y0 + 3.3, z + f.nz*sd*0.27); ph.lookAt(x + f.nx*sd*5, y0 + 3.3, z + f.nz*sd*5); }
+      }
+      // the deck overhead (the ballroom's ceiling), and the upper deck's cabins and rail
+      const dk = addTo(hull, new THREE.Mesh(new THREE.BoxGeometry((half + 0.6)*2, 0.5, seg*1.03), wood), f.p.x, y0 + H, f.p.z); dk.rotation.y = yaw;
+      if(Math.abs(u) < 0.62){ const cb = addTo(hull, new THREE.Mesh(new THREE.BoxGeometry((half - 1.4)*2, 3.2, seg*1.03), white), f.p.x, y0 + H + 1.85, f.p.z); cb.rotation.y = yaw;
+        if(k % Math.round(5/seg) === 0) for(const sd of [-1, 1]){ const wn = addTo(hull, new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.4, 1.4), lam(0xffd27a, 0xffb040, 0.8)), f.p.x + f.nx*sd*(half - 1.35), y0 + H + 2.0, f.p.z + f.nz*sd*(half - 1.35)); wn.rotation.y = yaw; } }
+      if(k % Math.round(2/seg) === 0) for(const sd of [-1, 1]) addTo(hull, new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.1, 0.12), white), f.p.x + f.nx*sd*(half + 0.3), y0 + H + 0.8, f.p.z + f.nz*sd*(half + 0.3));
+    }
+    // the two tall stacks with their crowns, and the name board
+    const fs = frm(P, c + Math.round(L*0.45));
+    for(const sd of [-1, 1]){
+      const x = fs.p.x + fs.nx*sd*2.6, z = fs.p.z + fs.nz*sd*2.6, y0 = fs.p.y + BED + 10;
+      addTo(hull, new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.0, 14, 10), black), x, y0 + 7, z);
+      for(let q=0;q<8;q++){ const cr = addTo(hull, new THREE.Mesh(new THREE.ConeGeometry(0.4, 1.4, 4), black), x + Math.cos(q*0.785)*1.1, y0 + 14.4, z + Math.sin(q*0.785)*1.1); cr.rotation.set(Math.sin(q*0.785)*0.4, 0, -Math.cos(q*0.785)*0.4); }
+    }
+    mergeStatic(hull); hull.traverse(o=>{ if(o.isMesh) o.castShadow = true; }); scene.add(hull);
+    // smoke from the stacks
+    ANIMS.push(t=>{ if(!STEAM || state.phase === "menu" || Math.random() > 0.25) return;
+      for(const sd of [-1, 1]) STEAM.spawn(fs.p.x + fs.nx*sd*2.6, fs.p.y + BED + 25, fs.p.z + fs.nz*sd*2.6, 1.2, 2.5, 0.6, {life:5, size:[2, 9], col:[0.35, 0.3, 0.38], alpha:0.5, heat:0.2, drag:0.4, grav:-0.4}); });
+    // the paddlewheel at the stern, turning
+    {
+      const fp = frm(P, c + L + Math.round(4/seg)), g = new THREE.Group(), R = 5.5;
+      g.position.set(fp.p.x, fp.p.y + BED + 4.4, fp.p.z); g.rotation.y = Math.atan2(fp.nx, fp.nz);
+      const wheel = new THREE.Group(); g.add(wheel);
+      for(const s of [-1, 1]){ const rim = addTo(wheel, new THREE.Mesh(new THREE.TorusGeometry(R, 0.25, 6, 24), red), 0, 0, s*(fp.half + 1.5)); void rim; }
+      for(let q=0;q<10;q++){ const a = q/10*Math.PI*2;
+        const bl = addTo(wheel, new THREE.Mesh(new THREE.BoxGeometry(0.4, 2.2, (fp.half + 1.5)*2), red), Math.cos(a)*(R - 1), Math.sin(a)*(R - 1), 0); bl.rotation.z = a; }
+      // up on the stern, clear of the road: it spins over it
+      g.position.y += 3.2;
+      scene.add(g);
+      ANIMS.push(t=>{ wheel.rotation.z = -t*1.4; });
+    }
+    // chandeliers in the ballroom, swaying
+    const chand = [];
+    for(let k=c - L + Math.round(8/seg); k<=c + L - Math.round(8/seg); k+=Math.round(13/seg)){
+      const f = frm(P, k), g = new THREE.Group(); g.position.set(f.p.x, f.p.y + BED + 6.4, f.p.z);
+      addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.4, 4), black), 0, -0.7, 0);
+      addTo(g, new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.08, 5, 14), lam(0xd8b050)), 0, -1.5, 0).rotation.x = Math.PI/2;
+      for(let q=0;q<8;q++) addTo(g, new THREE.Mesh(new THREE.OctahedronGeometry(0.16, 0), basic(0xfff4c8)), Math.cos(q*0.785)*0.9, -1.75, Math.sin(q*0.785)*0.9);
+      addTo(g, new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), basic(0xfff4c8)), 0, -1.6, 0);
+      scene.add(g); chand.push([g, rnd()*6]);
+    }
+    const blight = new THREE.PointLight(0xffd27a, 0, 30, 1.4); scene.add(blight);
+    ANIMS.push(t=>{ chand.forEach(([g, ph])=>{ g.rotation.z = Math.sin(t*1.3 + ph)*0.12; g.rotation.x = Math.sin(t*0.9 + ph)*0.08; });
+      const n = nearest(pose.x, pose.z), inside = n.path === P && Math.abs(n.pi - c) <= L;
+      blight.intensity = inside ? 1.3 : 0; if(inside) blight.position.set(pose.x, pose.y + 4, pose.z); });
+    orbRow(P, c - Math.round(L*0.6), 0, 5, 7);
+    // logs drifting across the water of the ford in front of the boat
+    const FD = FORDS.find(F=> F.path === P0 && Math.abs(F.at - FORD_I) < 4), wl = FD ? FD.level : -1e9;
+    for(const k of [0, 1]){
+      const f = frm(P, FORD_I + (k ? 2 : -2)), g = new THREE.Group();
+      addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.6, 5.5, 8), lam(0x5a3e28)), 0, 0, 0).rotation.x = Math.PI/2;
+      for(const e of [-1, 1]) addTo(g, new THREE.Mesh(new THREE.CircleGeometry(0.55, 8), lam(0xc49a6a)), 0, 0, e*2.76).rotation.y = e > 0 ? 0 : Math.PI;
+      scene.add(g);
+      HAZ.push({kind:"log", g, i:f.i, u:(k ? -1 : 1)*(f.half + 4), dir:k ? 1 : -1, r:2.2, h:1.4, x:0, y:0, z:0, cool:0, spd:2.2, wl});
+    }
+  }
+
+  /* ---- 8b. the treetops (the second shortcut): cypress trunks, rope rails, swinging logs ---- */
+  if(B1){
+    const P = B1, trunk = lam(0x6b5a4a), moss = lam(0x8aa05a), rail = new THREE.LineBasicMaterial({color:0xe8d8b0});
+    const g = new THREE.Group(), railPts = {"-1":[], "1":[]};
+    for(let k=Math.round(30/seg); k<P.N - Math.round(30/seg); k++){
+      const f = frm(P, k), y = f.p.y + BED;
+      if(k % Math.round(3/seg) === 0) for(const sd of [-1, 1]){
+        const off = f.half + 0.9, x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off;
+        addTo(g, new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.3, 0.2), trunk), x, y + 0.55, z);
+        railPts[sd].push(x, y + 1.15, z);
+      }
+      if(k % Math.round(26/seg) === 0) for(const sd of [-1, 1]){
+        const off = f.half + 5 + rnd()*3, x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off, g0 = gradedY(x, z), H = 30 + rnd()*14;
+        addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(1.3, 3.2, H, 10), trunk), x, g0 + H/2 - 1, z);
+        // a platform bolted round the trunk at road height, and a lantern
+        addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.6, 0.35, 12), lam(0x8a6040)), x, y + 0.2, z);
+        addTo(g, new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.5), basic(NEON[Math.floor(rnd()*NEON.length)])), x - f.nx*sd*2.4, y + 3.2, z - f.nz*sd*2.4);
+        // a crown of feathery green, and moss hanging off it
+        for(let q=0;q<5;q++) addTo(g, new THREE.Mesh(new THREE.IcosahedronGeometry(5 + rnd()*3, 0), lam(0x3f7a4a)), x + (rnd() - 0.5)*9, g0 + H - 2 + rnd()*5, z + (rnd() - 0.5)*9).scale.y = 0.45;
+        for(let q=0;q<6;q++) addTo(g, new THREE.Mesh(new THREE.ConeGeometry(0.4, 4 + rnd()*4, 4), moss), x + (rnd() - 0.5)*10, g0 + H - 6, z + (rnd() - 0.5)*10).rotation.x = Math.PI;
+      }
+    }
+    mergeStatic(g); g.traverse(o=>{ if(o.isMesh) o.castShadow = true; }); scene.add(g);
+    for(const sd of ["-1", "1"]){ const gg = new THREE.BufferGeometry(); gg.setAttribute("position", new THREE.Float32BufferAttribute(railPts[sd], 3)); scene.add(new THREE.Line(gg, rail)); }
+    // logs on chains, swinging across the road from beams between the trunks
+    for(const u of [0.3, 0.62]){
+      const f = frm(P, Math.round(u*P.N)), y = f.p.y + BED, g2 = new THREE.Group();
+      for(const sd of [-1, 1]) addTo(g2, new THREE.Mesh(new THREE.BoxGeometry(0.6, 12, 0.6), trunk), f.nx*sd*(f.half + 2.5), y + 6, f.nz*sd*(f.half + 2.5));
+      const beam = addTo(g2, new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 1), trunk), 0, y + 12, 0); beam.scale.z = (f.half + 3)*2; beam.rotation.y = Math.atan2(f.nx, f.nz);
+      g2.position.set(f.p.x, 0, f.p.z); scene.add(g2);
+      const pend = new THREE.Group(); pend.position.set(f.p.x, y + 12, f.p.z); pend.rotation.y = Math.atan2(f.t.x, f.t.z); scene.add(pend);
+      addTo(pend, new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 9.5, 4), black0()), 0, -4.75, 0);
+      const log = addTo(pend, new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 4.2, 10), lam(0x5a3e28)), 0, -10.2, 0); log.rotation.x = Math.PI/2;
+      HAZ.push({kind:"swing", pend, i:f.i, P, r:2.0, h:1.8, x:0, y:0, z:0, cool:0, ph:u*7, nx:f.nx, nz:f.nz, cx:f.p.x, cz:f.p.z, top:y + 12});
+    }
+    boostPad(P, Math.round(P.N*0.45), 0); boostPad(P, Math.round(P.N*0.8), 1.5);
+    orbRow(P, Math.round(P.N*0.5), 0, 5, 6);
+  }
+  function black0(){ return lam(0x1b1b1b); }
+
+  /* ---- 9. the vine gorge: two great trees, a limb across, vines hanging in the gap ---- */
+  if(LEAP){
+    const f = frm(P0, LEAP.i), g = new THREE.Group(), bark = lam(0x5a4632), vine = lam(0x3f8a3a);
+    const top = f.p.y + 24;
+    for(const sd of [-1, 1]){
+      const x = f.p.x + f.nx*sd*(f.half + 9), z = f.p.z + f.nz*sd*(f.half + 9), g0 = gradedY(x, z);
+      addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.8, top - g0 + 6, 10), bark), x, (top + g0)/2 + 3, z);
+      for(let q=0;q<5;q++) addTo(g, new THREE.Mesh(new THREE.IcosahedronGeometry(6 + rnd()*3, 0), lam(0x2f6a3a)), x + (rnd() - 0.5)*10, top + 6 + rnd()*4, z + (rnd() - 0.5)*10).scale.y = 0.5;
+    }
+    const limb = addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, (f.half + 9)*2, 8), bark), f.p.x, top + 1, f.p.z);
+    limb.rotation.z = Math.PI/2; limb.rotation.y = -Math.atan2(f.nz, f.nx);
+    mergeStatic(g); scene.add(g);
+    const vines = new THREE.Group(); vines.position.set(f.p.x, top, f.p.z); scene.add(vines);
+    for(let q=0;q<16;q++){
+      const v = (q/15 - 0.5)*2*(f.half + 7), len = 8 + rnd()*9, along = (rnd() - 0.5)*6;
+      const pts = []; for(let s=0;s<=6;s++) pts.push(new THREE.Vector3(f.nx*v + f.t.x*along + Math.sin(s*1.3 + q)*0.4, -s/6*len, f.nz*v + f.t.z*along + Math.cos(s*1.1 + q)*0.4));
+      const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 12, 0.14, 4, false), vine); vines.add(m);
+      if(q % 3 === 0) addTo(vines, new THREE.Mesh(new THREE.SphereGeometry(0.35, 6, 4), basic(NEON[q % NEON.length])), pts[6].x, pts[6].y, pts[6].z);
+    }
+    ANIMS.push(t=>{ vines.rotation.x = Math.sin(t*0.7)*0.04; vines.rotation.z = Math.sin(t*0.55 + 1)*0.05; });
+    const lip = LEAP.i - Math.round((TRACK.leaps[0].gap/2 + 3)/seg);
+    boostPad(P0, lip - Math.round(46/seg), -1.5); boostPad(P0, lip - Math.round(30/seg), 1.5);
+    orbRow(P0, lip - Math.round(20/seg), 0, 3, 6);
+  }
+
+  /* ---- 10. the firefly festival: lanterns strung over the road, stalls, the ferris wheel, fireworks ---- */
+  const FEST = {a:-1, b:-1};
+  if(LEAP && DROP.on){
+    const a = byM(P0, LEAP.i, 70), b = wrapIdx(P0, DROP.i - Math.round(60/seg));
+    FEST.a = a; FEST.b = b;
+    const span = ((b - a) % P0.N + P0.N) % P0.N;
+    const g = new THREE.Group(), pole = lam(0x3a2a4a), lpos = [], lcol = [];
+    for(let k=0; k<span; k+=Math.round(20/seg)){
+      const f = frm(P0, a + k), y = f.p.y + BED, ends = [];
+      for(const sd of [-1, 1]){ const x = f.p.x + f.nx*sd*(f.half + 1.8), z = f.p.z + f.nz*sd*(f.half + 1.8), g0 = gradedY(x, z);
+        addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 8, 6), pole), x, g0 + 4, z); ends.push([x, g0 + 7.8, z]); }
+      // a sagging string of paper lanterns across the road
+      for(let q=0;q<=12;q++){ const u = q/12, sag = 1.8*Math.sin(u*Math.PI);
+        const x = ends[0][0] + (ends[1][0] - ends[0][0])*u, yy = ends[0][1] + (ends[1][1] - ends[0][1])*u - sag, z = ends[0][2] + (ends[1][2] - ends[0][2])*u;
+        if(q && q < 12){ lpos.push(x, yy - 0.5, z); const c = new THREE.Color(NEON[(q + k) % NEON.length]); lcol.push(c.r, c.g, c.b); } }
+    }
+    mergeStatic(g); scene.add(g);
+    {
+      const inst = new THREE.InstancedMesh(new THREE.SphereGeometry(0.42, 8, 6), new THREE.MeshBasicMaterial({}), lpos.length/3);
+      const m4 = new THREE.Matrix4(), cc = new THREE.Color();
+      for(let k=0;k<lpos.length/3;k++){ m4.makeScale(1, 1.25, 1); m4.setPosition(lpos[k*3], lpos[k*3 + 1], lpos[k*3 + 2]); inst.setMatrixAt(k, m4); inst.setColorAt(k, cc.setRGB(lcol[k*3], lcol[k*3 + 1], lcol[k*3 + 2])); }
+      inst.instanceMatrix.needsUpdate = true; inst.instanceColor.needsUpdate = true; scene.add(inst);
+      const wires = []; for(let k=0;k+3<lpos.length;k+=3){ if(Math.hypot(lpos[k + 3] - lpos[k], lpos[k + 5] - lpos[k + 2]) < 4) wires.push(lpos[k], lpos[k + 1] + 0.45, lpos[k + 2], lpos[k + 3], lpos[k + 4] + 0.45, lpos[k + 5]); }
+      const wg = new THREE.BufferGeometry(); wg.setAttribute("position", new THREE.Float32BufferAttribute(wires, 3)); scene.add(new THREE.LineSegments(wg, new THREE.LineBasicMaterial({color:0x2a1a3a})));
+    }
+    // stalls down both sides: striped awnings, glowing counters
+    for(let k=Math.round(10/seg), n=0; k<span; k+=Math.round(16/seg), n++){
+      const f = frm(P0, a + k), sd = n % 2 ? 1 : -1, off = f.half + 7, x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off;
+      if(!clearOf(x, z, 4)) continue;
+      const s = new THREE.Group(), c = NEON[n % NEON.length];
+      pbox(s, 5, 2.4, 3, 0xf2efe6, 0, 1.2, 0);
+      pbox(s, 5.2, 0.5, 0.4, c, 0, 1.3, 1.6);
+      for(let q=0;q<5;q++){ const aw = pbox(s, 1.04, 0.12, 3.4, q % 2 ? 0xf2efe6 : c, -2.08 + q*1.04, 3.2, 0.6); aw.rotation.x = 0.3; }
+      for(const e of [-1, 1]) pbox(s, 0.14, 3.2, 0.14, 0x3a2a4a, e*2.5, 1.6, 1.8);
+      setDown(s, x, z, Math.atan2(-f.nx*sd, -f.nz*sd));
+    }
+    // the ferris wheel, off to one side at the middle of the straight
+    {
+      const f = frm(P0, a + Math.round(span*0.5)), sd = -1, off = f.half + 34, x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off;
+      const g2 = new THREE.Group(), R = 17, steel = 0xe8e2d4;
+      for(const s of [-1, 1]) for(const aa of [-0.32, 0.32]){ const leg = pbox(g2, 0.5, R + 3, 0.5, steel, Math.sin(aa)*(R + 3)/2, (R + 3)/2, s*2.2); leg.rotation.z = -aa; }
+      const wheel = new THREE.Group(); wheel.position.set(0, R + 2.2, 0); g2.add(wheel); g2.userData.noMerge = true;
+      for(const s of [-1, 1]){ const rim = new THREE.Mesh(new THREE.TorusGeometry(R, 0.25, 5, 40), basic(0xff3fd2)); rim.position.z = s*1.8; wheel.add(rim);
+        for(let q=0;q<12;q++){ const spk = pbox(wheel, 0.14, R, 0.14, steel, 0, 0, s*1.8); spk.geometry = spk.geometry.clone(); spk.geometry.translate(0, R/2, 0); spk.position.set(0, 0, s*1.8); spk.rotation.z = q/12*Math.PI*2; } }
+      const cars = [];
+      for(let q=0;q<12;q++){ const gon = new THREE.Group(); pbox(gon, 2.2, 1.4, 2.6, NEON[q % NEON.length], 0, -1.3, 0); wheel.add(gon); cars.push([gon, q/12*Math.PI*2]); }
+      // bulbs round the rim
+      for(let q=0;q<36;q++){ const aa = q/36*Math.PI*2; addTo(wheel, new THREE.Mesh(new THREE.SphereGeometry(0.28, 5, 4), basic(q % 2 ? 0xffe24a : 0x3ff2ff)), Math.cos(aa)*R, Math.sin(aa)*R, 2.1); }
+      setDown(g2, x, z, Math.atan2(f.t.x, f.t.z) + Math.PI/2);
+      ANIMS.push(t=>{ const r = t*0.14; wheel.rotation.z = r; cars.forEach(([gon, aa])=> gon.position.set(Math.cos(aa + r)*R, Math.sin(aa + r)*R, 0)); });
+    }
+    // fireworks over the straight
+    const fwAt = [0.2, 0.45, 0.7, 0.95].map(u=> frm(P0, a + Math.round(span*u)));
+    let fwT = 0;
+    ANIMS.push(t=>{
+      if(!SPRAY || state.phase === "menu") return;
+      const f = fwAt[Math.floor(t*0.37) % fwAt.length];
+      if(Math.hypot(camera.position.x - f.p.x, camera.position.z - f.p.z) > 420) return;
+      if(t - fwT < 1.1) return; fwT = t;
+      const x = f.p.x + f.nx*(rnd() - 0.5)*60 + f.nx*(rnd() < 0.5 ? -40 : 40), z = f.p.z + f.nz*(rnd() - 0.5)*60, y = f.p.y + 45 + rnd()*25;
+      const col = [[1,0.3,0.85],[0.3,0.95,1],[0.65,1,0.3],[1,0.85,0.3],[0.75,0.4,1]][Math.floor(rnd()*5)];
+      for(let k=0;k<60;k++){ const u = rnd()*2 - 1, th = rnd()*6.28, s = Math.sqrt(1 - u*u), v = 14 + rnd()*4;
+        SPRAY.spawn(x, y, z, Math.cos(th)*s*v, u*v, Math.sin(th)*s*v, {life:1.4 + rnd()*0.6, size:[0.9, 0.2], col, heat:1, grav:4, drag:1.1}); }
+      if(actx){ const d = Math.hypot(camera.position.x - x, camera.position.z - z), k = Math.max(0, 1 - d/420);
+        burst(0.5, "lowpass", 180, 0.3*k, 1, 0.05 + d/340); burst(0.9, "highpass", 2400, 0.06*k, 0.6, 0.12 + d/340); }
+    });
+    for(const u of [0.15, 0.45, 0.75]) orbRow(P0, a + Math.round(span*u), [0, -2.2, 2.2][Math.round(u*3) % 3], 5, 6);
+    boostPad(P0, a + Math.round(span*0.3), 0); boostPad(P0, a + Math.round(span*0.62), 0);
+  }
+
+  /* ---- 11a. the waterfall, pouring off the escarpment beside the road ---- */
+  if(DROP.on){
+    const f = frm(P0, DROP.i), W = 16;
+    const topY = gridH(DROP.x - DROP.tx*2, DROP.z - DROP.tz*2), botY = gridH(DROP.x + DROP.tx*14, DROP.z + DROP.tz*14);
+    const fallMat = new THREE.ShaderMaterial({ uniforms:{uTime:{value:0}}, side:THREE.DoubleSide, transparent:true, depthWrite:false,
+      vertexShader:"varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }",
+      fragmentShader:[
+        "uniform float uTime; varying vec2 vUv;",
+        "float h(float x){ return fract(sin(x*127.1)*43758.5); }",
+        "void main(){",
+        "  float col = floor(vUv.x*60.0), sp = 0.8 + 0.6*h(col);",
+        "  float s = fract(vUv.y*3.0 + uTime*sp + h(col + 3.0));",
+        "  float streak = smoothstep(0.0, 0.5, s)*(1.0 - smoothstep(0.5, 1.0, s));",
+        "  vec3 c = mix(vec3(0.35, 0.75, 0.95), vec3(0.95, 1.0, 1.0), streak*0.8 + (1.0 - vUv.y)*0.3);",
+        "  float a = 0.78 + 0.2*streak;",
+        "  a *= smoothstep(0.0, 0.08, vUv.x)*smoothstep(1.0, 0.92, vUv.x);",
+        "  gl_FragColor = vec4(c, a);",
+        "}"].join("\n") });
+    waterMats.push(fallMat);
+    for(const sd of [-1, 1]){
+      const off = f.half + 4 + W/2, cx = DROP.x - DROP.tz*sd*off + DROP.tx*1.5, cz = DROP.z + DROP.tx*sd*off + DROP.tz*1.5;
+      const H = topY - botY + 2, m = new THREE.Mesh(new THREE.PlaneGeometry(W, H, 1, 1), fallMat);
+      m.position.set(cx, botY + H/2 - 1, cz); m.rotation.y = Math.atan2(DROP.tx, DROP.tz); m.renderOrder = 4; scene.add(m);
+      // the river on top running to the edge, and the pool at the bottom
+      const riv = new THREE.Mesh(new THREE.PlaneGeometry(W, 40), new THREE.MeshLambertMaterial({color:0x3aa0c8, emissive:0x0a3040}));
+      riv.rotation.x = -Math.PI/2; riv.rotation.z = -Math.atan2(DROP.tx, DROP.tz); riv.position.set(cx - DROP.tx*21, topY + 0.25, cz - DROP.tz*21); scene.add(riv);
+      const pool = new THREE.Mesh(new THREE.CircleGeometry(W*0.8, 20), new THREE.MeshLambertMaterial({color:0x6fd0f0, emissive:0x104858}));
+      pool.rotation.x = -Math.PI/2; pool.position.set(cx + DROP.tx*9, botY + 0.3, cz + DROP.tz*9); scene.add(pool);
+      ANIMS.push(t=>{ if(!STEAM || state.phase === "menu" || Math.random() > 0.6) return;
+        if(Math.hypot(camera.position.x - cx, camera.position.z - cz) > 260) return;
+        STEAM.spawn(cx + DROP.tx*4 + (Math.random() - 0.5)*W, botY + 1, cz + DROP.tz*4 + (Math.random() - 0.5)*W*0.5, DROP.tx*3, 2 + Math.random()*3, DROP.tz*3,
+                    {life:3, size:[3, 12], col:[0.92, 0.97, 1.0], alpha:0.5, heat:0.1, drag:0.6, grav:-0.4}); });
+    }
+    // a boost pad waiting where you land, straight down the middle
+    boostPad(P0, byM(P0, DROP.i, 62), 0);
+    orbRow(P0, byM(P0, DROP.i, -40), 0, 3, 6);
+  }
+
+  /* ---- 11b. the mushroom hill (the third shortcut): giant neon mushrooms, bouncing caps, rolling barrels ---- */
+  if(B2){
+    const P = B2, g = new THREE.Group();
+    for(let k=Math.round(20/seg); k<P.N - Math.round(20/seg); k+=Math.round(14/seg)){
+      for(const sd of [-1, 1]){
+        if(rnd() < 0.25) continue;
+        const f = frm(P, k), off = f.half + 4 + rnd()*9, x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off;
+        if(!clearOf(x, z, 2.5)) continue;
+        const H = 4 + rnd()*9, cr = 2.5 + rnd()*4.5, c = NEON[Math.floor(rnd()*NEON.length)], g0 = gradedY(x, z);
+        addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(cr*0.18, cr*0.26, H, 8), lam(0xf2ecd8, 0x403a30, 0.4)), x, g0 + H/2, z);
+        addTo(g, new THREE.Mesh(capGeo, basic(c)), x, g0 + H - 0.2, z).scale.set(cr, cr*0.55, cr);
+        for(let q=0;q<5;q++){ const a = rnd()*6.28, r = rnd()*cr*0.7; addTo(g, new THREE.Mesh(new THREE.SphereGeometry(cr*0.1, 5, 4), basic(0xffffff)), x + Math.cos(a)*r, g0 + H - 0.2 + cr*0.5*Math.sqrt(1 - (r/cr)**2), z + Math.sin(a)*r); }
+      }
+    }
+    mergeStatic(g); scene.add(g);
+    const a = Math.round(40/seg), b = P.N - Math.round(50/seg);
+    let n = 0;
+    for(let k=a; k<b; k+=Math.round(22/seg), n++) bouncePad(P, k, [0, 1.8, -1.8, 0.5, -0.5, 1.8, -1.8][n % 7], "cap");
+    orbRow(P, Math.round(P.N*0.2), 0, 5, 6); orbRow(P, Math.round(P.N*0.62), 0, 5, 6);
+    // barrels, bouncing down the hill ahead of you
+    for(let q=0;q<4;q++){
+      const g2 = new THREE.Group();
+      addTo(g2, new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 1.5, 12), lam(0x8a5a30)), 0, 0, 0).rotation.z = Math.PI/2;
+      for(const e of [-0.45, 0.45]) addTo(g2, new THREE.Mesh(new THREE.CylinderGeometry(0.78, 0.78, 0.12, 12), lam(0x333333)), e, 0, 0).rotation.z = Math.PI/2;
+      g2.visible = false; scene.add(g2);
+      HAZ.push({kind:"barrel", g:g2, P, s:-1, lane:0, r:1.3, h:1.3, x:0, y:0, z:0, cool:0, spd:0, live:false});
+    }
+  }
+
+  /* ---- 12. the giant cypress and its frog choir ---- */
+  const FROGS = [];
+  if(GIANT.on){
+    const R = GIANT.ring, gy = gradedY(GIANT.x, GIANT.z), g = new THREE.Group();
+    // Spanish moss hanging off the limbs all round
+    for(let q=0;q<60;q++){ const a = rnd()*6.28, r = 14 + rnd()*48, y = gy + 34 + rnd()*30;
+      addTo(g, new THREE.Mesh(new THREE.ConeGeometry(0.5 + rnd()*0.5, 4 + rnd()*7, 4), lam(0x9ab07a)), GIANT.x + Math.cos(a)*r, y, GIANT.z + Math.sin(a)*r).rotation.x = Math.PI; }
+    mergeStatic(g); scene.add(g);
+    // a ring balcony round the trunk, and the frogs singing on it
+    const bal = new THREE.Mesh(new THREE.TorusGeometry(16.5, 1.2, 5, 36), lam(0x8a6040)); bal.rotation.x = Math.PI/2; bal.position.set(GIANT.x, gy + 7, GIANT.z); scene.add(bal);
+    for(let q=0;q<14;q++){
+      const a = q/14*Math.PI*2, x = GIANT.x + Math.cos(a)*16.5, z = GIANT.z + Math.sin(a)*16.5;
+      const fg = new THREE.Group(); fg.position.set(x, gy + 8, z); fg.rotation.y = Math.atan2(Math.cos(a), Math.sin(a));
+      const col = [0x5ec94a, 0x3fae3a, 0x9dff3f, 0x2f8a5a][q % 4];
+      addTo(fg, new THREE.Mesh(new THREE.SphereGeometry(1.1, 10, 8), lam(col)), 0, 0.2, 0).scale.set(1, 0.8, 1);
+      for(const s of [-1, 1]){ addTo(fg, new THREE.Mesh(new THREE.SphereGeometry(0.38, 8, 6), basic(0xffffff)), s*0.5, 0.95, 0.5); addTo(fg, new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 4), basic(0x111111)), s*0.5, 1.0, 0.8); }
+      const sac = addTo(fg, new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), lam(0xf2e27a)), 0, -0.1, 0.85);
+      scene.add(fg); FROGS.push({fg, sac, ph:rnd()*6});
+    }
+    ANIMS.push(t=>{
+      const d = Math.hypot(pose.x - GIANT.x, pose.z - GIANT.z), spd = Math.hypot(pose.vx, pose.vz), k = state.phase === "menu" ? 0.3 : Math.min(1, spd/35);
+      FROGS.forEach(F=>{ const beat = Math.max(0, Math.sin(t*(4 + 8*k) + F.ph)); F.sac.scale.setScalar(0.6 + beat*(0.6 + 1.2*k)); F.fg.position.y = gy + 8 + beat*0.15; });
+      // the choir sings louder the faster you go
+      if(actx && state.phase === "racing" && d < R + 40 && (GG.croakT = (GG.croakT || 0) - 1/60) <= 0){
+        GG.croakT = 0.28 - 0.14*k;
+        const f0 = [98, 123, 147, 110, 165][Math.floor(Math.random()*5)];
+        tone(f0*(1 + 0.3*k), 0.14, "square", 0.02 + 0.07*k, f0*0.7);
+      }
+    });
+    // boost pads round the ring, and orbs
+    const ring = [];
+    for(let i=0;i<P0.N;i++){ const p = P0.pts[i]; if(Math.abs(Math.hypot(p.x - GIANT.x, p.z - GIANT.z) - R) < 5) ring.push(i); }
+    if(ring.length > 10){ boostPad(P0, ring[Math.floor(ring.length*0.3)], 0); boostPad(P0, ring[Math.floor(ring.length*0.75)], 0); orbRow(P0, ring[Math.floor(ring.length*0.45)], 0, 4, 6); }
+  }
+
+  /* ---- 13. the band stand by the last jump, and the frog band on it ---- */
+  const BAND = [];
+  if(JUMP_I >= 0){
+    const f = frm(P0, byM(P0, JUMP_I, 18)), sd = -1, off = f.half + 9, x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off;
+    const g = new THREE.Group(); g.userData.noMerge = true;
+    pbox(g, 16, 1.2, 9, 0x8a6040, 0, 0.6, 0);
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(8, 16, 10, 0, Math.PI, 0, Math.PI/2), lam(0xff3fd2, 0x4a0a3a, 0.5)); shell.rotation.y = Math.PI; shell.position.set(0, 1.2, -1.5); shell.scale.set(1, 0.95, 0.7); g.add(shell);
+    for(let q=0;q<18;q++){ const aa = q/17*Math.PI; addTo(g, new THREE.Mesh(new THREE.SphereGeometry(0.25, 5, 4), basic(q % 2 ? 0xffe24a : 0x3ff2ff)), Math.cos(aa)*8, 1.2 + Math.sin(aa)*7.6, 4.0); }
+    const inst = [[0xc49a6a, "banjo"], [0xc2382a, "accordion"], [0xffd23f, "tuba"], [0xe8e2d4, "washboard"]];
+    for(let q=0;q<4;q++){
+      const fg = new THREE.Group(); fg.position.set(-5.4 + q*3.6, 1.2, 0.5);
+      addTo(fg, new THREE.Mesh(new THREE.SphereGeometry(1.0, 10, 8), lam([0x5ec94a, 0x3fae3a, 0x9dff3f, 0x2f8a5a][q])), 0, 1.0, 0).scale.set(1, 1.1, 0.9);
+      for(const s of [-1, 1]){ addTo(fg, new THREE.Mesh(new THREE.SphereGeometry(0.34, 8, 6), basic(0xffffff)), s*0.45, 1.95, 0.4); addTo(fg, new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 4), basic(0x111111)), s*0.45, 2.0, 0.7); }
+      const I = inst[q];
+      const tool = new THREE.Group(); tool.position.set(0, 0.8, 0.9); fg.add(tool);
+      if(I[1] === "banjo"){ addTo(tool, new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.15, 12), lam(I[0])), 0, 0, 0).rotation.x = Math.PI/2; addTo(tool, new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.6, 0.1), lam(0x5a3e28)), 0.5, 0.6, 0).rotation.z = -0.8; }
+      else if(I[1] === "accordion"){ addTo(tool, new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.8, 0.5), lam(I[0])), 0, 0, 0); }
+      else if(I[1] === "tuba"){ addTo(tool, new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.18, 6, 12), lam(I[0])), 0, 0.2, 0); addTo(tool, new THREE.Mesh(new THREE.ConeGeometry(0.5, 0.8, 10, 1, true), lam(I[0])), 0.3, 0.9, 0); }
+      else { addTo(tool, new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.1, 0.1), lam(I[0])), 0, 0, 0); }
+      g.add(fg); BAND.push({fg, tool, kind:I[1], ph:q*0.8});
+    }
+    setDown(g, x, z, Math.atan2(-f.nx*sd, -f.nz*sd), true);
+    ANIMS.push(t=>{ BAND.forEach(b=>{ const beat = Math.abs(Math.sin(t*4.2 + b.ph));
+      b.fg.position.y = 1.2 + beat*0.25; b.fg.rotation.z = Math.sin(t*2.1 + b.ph)*0.12;
+      if(b.kind === "accordion") b.tool.scale.x = 0.75 + 0.35*Math.abs(Math.sin(t*2.1 + b.ph));
+      else b.tool.rotation.z = Math.sin(t*8.4 + b.ph)*0.15; }); });
+    boostPad(P0, byM(P0, JUMP_I, -55), 0);
+    boostPad(P0, byM(P0, JUMP_I, 60), 0);
+    orbRow(P0, byM(P0, JUMP_I, 70), 0, 4, 6);
+  }
+
+  /* ---- everywhere: neon mushrooms by the road, fireflies in the air, balloons in the sky ---- */
+  {
+    const spots = [];
+    paths.forEach(P=>{
+      for(let k=0;k<P.N;k+=Math.round(9/seg)){
+        const f = frm(P, k);
+        for(const sd of [-1, 1]){
+          if(rnd() < 0.35) continue;
+          const off = f.half + 2.5 + rnd()*7, x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off;
+          if(!clearOf(x, z, 2) || lakeE(x, z) < 1.05 || (CAVE && P === P0 && k >= CAVE.a - 3 && k <= CAVE.b + 3)) continue;
+          const n = 1 + Math.floor(rnd()*3);
+          for(let q=0;q<n;q++) spots.push([x + (rnd() - 0.5)*1.6, z + (rnd() - 0.5)*1.6, 0.4 + rnd()*0.9]);
+        }
+      }
+    });
+    const stemI = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.16, 0.22, 1, 6), new THREE.MeshLambertMaterial({color:0xf2ecd8}), spots.length);
+    const capI = new THREE.InstancedMesh(capGeo, new THREE.MeshBasicMaterial({}), spots.length);
+    const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), cc = new THREE.Color();
+    spots.forEach((s, k)=>{ const y = gradedY(s[0], s[1]), h = s[2]*1.6;
+      q4.setFromEuler(new THREE.Euler((rnd() - 0.5)*0.3, 0, (rnd() - 0.5)*0.3));
+      v3.set(s[0], y + h/2, s[1]); s3.set(s[2], h, s[2]); m4.compose(v3, q4, s3); stemI.setMatrixAt(k, m4);
+      v3.set(s[0], y + h - 0.05, s[1]); s3.set(s[2]*0.9, s[2]*0.5, s[2]*0.9); m4.compose(v3, q4, s3); capI.setMatrixAt(k, m4);
+      capI.setColorAt(k, cc.setHex(NEON[k % NEON.length])); });
+    stemI.instanceMatrix.needsUpdate = true; capI.instanceMatrix.needsUpdate = true; capI.instanceColor.needsUpdate = true;
+    scene.add(stemI); scene.add(capI);
+  }
+  {
+    // fireflies: a cloud of blinking points along every road, drifting
+    const pos = [], ph = [];
+    paths.forEach(P=>{ for(let k=0;k<P.N;k+=2){ const f = frm(P, k);
+      for(let q=0;q<2;q++){ const sd = rnd() < 0.5 ? -1 : 1, off = f.half + 1 + rnd()*16, x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off;
+        pos.push(x, gradedY(x, z) + 0.6 + rnd()*4.5, z); ph.push(rnd()*6.28); } } });
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("aPh", new THREE.Float32BufferAttribute(ph, 1));
+    const mat = new THREE.ShaderMaterial({ uniforms:{uTime:{value:0}, uScale:{value:window.innerHeight/2}}, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
+      vertexShader:[
+        "attribute float aPh; uniform float uTime, uScale; varying float vA;",
+        "void main(){",
+        "  vec3 p = position + vec3(sin(uTime*0.7 + aPh*3.0), sin(uTime*0.9 + aPh)*0.6, cos(uTime*0.6 + aPh*2.0))*1.2;",
+        "  vec4 mv = modelViewMatrix*vec4(p, 1.0);",
+        "  vA = pow(max(0.0, sin(uTime*1.6 + aPh*5.0)), 3.0);",
+        "  gl_PointSize = clamp(uScale*0.22/max(1.0, -mv.z), 1.0, 9.0);",
+        "  gl_Position = projectionMatrix*mv;",
+        "}"].join("\n"),
+      fragmentShader:[
+        "varying float vA;",
+        "void main(){ float d = length(gl_PointCoord - 0.5); if(d > 0.5) discard;",
+        "  gl_FragColor = vec4(vec3(0.85, 1.0, 0.35)*vA*(1.0 - d*1.6), 1.0); }"].join("\n") });
+    const pm = new THREE.Points(g, mat); pm.frustumCulled = false; scene.add(pm);
+    waterMats.push(mat);
+  }
+  {
+    // hot air balloons drifting over the park
+    const balloons = [];
+    for(let q=0;q<6;q++){
+      const b = new THREE.Group(), sg = new THREE.SphereGeometry(9, 16, 12), cols = [];
+      const c1 = new THREE.Color(NEON[q % NEON.length]), c2 = new THREE.Color(0xfff4e0);
+      const pa = sg.attributes.position;
+      for(let v=0; v<pa.count; v++){ const a = Math.atan2(pa.getZ(v), pa.getX(v)); const c = Math.floor((a + Math.PI)/(Math.PI/4)) % 2 ? c1 : c2; cols.push(c.r, c.g, c.b); }
+      sg.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
+      addTo(b, new THREE.Mesh(sg, new THREE.MeshLambertMaterial({vertexColors:true})), 0, 0, 0).scale.y = 1.2;
+      addTo(b, new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.8, 2.4), lam(0x8a6040)), 0, -14, 0);
+      for(const s of [[-1,-1],[1,-1],[-1,1],[1,1]]) addTo(b, new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 5, 3), lam(0x333333)), s[0]*1.1, -11, s[1]*1.1);
+      scene.add(b);
+      balloons.push({b, a:q/6*Math.PI*2, r:300 + rnd()*250, y:120 + rnd()*90, sp:0.012 + rnd()*0.01});
+    }
+    ANIMS.push(t=>{ balloons.forEach(B=>{ const a = B.a + t*B.sp; B.b.position.set(Math.cos(a)*B.r, B.y + Math.sin(t*0.2 + B.a)*6, Math.sin(a)*B.r); }); });
+  }
+
+  /* ==== the play ==== */
+  let handPrev = false, trick = 0, trickKind = 0, trickN = 0, tricked = false, chain = 0, lastBounce = -9, hitCool = 0, lastPhase = "", sparkle = 0;
+  const G_ON = 1.5;
+  function kick(power, time){
+    drift.boostT = Math.max(drift.boostT, time); drift.boostPower = Math.max(drift.boostPower, power);
+    drift.boostTier = Math.max(drift.boostTier, 1); drift.flash = 1;
+    if(typeof postMat !== "undefined") postMat.uniforms.uFlash.value = Math.max(postMat.uniforms.uFlash.value, 0.18);
+  }
+  function knock(nx, nz, hard){
+    const vn = pose.vx*nx + pose.vz*nz;
+    if(vn < 0){ pose.vx -= nx*vn*1.6; pose.vz -= nz*vn*1.6; }
+    pose.vx *= 0.62; pose.vz *= 0.62; pose.vy = Math.max(pose.vy || 0, 3.5); pose.air = true; pose.airT = 0;
+    GAME.shake = Math.max(GAME.shake || 0, 0.35);
+    if(actx) SFX.bump(hard ? 9 : 6);
+    GG.hit(hard ? 2 : 1);
+  }
+  GG.hit = n=>{
+    if(hitCool > 0) return;
+    hitCool = 1.2;
+    const lost = Math.min(GG.orbs, n);
+    GG.orbs -= lost;
+    for(let k=0;k<lost*6;k++) spawnDust(pose.x, pose.y + 1, pose.z, [0.85, 1.0, 0.35], 0.4, (Math.random() - 0.5)*9, (Math.random() - 0.5)*9, 5 + Math.random()*4);
+  };
+  GG.dragK = ()=> 1 - GG.orbs*0.016;
+  GG.ceil = ()=> GG.orbs*0.55;
+  GG.reset = ()=>{ GG.orbs = 0; trick = 0; tricked = false; chain = 0; ORBS.forEach(o=>{ o.live = true; o.g.visible = true; });
+    HAZ.forEach(h=>{ if(h.kind === "barrel"){ h.live = false; h.g.visible = false; } }); };
+  GG.onLand = landed=>{
+    if(!tricked) return;
+    tricked = false;
+    if(trick <= 0.06){ kick(10, 1.3); if(actx){ SFX.boost(2); tone(660, 0.18, "triangle", 0.12, 990); }
+      for(let k=0;k<24;k++) spawnDust(pose.x, pose.y + 0.5, pose.z, [1.0, 0.4 + Math.random()*0.5, 0.9], 0.5, (Math.random() - 0.5)*8, (Math.random() - 0.5)*8, 3 + Math.random()*4); }
+    else { GAME.shake = Math.max(GAME.shake || 0, 0.3); pose.vx *= 0.85; pose.vz *= 0.85; }      // came down mid spin
+    trick = 0; GG.trickRoll = GG.trickYaw = 0;
+  };
+  GG.stepCar = (dt, c)=>{
+    const T = state.t, racing = state.phase === "racing";
+    hitCool = Math.max(0, hitCool - dt);
+    // confetti at the lights and at the flag
+    if(state.phase !== lastPhase){ if(state.phase === "racing" && lastPhase === "countdown") confetti(70); if(state.phase === "done") confetti(90); lastPhase = state.phase; }
+    const pressed = c.hand && !handPrev; handPrev = c.hand;
+    // a trick in the air: tap the drift button once you are properly off the ground
+    if(racing && pose.air && pose.airT > 0.12 && pressed && trick <= 0 && !tricked && drift.mode !== "hop"){
+      trick = 0.6; trickKind = trickN++ % 3; tricked = true; if(actx) tone(420, 0.25, "triangle", 0.08, 880);
+    }
+    if(trick > 0){
+      trick = Math.max(0, trick - dt);
+      const u = 1 - trick/0.6, e = u*u*(3 - 2*u), a = e*Math.PI*2;
+      GG.trickRoll = trickKind === 1 ? 0 : trickKind === 0 ? a : a*0.5;
+      GG.trickYaw  = trickKind === 1 ? a : trickKind === 2 ? a*0.5 : 0;
+      if(trick === 0){ GG.trickRoll = GG.trickYaw = 0; }
+    }
+    // a little steering in the air, to line the landing up
+    if(pose.air && pose.airT > 0.1){ const s = c.steer || 0; pose.vx += c.nfz*s*5.5*dt; pose.vz -= c.nfx*s*5.5*dt; }
+    if(!racing) return;
+    // pads
+    for(const p of PADS){
+      p.cool = Math.max(0, p.cool - dt);
+      if(p.sq) { p.sq = Math.max(0, p.sq - dt*3); p.mesh.scale.set(1 + p.sq*0.25, 1 - p.sq*0.6, 1 + p.sq*0.25); }
+      if(p.cool > 0) continue;
+      const dx = pose.x - p.x, dz = pose.z - p.z;
+      if(dx*dx + dz*dz > p.r*p.r || Math.abs(pose.y - p.y) > 1.6) continue;
+      p.cool = 1.0;
+      if(p.kind === "boost"){
+        kick(13, 1.1); pose.vx += c.nfx*2.5; pose.vz += c.nfz*2.5;
+        if(actx) SFX.boost(1);
+      } else {
+        if(pose.air && pose.vy > 2) continue;
+        chain = T - lastBounce < 1.9 ? chain + 1 : 1; lastBounce = T;
+        pose.vy = 8.6 + Math.min(4, chain)*0.4; pose.air = true; pose.airT = 0; p.sq = 1;
+        pose.vx += c.nfx*2.0; pose.vz += c.nfz*2.0;
+        if(chain >= 2) kick(5 + Math.min(6, chain)*1.6, 0.8);
+        if(actx){ tone(200 + chain*40, 0.28, "sine", 0.18, 520 + chain*60); SFX.pop(0.6); }
+        for(let k=0;k<14;k++) spawnDust(p.x, p.y + 0.3, p.z, p.P === B2 ? [1.0, 0.4, 0.9] : [0.6, 1.0, 0.4], 0.4, (Math.random() - 0.5)*6, (Math.random() - 0.5)*6, 3 + Math.random()*3);
+      }
+    }
+    // the geysers
+    for(const G of GEYS){
+      if(G.on > 0 && Math.hypot(pose.x - G.x, pose.z - G.z) < 3.4 && pose.y < G.y + 3){
+        pose.vy = Math.max(pose.vy || 0, 15); pose.air = true; pose.airT = 0;
+        pose.vx += c.nfx*3; pose.vz += c.nfz*3;
+        splash.mud = Math.min(1, splash.mud + 0.6); GAME.shake = Math.max(GAME.shake || 0, 0.3);
+        G.on = Math.min(G.on, 0.25);
+      }
+    }
+    // the orbs
+    for(const o of ORBS){
+      if(!o.live) continue;
+      const dx = pose.x - o.x, dz = pose.z - o.z, dy = pose.y + 0.8 - o.y;
+      if(dx*dx + dz*dz < 5.8 && Math.abs(dy) < 2.6){
+        o.live = false; o.g.visible = false; o.t = 7;
+        if(GG.orbs < 10) GG.orbs++;
+        sparkle = 0.4;
+        if(actx) tone(880 + GG.orbs*70, 0.16, "sine", 0.12, 1320 + GG.orbs*70);
+        for(let k=0;k<8;k++) spawnDust(o.x, o.y, o.z, [0.9, 1.0, 0.4], 0.3, (Math.random() - 0.5)*5, (Math.random() - 0.5)*5, 2 + Math.random()*3);
+      }
+    }
+    // the hazards
+    for(const h of HAZ){
+      if(h.kind === "barrel" && !h.live) continue;
+      const dx = pose.x - h.x, dz = pose.z - h.z, d = Math.hypot(dx, dz);
+      if(d < h.r + 1.4 && pose.y < h.y + h.h && pose.y > h.y - h.h - 1){ h.cool = 0.8; knock(dx/(d || 1), dz/(d || 1), h.kind === "swing"); }
+    }
+    // the gator's jaws: shut on you and you bounce off its teeth
+    if(GATORJ.on && GATORJ.open < 0.35){
+      const dx = pose.x - GATORJ.x, dz = pose.z - GATORJ.z, u = dx*GATORJ.tx + dz*GATORJ.tz, v = -dx*GATORJ.tz + dz*GATORJ.tx;
+      if(u > -1 && u < 8 && Math.abs(v) < GATORJ.hw && pose.y < GATORJ.y + 3.2 && pose.y > GATORJ.y - 1.5){
+        pose.x -= GATORJ.tx*(u + 1.5); pose.z -= GATORJ.tz*(u + 1.5);
+        knock(-GATORJ.tx, -GATORJ.tz, true);
+        pose.vx *= 0.4; pose.vz *= 0.4;
+        if(actx){ burst(0.2, "lowpass", 400, 0.4, 1, 0); tone(80, 0.3, "sawtooth", 0.1, 50); }
+      }
+    }
+  };
+  GG.rival = (r, i0, target, dt)=>{
+    r.gb = Math.max(0, (r.gb || 0) - dt);
+    for(const p of PADS){
+      if(p.P !== P0 || Math.abs(i0 - p.i) > 1 || Math.abs(r.lane - p.lane) > 2.4 || r.lastPad === p) continue;
+      r.lastPad = p;
+      if(p.kind === "boost") r.gb = 1.3;
+      else if(!r.air){ r.vy = 8.4; r.air = true; r.airT = 0; }
+    }
+    return target + (r.gb > 0 ? 9 : 0);
+  };
+  GG.hud = (hud, W, H, k)=>{
+    // the firefly jar: how many you carry
+    const x = W - 12*k - 150*k, y = 12*k + 190*k;
+    hud.fillStyle = "rgba(20,10,40,.6)"; hud.fillRect(x, y, 150*k, 30*k);
+    hud.strokeStyle = "#000"; hud.lineWidth = 2*k; hud.strokeRect(x, y, 150*k, 30*k);
+    for(let q=0;q<10;q++){ hud.beginPath(); hud.arc(x + 12*k + q*13.2*k, y + 15*k, 5*k, 0, 7);
+      hud.fillStyle = q < GG.orbs ? (sparkle > 0 && q === GG.orbs - 1 ? "#ffffff" : "#e8ff6a") : "rgba(255,255,255,.18)"; hud.fill(); }
+  };
+
+  /* the world's own clock: geysers, jaws, hazards, orbs coming back */
+  ANIMS.push(t=>{
+    const dt = Math.min(0.1, Math.max(0, t - (GG.lastT || t))); GG.lastT = t;
+    sparkle = Math.max(0, sparkle - dt);
+    ORBS.forEach(o=>{ if(o.live){ o.g.position.y = o.y + Math.sin(t*2.2 + o.ph)*0.25; o.g.rotation.y = t; } else if((o.t -= dt) <= 0){ o.live = true; o.g.visible = true; } });
+    GEYS.forEach(G=>{
+      G.t -= dt;
+      if(G.t <= 0 && G.on <= 0){ G.on = G_ON; G.t = 3.6 + Math.random()*2.2;
+        const d = Math.hypot(camera.position.x - G.x, camera.position.z - G.z); if(actx && d < 200){ const k = 1 - d/200; burst(1.0, "lowpass", 220, 0.35*k, 1, 0); burst(0.6, "bandpass", 900, 0.12*k, 0.8, 0); } }
+      const warn = G.on <= 0 && G.t < 0.9;
+      G.pool.material.emissive.setRGB(0.25 + (warn ? 0.35*Math.abs(Math.sin(t*20)) : 0), 0.1, 0.03);
+      if(!STEAM || Math.hypot(camera.position.x - G.x, camera.position.z - G.z) > 300) { G.on -= dt; return; }
+      if(G.on > 0){
+        G.on -= dt; G.emit += dt*80;
+        while(G.emit >= 1){ G.emit -= 1;
+          SPRAY.spawn(G.x + (Math.random() - 0.5)*1.5, G.y + 0.5, G.z + (Math.random() - 0.5)*1.5, (Math.random() - 0.5)*4, 14 + Math.random()*10, (Math.random() - 0.5)*4,
+                      {life:1.3 + Math.random()*0.6, size:[1.2 + Math.random(), 0.6], col:[0.42, 0.27, 0.14], heat:0, grav:14, drag:0.3});
+          if(Math.random() < 0.3) STEAM.spawn(G.x, G.y + 2, G.z, (Math.random() - 0.5)*2, 8 + Math.random()*6, (Math.random() - 0.5)*2,
+                      {life:2.5, size:[2, 8], col:[0.55, 0.45, 0.38], alpha:0.45, heat:0.1, drag:0.7, grav:-0.3});
+        }
+      } else if(warn && Math.random() < 0.5){
+        SPRAY.spawn(G.x + (Math.random() - 0.5)*2, G.y + 0.3, G.z + (Math.random() - 0.5)*2, 0, 3 + Math.random()*3, 0, {life:0.6, size:[0.5, 0.3], col:[0.45, 0.3, 0.16], heat:0, grav:12});
+      }
+    });
+    if(GATORJ.on){
+      // open for three seconds, snap shut for one and a bit; the eyes go red as it is about to
+      GATORJ.t = (GATORJ.t + dt) % 5.0;
+      const c = GATORJ.t, open = c < 3.1 ? 1 : c < 3.4 ? 1 - (c - 3.1)/0.3 : c < 4.6 ? 0 : (c - 4.6)/0.4;
+      if(open === 0 && GATORJ.open > 0 && actx){ const d = Math.hypot(camera.position.x - GATORJ.x, camera.position.z - GATORJ.z); if(d < 150){ const k = 1 - d/150; burst(0.12, "lowpass", 500, 0.5*k, 1, 0); tone(70, 0.2, "square", 0.08*k, 45); } }
+      GATORJ.open = open;
+      GATORJ.upper.rotation.x = -0.72*open;
+      const warn = c > 2.4 && c < 3.4;
+      GATORJ.eyes.forEach(e=> e.material.color.setHex(warn && Math.sin(t*18) > 0 ? 0xff2020 : 0xffe24a));
+    }
+    HAZ.forEach(h=>{
+      if(h.kind === "turtle" || h.kind === "log"){
+        const spd = h.kind === "log" ? h.spd : 0.9, lim = MAIN.half[h.i] + (h.kind === "log" ? 5 : 7);
+        h.u += h.dir*spd*dt; if(Math.abs(h.u) > lim){ h.u = Math.sign(h.u)*lim; h.dir = -h.dir; }
+        const f = frm(MAIN, h.i), x = f.p.x + f.nx*h.u, z = f.p.z + f.nz*h.u;
+        const y = h.kind === "log" ? Math.max(gradedY(x, z), h.wl) + 0.2 : gradedY(x, z);
+        h.x = x; h.z = z; h.y = y + (h.kind === "log" ? 0.6 : 0.8);
+        h.g.position.set(x, y + (h.kind === "log" ? 0.2 + Math.sin(t*1.7)*0.08 : 0), z);
+        h.g.rotation.y = Math.atan2(f.nx*h.dir, f.nz*h.dir) + (h.kind === "log" ? Math.PI/2 : 0);
+        if(h.kind === "turtle") h.g.rotation.z = Math.sin(t*3)*0.04;
+      } else if(h.kind === "swing"){
+        const ang = Math.sin(t*1.25 + h.ph)*0.95, lx = Math.sin(ang)*10.2, ly = -Math.cos(ang)*10.2;
+        h.pend.rotation.z = ang;
+        // the pendulum swings across the road, in the plane of nx, nz
+        h.x = h.cx - h.nx*lx; h.z = h.cz - h.nz*lx; h.y = h.top + ly;
+      } else if(h.kind === "barrel"){
+        const P = h.P, n = nearest(pose.x, pose.z);
+        if(!h.live && state.phase === "racing" && n.path === P && n.pi < P.N*0.7 && Math.random() < dt*0.6){
+          h.live = true; h.g.visible = true; h.s = n.pi + Math.round((60 + Math.random()*50)/P.seg); h.lane = (Math.random() - 0.5)*2*(P.half[Math.min(P.N - 1, h.s)] - 1.2); h.spd = 9 + Math.random()*4;
+        }
+        if(!h.live) return;
+        h.s += h.spd*dt/P.seg;
+        if(h.s >= P.N - 2 || (n.path === P && h.s < n.pi - 30/P.seg)){ h.live = false; h.g.visible = false; return; }
+        const i = Math.floor(h.s), f = frm(P, i), x = f.p.x + f.nx*h.lane, z = f.p.z + f.nz*h.lane, y = surfaceY(x, z) + 0.75 + Math.abs(Math.sin(t*5 + h.lane))*0.6;
+        h.x = x; h.z = z; h.y = y; h.g.position.set(x, y, z); h.g.rotation.y = Math.atan2(f.t.x, f.t.z) + Math.PI/2; h.g.rotation.x = -h.s*P.seg/0.75;
+      }
+    });
+  });
+}
+
 /* ---- Copper Lake: the water, stone along the causeway, a dock and boats ---- */
 if(LAKE.on){
   const STEP = 2, AX = LAKE.rx*1.15, AZ = LAKE.rz*1.15;
@@ -7369,7 +8569,7 @@ if(LAKE.on){
   g.setAttribute("aDepth", new THREE.Float32BufferAttribute(dep,1));
   g.setIndex(idx);
   const wm = new THREE.Mesh(g, LAKE.lava ? lavaMaterial() : waterMaterial()); wm.renderOrder = 3; wm.frustumCulled = false; scene.add(wm);
-  if(!LAKE.frozen && !LAKE.lava){
+  if(!LAKE.frozen && !LAKE.lava && !GATOR){
   // riprap along the waterline of the causeway
   const rockMat = new THREE.MeshLambertMaterial({map:rockTex});
   const P = MAIN;
@@ -10584,9 +11784,22 @@ const MUSIC = {
     [74,-1,-1,71, -1,-1,74,-1, 79,-1,78,-1, 79,-1,-1,-1]
   ]
 };
+/* Gator Gulch has its own: a zydeco two-step in G, accordion on top, a
+   rubboard scratching the sixteenths, and the band pushes on for the last lap */
+const ZYDECO = {
+  bpm: 148,
+  chords: [[55,59,62], [60,64,67], [62,66,69], [55,59,62]],   // G C D G
+  lead: [
+    [67,-1,71,-1, 74,-1,71,-1, 72,71,69,-1, 67,-1,-1,-1],
+    [72,-1,76,-1, 79,-1,76,-1, 74,72,71,-1, 72,-1,-1,-1],
+    [74,-1,78,-1, 81,-1,78,-1, 76,74,72,-1, 71,-1,69,-1],
+    [67,69,71,72, 74,-1,71,-1, 67,-1,62,-1, 67,-1,-1,-1]
+  ]
+};
 const mtof = m => 440*Math.pow(2, (m-69)/12);
 function tickMusic(){
   if(!actx || actx.state !== "running") return;
+  if(GATOR) return tickZydeco();
   const spb = 60/MUSIC.bpm/4;                  // seconds per 16th
   while(AUD.seqNext < actx.currentTime + 0.12){
     const t = AUD.seqNext, s = AUD.step % 16, bar = Math.floor(AUD.step/16) % 4;
@@ -10605,6 +11818,32 @@ function tickMusic(){
     const n = MUSIC.lead[bar][s];
     if(n > 0 && AUD.musicMode === "menu" && Math.floor(AUD.step/64) % 2 === 1)
       tone(mtof(n), 0.22, "square", 0.05, 0, at, B);
+    AUD.seqNext += spb;
+    AUD.step++;
+  }
+}
+function tickZydeco(){
+  const last = AUD.musicMode === "race" && state.lap >= LAPS && state.phase === "racing";
+  const bpm = ZYDECO.bpm*(last ? 1.16 : 1), spb = 60/bpm/4;
+  while(AUD.seqNext < actx.currentTime + 0.12){
+    const t = AUD.seqNext, s = AUD.step % 16, bar = Math.floor(AUD.step/16) % 4;
+    const ch = ZYDECO.chords[bar], at = t - actx.currentTime, B = AUD.music;
+    // swung: every other sixteenth a touch late
+    const sw = s % 2 ? spb*0.18 : 0;
+    // kick on the beat, snare on two and four
+    if(s % 4 === 0) tone(110, 0.14, "sine", 0.5, 44, at, B);
+    if(s === 4 || s === 12) burst(0.12, "bandpass", 2000, 0.2, 0.7, at, 0, B);
+    // the rubboard: every sixteenth, leaning on the offbeats
+    burst(0.035, "highpass", 5200, s % 4 === 2 ? 0.1 : 0.045, 0.9, at + sw, 0, B);
+    // boom-chick bass: root on the beat, the fifth on the and
+    if(s % 4 === 0) tone(mtof(ch[0] - 24), 0.16, "triangle", 0.32, 0, at, B);
+    if(s % 4 === 2) tone(mtof(ch[2] - 24), 0.12, "triangle", 0.24, 0, at + sw, B);
+    // the accordion's chord stabs on the offbeat
+    if(s % 4 === 2) ch.forEach(m=> tone(mtof(m + 12), 0.09, "sawtooth", 0.012, 0, at + sw, B));
+    // and its tune, over the top: quiet under the engine in a race
+    const n = ZYDECO.lead[bar][s];
+    if(n > 0){ const v = AUD.musicMode === "menu" ? 0.05 : 0.028;
+      tone(mtof(n), 0.18, "square", v, 0, at + sw, B); tone(mtof(n)*1.006, 0.18, "sawtooth", v*0.5, 0, at + sw, B); }
     AUD.seqNext += spb;
     AUD.step++;
   }
@@ -10906,7 +12145,7 @@ function stepCarInner(dt){
 
   // resistance sets top speed instead of a hard clamp
   const sgn = Math.sign(along || 1);
-  a -= sgn * (0.0006*along*along + (deepOff ? 1.9 : offRoad ? 1.0 : 0.30 + wetAmt*0.34));
+  a -= sgn * (0.0006*along*along*GG.dragK() + (deepOff ? 1.9 : offRoad ? 1.0 : 0.30 + wetAmt*0.34));
   a -= along * (deepOff ? 0.15 : offRoad ? 0.09 : 0.02 + wetAmt*0.035 - tarAmt*0.006);
   /* The mountain's mud is thick. It holds the car harder the faster it tries
      to go (the tyres and the body are pushing a bow wave of it), so in a
@@ -10922,7 +12161,7 @@ function stepCarInner(dt){
   let newAlong = along + a*dt;
   if(!thr && !brk && Math.abs(newAlong) < 0.35) newAlong = 0;   // no creeping
   if(newAlong < -11) newAlong = -11;
-  const ceiling = MAXV + (drift.boostT > 0 ? 8 : 0);   // boost lifts the limiter
+  const ceiling = MAXV + (drift.boostT > 0 ? 8 : 0) + GG.ceil();   // boost lifts the limiter (and in the swamp, the fireflies you carry)
   if(newAlong > ceiling) newAlong = ceiling;
   const netA = (newAlong - along)/Math.max(dt, 0.0001);
 
@@ -11261,6 +12500,7 @@ function stepCarInner(dt){
     pose.bPv += Math.max(-0.85, Math.min(0.85, -mP*6.5));
     pose.bRv += Math.max(-0.85, Math.min(0.85, -mR*6.0));
     pose.bHv -= Math.min(1.6, landed*0.16);
+    if(GATOR) GG.onLand(landed);
     // coming down on the lake ice: a burst of ice chips and powder
     if(landed > 2.5 && iceAt(pose.x, pose.z) > 0.3){
       burst(0.16, "highpass", 2600, Math.min(0.2, 0.05 + landed*0.02), 1.2, 0, 5200);
@@ -11586,9 +12826,10 @@ function stepCarInner(dt){
     }
     splash.mud = Math.min(1, splash.mud + k2*dt*0.12);
   }
+  if(GATOR) GG.stepCar(dt, {hand, steer, nfx, nfz});
   car.position.set(pose.x, pose.y - (pose.sink || 0), pose.z);
   car.rotation.order = "YXZ";
-  car.rotation.set(pose.pitch, pose.h + pose.yawVis, pose.roll);
+  car.rotation.set(pose.pitch, pose.h + pose.yawVis + GG.trickYaw, pose.roll + GG.trickRoll);
   car.userData.wheels.forEach(w=>{
     w.mesh.rotation.x = pose.wheelSpin;
     if(w.steer) w.pivot.rotation.y = pose.steerVis;
@@ -12102,6 +13343,7 @@ function drawHUDInner(dt, alongNow){
     hud.restore();
   }
 
+  if(GATOR && state.phase !== "menu") GG.hud(hud, W, H, k);
   /* minimap, bottom right (not on an expedition: finding the way is the point) */
   if(!EXP.on){
     const size = 96*k, mx = W - size - 12*k, my = H - size - 12*k;
@@ -12468,6 +13710,7 @@ function stepRivals(dt){
       // (mud no longer slows the player, so it does not slow the rivals either)
       target *= FROZEN ? 1 - Math.max(q.wet||0, iceAt(r.mesh.position.x, r.mesh.position.z))*0.12
                        : 1 - (q.wet||0)*0.32;
+      if(GATOR) target = GG.rival(r, i0, target, dt);
 
       // traffic: anything close ahead in the same lane
       let blocked = false;
@@ -12818,9 +14061,10 @@ function lavaReset(){
   const x = pose.x, y = pose.y, z = pose.z;
   for(let k=0;k<40;k++) spawnDust(x + (Math.random() - 0.5)*3, y + 0.5, z + (Math.random() - 0.5)*3, 4, 1.2,
                                   (Math.random() - 0.5)*3, (Math.random() - 0.5)*3, 4 + Math.random()*5);
-  for(let k=0;k<24;k++) spawnDust(x, y + 0.3, z, [1.0, 0.5, 0.12], 0.6, (Math.random() - 0.5)*8, (Math.random() - 0.5)*8, 5 + Math.random()*6);
+  for(let k=0;k<24;k++) spawnDust(x, y + 0.3, z, GATOR ? [0.4, 0.9, 1.0] : [1.0, 0.5, 0.12], 0.6, (Math.random() - 0.5)*8, (Math.random() - 0.5)*8, 5 + Math.random()*6);
   if(actx){ burst(1.4, "highpass", 1800, 0.3, 0.6, 0, 5000); burst(0.6, "lowpass", 300, 0.3, 1, 0); }
-  banner("INTO THE LAVA", "#ff6a2a", 1.6);
+  banner(GATOR ? "SPLASH!" : "INTO THE LAVA", GATOR ? "#3ccfff" : "#ff6a2a", 1.6);
+  if(GATOR) GG.hit(3);
   const n = nearest(x, z), P = n.path;
   if(P === MAIN){ resetCar(); return; }
   // back on the branch, eight metres before where it left the deck
@@ -12988,6 +14232,7 @@ function resetRace(){
   camera.position.set(pose.x - Math.sin(pose.h)*9.2, pose.y + 3.55, pose.z - Math.cos(pose.h)*9.2);
   GAME.paused = false; GAME.doneT = 0; GAME.resultsShown = false; GAME.goT = 0;
   GAME.startAt = null; GAME.stallT = 0; GAME.launchFx = 0;
+  GG.reset();
   CAR_DIRT.uDirt.value = 0; CAR_DIRT.uSnow.value = 0;
   CAR_DIRT.uDirtCol.value.set(DESERT ? 0x9a7650 : WINTER ? 0x6a6a70 : FALL ? 0x4e3622 : 0x4a3524);
   GAME.wrongT = 0; GAME.stuckT = 0; GAME.placePrev = 0; GAME.placeT = 0;
@@ -13367,7 +14612,7 @@ const GP_GROUPS = (()=>{
   if(special.length) g.push({name: "Special stages", short: "SPECIAL", ids: special, kind:"special"});
   return g;
 })();
-const SEASON_COL = { summer:"#8fd06a", fall:"#f08a2a", winter:"#8fd3f4", desert:"#e56a3a" };
+const SEASON_COL = { summer:"#8fd06a", fall:"#f08a2a", winter:"#8fd3f4", desert:"#e56a3a", swamp:"#ff7ac8" };
 function showTracks(mode, group){
   const exped = mode === "expedition";
   let ids, gi = 0;
@@ -14088,6 +15333,7 @@ function frame(now){
 
   const clock = state.phase === "menu" ? GAME.attractT : state.t;
   ANIMS.forEach(f=> f(clock));
+  ANIMS_LATE.forEach(f=> f(clock));
   waterMats.forEach(m=>{
     if(m.uniforms) m.uniforms.uTime.value = clock;
     else if(m.map) m.map.offset.y = (clock*0.09)%1;
