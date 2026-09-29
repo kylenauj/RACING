@@ -14655,6 +14655,8 @@ function rebuildCar(){
   car = buildWagon(carOpts());
   car.visible = vis; car.position.copy(p); car.rotation.copy(r);
   scene.add(car);
+  // in an online room: tell the others, so they see the new wagon too
+  try{ if(NET.on) netTrackMe(); }catch(e){}
 }
 function applySettings(){
   const S = SAVE.settings;
@@ -16262,7 +16264,8 @@ async function netTransport(code, meta, h){
 
 /* ---- joining, leaving ---- */
 function netMeta(){
-  return { id:NET.id, name:NET.name, paint:NET_PAINT(), host:NET.host, track:TRACK_ID, pick:NET.pick, racing:NET.racing, at:NET.joinedAt };
+  // (and the wagon you built in the garage, so your friends see you in it)
+  return { id:NET.id, name:NET.name, paint:NET_PAINT(), host:NET.host, track:TRACK_ID, pick:NET.pick, racing:NET.racing, at:NET.joinedAt, car:carOpts() };
 }
 async function netJoin(code, opts){
   if(NET.on) netLeave(true);
@@ -16344,21 +16347,43 @@ function netNameTag(name, paint){
   sp.scale.set(4.4, 1.1, 1); sp.position.y = 3.3; sp.renderOrder = 9;
   return sp;
 }
+/* a friend's car: the wagon they built in their garage (or, from an older copy of the game
+   that doesn't say, one of the regulars' cars in their colour) */
+function netCarMesh(m, n){
+  let mesh;
+  if(m.car && typeof m.car === "object"){
+    try{ mesh = buildWagon(Object.assign({}, m.car, {paint: m.paint || m.car.paint})); mesh.userData.wheelR = mesh.userData.wr; }catch(e){ mesh = null; }
+  }
+  if(!mesh) mesh = buildRival(["box", "trail", "pickup"][n % 3], {paint:m.paint || "#cfd3cf", rust:20, num:10 + n});
+  mesh.rotation.order = "YXZ";
+  return mesh;
+}
 function netAddPeer(m){
-  const mesh = buildRival(["box", "trail", "pickup"][NET.peers.size % 3], {paint:m.paint || "#cfd3cf", rust:20, num:10 + NET.peers.size});
-  mesh.rotation.order = "YXZ"; mesh.visible = false; scene.add(mesh);
+  const mesh = netCarMesh(m, NET.peers.size);
+  mesh.visible = false; scene.add(mesh);
   const tag = netNameTag(m.name || "Friend", m.paint); mesh.add(tag);
   const car = { net:true, id:m.id, mesh, tag, def:{name:m.name || "Friend", car:"online", paint:m.paint || "#cfd3cf"},
                 s:0, lap:0, v:0, lane:0, laneT:0, laneRate:0, home:0, finish:null, y:null, vy:0, air:false, pitch:0 };
   const p = { id:m.id, meta:m, car, pc:null, dc:null, open:false, relay:false, since:performance.now(), last:null, recv:0,
-              sx:0, sy:0, sz:0, sh:0, pend:[] };
+              sx:0, sy:0, sz:0, sh:0, sp:0, sr:0, pend:[], carKey:JSON.stringify(m.car || null) };
   NET.peers.set(m.id, p);
   // back mid-race (their connection hiccuped): straight back into the field
   if(NET.racing && !m.spectate){ FIELD = FIELD.concat([car]); mesh.visible = true; }
   if(NET.id < m.id) netCall(p);                        // one side of each pair makes the offer
 }
 function netAlive(p){ return p.open && performance.now() - p.recv < 8000; }
-function netUpdatePeer(p, m){ p.meta = m; p.car.def.name = m.name || "Friend"; }
+function netUpdatePeer(p, m){
+  p.meta = m; p.car.def.name = m.name || "Friend";
+  // they changed their wagon in the garage: swap the car over
+  const key = JSON.stringify(m.car || null);
+  if(key !== p.carKey){
+    p.carKey = key;
+    const old = p.car.mesh, mesh = netCarMesh(m, [...NET.peers.keys()].indexOf(p.id));
+    mesh.visible = old.visible; mesh.position.copy(old.position); mesh.rotation.copy(old.rotation);
+    old.remove(p.car.tag); mesh.add(p.car.tag);
+    scene.remove(old); scene.add(mesh); p.car.mesh = mesh;
+  }
+}
 function netDropPeer(p){
   try{ if(p.dc) p.dc.close(); }catch(e){}
   try{ if(p.pc) p.pc.close(); }catch(e){}
@@ -16477,7 +16502,8 @@ function netFrame(dt){
     if(NET.sendAcc >= 1/NET_CFG.hz){
       NET.sendAcc = 0;
       const r2 = v=> Math.round(v*100)/100;
-      const d = { from:NET.id, x:r2(pose.x), y:r2(pose.y), z:r2(pose.z), h:r2(pose.h + pose.yawVis), p:r2(pose.pitch), r:r2(pose.roll),
+      // (where the car is drawn: sunk into the mud or water as far as it is here, tilted the same way)
+      const d = { from:NET.id, x:r2(pose.x), y:r2(pose.y - (pose.sink || 0)), z:r2(pose.z), h:r2(pose.h + pose.yawVis), p:r2(pose.pitch), r:r2(pose.roll), st:r2(pose.steerVis || 0),
                   vx:r2(pose.vx), vz:r2(pose.vz), lap:state.lap - 1, s:state.idx, fin:state.phase === "done" ? GAME.finishTime : null, t:r2(state.t) };
       const js = JSON.stringify(d);
       let relayNeeded = false;
@@ -16499,11 +16525,14 @@ function netMoveCar(p, dt){
   const age = Math.min(0.35, (performance.now() - p.recv)/1000);
   const tx = d.x + (d.vx || 0)*age, tz = d.z + (d.vz || 0)*age, ty = d.y;
   const k = 1 - Math.exp(-dt*14);
-  if(!p.placed || Math.hypot(tx - p.sx, tz - p.sz) > 25){ p.sx = tx; p.sy = ty; p.sz = tz; p.sh = d.h; p.placed = true; }
+  if(!p.placed || Math.hypot(tx - p.sx, tz - p.sz) > 25){ p.sx = tx; p.sy = ty; p.sz = tz; p.sh = d.h; p.sp = d.p || 0; p.sr = d.r || 0; p.placed = true; }
   else { p.sx += (tx - p.sx)*k; p.sy += (ty - p.sy)*k; p.sz += (tz - p.sz)*k;
-         let dh = d.h - p.sh; while(dh > Math.PI) dh -= 2*Math.PI; while(dh < -Math.PI) dh += 2*Math.PI; p.sh += dh*k; }
+         let dh = d.h - p.sh; while(dh > Math.PI) dh -= 2*Math.PI; while(dh < -Math.PI) dh += 2*Math.PI; p.sh += dh*k;
+         p.sp += ((d.p || 0) - p.sp)*k; p.sr += ((d.r || 0) - p.sr)*k; }
   r.mesh.position.set(p.sx, p.sy, p.sz);
-  r.mesh.rotation.set(-(d.p || 0), p.sh, -(d.r || 0));
+  // tilted exactly the way their own car is drawn on their screen (yaw, then pitch and roll)
+  r.mesh.rotation.set(p.sp, p.sh, p.sr);
+  if(r.mesh.userData.wheels) r.mesh.userData.wheels.forEach(w=>{ if(w.steer && w.pivot) w.pivot.rotation.y = d.st || 0; });
   r.lap = d.lap | 0; r.s = d.s | 0; r.v = Math.hypot(d.vx || 0, d.vz || 0);
   const pt = pts[((r.s % NS) + NS) % NS], tn = tans[((r.s % NS) + NS) % NS];
   r.lane = r.laneT = (p.sx - pt.x)*(-tn.z) + (p.sz - pt.z)*tn.x;
