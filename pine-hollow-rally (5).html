@@ -726,7 +726,11 @@ const TRACKS = [
     lake:{at:[0,0], rx:290, rz:150, frozen:true},
     /* where the ice has buckled into ridges: [x, z, height]. The road is
        ramped over each one, and the rest of the ridge runs off across the lake */
-    ridges:[[-74,42,1.5],[74,-42,1.8],[77,37,1.4],[-77,-37,2.0]],
+    ridges:[[77,37,1.4],[-77,-37,2.0]],
+    /* the first time through the middle the road climbs onto an old timber bridge over the
+       other road, and the middle of it is gone: a kicker at the broken end, and you jump the
+       road below to the far half. No turning off onto the other loop at the crossing. */
+    spans:[{at:[0,0], road:-1, pass:1, under:-1, over:true, span:36, wall:36, broken:8.5, kick:2.6, lift:true}],
     branches:[
       // the logging road over the hill, cutting off the east loop
       {a:[430,-140], b:[430,150], via:[[418,-50],[418,50]],
@@ -2747,7 +2751,7 @@ if(GIANT.on){
 /* ---- the ravine and its bridge ---- */
 const GORGE = { on:false, i:0, depth:0, span:35, samples:0, reach:0, wall:26 };
 let SPANS = [];                        // the log bridges over lava, built once the roads have their heights
-let SURF_HINT = null;
+let SURF_HINT = null, SURF_RIVAL = false;
 const FISS = [];                       // points along the lava fissures, kept clear of trees
 const PILLARS = [];                    // the ice pillar clusters out in the snow
 const NO_TREES = [];                   // [x, z, r]: kept clear for something built there
@@ -3305,7 +3309,7 @@ function passIdx(P, at, pass, skip){
     j = Q === P ? passIdx(Q, d.at, 1, i) : passIdx(Q, d.at, 1);
     const need = Q.pts[j].y + 7.2 - P.pts[i].y;
     if(need > 0){
-      const up = need*0.6, down = need - up;
+      const up = d.lift ? need : need*0.6, down = need - up;      // (lift: all of it on this road, the other stays put)
       const bump = (R0, c, amt, halfLen)=>{
         const E0 = Math.round(halfLen/R0.seg), Rr = Math.round(Math.max(45, amt/0.065)/R0.seg);
         for(let k=-(E0 + Rr); k<=E0 + Rr; k++){
@@ -3337,6 +3341,12 @@ function passIdx(P, at, pass, skip){
   for(let k=-S;k<=S;k++) P.deck[wrapIdx(P, i + k)] = 1;
   const W = Math.round((d.wall - 1)/seg);
   for(let k=-W;k<=W;k++) P.noStamp[wrapIdx(P, i + k)] = 1;
+  if(d.broken){
+    // the middle is gone: a kicker up to the broken end, the gap, and the far half falling away to land on
+    sp.gapS = Math.round(d.broken/seg);
+    ramp(P, wrapIdx(P, i - sp.gapS), Math.round(30/seg), Math.round(30/seg), d.kick || 2.2, 0, true, 3);
+    for(let k=-sp.gapS + 1;k<=sp.gapS - 1;k++) P.deck[wrapIdx(P, i + k)] = 0;
+  }
   SPANS.push(sp);
 });
 /* The lava leap: no bridge at all. A kicker on the approach, a channel of
@@ -3438,6 +3448,7 @@ function spanFind(x, z, tol){
       if(d2 < best){ best = d2; bs = k + t; }
     }
     if(Math.abs(bs) > sp.S) continue;
+    if(sp.gapS && Math.abs(bs) < sp.gapS && !SURF_RIVAL) continue;          // the broken middle: nothing under you
     const d = Math.sqrt(best), half = P.half[wrapIdx(P, sp.i + Math.round(bs))];
     if(d <= half + tol) return [sp, sp.i + bs, d, half];
   }
@@ -3752,7 +3763,7 @@ const NOTES = (()=>{
   RIDGES.forEach(R0=> add(R0.at - Math.round(18/seg), "ridge"));
   FORDS.forEach(F=>{ if(F.path === P) add(F.at - Math.round(20/seg), "water"); });
   if(RIVER.on) add(RIVER.a - Math.round(24/seg), "creek");
-  SPANS.forEach(sp=>{ if(sp.P === P) add(sp.i - sp.S - Math.round((sp.leap ? 70 : 25)/seg), sp.leap ? "lavaleap" : sp.over ? "overpass" : "bridge"); });
+  SPANS.forEach(sp=>{ if(sp.P === P) add(sp.i - sp.S - Math.round((sp.leap || sp.gapS ? 70 : 25)/seg), sp.leap ? "lavaleap" : sp.gapS ? "bridgeout" : sp.over ? "overpass" : "bridge"); });
   TUNNELS.forEach(T=> add(T.a - Math.round(30/seg), "tunnel"));
   BRANCHES.forEach(B=>{
     const m = P.pts[B.splitAt], t = P.tans[B.splitAt], look = B.pts[Math.min(B.N - 1, Math.round(14/B.seg))];
@@ -3781,7 +3792,7 @@ const NOTES = (()=>{
   }
   return out;
 })();
-const NOTE_WORDS = { lavaleap:"lava jump, flat out, don't lift", tunnel:"into the ice tunnel", overpass:"over the bridge", bridge:"log bridge, lava below", jump:"jump", bigjump:"big jump, keep straight", ridge:"ice ridge, jump", water:"water", creek:"into the creek",
+const NOTE_WORDS = { bridgeout:"bridge out, jump, flat out", lavaleap:"lava jump, flat out, don't lift", tunnel:"into the ice tunnel", overpass:"over the bridge", bridge:"log bridge, lava below", jump:"jump", bigjump:"big jump, keep straight", ridge:"ice ridge, jump", water:"water", creek:"into the creek",
                      mud:"mud", crossing:"crossing", ice:"onto ice", crest:"over crest", bumps:"bumps" };
 function noteSay(n){
   if(n.kind === "fork") return (n.label ? n.label.toLowerCase() : "shortcut") + " " + (n.dir > 0 ? "left" : "right");
@@ -5515,14 +5526,17 @@ if(SPANS.length){
       return {x: A.x + (B.x - A.x)*f, z: A.z + (B.z - A.z)*f, y: pathY(P, s0) + BED, tx:T.x, tz:T.z, half:P.half[wrapIdx(P, Math.round(s0))]}; };
     const Sv = Math.min(sp.S, Math.round((sp.wall + 1.5)/seg)), L0 = -Sv, L1 = Sv;
     if(!sp.leap){
+    const inGap = s0 => sp.gapS && Math.abs(s0) < sp.gapS - 0.4;
     // the deck: logs across, a hand's width apart
     for(let s0=L0; s0<=L1; s0+=0.5/seg){
+      if(inGap(s0)) continue;
       const q = at(s0), nx = -q.tz, nz = q.tx, w = q.half + 0.7;
       logBetween(g, new THREE.Vector3(q.x - nx*w, q.y - 0.17, q.z - nz*w), new THREE.Vector3(q.x + nx*w, q.y - 0.17, q.z + nz*w), 0.21, Math.random() < 0.5 ? bark : bark2);
     }
     // stringers under it, and the rails
     const step = Math.max(1, Math.round(3/seg));
     for(let s0=L0; s0<L1; s0+=step){
+      if(inGap(s0) || inGap(Math.min(L1, s0 + step)) || (sp.gapS && s0 < -sp.gapS && s0 + step > -sp.gapS)) continue;
       const a = at(s0), b = at(Math.min(L1, s0 + step));
       for(const sd of [-1, 1]){
         const na = [-a.tz, a.tx], nb = [-b.tz, b.tx];
@@ -5537,9 +5551,24 @@ if(SPANS.length){
         sn.position.copy(pa).add(pb).multiplyScalar(0.5); sn.position.y += 1.15; sn.lookAt(pb.x, sn.position.y, pb.z); g.add(sn);
       }
     }
+    // the broken ends: deck logs snapped off and hanging down into the gap, stringers poking out
+    if(sp.gapS) for(const sd of [-1, 1]){
+      const q = at(sd*(sp.gapS - 0.4)), nx = -q.tz, nz = q.tx, fx = q.tx*sd, fz = q.tz*sd;
+      for(let k=0;k<7;k++){
+        const lat = (k/6 - 0.5)*2*(q.half + 0.4), drop = 0.8 + Math.random()*2.6, out = 0.6 + Math.random()*1.8;
+        const A = new THREE.Vector3(q.x + nx*lat, q.y - 0.2, q.z + nz*lat);
+        const B = new THREE.Vector3(A.x + fx*out + (Math.random() - 0.5)*0.8, A.y - drop, A.z + fz*out + (Math.random() - 0.5)*0.8);
+        logBetween(g, A, B, 0.16 + Math.random()*0.06, Math.random() < 0.5 ? bark : charred);
+      }
+      for(const ls of [-1, 1]){
+        const ws = q.half - 0.6, A = new THREE.Vector3(q.x + nx*ls*ws, q.y - 0.6, q.z + nz*ls*ws);
+        logBetween(g, A, new THREE.Vector3(A.x + fx*2.4, A.y - 0.9, A.z + fz*2.4), 0.38, charred);
+      }
+    }
     // trestle bents down into the gap
     const bentStep = Math.max(1, Math.round((sp.low ? 8 : 6.5)/seg));
     for(let s0=-sp.S + bentStep; s0<sp.S; s0+=bentStep){
+      if(sp.gapS && Math.abs(s0) < sp.gapS + 1) continue;
       const q = at(s0), nx = -q.tz, nz = q.tx, uvq = spanUV(sp, q.x, q.z);
       if(Math.abs(uvq[0]) > sp.wall - 2) continue;                // on the rock at the ends, no bent needed
       if(sp.over){
@@ -5618,6 +5647,7 @@ if(SPANS.length){
     const lm = new THREE.Mesh(lg, lavaMaterial()); lm.material.side = THREE.DoubleSide; lm.frustumCulled = false; scene.add(lm);
   });
   // a sign before each crevasse on the high route
+  SPANS.forEach(sp=>{ if(sp.gapS) roadSign(sp.i - sp.S - Math.round(70/MAIN.seg), 1, ["BRIDGE OUT", "flat out \u2014 jump it"], "#d8302a", "#f2efe6"); });
   SPANS.forEach(sp=>{ if(sp.P === MAIN && !sp.over && !sp.leap) roadSign(sp.i - sp.S - Math.round(60/MAIN.seg), 1, ["LOG BRIDGE", "lava below \u2014 keep it straight"], "#e2b21e", "#1f1f1f"); });
 }
 /* ---- the ice tunnel: a tube of clear blue ice over the road, ribbed,
@@ -8240,55 +8270,111 @@ if(SWAMPGP){
 
   /* ---- Bigfoot ---- */
   if(TRACK.bigfoot){
-    const fur = PM(0x4a3526), fur2 = PM(0x3a2a1e), skin = PM(0x2b211a);
-    const i0 = Math.round(TRACK.bigfoot*MAIN.N), p0 = MAIN.pts[i0], t0 = MAIN.tans[i0];
-    let bx = null, bz = null, sd = 1;
-    for(const off of [20, 24, 28, 32]) for(const s of [1, -1]){
-      if(bx !== null) break;
-      const x = p0.x - t0.z*s*(MAIN.half[i0] + off), z = p0.z + t0.x*s*(MAIN.half[i0] + off);
-      if(clearOf(x, z, 12) && bwPool(x, z) < 0.02 && clearOf(x + t0.x*14, z + t0.z*14, 12) && clearOf(x - t0.x*14, z - t0.z*14, 12)){ bx = x; bz = z; sd = s; }
+    /* where he walks: a dry, fairly level stretch of the tree line, parallel to the road and
+       well back from it, every step of it out of the water (checked against the water itself) */
+    const walkOK = (x, z, tx, tz, span)=>{
+      let lo = Infinity, hi = -Infinity;
+      for(let u=-span - 2; u<=span + 2; u+=2){
+        const px = x + tx*u, pz = z + tz*u, gy = gradedY(px, pz), wt = waterTop(px, pz);
+        if(wt !== null && gy < wt + 0.3) return false;
+        if(!clearOf(px, pz, 12)) return false;
+        lo = Math.min(lo, gy); hi = Math.max(hi, gy);
+      }
+      return hi - lo < 5;
+    };
+    const base = Math.round(TRACK.bigfoot*MAIN.N);
+    let bx = null, bz = null, sd = 1, i0 = base, tx = 0, tz = 1;
+    search: for(const di of [0, 20, -20, 40, -40, 60, -60, 80, -80, 110, -110]) for(const off of [15, 18, 22, 26, 30]) for(const s0 of [1, -1]){
+      const ii = wrapIdx(MAIN, base + Math.round(di/MAIN.seg)), p = MAIN.pts[ii], t = MAIN.tans[ii];
+      const x = p.x - t.z*s0*(MAIN.half[ii] + off), z = p.z + t.x*s0*(MAIN.half[ii] + off);
+      // and you can see him from the road: no rise of ground in between, from the road a little before
+      const see = (()=>{ const r = MAIN.pts[wrapIdx(MAIN, ii - Math.round(30/MAIN.seg))], ey = surfaceY(r.x, r.z) + 1.6, ty = gradedY(x, z) + 1.6;
+        for(let f=0.1; f<0.95; f+=0.05){ const px = r.x + (x - r.x)*f, pz = r.z + (z - r.z)*f; if(gradedY(px, pz) > ey + (ty - ey)*f - 0.4) return false; } return true; })();
+      if(see && walkOK(x, z, t.x, t.z, 14)){ bx = x; bz = z; sd = s0; i0 = ii; tx = t.x; tz = t.z; break search; }
     }
     if(bx !== null){
-      PROP_KEEP.push([bx, bz, 20]);
+      // a clearing: the forest keeps off his whole walk, and off a wide line of sight from the road to it
+      for(let u=-16; u<=16; u+=4) PROP_KEEP.push([bx + tx*u, bz + tz*u, 12]);
+      { const q = MAIN.pts[i0], dx = bx - q.x, dz = bz - q.z, L = Math.hypot(dx, dz);
+        for(let d=MAIN.half[i0] + 3; d<L; d+=5) for(const u of [-12, 0, 12]) PROP_KEEP.push([q.x + dx/L*d + tx*u*(d/L), q.z + dz/L*d + tz*u*(d/L), 11]); }
+      // faceted fur in three browns, the leathery face and hands, and eyes that catch the light
+      const FM = c=> new THREE.MeshLambertMaterial({color:c});          // (the facets come from the geometry's own face normals)
+      const fur = FM(0x3f2a1b), furD = FM(0x2a1b11), furL = FM(0x55392a), skin = FM(0x1f1611), eyeM = new THREE.MeshBasicMaterial({color:0xc9a24a});
+      const lump = (parent, r, sx, sy, sz, m, x, y, z, det)=>{
+        // lumpy, but every face still meets its neighbours: the same bump for the same corner
+        const g = new THREE.IcosahedronGeometry(r, det === undefined ? 1 : det), a = g.attributes.position, seed = Math.random()*100;
+        for(let i=0;i<a.count;i++){ const x = a.getX(i), y = a.getY(i), z = a.getZ(i);
+          const hsh = Math.sin((Math.round(x*1e3)*12.9898 + Math.round(y*1e3)*78.233 + Math.round(z*1e3)*37.719)*0.001 + seed)*43758.5453;
+          const k = 0.9 + (hsh - Math.floor(hsh))*0.2; a.setXYZ(i, x*k, y*k, z*k); }
+        g.computeVertexNormals();
+        const mm = new THREE.Mesh(g, m); mm.scale.set(sx, sy, sz); mm.position.set(x, y, z); parent.add(mm); return mm;
+      };
+      // shaggy hanks of hair: little downward cones hung round a part
+      const tufts = (parent, n, rx, ry, rz, cy, len, m)=>{
+        for(let k=0;k<n;k++){
+          const a = Math.random()*Math.PI*2, h = (Math.random() - 0.5)*2*ry;
+          const c = new THREE.Mesh(new THREE.ConeGeometry(0.04 + Math.random()*0.03, len*(0.6 + Math.random()*0.6), 4), m);
+          c.rotation.x = Math.PI + (Math.random() - 0.5)*0.25; c.rotation.z = (Math.random() - 0.5)*0.25;
+          c.position.set(Math.cos(a)*rx, cy + h, Math.sin(a)*rz); parent.add(c);
+        }
+      };
       const root = new THREE.Group(), body = new THREE.Group(); root.add(body); scene.add(root);
+      root.name = "bigfoot"; root.scale.setScalar(1.15);
       const legs = [], arms = [];
+      // legs: heavy thighs, bent at the knee, long flat feet
       for(const s of [-1, 1]){
-        const hip = new THREE.Group(); hip.position.set(s*0.28, 1.15, 0); body.add(hip);
-        pcyl(hip, 0.21, 0.17, 0.62, 8, fur, 0, -0.31, 0);
-        const knee = new THREE.Group(); knee.position.set(0, -0.62, 0); hip.add(knee);
-        pcyl(knee, 0.16, 0.12, 0.55, 8, fur, 0, -0.27, 0);
-        pbox(knee, 0.26, 0.1, 0.48, skin, 0, -0.57, 0.1);
-        legs.push({hip, knee, s});
+        const hip = new THREE.Group(); hip.position.set(s*0.24, 1.02, 0); body.add(hip);
+        lump(hip, 0.2, 1, 1.45, 1.05, fur, 0, -0.26, 0);
+        tufts(hip, 4, 0.17, 0.12, 0.17, -0.34, 0.14, furD);
+        const knee = new THREE.Group(); knee.position.set(0, -0.5, 0.02); hip.add(knee);
+        lump(knee, 0.14, 1, 1.9, 1.05, fur, 0, -0.25, 0);
+        const ankle = new THREE.Group(); ankle.position.set(0, -0.5, 0); knee.add(ankle);
+        lump(ankle, 0.1, 1.25, 0.55, 2.3, skin, 0, -0.03, 0.1, 0);
+        legs.push({hip, knee, ankle, s});
       }
-      const chest = new THREE.Group(); chest.position.set(0, 1.12, 0); chest.rotation.x = 0.22; body.add(chest);
-      { const tm = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10), fur); tm.scale.set(0.58, 0.72, 0.42); tm.position.set(0, 0.62, 0); chest.add(tm); }
-      { const bl = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), fur2); bl.scale.set(0.46, 0.5, 0.36); bl.position.set(0, 0.35, 0.08); chest.add(bl); }
+      // the hips and belly, and the great hunched chest and back leaning over them
+      lump(body, 0.34, 1.15, 0.8, 0.95, fur, 0, 1.08, 0);
+      const chest = new THREE.Group(); chest.position.set(0, 1.12, 0); chest.rotation.x = 0.32; body.add(chest);
+      lump(chest, 0.4, 1.45, 1.25, 1.0, fur, 0, 0.42, 0);
+      lump(chest, 0.32, 1.25, 0.9, 0.9, furD, 0, 0.62, -0.1);                 // the hump of the back
+      lump(chest, 0.26, 1.2, 0.95, 0.6, furL, 0, 0.36, 0.2);                  // a lighter chest
+      tufts(chest, 14, 0.48, 0.25, 0.34, 0.2, 0.18, furD);
+      // arms: long, hanging past the knees, heavy hands
       for(const s of [-1, 1]){
-        const sh = new THREE.Group(); sh.position.set(s*0.56, 1.08, 0); chest.add(sh);
-        pcyl(sh, 0.14, 0.12, 0.72, 8, fur, 0, -0.36, 0);
-        const el = new THREE.Group(); el.position.set(0, -0.72, 0); sh.add(el);
-        pcyl(el, 0.12, 0.09, 0.68, 8, fur, 0, -0.34, 0);
-        pbox(el, 0.17, 0.3, 0.11, skin, 0, -0.76, 0);
+        const sh = new THREE.Group(); sh.position.set(s*0.52, 0.76, 0.02); chest.add(sh);
+        lump(sh, 0.16, 1.1, 1.0, 1.0, fur, 0, -0.02, 0);
+        lump(sh, 0.135, 1, 2.9, 1, fur, 0, -0.34, 0);
+        tufts(sh, 4, 0.11, 0.2, 0.11, -0.32, 0.13, furD);
+        const el = new THREE.Group(); el.position.set(0, -0.64, 0); sh.add(el);
+        lump(el, 0.12, 1, 2.9, 1, fur, 0, -0.32, 0);
+        lump(el, 0.1, 1.1, 1.5, 0.75, skin, 0, -0.7, 0.02, 0);                // the hand
         arms.push({sh, el, s});
       }
-      const head = new THREE.Group(); head.position.set(0, 1.36, 0.18); chest.add(head);
-      { const hm = new THREE.Mesh(new THREE.SphereGeometry(0.27, 10, 8), fur); hm.scale.set(1, 1.08, 1); head.add(hm); }
-      pcyl(head, 0.02, 0.14, 0.22, 6, fur2, 0, 0.3, -0.04);                   // the crest
-      pbox(head, 0.3, 0.28, 0.06, skin, 0, -0.03, 0.24);                      // the face
-      pbox(head, 0.36, 0.07, 0.1, fur2, 0, 0.1, 0.26);                        // the brow
+      // the head: sunk between the shoulders, pointed at the crown, heavy brow, dark face, glint of eyes
+      const head = new THREE.Group(); head.position.set(0, 1.0, 0.2); chest.add(head);
+      lump(head, 0.25, 1, 1.05, 1, fur, 0, 0.02, 0);
+      const crest = new THREE.Mesh(new THREE.ConeGeometry(0.19, 0.2, 5), fur); crest.position.set(0, 0.22, -0.06); crest.rotation.x = -0.35; head.add(crest);
+      lump(head, 0.16, 1.15, 0.95, 0.5, skin, 0, -0.03, 0.17, 0);             // the face
+      const brow = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.07, 0.12), furD); brow.position.set(0, 0.07, 0.22); brow.rotation.x = 0.15; head.add(brow);
+      for(const s of [-1, 1]){ const e = new THREE.Mesh(new THREE.SphereGeometry(0.022, 5, 4), eyeM); e.position.set(s*0.07, 0.02, 0.26); head.add(e); }
+      lump(head, 0.07, 1.4, 0.8, 0.9, skin, 0, -0.12, 0.23, 0);               // the muzzle
       root.traverse(o=>{ if(o.isMesh) o.castShadow = true; });
-      // up and down the tree line, and a look over the shoulder at whoever is passing
-      const tx = t0.x, tz = t0.z, span = 14;
+      // up and down the tree line with a long, bent-kneed stride, arms swinging; a look at whoever passes
+      const span = 14;
       ANIMS.push(tt=>{
         const u = (tt*0.045) % 2, fw = u < 1, pos = (fw ? u : 2 - u)*2 - 1;
         const x = bx + tx*pos*span, z = bz + tz*pos*span;
         root.position.set(x, gradedY(x, z), z);
         root.rotation.y = Math.atan2(tx, tz) + (fw ? 0 : Math.PI);
-        const ph = tt*3.1;
-        legs.forEach(L=>{ const a = Math.sin(ph + (L.s > 0 ? 0 : Math.PI)); L.hip.rotation.x = a*0.45; L.knee.rotation.x = Math.max(0, -Math.cos(ph + (L.s > 0 ? 0 : Math.PI)))*0.7; });
-        arms.forEach(A=>{ const a = Math.sin(ph + (A.s > 0 ? Math.PI : 0)); A.sh.rotation.x = a*0.5; A.el.rotation.x = -0.25 - Math.max(0, a)*0.35; A.sh.rotation.z = A.s*0.12; });
-        body.position.y = Math.abs(Math.sin(ph))*0.05;
-        // the look back: the head swings round toward the camera when it is near
+        const ph = tt*2.6;
+        legs.forEach(L=>{ const o = L.s > 0 ? 0 : Math.PI, a = Math.sin(ph + o);
+          L.hip.rotation.x = -0.15 + a*0.5;
+          L.knee.rotation.x = 0.25 + Math.max(0, Math.cos(ph + o))*0.75;
+          L.ankle.rotation.x = -0.1 - a*0.25; });
+        arms.forEach(A=>{ const a = Math.sin(ph + (A.s > 0 ? Math.PI : 0));
+          A.sh.rotation.x = a*0.55; A.el.rotation.x = -0.3 - Math.max(0, a)*0.4; A.sh.rotation.z = A.s*0.18; });
+        body.position.y = -Math.abs(Math.cos(ph))*0.07;
+        body.rotation.z = Math.sin(ph)*0.05;                                   // the roll of a heavy walker
         const dx = camera.position.x - x, dz = camera.position.z - z, d = Math.hypot(dx, dz);
         let want = 0;
         if(d < 90){ let a = Math.atan2(dx, dz) - root.rotation.y; while(a > Math.PI) a -= 2*Math.PI; while(a < -Math.PI) a += 2*Math.PI; want = Math.max(-1.3, Math.min(1.3, a)); }
@@ -14470,7 +14556,7 @@ function fmt(t){
   const m = Math.floor(t/60);
   const sec = Math.floor(t%60);
   const cs = Math.floor((t*100)%100);
-  return m + "'" + String(sec).padStart(2,"0") + '"' + String(cs).padStart(2,"0");
+  return m + ":" + String(sec).padStart(2,"0") + "." + String(cs).padStart(2,"0");      // race clock: 1:37.24
 }
 let splitTimer = 0;
 function flashSplit(t){ splitTimer = 2.4; splitText = "LAP " + state.lap + "   " + fmt(t); }
@@ -14496,40 +14582,87 @@ function hudText(txt, x, y, size, colour, align){
   hud.fillText(txt, x, y);
 }
 
+/* The HUD's type system. Labels: small upright capitals, letter-spaced, cream grey, no outline,
+   always on a plate. Figures: the italic heavy face, every digit on the same advance so a
+   running clock never shuffles sideways. Plates: the menus' slanted ink cards, so no reading
+   ever sits straight on the scenery. */
+const HUD_FONT = '"Saira Condensed", "Arial Narrow", Arial, sans-serif';
+function hudLabel(txt, x, y, align, col){
+  hud.font = '700 ' + Math.round(UI.label*HK) + 'px ' + HUD_FONT;
+  if("letterSpacing" in hud) hud.letterSpacing = (UI.label*HK*0.14).toFixed(1) + "px";
+  hud.textAlign = align || "left"; hud.textBaseline = "alphabetic";
+  hud.fillStyle = col || UI.dim; hud.fillText(txt, x, y);
+  if("letterSpacing" in hud) hud.letterSpacing = "0px";
+}
+function hudNum(txt, x, y, size, col, align){
+  const px = Math.round(size*HK*1.12);
+  hud.font = 'italic 800 ' + px + 'px ' + HUD_FONT;
+  hud.textAlign = "left"; hud.textBaseline = "alphabetic";
+  const dw = hud.measureText("0").width, adv = ch => /[0-9]/.test(ch) ? dw : hud.measureText(ch).width*0.92;
+  let w = 0; for(const ch of txt) w += adv(ch);
+  let cx = align === "right" ? x - w : align === "center" ? x - w/2 : x;
+  hud.lineJoin = "round"; hud.lineWidth = Math.max(2, size*HK*0.12); hud.strokeStyle = "#000"; hud.fillStyle = col;
+  for(const ch of txt){ const a = adv(ch), cw = hud.measureText(ch).width, ox = (a - cw)/2;
+    hud.strokeText(ch, cx + ox, y); hud.fillText(ch, cx + ox, y); cx += a; }
+  return w;
+}
+function hudPlate(x, y, w, h, accent){
+  const sk = h*0.12, k = HK;
+  const path = (dx, dy)=>{ hud.beginPath(); hud.moveTo(x + sk + dx, y + dy); hud.lineTo(x + w + sk + dx, y + dy);
+    hud.lineTo(x + w - sk + dx, y + h + dy); hud.lineTo(x - sk + dx, y + h + dy); hud.closePath(); };
+  path(3*k, 3*k); hud.fillStyle = "rgba(0,0,0,.55)"; hud.fill();
+  path(0, 0); hud.fillStyle = "rgba(10,24,16,.78)"; hud.fill();
+  hud.lineWidth = 2*k; hud.strokeStyle = "#000"; hud.stroke();
+  if(accent){                                      // a strip of the accent down the slanted leading edge
+    hud.beginPath(); hud.moveTo(x + sk, y); hud.lineTo(x + sk + 5*k, y); hud.lineTo(x - sk + 5*k, y + h); hud.lineTo(x - sk, y + h); hud.closePath();
+    hud.fillStyle = accent; hud.fill(); hud.lineWidth = 1.5*k; hud.strokeStyle = "#000"; hud.stroke(); }
+}
+function hudPill(txt, x, y, bg, align){
+  hud.font = 'italic 800 ' + Math.round(UI.small*HK) + 'px ' + HUD_FONT;
+  const w = hud.measureText(txt).width + 10*HK, h = UI.small*HK*1.05, x0 = align === "right" ? x - w : x;
+  hud.fillStyle = bg; hud.beginPath();
+  if(hud.roundRect) hud.roundRect(x0, y - h + 2*HK, w, h, h/2); else hud.rect(x0, y - h + 2*HK, w, h);
+  hud.fill(); hud.lineWidth = 1.5*HK; hud.strokeStyle = "#000"; hud.stroke();
+  hud.fillStyle = "#101410"; hud.textAlign = "center"; hud.textBaseline = "alphabetic"; hud.fillText(txt, x0 + w/2, y - 1*HK);
+}
+
 const TACH_MAX = 7000;
 function drawTach(rpm, cx, cy, R){
-  const c = hud;
+  const c = hud, k = HK;
   const a0 = Math.PI*0.80, a1 = Math.PI*2.20;
   const ang = v => a0 + (v/9)*(a1-a0);
-  c.beginPath();
-  c.arc(cx, cy, R+16*HK, a0, a1);
-  c.arc(cx, cy, R-10*HK, a1, a0, true);
-  c.closePath();
-  c.fillStyle = "rgba(238,238,232,.9)"; c.fill();
-  c.lineWidth = 3*HK; c.strokeStyle = "rgba(0,0,0,.85)"; c.stroke();
-
-  c.beginPath(); c.arc(cx, cy, R+9*HK, ang(7.4), ang(9));
-  c.lineWidth = 13*HK; c.strokeStyle = "#e11d10"; c.stroke();
-
+  // the face: a cream band with an ink rim
+  c.beginPath(); c.arc(cx, cy, R+16*k, a0, a1); c.arc(cx, cy, R-12*k, a1, a0, true); c.closePath();
+  c.fillStyle = "rgba(242,238,226,.94)"; c.fill();
+  c.lineWidth = 3*k; c.strokeStyle = "#000"; c.stroke();
+  // the red line: a band on the outer edge from 7.5, clear of the figures
+  c.beginPath(); c.arc(cx, cy, R+12.5*k, ang(7.5), ang(9)); c.lineWidth = 6*k; c.strokeStyle = "#d8261a"; c.stroke();
+  // ticks: long at the thousands, short at the halves
+  for(let v=0; v<=9; v+=0.5){
+    const a = ang(v), major = v % 1 === 0, r0 = major ? R + 3*k : R + 8*k;
+    c.beginPath(); c.moveTo(cx + Math.cos(a)*r0, cy + Math.sin(a)*r0); c.lineTo(cx + Math.cos(a)*(R + 15*k), cy + Math.sin(a)*(R + 15*k));
+    c.lineWidth = (major ? 2.4 : 1.4)*k; c.strokeStyle = "#15181a"; c.stroke();
+  }
+  // the figures: upright, inside the ticks, red where the red line is
   c.textAlign = "center"; c.textBaseline = "middle";
+  c.font = '700 ' + Math.round(13*k) + 'px ' + HUD_FONT;
   for(let v=0; v<=9; v++){
     const a = ang(v);
-    c.beginPath();
-    c.moveTo(cx + Math.cos(a)*(R+2*HK), cy + Math.sin(a)*(R+2*HK));
-    c.lineTo(cx + Math.cos(a)*(R+15*HK), cy + Math.sin(a)*(R+15*HK));
-    c.lineWidth = 2.4*HK; c.strokeStyle = "#15181a"; c.stroke();
-    c.fillStyle = "#15181a";
-    c.font = 'italic 800 ' + Math.round(16*HK) + 'px "Saira Condensed", Arial, sans-serif';
-    c.fillText(String(v), cx + Math.cos(a)*(R-1*HK), cy + Math.sin(a)*(R-1*HK));
+    c.fillStyle = v >= 8 ? "#c41e12" : "#15181a";
+    c.fillText(String(v), cx + Math.cos(a)*(R - 4*k), cy + Math.sin(a)*(R - 4*k) + 0.5*k);
   }
-  const v = Math.max(0, Math.min(9, rpm/TACH_MAX*9));
-  const a = ang(v);
+  c.font = '700 ' + Math.round(7.5*k) + 'px ' + HUD_FONT; c.fillStyle = "#5a5a52";
+  if("letterSpacing" in c) c.letterSpacing = (0.8*k).toFixed(1) + "px";
+  c.fillText("RPM ×1000", cx, cy + R*0.42); if("letterSpacing" in c) c.letterSpacing = "0px";
+  // the needle: tapered, with a short tail, on an ink hub
+  const v = Math.max(0, Math.min(9, rpm/TACH_MAX*9)), a = ang(v), ca = Math.cos(a), sa = Math.sin(a), nx = -sa, ny = ca;
   c.beginPath();
-  c.moveTo(cx - Math.cos(a)*9*HK, cy - Math.sin(a)*9*HK);
-  c.lineTo(cx + Math.cos(a)*(R+12*HK), cy + Math.sin(a)*(R+12*HK));
-  c.lineWidth = 3.4*HK; c.strokeStyle = "#d81f14"; c.stroke();
-  c.beginPath(); c.arc(cx, cy, 6*HK, 0, 7);
-  c.fillStyle = "#15181a"; c.fill();
+  c.moveTo(cx - ca*10*k + nx*2.6*k, cy - sa*10*k + ny*2.6*k);
+  c.lineTo(cx + ca*(R + 11*k), cy + sa*(R + 11*k));
+  c.lineTo(cx - ca*10*k - nx*2.6*k, cy - sa*10*k - ny*2.6*k); c.closePath();
+  c.fillStyle = "#d8261a"; c.fill(); c.lineWidth = 1.2*k; c.strokeStyle = "#000"; c.stroke();
+  c.beginPath(); c.arc(cx, cy, 6*k, 0, 7); c.fillStyle = "#15181a"; c.fill();
+  c.beginPath(); c.arc(cx, cy, 2.2*k, 0, 7); c.fillStyle = "#8a8a82"; c.fill();
 }
 
 /* One palette and one type scale across the whole readout. Labels were
@@ -14663,68 +14796,70 @@ function drawHUDInner(dt, alongNow){
   if(state.phase === "menu" || GAME.ui && !GAME.paused) return;
   const lapNo = Math.min(state.lap, LAPS);
 
-  /* top left: total and lap times */
-  hudText("TOTAL TIME", 12*k, 20*k, UI.label, UI.dim);
-  hudText(fmt(state.t), 10*k, 46*k, UI.value, UI.ink);
-  if(EXP.on) drawExpHUD(W, H, k);
-  else {
-  hud.fillStyle = UI.key;
-  hud.fillRect(11*k, 54*k, 20*k, 16*k);
-  hud.strokeStyle = "#000"; hud.lineWidth = 2*k;
-  hud.strokeRect(11*k, 54*k, 20*k, 16*k);
-  hudText(String(lapNo), 21*k, 67*k, UI.label, "#16202a", "center");
-  hudText("LAP TIME", 37*k, 67*k, UI.label, UI.dim);
-  hudText(fmt(state.t - state.lapStart), 10*k, 92*k, UI.value, UI.ink);
+  /* top left: the clocks, on one plate. Total above, this lap below, the split to your best in a pill */
+  if(EXP.on){
+    hudPlate(20*k, 10*k, 128*k, 50*k, UI.key);
+    hudLabel("TIME", 30*k, 24*k); hudNum(fmt(state.t), 29*k, 51*k, UI.value*0.9, UI.ink);
+    drawExpHUD(W, H, k);
+  } else {
+  hudPlate(20*k, 10*k, 140*k, 92*k, UI.key);
+  hudLabel("TOTAL", 30*k, 24*k); hudNum(fmt(state.t), 29*k, 49*k, UI.value*0.78, "#dfe7df");
+  hudLabel("LAP", 30*k, 65*k);
   { const d = traceDelta();
-    if(d !== null) hudText((d < 0 ? "\u2212" : "+") + Math.abs(d).toFixed(2), 12*k, 110*k, UI.small, d < 0 ? "#5cf07a" : "#ff6a4a"); }
+    if(d !== null) hudPill((d < 0 ? "−" : "+") + Math.abs(d).toFixed(2), 150*k, 66*k, d < 0 ? "#5cf07a" : "#ff7a5a", "right"); }
+  hudNum(fmt(state.t - state.lapStart), 29*k, 93*k, UI.value, UI.ink);
 
-  /* top centre: the lap counter */
-  if(LAPS < 99){
-    hud.font = 'italic 800 ' + Math.round(UI.value*1.3*k*1.12) + 'px "Saira Condensed", "Arial Narrow", Arial, sans-serif';
-    const wN = hud.measureText(String(lapNo)).width;
-    hudText(String(lapNo), W/2 - 4*k, 44*k, UI.value*1.3, UI.key, "right");
-    hudText("/" + LAPS, W/2 - 2*k, 44*k, UI.small*1.2, UI.ink, "left");
-  } else hudText(String(lapNo), W/2, 44*k, UI.value*1.3, UI.key, "center");
-  hudText("LAP", W/2, 57*k, UI.label, UI.dim, "center");
+  /* top centre: the lap, compact, so the pace notes have the space under it */
+  { const pw = 92*k, px0 = W/2 - pw/2;
+    hudPlate(px0, 8*k, pw, 34*k);
+    hudLabel("LAP", px0 + 12*k, 30*k);
+    if(LAPS < 99){ const x1 = px0 + pw - 12*k; const w2 = hudNum("/" + LAPS, x1, 34*k, UI.small*1.15, "#dfe7df", "right"); hudNum(String(lapNo), x1 - w2 - 1*k, 35*k, UI.value*0.95, UI.key, "right"); }
+    else hudNum(String(lapNo), px0 + pw - 12*k, 35*k, UI.value*0.95, UI.key, "right"); }
   drawNotes(W, k);
 
-  /* top right: position and the best laps */
-  const field = FIELD.length + 1;
-  if(FIELD.length){
-    hudText("POSITION", W-12*k, 20*k, UI.label, UI.dim, "right");
-    hudText(state.place + "/" + field, W-10*k, 52*k, UI.value, UI.ink, "right");
-  } else {
-    const rb = recordFor().bestLap;
-    hudText("RECORD LAP", W-12*k, 20*k, UI.label, UI.dim, "right");
-    hudText(rb != null ? fmt(rb) : "\u2014", W-10*k, 50*k, UI.value*0.8, UI.ink, "right");
+  /* top right: position (or the record), then the best laps set this race */
+  const field = FIELD.length + 1, top = state.lapTimes.slice().sort((x,y)=>x-y).slice(0,3);
+  { const pw = 132*k, px0 = W - pw - 22*k, ph = (top.length ? 62 + 16*top.length : 52)*k;
+    hudPlate(px0, 8*k, pw, ph, FIELD.length ? UI.key : null);
+    const xr = px0 + pw - 12*k;
+    if(FIELD.length){
+      hudLabel("POSITION", px0 + 14*k, 22*k);
+      const w2 = hudNum("/" + field, xr, 47*k, UI.small*1.15, "#dfe7df", "right");
+      hudNum(String(state.place), xr - w2 - 1*k, 48*k, UI.value, UI.ink, "right");
+    } else {
+      const rb = recordFor().bestLap;
+      hudLabel("RECORD", px0 + 14*k, 22*k);
+      hudNum(rb != null ? fmt(rb) : "—", xr, 46*k, UI.value*0.72, UI.ink, "right");
+    }
+    if(top.length){
+      hudLabel(top.length > 1 ? "BEST LAPS" : "BEST LAP", px0 + 14*k, 66*k);
+      top.forEach((t, i)=>{ const y = (82 + i*16)*k;
+        hudLabel(String(i + 1), px0 + 16*k, y, "left", UI.key);
+        hudNum(fmt(t), xr, y + 1*k, UI.small, i ? "#dfe7df" : UI.ink, "right"); });
+    }
   }
-  // the best laps so far this race: nothing until there is one
-  const top = state.lapTimes.slice().sort((x,y)=>x-y).slice(0,3);
-  if(top.length) hudText(top.length > 1 ? "BEST LAPS" : "BEST LAP", W-12*k, 72*k, UI.label, UI.dim, "right");
-  for(let i=0;i<top.length;i++){
-    const y = (88 + i*15)*k;
-    hudText(String(i+1), W-84*k, y, UI.label, UI.key, "right");
-    hudText(fmt(top[i]), W-10*k, y, UI.small, UI.ink, "right");
   }
-
-  }
-  /* bottom left: tachometer */
+  /* bottom left: the rev counter, and the gear and speed on a plate beside it */
   drawTach(Math.min(DRIVE.redline*1.02, trans.rpm + (trans.spin || 0)), 74*k, H-58*k, 46*k);
-
-  /* gear box and speed */
-  const gx = 140*k, gy = H-70*k, gw = 42*k, gh = 44*k;
-  hud.fillStyle = "#f1f1ea"; hud.fillRect(gx, gy, gw, gh);
-  hud.fillStyle = "#111";    hud.fillRect(gx, gy+gh-13*k, gw, 13*k);
-  hud.strokeStyle = "#000";  hud.lineWidth = 3*k;
-  hud.strokeRect(gx, gy, gw, gh);
-  hud.save();
-  hud.globalAlpha = trans.shiftT > 0 ? 0.4 : 1;
-  hudText(gearLabel(), gx+gw/2, gy+29*k, UI.value, "#16202a", "center");
-  hud.restore();
-  hudText("SHIFT", gx+gw/2, gy+gh-3*k, UI.label*0.82, UI.ink, "center");
-  const kmh = SAVE.settings.units === 1;
-  hudText(String(Math.round(Math.abs(alongNow)*(kmh ? 3.6 : 2.23694))), gx+gw+62*k, H-30*k, UI.value, UI.ink, "right");
-  hudText(kmh ? "KM/H" : "MPH", gx+gw+66*k, H-30*k, UI.label, UI.dim);
+  { const bx = 146*k, by = H-74*k, bw = 138*k, bh = 56*k;
+    hudPlate(bx, by, bw, bh);
+    // the gear: an upright figure in a cream box, and how it's being changed under it
+    const gx = bx + 14*k, gy = by + 8*k, gw = 34*k, gh = 40*k;
+    hud.fillStyle = "#f2eee2"; hud.fillRect(gx, gy, gw, gh - 11*k);
+    hud.fillStyle = "#15181a"; hud.fillRect(gx, gy + gh - 11*k, gw, 11*k);
+    hud.lineWidth = 2*k; hud.strokeStyle = "#000"; hud.strokeRect(gx, gy, gw, gh);
+    hud.save(); hud.globalAlpha = trans.shiftT > 0 ? 0.45 : 1;
+    hud.font = '800 ' + Math.round(24*k) + 'px ' + HUD_FONT; hud.textAlign = "center"; hud.textBaseline = "alphabetic";
+    hud.fillStyle = "#15181a"; hud.fillText(gearLabel(), gx + gw/2, gy + 26*k); hud.restore();
+    hud.font = '700 ' + Math.round(7.5*k) + 'px ' + HUD_FONT; hud.textAlign = "center";
+    if("letterSpacing" in hud) hud.letterSpacing = (0.8*k).toFixed(1) + "px";
+    hud.fillStyle = trans.auto ? "#dfe7df" : UI.key; hud.fillText(trans.auto ? "AUTO" : "MANUAL", gx + gw/2, gy + gh - 3*k);
+    if("letterSpacing" in hud) hud.letterSpacing = "0px";
+    // the speed: big fixed-width figures, the unit set small beside their baseline
+    const kmh = SAVE.settings.units === 1, sp = Math.round(Math.abs(alongNow)*(kmh ? 3.6 : 2.23694));
+    hudNum(String(sp), bx + bw - 44*k, by + 40*k, UI.value*1.05, UI.ink, "right");
+    hudLabel(kmh ? "KM/H" : "MPH", bx + bw - 40*k, by + 40*k);
+  }
 
   /* drift charge: the bar fills toward the next tier and takes its colour */
   const hex = c => "rgb(" + c.map(v=>Math.round(v*255)).join(",") + ")";
@@ -15179,9 +15314,10 @@ function stepRivals(dt){
        curves away faster than gravity can follow, and the car leaves at the
        slope it was just on */
     SURF_HINT = a.y + (b.y - a.y)*f + BED + 0.6;          // its own road, not a deck over it
+    SURF_RIVAL = true;
     const gy = surfaceY(x, z), spR = Math.max(0, r.v), look = Math.max(1.2, spR*dt*1.2);
     const gA = surfaceY(x + t.x*look, z + t.z*look), gB = surfaceY(x - t.x*look, z - t.z*look);
-    SURF_HINT = null;
+    SURF_HINT = null; SURF_RIVAL = false;
     const gSlope = (gA - gB)/(2*look), gCurve = (gA - 2*gy + gB)/(look*look);
     if(r.y === null || !isFinite(r.y) || dt <= 0){ r.y = gy; r.vy = 0; r.air = false; }
     // (soft mud soaks up the rebound, so a rival wallows over its humps)
@@ -15541,8 +15677,26 @@ function lavaReset(){
   pose.x = p.x; pose.z = p.z; pose.h = Math.atan2(t.x, t.z); pose.y = surfaceY(p.x, p.z); pose.lastGy = pose.y;
   camH = pose.h; camera.position.set(pose.x - Math.sin(pose.h)*9, pose.y + 3.6, pose.z - Math.cos(pose.h)*9);
 }
-function resetCar(){
+/* short of the far half of a broken bridge: down onto the road below. That road is another
+   part of the lap, so you're put back on the approach to the bridge to have another go. */
+function checkBrokenBridge(){
   if(state.phase !== "racing" || GAME.paused) return;
+  for(const sp of SPANS){
+    if(!sp.gapS || sp.P !== MAIN) continue;
+    const near = Math.abs(((state.idx - sp.i) % MAIN.N + MAIN.N*1.5) % MAIN.N - MAIN.N/2);
+    if(near > sp.gapS + 40/MAIN.seg) continue;                                  // on the road below: that's fine
+    const dx = pose.x - sp.x, dz = pose.z - sp.z, u = dx*sp.tx + dz*sp.tz, v = -dx*sp.tz + dz*sp.tx;
+    if(Math.abs(u) > sp.gapS*MAIN.seg + 8 || Math.abs(v) > 16) continue;
+    if(pose.y < pathY(MAIN, sp.i) + BED - 3.2){
+      banner("TOO SHORT", "#ff6a4a", 1.5, "flat out at the gap");
+      resetCar(wrapIdx(MAIN, sp.i - sp.S - Math.round(45/MAIN.seg)));
+      return;
+    }
+  }
+}
+function resetCar(at){
+  if(state.phase !== "racing" || GAME.paused) return;
+  if(at !== undefined) state.idx = at;
   const i = state.idx, p = pts[i], t = tans[i];
   pose.x = p.x; pose.z = p.z; pose.h = Math.atan2(t.x, t.z);
   pose.y = surfaceY(p.x, p.z); pose.lastGy = pose.y;
@@ -17442,6 +17596,7 @@ function frame(now){
     }
 
     info = stepCar(dt);
+    checkBrokenBridge();
     stepRivals(dt);
     netFrame(dt);
     stepLeafPiles(dt);
