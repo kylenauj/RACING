@@ -1031,76 +1031,80 @@ const TRACKS = [
     ]},
 
   /* ---- THE SWAMP CUP: the bayou, boardwalks, mud and willows ---- */
-  { name:"BAYOU BEND", after:"a bayou in the delta", relief:0.6, rollers:0.5, season:"swamp", cup:4,
-    blurb:"along the bayou under the willows: out over the black water on the long boardwalk, through four stretches of deep mud, past the old trappers' cabins and home over a second boardwalk",
+  { name:"BAYOU BEND", after:"Laguna Seca", relief:0.8, rollers:0.4, season:"swamp", cup:4,
+    blurb:"Laguna Seca in the bayou: a boardwalk down the front straight, the Andretti hairpin, the long drag up through the cypress to the Corkscrew, left at the top and straight down the drop, then through the black water at the last hairpin",
+    kit:["crest","tabletop","double"],
+    shape:"BAYOU BEND \u2014 the Corkscrew",
+    feature:"the Corkscrew: a blind left at the top of the hill and a plunge down the other side, and the last hairpin through the black water",
+    ctrl:[[-300,240],[-150,255],[0,265],[150,270],[260,280],[320,250],[315,200],[250,185],[150,170],[60,150],[0,110],[-40,40],
+          [20,-60],[120,-150],[230,-230],[300,-280],[330,-330],[300,-370],[250,-345],[225,-295],[170,-240],[80,-220],[0,-250],
+          [-100,-220],[-200,-160],[-300,-60],[-380,60],[-420,160],[-380,230]],
+    hills:[[285,-330,150,32],[-350,0,160,8],[0,300,200,-4]],
+    jumps:[[[60,-110],2.0]], fords:[],
+    bigJumps:[[[-250,-110],3.4]],
+    mud:[[[150,170],[0,110]], [[0,-250],[-200,-160]]],
+    boardwalks:[[[-150,255],[60,267]]],
+    wades:[[[-380,60],[-420,160]]],
+    cabins:4,
+    branches:[
+      // the fire road, round the outside of the drag up to the Corkscrew
+      {a:[0,110], b:[230,-230], via:[[130,40],[240,-90]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, label:"FIRE ROAD", mainLabel:"RAHAL STRAIGHT"}
+    ]},
+  { name:"CYPRESS HOLLOW", after:"Interlagos", relief:0.8, rollers:0.4, season:"swamp", cup:4,
+    blurb:"Interlagos among the cypress: down through the S off the line, the long back straight on the boardwalk, into the water at the bottom of the lake descent, round the twisty infield by the lake and over the crest at the dive, then the long climb home",
     kit:["crest","rhythm","kicker"],
-    shape:"BAYOU BEND — two boardwalks over the black water",
-    feature:"two boardwalks over the black water, deep mud and the trappers' cabins",
-    ctrl:[[0,-380],[120,-400],[240,-360],[330,-280],[360,-170],[300,-90],[330,10],[400,90],[380,200],[290,260],[180,240],[90,300],
-          [-20,330],[-140,290],[-230,200],[-250,90],[-320,10],[-360,-100],[-300,-200],[-200,-260],[-100,-330]],
-    hills:[[0,0,320,5],[330,-300,140,6],[-300,250,150,5]],
-    jumps:[], fords:[[-320,10]],
-    mud:[[[300,-90],[330,10]], [[380,200],[290,260]], [[-140,290],[-230,200]], [[-360,-100],[-300,-200]]],
-    boardwalks:[[[150,-395],[250,-355]], [[70,305],[-60,322]]],
-    cabins:4,
-    branches:[
-      // the levee road, out along the top of the bank while the main road winds through the trees
-      {a:[330,-280], b:[330,10], via:[[430,-190],[430,-60]],
-       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, label:"LEVEE", mainLabel:"BAYOU ROAD"}
-    ]},
-  { name:"CYPRESS HOLLOW", after:"a cypress swamp round a lake", relief:0.7, rollers:0.5, season:"swamp", cup:4,
-    blurb:"all the way round Cypress Lake through the bald cypress and the knees at their feet: two boardwalks across the inlets, mud in the hollows, and a cabin or three back in the moss",
-    kit:["crest","kicker","rhythm"],
-    shape:"CYPRESS HOLLOW — round the lake",
-    feature:"a lap round a cypress lake, with boardwalks across two inlets",
-    ctrl:[[-300,-150],[-150,-195],[0,-175],[150,-205],[300,-140],[385,-20],[350,110],[250,215],[100,250],[-40,280],
-          [-180,230],[-300,150],[-385,40],[-365,-70]],
-    hills:[[300,250,150,8],[-300,-250,160,8]],
-    jumps:[], fords:[],
-    lake:{at:[0,40], rx:190, rz:95},
-    mud:[[[-150,-195],[0,-175]], [[250,215],[100,250]], [[-385,40],[-365,-70]]],
-    boardwalks:[[[160,-203],[295,-143]], [[-185,228],[-298,152]]],
+    shape:"CYPRESS HOLLOW \u2014 down to the lake",
+    feature:"the S off the line, a boardwalk down the back straight, and a wade at the bottom of the lake descent",
+    ctrl:[[380,100],[370,-40],[330,-120],[280,-160],[240,-120],[180,-150],[80,-190],[-40,-215],[-180,-230],[-320,-220],
+          [-400,-160],[-395,-80],[-330,-30],[-260,-60],[-200,-15],[-150,50],[-200,120],[-230,195],[-160,230],[-60,185],
+          [20,130],[90,150],[180,215],[300,215],[375,165]],
+    hills:[[330,-100,160,14],[-380,-150,150,10],[250,260,120,6]],
+    jumps:[[[-60,185],2.2]], fords:[],
+    bigJumps:[[[240,215],3.2]],
+    lake:{at:[60,20], rx:150, rz:75},
+    mud:[[[-260,-60],[-150,50]], [[-230,195],[-160,230]]],
+    boardwalks:[[[-40,-215],[-180,-230]]],
+    wades:[[[-395,-80],[-330,-30]]],
     cabins:3,
-    branches:[
-      // the pipeline track, wide round the east end of the lake
-      {a:[300,-140], b:[350,110], via:[[440,-70],[440,60]],
-       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, label:"PIPELINE", mainLabel:"LAKE ROAD"}
-    ]},
-  { name:"BIGFOOT TRAIL", after:"a trail in the deep woods", relief:1.0, rollers:0.7, season:"swamp", cup:4,
-    blurb:"up and down the ridges through the deep woods, a boardwalk over the beaver pond and mud in every bottom. Keep an eye on the tree line: folks say something walks it",
-    kit:["crest","tabletop","kicker"],
-    shape:"BIGFOOT TRAIL — something in the trees",
-    feature:"a boardwalk over the beaver pond, and something walking the tree line",
-    ctrl:[[0,-420],[140,-380],[220,-280],[200,-170],[280,-80],[330,40],[260,150],[300,260],[200,340],[60,320],
-          [-40,230],[-160,280],[-280,220],[-300,100],[-220,0],[-300,-110],[-260,-240],[-140,-330]],
-    hills:[[250,-150,160,20],[-250,150,170,16],[0,-100,220,8]],
-    jumps:[], fords:[[-220,0]],
-    mud:[[[200,-170],[280,-80]], [[-160,280],[-280,220]], [[-300,-110],[-260,-240]]],
-    boardwalks:[[[70,322],[-35,238]]],
+    branches:[]},
+  { name:"BIGFOOT TRAIL", after:"Mount Panorama", relief:1.0, rollers:0.5, season:"swamp", cup:4,
+    blurb:"Mount Panorama in the deep woods: the pit straight on the boardwalk, hard left and up the mountain, the cutting and the switchbacks to the top, the esses down, the elbow, then flat out down the long straight over the humps and straight into the water at the bottom. Keep an eye on the tree line up the mountain: folks say something walks it",
+    kit:["crest","tabletop"],
+    shape:"BIGFOOT TRAIL \u2014 up the mountain",
+    feature:"up the mountain and down the long straight over its humps into the water, and something walking the tree line",
+    ctrl:[[-250,360],[-50,372],[120,370],[200,340],[215,260],[160,150],[90,40],[60,-20],[100,-80],[60,-140],[100,-200],
+          [60,-270],[100,-335],[50,-400],[0,-365],[-40,-405],[-90,-365],[-120,-300],[-165,-340],[-215,-300],[-240,-150],
+          [-265,20],[-285,180],[-255,250],[-300,295],[-295,345]],
+    hills:[[40,-250,230,50],[-250,-250,120,20]],
+    jumps:[[[-247,-80],1.8]], fords:[],
+    bigJumps:[[[-270,100],3.8]],
+    mud:[[[90,40],[60,-20]], [[-120,-300],[-215,-300]]],
+    boardwalks:[[[-50,372],[120,370]]],
+    wades:[[[-283,190],[-257,248]]],
     cabins:3,
-    bigfoot:0.3,
+    bigfoot:0.2,
     branches:[
-      // the logging road, over the ridge while the trail goes round it
-      {a:[220,-280], b:[330,40], via:[[330,-230],[390,-100]],
-       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, label:"LOGGING ROAD", mainLabel:"THE TRAIL"}
+      // the old mountain track, out round the flank of the hill
+      {a:[215,260], b:[60,-20], via:[[260,160],[200,20]],
+       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, label:"MOUNTAIN TRACK", mainLabel:"MOUNTAIN STRAIGHT"}
     ]},
-  { name:"WILLOW MARSH", after:"an open marsh", relief:0.5, rollers:0.4, season:"swamp", cup:4,
-    blurb:"out across the open marsh on three boardwalks, weeping willows all along the dry ground between them, and more mud than road in places",
+  { name:"WILLOW MARSH", after:"Zandvoort", relief:0.7, rollers:0.4, season:"swamp", cup:4,
+    blurb:"Zandvoort in the marsh: the main straight on a boardwalk, the Tarzan hairpin, round the tight left and up over the crest, fast down through the willows, a short boardwalk, through the water and round the long last corner",
     kit:["crest","rhythm","double"],
-    shape:"WILLOW MARSH — three boardwalks",
-    feature:"three boardwalks across the open marsh, and weeping willows all the way",
-    ctrl:[[-420,-60],[-340,-200],[-200,-260],[-60,-220],[60,-280],[200,-260],[330,-180],[400,-50],[350,80],[410,200],
-          [300,300],[150,260],[20,320],[-120,280],[-220,180],[-330,150],[-430,60]],
-    hills:[[0,0,300,4]],
-    jumps:[], fords:[],
-    mud:[[[60,-280],[200,-260]], [[300,300],[150,260]], [[-330,150],[-430,60]]],
-    boardwalks:[[[-190,-257],[-70,-223]], [[395,-40],[355,70]], [[10,318],[-110,283]]],
+    shape:"WILLOW MARSH \u2014 over the dunes",
+    feature:"a boardwalk main straight into the Tarzan hairpin, a crest you jump, and a wade through the marsh",
+    ctrl:[[-320,300],[-100,300],[120,295],[280,285],[355,240],[330,170],[260,180],[180,140],[120,90],[140,30],[210,40],
+          [280,-40],[300,-130],[260,-190],[150,-230],[40,-200],[-20,-260],[-100,-240],[-160,-170],[-260,-160],[-340,-80],
+          [-380,60],[-380,200]],
+    hills:[[300,-100,150,18],[150,-230,120,12],[-300,-120,150,8]],
+    jumps:[[[290,-85],2.0]], fords:[],
+    bigJumps:[[[200,-225],3.4]],
+    mud:[[[-340,-80],[-380,60]], [[120,90],[140,30]]],
+    boardwalks:[[[-100,300],[120,295]], [[-20,-260],[-100,-240]]],
+    wades:[[[-160,-170],[-260,-160]]],
     cabins:4,
-    branches:[
-      // the duck hunters' track, through the reeds on the inside of the bend
-      {a:[-60,-220], b:[330,-180], via:[[40,-150],[210,-130]],
-       half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, label:"HUNTERS' TRACK", mainLabel:"MARSH ROAD"}
-    ]}
+    branches:[]}
 ];
 
 /* ---- paths -------------------------------------------------------- */
@@ -1511,6 +1515,7 @@ if(SWAMPGP){
   ["canyon","gallery"].forEach(k=>{ if(TRACK[k]) TRACK[k] = Object.assign({}, TRACK[k], {from: mv(TRACK[k].from), to: mv(TRACK[k].to)}); });
   TRACK.washes = (TRACK.washes||[]).map(mv);
   TRACK.boardwalks = (TRACK.boardwalks||[]).map(b=> [mv(b[0]), mv(b[1])]);
+  TRACK.wades = (TRACK.wades||[]).map(b=> [mv(b[0]), mv(b[1])]);
   if(TRACK.summit) TRACK.summit = mv(TRACK.summit);
   TRACK.camps = (TRACK.camps||[]).map(mv);
   TRACK.flats = (TRACK.flats||[]).map(f=> mv([f[0], f[1]]).concat([f[2]]));
@@ -3815,12 +3820,26 @@ function caveOf(s){ for(const C of CAVES){ if(s >= C.a && s <= C.b) return C; } 
    the land either side is dug out into the pool, right up to the edge of the
    deck, and the pool fades back to dry ground at either end, where the deck
    comes down off the bank. MAIN.bwk marks the stations (1 on the deck). */
+/* A wade is the same pool with no deck over it: the road runs down off the bank into the
+   water, a wheel deep through the middle, and back up out the far side. */
 MAIN.bwk = new Float32Array(MAIN.N);
-(TRACK.boardwalks || []).forEach(d=>{
+(TRACK.boardwalks || []).map(d=> [d, false]).concat((TRACK.wades || []).map(d=> [d, true])).forEach(([d, wade])=>{
   const seg = MAIN.seg;
   let a = snapTo(MAIN, d[0]), b = snapTo(MAIN, d[1]);
   let n = b - a; if(n < 0) n += MAIN.N;
   if(n > MAIN.N/2){ const q = a; a = b; b = q; n = MAIN.N - n; }         // the short way along
+  let wLevel = 0;
+  if(wade){
+    // the water stands a little below the lower bank; the road dips 0.55m under it in the middle
+    const ya = MAIN.pts[wrapIdx(MAIN, a)].y, yb = MAIN.pts[wrapIdx(MAIN, b)].y;
+    wLevel = Math.min(ya, yb) + BED - 0.5;
+    const L0 = n*seg, bed = wLevel - BED - 0.55;
+    for(let k=-Math.round(20/seg); k<=n + Math.round(20/seg); k++){
+      const u = k*seg, w = smoothstep(-20, 22, u)*(1 - smoothstep(L0 - 22, L0 + 20, u)), i = wrapIdx(MAIN, a + k);
+      MAIN.pts[i].y = MAIN.pts[i].y*(1 - w) + Math.min(MAIN.pts[i].y, bed)*w;
+      if(w > 0.45){ MAIN.surf[i] = SURF.WATER; MAIN.wet[i] = Math.max(MAIN.wet[i], smoothstep(0.45, 0.8, w)); }
+    }
+  }
   const pts = []; let lo = Infinity, x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
   for(let k=0;k<=n;k+=Math.max(1, Math.round(2/seg))){
     const i = wrapIdx(MAIN, a + k), p = MAIN.pts[i];
@@ -3831,9 +3850,11 @@ MAIN.bwk = new Float32Array(MAIN.N);
   const L = n*seg, E = Math.min(20, L*0.2);
   for(let k=-Math.round(12/seg); k<=n + Math.round(12/seg); k++){
     const u = k*seg, w = smoothstep(-12, 4, u)*(1 - smoothstep(L - 4, L + 12, u));
-    const i = wrapIdx(MAIN, a + k); MAIN.bwk[i] = Math.max(MAIN.bwk[i], w);
+    const i = wrapIdx(MAIN, a + k); if(!wade) MAIN.bwk[i] = Math.max(MAIN.bwk[i], w);      // (a wade has no deck, and no rails)
   }
-  BOARDWALKS.push({a, b, n, pts, L, E, half:MAIN.baseHalf, level:lo - 1.35, floor:lo - 2.9,
+  if(wade) BOARDWALKS.push({a, b, n, pts, L, E:Math.min(26, L*0.3), half:MAIN.baseHalf, level:wLevel, floor:wLevel - 1.6, wade:true,
+                            x0:x0 - 36, x1:x1 + 36, z0:z0 - 36, z1:z1 + 36});
+  else BOARDWALKS.push({a, b, n, pts, L, E, half:MAIN.baseHalf, level:lo - 1.35, floor:lo - 2.9,
                    x0:x0 - 36, x1:x1 + 36, z0:z0 - 36, z1:z1 + 36});
 });
 /* the ground round a boardwalk: dug down to the pool's bed from just past the deck's edge
@@ -7873,6 +7894,35 @@ if(SWAMPGP){
   const pileM = PM(0x3e3226), railM = PM(0x6e5a42), mossM = PM(0x5d7a34), lampM = new THREE.MeshLambertMaterial({color:0xffe2a0, emissive:0xffa840, emissiveIntensity:1.1});
   const rnd = seeded(9127);
 
+  /* ---- lily pads (only to look at: nothing here bounces) ----
+     A pad is a flat disc with its notch cut out, laid on the water in patches
+     of a few, some with a flower. All of them one instanced mesh. */
+  const LILIES = [], FLOWERS = [];
+  function lilyPatch(x, y, z, n, ok){
+    for(let k=0;k<n;k++){
+      const a = rnd()*Math.PI*2, d = rnd()*2.6, px = x + Math.cos(a)*d, pz = z + Math.sin(a)*d;
+      if(!ok(px, pz)) continue;
+      const r = 0.35 + rnd()*0.55;
+      LILIES.push([px, y + 0.03 + rnd()*0.01, pz, r, rnd()*6.28]);
+      if(rnd() < 0.18) FLOWERS.push([px + (rnd() - 0.5)*r*0.6, y + 0.1, pz + (rnd() - 0.5)*r*0.6, rnd() < 0.6]);
+    }
+  }
+  function lilyMeshes(){
+    if(!LILIES.length) return;
+    const geo = new THREE.CircleGeometry(1, 16, 0.3, Math.PI*2 - 0.55); geo.rotateX(-Math.PI/2);
+    const pads = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({side:THREE.DoubleSide}), LILIES.length);
+    const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), cc = new THREE.Color(), up = new THREE.Vector3(0, 1, 0);
+    LILIES.forEach((L, k)=>{ q4.setFromAxisAngle(up, L[4]); v3.set(L[0], L[1], L[2]); s3.set(L[3], 1, L[3]); m4.compose(v3, q4, s3); pads.setMatrixAt(k, m4);
+      pads.setColorAt(k, cc.setHSL(0.24 + rnd()*0.07, 0.45 + rnd()*0.2, 0.26 + rnd()*0.12)); });
+    pads.instanceMatrix.needsUpdate = true; pads.instanceColor.needsUpdate = true; pads.renderOrder = 4; scene.add(pads);
+    if(!FLOWERS.length) return;
+    const fg = new THREE.OctahedronGeometry(0.16, 0); fg.scale(1, 0.75, 1);
+    const fl = new THREE.InstancedMesh(fg, new THREE.MeshLambertMaterial({}), FLOWERS.length);
+    FLOWERS.forEach((F, k)=>{ q4.setFromAxisAngle(up, rnd()*6); v3.set(F[0], F[1], F[2]); s3.set(1, 1, 1); m4.compose(v3, q4, s3); fl.setMatrixAt(k, m4);
+      fl.setColorAt(k, F[3] ? cc.setHSL(0.93, 0.7, 0.8) : cc.setHSL(0.13, 0.3, 0.93)); });
+    fl.instanceMatrix.needsUpdate = true; fl.instanceColor.needsUpdate = true; scene.add(fl);
+  }
+
   /* ---- the boardwalks ---- */
   BOARDWALKS.forEach((W, n)=>{
     // the pool: one sheet of black water at its level, drawn only where it lies over the ground
@@ -7897,6 +7947,7 @@ if(SWAMPGP){
 
     // the deck: planks across the road, a stringer under each edge, pilings down into the water
     const g = new THREE.Group();
+    if(!W.wade){
     for(let u=0; u<=W.L; u+=0.62){
       const q = atS(W.a + u/seg), w = (q.half + 0.55)*2;
       const pl = pbox(g, w, 0.09, 0.52, plankM[Math.floor(rnd()*plankM.length)], q.x, q.y + 0.06 + (rnd() - 0.5)*0.03, q.z);
@@ -7924,6 +7975,14 @@ if(SWAMPGP){
     }
     g.traverse(o=>{ if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
     mergeStatic(g); scene.add(g);
+    } else {
+      // a wade: marker posts either side to show where the road runs under the water
+      for(let u=6; u<W.L - 4; u+=9){ const q = atS(W.a + u/seg);
+        for(const sd of [-1, 1]){ const x = q.x - q.tz*sd*(q.half + 1.2), z = q.z + q.tx*sd*(q.half + 1.2), bed = Math.min(gradedY(x, z), W.level) - 0.4;
+          pcyl(g, 0.09, 0.1, W.level + 1.4 - bed, 6, pileM, x, (W.level + 1.4 + bed)/2, z);
+          pbox(g, 0.2, 0.3, 0.2, u % 18 < 9 ? PM(0xd8302a) : PM(0xf2efe6), x, W.level + 1.3, z); } }
+      mergeStatic(g); scene.add(g);
+    }
 
     // the pool's edges: reeds and cattails, lily pads out on the water, dead snags standing in it
     const reedM = PM(0x7a8a3a), tailM = PM(0x5a3a1e), padM = PM(0x4e7a34), snagM = PM(0x6e665a);
@@ -7932,8 +7991,8 @@ if(SWAMPGP){
       const x = W.x0 + rnd()*(W.x1 - W.x0), z = W.z0 + rnd()*(W.z1 - W.z0), w = bwPool(x, z);
       if(w < 0.1 || !clearOf(x, z, 1.4)) continue;
       const deep = W.level - gradedY(x, z);
-      if(deep > 0.4 && rnd() < 0.5){
-        const lp = pcyl(pg, 0.45 + rnd()*0.5, 0.45, 0.03, 9, padM, x, W.level + 0.03, z); lp.rotation.y = rnd()*6;
+      if(deep > 0.35 && rnd() < 0.55){
+        lilyPatch(x, W.level, z, 3 + Math.floor(rnd()*6), (xx, zz)=> W.level - gradedY(xx, zz) > 0.25 && clearOf(xx, zz, 1.2));
       } else if(w < 0.85){
         const hgt = 1.2 + rnd()*1.2, yb = Math.max(gradedY(x, z), W.level - 0.3);
         pcyl(pg, 0.03, 0.05, hgt, 4, reedM, x, yb + hgt/2, z);
@@ -7950,8 +8009,20 @@ if(SWAMPGP){
       tg.rotation.z = (rnd() - 0.5)*0.25; setDown(tg, x, z, rnd()*6.28); made++;
     }
     mergeStatic(pg); scene.add(pg);
-    roadSign(wrapIdx(MAIN, W.a - Math.round(70/seg)), 1, ["BOARDWALK", "planks for the next " + Math.round(W.L/10)*10 + "m"], "#4a3a26", "#efe4c4");
+    if(W.wade) roadSign(wrapIdx(MAIN, W.a - Math.round(70/seg)), 1, ["DEEP WATER", "keep your foot in"], "#2a4a5a", "#eaf4f4");
+    else roadSign(wrapIdx(MAIN, W.a - Math.round(70/seg)), 1, ["BOARDWALK", "planks for the next " + Math.round(W.L/10)*10 + "m"], "#4a3a26", "#efe4c4");
   });
+
+  // round the shallows of the lake too
+  if(LAKE.on && !LAKE.frozen && !LAKE.lava){
+    for(let k=0, made=0; k<4000 && made<140; k++){
+      const a = rnd()*Math.PI*2, e = 0.55 + rnd()*0.45, x = LAKE.x + Math.cos(a)*LAKE.rx*e, z = LAKE.z + Math.sin(a)*LAKE.rz*e;
+      if(LAKE.level - gradedY(x, z) < 0.3 || !clearOf(x, z, 2)) continue;
+      lilyPatch(x, LAKE.level, z, 3 + Math.floor(rnd()*7), (xx, zz)=> LAKE.level - gradedY(xx, zz) > 0.25 && clearOf(xx, zz, 1.2));
+      made++;
+    }
+  }
+  lilyMeshes();
 
   /* ---- the cabins ---- */
   const logMs = [PM(0x7a6a58), PM(0x6c5e4e), PM(0x857563)], roofM = PM(0x4a4038), stoneM = PM(0x6f6b64), darkM = PM(0x1c1712), boardM = PM(0x6a5a46);
@@ -9898,23 +9969,25 @@ function willowGeometry(){
     l.translate(0, 0.17, 0); l.rotateZ(0.55 + R(0, 0.25)); l.rotateY(a); l.translate(lean, 0.3, 0);
     put(l, ()=> c.setHSL(0.08, 0.2, 0.2));
   }
-  for(let k=0;k<9;k++){                                   // the crown, a loose dome of blobs
-    const a = k/9*Math.PI*2 + R(0, 0.5), rr = k === 0 ? 0 : R(0.12, 0.3), r = R(0.14, 0.22);
-    const b = new THREE.IcosahedronGeometry(r, 0); b.scale(1, 0.7, 1);
-    b.translate(lean + Math.cos(a)*rr, 0.56 + R(0, 0.1) - rr*0.25, Math.sin(a)*rr);
-    put(b, y=> c.setHSL(0.19 + Math.random()*0.06, 0.45, 0.30 + Math.random()*0.1));
+  for(let k=0;k<15;k++){                                  // the crown: a full, soft dome
+    const a = k/15*Math.PI*2 + R(0, 0.4), rr = k < 3 ? R(0, 0.1) : R(0.16, 0.34), r = R(0.13, 0.2);
+    const b = new THREE.IcosahedronGeometry(r, 1); b.scale(1.15, 0.72, 1.15);
+    b.translate(lean + Math.cos(a)*rr, 0.64 + R(0, 0.08) - rr*0.3, Math.sin(a)*rr);
+    put(b, y=> c.setHSL(0.2 + Math.random()*0.05, 0.42 + Math.random()*0.15, 0.28 + (y - 0.5)*0.5 + Math.random()*0.06));
   }
-  // the curtain: long thin strands, each a narrow blade hanging from the rim and swaying out
-  for(let k=0;k<70;k++){
-    const a = Math.random()*Math.PI*2, rr = R(0.2, 0.42), top = R(0.5, 0.66), len = R(0.32, 0.5), w = R(0.02, 0.035);
-    const x = lean + Math.cos(a)*rr, z = Math.sin(a)*rr, out = R(0.02, 0.06), ox = Math.cos(a)*out, oz = Math.sin(a)*out;
-    const tx = -Math.sin(a)*w, tz = Math.cos(a)*w;
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.Float32BufferAttribute([
-      x - tx, top, z - tz,  x + tx, top, z + tz,  x + ox*2, top - len, z + oz*2,
-      x + tx, top, z + tz,  x + ox*2 + tx*0.3, top - len*0.96, z + oz*2 + tz*0.3,  x + ox*2, top - len, z + oz*2], 3));
-    put(g, y=> c.setHSL(0.2 + Math.random()*0.05, 0.5, 0.36 + (y - top + len)*0.4 + Math.random()*0.06));
+  /* the curtain: a couple of hundred fine strands off the rim of the dome, each running out a
+     little and then hanging straight down, most of the way to the ground */
+  const sp = [];
+  for(let k=0;k<230;k++){
+    const a = Math.random()*Math.PI*2, rr = R(0.2, 0.46), top = 0.74 - rr*0.42 + R(-0.03, 0.03);
+    const len = R(0.34, 0.6), w = R(0.009, 0.018), ox = Math.cos(a), oz = Math.sin(a), tx = -oz*w, tz = ox*w;
+    const P0 = [lean + ox*rr, top, oz*rr], P1 = [P0[0] + ox*0.05, top - len*0.3, P0[2] + oz*0.05], P2 = [P1[0] + ox*0.012, Math.max(0.04, top - len), P1[2] + oz*0.012];
+    const seg = (A, B, wa, wb)=> sp.push(A[0] - tx*wa, A[1], A[2] - tz*wa,  A[0] + tx*wa, A[1], A[2] + tz*wa,  B[0] + tx*wb, B[1], B[2] + tz*wb,
+                                        A[0] - tx*wa, A[1], A[2] - tz*wa,  B[0] + tx*wb, B[1], B[2] + tz*wb,  B[0] - tx*wb, B[1], B[2] - tz*wb);
+    seg(P0, P1, 1, 0.85); seg(P1, P2, 0.85, 0.3);
   }
+  { const g2 = new THREE.BufferGeometry(); g2.setAttribute("position", new THREE.Float32BufferAttribute(sp, 3));
+    put(g2, y=> c.setHSL(0.19 + Math.random()*0.05, 0.5, 0.26 + (0.7 - y)*0.25 + Math.random()*0.05)); }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
@@ -10228,7 +10301,8 @@ courseBillboard();
                        else tint.setHSL(0.2 + Math.random()*0.05, 0.22, 0.42 + Math.random()*0.1); }
       else if(FALL && kind > 0) fallTint(tint);
       else if(GATOR) tint.setHSL(0.26 + Math.random()*0.14, 0.45 + Math.random()*0.2, 0.52 + Math.random()*0.14);   // lush swamp greens, some teal
-      else if(SWAMPGP){ const k = 0.85 + Math.random()*0.35; tint.setRGB(k*0.98, k, k*0.86); }                   // the trees' own colours, a little varied
+      else if(SWAMPGP){ if(kind === 2) tint.setHSL(0.2 + Math.random()*0.08, 0.4 + Math.random()*0.15, 0.36 + Math.random()*0.1);   // gum and oak, green
+                        else { const k = 0.85 + Math.random()*0.35; tint.setRGB(k*0.98, k, k*0.86); } }                           // willow and cypress keep their own colours
       else if(roll < 0.09)      tint.setHSL(0.10 + Math.random()*0.05, 0.55, 0.52);  // autumn
       else if(roll < 0.15) tint.setHSL(0.13 + Math.random()*0.03, 0.35, 0.55);  // dry
       else if(roll < 0.20) tint.setHSL(0.42 + Math.random()*0.06, 0.16, 0.52);  // bluish
