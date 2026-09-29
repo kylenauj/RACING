@@ -1754,6 +1754,7 @@ const FLATS = [];
 const LAKE = {on:false};
 const SWAMP = {on:false};
 const BOARDWALKS = [];                // the Swamp Cup's boardwalks: stretches of main road on planks over pools (filled in once the road is final)
+let WATERS = false;                   // any standing water the car can wade (set once the pools are known)
 const PROP_KEEP = [];                 // [x, z, r]: ground a set piece stands on, that the forest keeps off
 const PIT = {on:false};
 const BOWL = {on:false};
@@ -3895,6 +3896,28 @@ function carveBoardwalks(y, x, z){
   }
   return y;
 }
+/* how much a point is inside one pool's water: the pool round a boardwalk (not the deck),
+   or all of a wade, road and all; fading out at the far edges and at either end */
+function bwMask(W, x, z){
+  if(x < W.x0 || x > W.x1 || z < W.z0 || z > W.z1) return 0;
+  let best = Infinity, bu = 0, bh = W.half;
+  for(const p of W.pts){ const d = (p.x - x)**2 + (p.z - z)**2; if(d < best){ best = d; bu = p.u; bh = p.h; } }
+  const d = Math.sqrt(best), ends = smoothstep(0, W.E, bu)*smoothstep(0, W.E, W.L - bu);
+  return (1 - smoothstep(16 + bh, 28 + bh, d))*ends*(W.wade ? 1 : smoothstep(bh + 0.2, bh + 1.2, d));
+}
+/* The top of the standing water at a point (a swamp pool or wade, the lake, the marsh), or
+   null on dry land. The car never sinks further than its wheels into any of it: wherever the
+   bed is deeper, it drives on a floor a wheel's depth under the surface (see surfaceY). */
+function waterTop(x, z){
+  let top = null;
+  for(const W of BOARDWALKS) if(bwMask(W, x, z) > 0.2) top = top === null ? W.level : Math.max(top, W.level);
+  if(LAKE.on && !LAKE.frozen && !LAKE.lava && !GATOR && Math.hypot((x - LAKE.x)/LAKE.rx, (z - LAKE.z)/LAKE.rz) < 1.08)
+    top = top === null ? LAKE.level : Math.max(top, LAKE.level);
+  if(SWAMP.on && swampAt(x, z) > 0.2) top = top === null ? SWAMP.water : Math.max(top, SWAMP.water);
+  return top;
+}
+const WADE_DEPTH = 0.45;              // how far under the surface the wheels ride, at most
+WATERS = BOARDWALKS.length > 0 || SWAMP.on || (LAKE.on && !LAKE.frozen && !LAKE.lava && !GATOR);
 /* how far into a boardwalk's pool a point is (0 on dry land, 1 out in the water) */
 function bwPool(x, z){
   let out = 0;
@@ -4192,6 +4215,7 @@ function surfaceY(x, z){
     if(s !== null) return pathY(MAIN, s) + BED;
   }
   const h = gridH(x, z);
+  if(WATERS){ const wt = waterTop(x, z); if(wt !== null && h < wt - WADE_DEPTH) return wt - WADE_DEPTH; }   // never deeper than the wheels
   const c = cellAt(x, z);
   const half = c >= 0 && GP[c] >= 0 ? GHW[c] : 5;
   return h + offRoadBump(x, z)*smoothstep(half - 0.5, half + 5.0, distAt(x, z));
@@ -7952,7 +7976,8 @@ if(SWAMPGP){
     for(let r=0;r<nz;r++) for(let q=0;q<nx;q++){
       const x = W.x0 + q*STEP, z = W.z0 + r*STEP;
       pos.push(x, W.level, z); uv.push(x, z);
-      dep.push(Math.max(-1, Math.min(3, W.level - gradedY(x, z))));
+      // (only inside this pool: low ground round about is not under its water)
+      dep.push(bwMask(W, x, z) > 0.02 ? Math.max(-1, Math.min(3, W.level - gradedY(x, z))) : -1);
     }
     for(let r=0;r<nz-1;r++) for(let q=0;q<nx-1;q++){
       const a2 = r*nx + q, b2 = a2 + 1, d2 = a2 + nx, e2 = d2 + 1;
@@ -12971,7 +12996,9 @@ function stepCarInner(dt){
   const tarAmt = offRoad ? 0 : pavedAt(pose.x, pose.z);
   /* In the Winter Cup the water is ice: a ford or the creek is not deep and
      draggy but glassy, and the frozen lake is ice from shore to shore. */
-  const wet0 = offRoad ? 0 : near0.wet;
+  const wTop = WATERS ? waterTop(pose.x, pose.z) : null;
+  const poolIn = wTop !== null ? Math.max(0, Math.min(1, (wTop - gridH(pose.x, pose.z))/0.4)) : 0;   // standing water underneath
+  const wet0 = Math.max(offRoad ? 0 : near0.wet, poolIn);
   const iceAmt = FROZEN ? Math.max(wet0, iceAt(pose.x, pose.z)) : 0;
   const wetAmt = FROZEN ? 0 : wet0;
   const inMud   = mudAmt > 0.25;
@@ -13048,6 +13075,7 @@ function stepCarInner(dt){
   const sgn = Math.sign(along || 1);
   a -= sgn * (0.0006*along*along*GG.dragK() + (deepOff ? 1.9 : offRoad ? 1.0 : 0.30 + wetAmt*0.34));
   a -= along * (deepOff ? 0.15 : offRoad ? 0.09 : 0.02 + wetAmt*0.035 - tarAmt*0.006);
+  if(offRoad && poolIn > 0) a -= along*0.1*poolIn;          // out in the water off the road it drags hard: no short cut across a lake
   /* The mountain's mud is thick. It holds the car harder the faster it tries
      to go (the tyres and the body are pushing a bow wave of it), so in a
      bog you plough along with the engine screaming and the wheels flinging
