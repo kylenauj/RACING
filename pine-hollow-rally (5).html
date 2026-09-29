@@ -1101,19 +1101,19 @@ const TRACKS = [
        half:4.8, jumps:[[0.5,24,7,2.0,42]], tune:0, label:"MOUNTAIN TRACK", mainLabel:"MOUNTAIN STRAIGHT"}
     ]},
   { name:"WILLOW MARSH", after:"Zandvoort", relief:0.7, rollers:0.4, season:"swamp", cup:4,
-    blurb:"Zandvoort in the marsh: the main straight on a boardwalk, the Tarzan hairpin, round the tight left and up over the crest, fast down through the willows, a short boardwalk, through the water and round the long last corner",
+    blurb:"Zandvoort gone under the marsh: a third of the lap is in the water. Off the boardwalk and straight into it down the main straight, through the Tarzan hairpin in a spray, up over the dune crest, down into the water again, a short boardwalk, a long wade to the last corner and the whole of that corner under water",
     kit:["crest","rhythm","double"],
     shape:"WILLOW MARSH \u2014 over the dunes",
-    feature:"a boardwalk main straight into the Tarzan hairpin, a crest you jump, and a wade through the marsh",
+    feature:"a third of the lap in the water: five wades and two boardwalks across the marsh",
     ctrl:[[-320,300],[-100,300],[120,295],[280,285],[355,240],[330,170],[260,180],[180,140],[120,90],[140,30],[210,40],
           [280,-40],[300,-130],[260,-190],[150,-230],[40,-200],[-20,-260],[-100,-240],[-160,-170],[-260,-160],[-340,-80],
           [-380,60],[-380,200]],
     hills:[[300,-100,150,18],[150,-230,120,12],[-300,-120,150,8]],
     jumps:[[[10,298],1.6], [[200,290],2.2], [[290,-85],2.0], [[-382,130],2.2]],
     bigJumps:[[[200,-225],3.4], [[-300,-120],3.0]],
-    mud:[[[-340,-80],[-380,60]], [[120,90],[140,30]]],
+    mud:[[[120,90],[140,30]]],
     boardwalks:[[[-100,300],[120,295]], [[-20,-260],[-100,-240]]],
-    wades:[[[-160,-170],[-260,-160]], [[330,170],[262,180]], [[130,-228],[45,-202]]],
+    wades:[[[150,293],[272,287]], [[345,212],[195,148]], [[150,-230],[40,-205]], [[-150,-180],[-338,-86]], [[-380,20],[-378,212]]],
     cabins:4,
     widths:[[[-340,-80],[-380,200],11], [[180,140],[210,40],3.1], [[-100,-240],[-160,-170],3.2]],
     branches:[]}
@@ -3863,9 +3863,11 @@ MAIN.bwk = new Float32Array(MAIN.N);
     // the water stands a little below the lower bank; the road dips 0.55m under it in the middle
     const ya = MAIN.pts[wrapIdx(MAIN, a)].y, yb = MAIN.pts[wrapIdx(MAIN, b)].y;
     wLevel = Math.min(ya, yb) + BED - 0.5;
-    const L0 = n*seg, bed = wLevel - BED - 0.55;
-    for(let k=-Math.round(20/seg); k<=n + Math.round(20/seg); k++){
-      const u = k*seg, w = smoothstep(-20, 22, u)*(1 - smoothstep(L0 - 22, L0 + 20, u)), i = wrapIdx(MAIN, a + k);
+    const L0 = n*seg, bed = wLevel - BED - 0.55, E0 = Math.min(26, L0*0.3);
+    // (the dip in the road and the water over it ease in together, so there is never a
+    //  stretch of sunken road with no water on it)
+    for(let k=0; k<=n; k++){
+      const u = k*seg, w = smoothstep(E0*0.25, E0, u)*(1 - smoothstep(L0 - E0, L0 - E0*0.25, u)), i = wrapIdx(MAIN, a + k);
       MAIN.pts[i].y = MAIN.pts[i].y*(1 - w) + Math.min(MAIN.pts[i].y, bed)*w;
       if(w > 0.45){ MAIN.surf[i] = SURF.WATER; MAIN.wet[i] = Math.max(MAIN.wet[i], smoothstep(0.45, 0.8, w)); }
     }
@@ -3901,6 +3903,17 @@ function carveBoardwalks(y, x, z){
     if(w <= 0) continue;
     const bed = W.floor + 0.35*Math.sin(x*0.19 + z*0.13) + 0.25*Math.sin(x*0.07 - z*0.11);
     y = y*(1 - w) + Math.min(y, bed)*w;
+  }
+  /* and a bank round each one: no ground near a pool lies under its water unless it is in the
+     pool, so the water's edge is always a shore, never a sheet stopping in mid air */
+  for(const W of BOARDWALKS){
+    if(x < W.x0 || x > W.x1 || z < W.z0 || z > W.z1 || y >= W.level + 0.2) continue;
+    const m = bwMask(W, x, z);
+    if(m >= 0.5) continue;
+    let best = Infinity, bh = W.half;
+    for(const p of W.pts){ const d = (p.x - x)**2 + (p.z - z)**2; if(d < best){ best = d; bh = p.h; } }
+    const near = 1 - smoothstep(30 + bh, 42 + bh, Math.sqrt(best));
+    if(near > 0) y += (W.level + 0.2 - y)*near*(1 - m*2);
   }
   return y;
 }
@@ -11119,6 +11132,21 @@ function buildWagon(opts){
   const BELT = o.sport ? 0.83 : 0.92, ROOF = o.sport ? 1.29 : 1.46;
   const WSB = o.sport ? 1.08 : 1.18, WST = o.sport ? 0.1 : 0.42;     // windscreen foot and top, along the car
   const RT = o.sport ? -1.72 : -2.08, RB = o.sport ? -2.26 : -2.22;   // rear window top and foot
+  /* anything fixed to the flanks keeps out of the wheel openings: these are the
+     stretches of the side, between za and zb, that are clear of both arches (and
+     the flares round them) for a part whose lowest edge is at height y */
+  const ARCH_M = o.fender > 0 ? 0.15 : 0.05, ARCH_TOP = WR + (ARCH + ARCH_M)*0.95;
+  const sideSpans = (za, zb, y, m = ARCH_M) => {
+    const out = []; let a = za;
+    for (const cz of [AXLE_R, AXLE_F]) {
+      const r = ARCH + m, dy = (y - WR)/0.95, h = dy <= 0 ? r : dy >= r ? 0 : Math.sqrt(r*r - dy*dy);
+      if (h <= 0 || cz + h <= a || cz - h >= zb) continue;
+      if (cz - h > a) out.push([a, cz - h]);
+      a = Math.max(a, cz + h);
+    }
+    if (zb > a) out.push([a, zb]);
+    return out.filter(q => q[1] - q[0] > 0.12);
+  };
 
   // ---- Lower body with chunky low-poly wheel arches ----
   const body = [[-L, SILL]];
@@ -11158,7 +11186,7 @@ function buildWagon(opts){
     box(0.42, 0.05, 0.04, M.plastic, 0, BELT, 1.88);
     for (const s of [1, -1]) cyl(0.07, 0.05, 10, M.head, 'z', s * 0.62, 0.33, L + 0.17);   // fog lamps
     // black cladding along the sills and a lip under the nose
-    for (const s of [1, -1]) box(0.03, 0.16, 3.4, M.plastic, s * (SIDE + 0.012), 0.36, 0.05);
+    for (const s of [1, -1]) for (const [a, b] of sideSpans(-2.2, 2.2, 0.28)) box(0.03, 0.16, b - a, M.plastic, s * (SIDE + 0.012), 0.36, (a + b)/2);
     box(1.7, 0.04, 0.22, M.plastic, 0, 0.25, L + 0.12);
   } else {
     box(0.95, 0.2, 0.04, M.trim, 0, 0.62, 2.35);
@@ -11308,28 +11336,49 @@ function buildWagon(opts){
     box(0.07, 0.012, 0.03, M.chrome, W/2 - 0.1, H + 0.012, 0.03, j);
   };
   const spare = (x, y, z, axis) => { cyl(0.32, 0.2, 12, M.tire, axis, x, y, z); cyl(0.19, 0.205, 8, M.rim, axis, x, y, z); };
+  /* The roof is laid out front to back: the lamp bar across the front, then the
+     roof box, the tent, the spare and the cans, each in its own stretch. When it
+     won't all go the spare moves to the tailgate and the cans to the bumper, and
+     the box and the tent come in shorter. */
+  const tentOn = (opt.tent | 0) > 0;
+  const roofF = RZ0 - (A.lights ? 0.14 : 0), roofB = o.sport ? RZ1 + 0.1 : RZ1 - 0.12, roofL = roofF - roofB;
+  let spareUp = A.spare && A.rack, cansUp = A.cans && A.rack;
+  const flexL = (A.pod ? 0.8 : 0) + (tentOn ? 0.9 : 0);
+  const needL = () => flexL + (spareUp ? 0.7 : 0) + (cansUp ? 0.3 : 0);
+  if (needL() > roofL && spareUp) spareUp = false;
+  if (needL() > roofL && cansUp) cansUp = false;
+  const flexK = flexL > 0 ? Math.max(0.6, Math.min(1, (roofL - (spareUp ? 0.7 : 0) - (cansUp ? 0.3 : 0))/flexL)) : 1;
+  let roofZ = roofF;
+  const roofSlot = len => { const z = roofZ - len/2; roofZ -= len; return z; };
+  const podL = 0.8*flexK - 0.04, podZ = A.pod ? roofSlot(0.8*flexK) : 0;
+  const tentL = 0.9*flexK - 0.04, tentZ = tentOn ? roofSlot(0.9*flexK) : 0;
+  const spareZ = spareUp ? roofSlot(0.7) : 0;
+  const cansZ = cansUp ? roofSlot(0.3) : 0;
   if (A.spare) {
-    if (A.rack) { spare(-0.1, RY + 0.16, RZM, 'y'); box(0.05, 0.012, 0.66, M.strap, -0.1, RY + 0.266, RZM); }
+    if (spareUp) { spare(-0.1, RY + 0.16, spareZ, 'y'); box(0.05, 0.012, 0.66, M.strap, -0.1, RY + 0.266, spareZ); }
     else spare(0, 0.62, REAR - 0.16, 'z');                                  // hung on the tailgate
   }
   if (A.cans) {
-    if (A.rack) {
+    if (cansUp) {
       // stood side by side in a tray at the back of the rack, strapped in
-      const cz = RZ1 + 0.2;
+      const cz = cansZ;
       box(0.84, 0.02, 0.24, M.trim, 0, RY + 0.07, cz);
       jerry(0.2, RY + 0.08, cz, M.jerry); jerry(-0.2, RY + 0.08, cz, M.jerryR);
       box(0.86, 0.03, 0.012, M.strap, 0, RY + 0.33, cz - 0.09);
     } else for (const s of [1, -1]) {
       // standing on the rear bumper either side of the tailgate, in a bracket
-      jerry(s * 0.49, 0.435, REAR - 0.11, s > 0 ? M.jerry : M.jerryR);
-      box(0.36, 0.03, 0.012, M.strap, s * 0.49, 0.72, REAR - 0.2);
-      box(0.02, 0.36, 0.02, M.trim, s * 0.67, 0.62, REAR - 0.05);
+      const cy = o.safari ? 0.47 : 0.435;
+      jerry(s * 0.52, cy, REAR - 0.11, s > 0 ? M.jerry : M.jerryR);
+      box(0.36, 0.03, 0.012, M.strap, s * 0.52, cy + 0.285, REAR - 0.2);
+      box(0.02, 0.36, 0.02, M.trim, s * 0.7, cy + 0.185, REAR - 0.05);
     }
   }
   if (A.shovel) {
-    // strapped along the rack, or down the passenger side
+    // strapped along the rack, or down the passenger side; with a box or a tent
+    // taking the middle it hangs blade-down on the outside of the rail instead
     const sh = new THREE.Group(); car.add(sh);
-    if (A.rack) sh.position.set(0.52, RY + 0.08, RZM);
+    if (A.pod || tentOn) { sh.position.set(A.rack ? 0.73 : 0.8, (A.rack ? RY : ROOF + 0.06) - 0.02, RZM); sh.rotation.z = Math.PI/2; }
+    else if (A.rack) sh.position.set(0.52, RY + 0.08, RZM);
     else {
       sh.position.set(0.5, ROOF + 0.06, (WST + RT)/2);
       for (const dz of [-0.35, 0.3]) box(0.08, 0.04, 0.05, M.plastic, 0.5, ROOF + 0.03, (WST + RT)/2 + dz);
@@ -11349,16 +11398,17 @@ function buildWagon(opts){
   }
   if (A.bull) {
     // a steel push bar in front of the bumper
-    for (const s of [1, -1]) cyl(0.035, 0.5, 6, M.plastic, 'y', s * 0.42, 0.55, L + 0.24);
-    cyl(0.035, 0.9, 6, M.plastic, 'x', 0, 0.78, L + 0.24);
-    cyl(0.035, 1.1, 6, M.plastic, 'x', 0, 0.42, L + 0.28);
+    const bz = L + (o.safari ? 0.32 : 0.24);
+    for (const s of [1, -1]) cyl(0.035, 0.5, 6, M.plastic, 'y', s * 0.42, 0.55, bz);
+    cyl(0.035, 0.9, 6, M.plastic, 'x', 0, 0.78, bz);
+    cyl(0.035, 1.1, 6, M.plastic, 'x', 0, 0.42, bz + 0.04);
   }
   if (A.pod) {
     // a hard-shell roof box, clamped to the front of the rack (or straight onto the roof)
-    const py = A.rack ? RY + 0.05 : ROOF + 0.04, pz = RZ0 - 0.55;
-    box(0.98, 0.24, 0.8, M.pod, 0, py + 0.12, pz);
-    box(0.9, 0.07, 0.72, M.pod, 0, py + 0.27, pz);
-    for (const s of [1, -1]) box(0.02, 0.03, 0.55, M.trim, s * 0.5, py + 0.15, pz);
+    const py = A.rack ? RY + 0.05 : ROOF + 0.04, pz = podZ;
+    box(0.98, 0.24, podL, M.pod, 0, py + 0.12, pz);
+    box(0.9, 0.07, podL - 0.08, M.pod, 0, py + 0.27, pz);
+    for (const s of [1, -1]) box(0.02, 0.03, podL*0.7, M.trim, s * 0.5, py + 0.15, pz);
   }
   if (A.tape) {
     // rally tape: a black X across each headlamp, against stones
@@ -11369,11 +11419,16 @@ function buildWagon(opts){
   }
   // ---- the woodie: wood panels down both flanks and across the tailgate, framed in ash ----
   if (o.woodie) {
+    const wz0 = -2.18, wz1 = 1.35, panels = sideSpans(wz0, wz1, 0.49).filter(q => q[1] - q[0] > 0.4);
     for (const s of [1, -1]) {
-      const x = s * (SIDE + 0.008);
-      box(0.012, 0.3, 3.3, M.woodP, x, 0.64, -0.3);
-      for (const y of [0.49, 0.79]) box(0.02, 0.05, 3.36, M.ash, s * (SIDE + 0.014), y, -0.3);
-      for (const z of [1.34, 0.06, -1.14, -1.94]) box(0.02, 0.34, 0.05, M.ash, s * (SIDE + 0.014), 0.64, z);
+      const x = s * (SIDE + 0.008), xa = s * (SIDE + 0.014);
+      for (const [a, b] of panels) {
+        box(0.012, 0.3, b - a, M.woodP, x, 0.64, (a + b)/2);
+        box(0.02, 0.05, b - a + 0.04, M.ash, xa, 0.49, (a + b)/2);
+        for (const z of [a + 0.02, b - 0.02]) box(0.02, 0.34, 0.05, M.ash, xa, 0.64, z);
+        for (const z of [0.06, -1.14]) if (z > a + 0.2 && z < b - 0.2) box(0.02, 0.34, 0.05, M.ash, xa, 0.64, z);
+      }
+      for (const [a, b] of sideSpans(wz0, wz1, 0.765).filter(q => q[1] - q[0] > 0.4)) box(0.02, 0.05, b - a + 0.04, M.ash, xa, 0.79, (a + b)/2);
     }
     box(1.2, 0.3, 0.012, M.woodP, 0, 0.66, REAR - 0.004);
     for (const y of [0.5, 0.82]) box(1.26, 0.04, 0.02, M.ash, 0, y, REAR - 0.01);
@@ -11381,15 +11436,18 @@ function buildWagon(opts){
   // ---- the safari: running boards, and a snorkel up the passenger's pillar ----
   if (o.safari) {
     for (const s of [1, -1]) {
-      box(0.22, 0.04, 2.0, M.matte, s * (SIDE + 0.12), 0.28, 0.05);
-      for (const z of [0.8, -0.7]) box(0.14, 0.12, 0.05, M.matte, s * (SIDE + 0.06), 0.33, z);
+      const [a, b] = sideSpans(-1.2, 1.2, 0, ARCH_M + 0.08)[0];
+      box(0.22, 0.04, b - a, M.matte, s * (SIDE + 0.12), 0.28, (a + b)/2);
+      for (const z of [b - 0.2, a + 0.2]) box(0.14, 0.12, 0.05, M.matte, s * (SIDE + 0.06), 0.33, z);
     }
   }
   if (o.safari || A.snorkel) {
-    const sx = -(SIDE + 0.07), sz = WSB - 0.22;
-    cyl(0.055, ROOF + 0.12 - 0.62, 8, M.plastic, 'y', sx, (ROOF + 0.12 + 0.62)/2, sz);
+    // it runs up the pillar behind the mirror and into the body just under the
+    // waist, behind the front arch and its flare, so the wheel turns clear of it
+    const sx = -(SIDE + 0.07), sz = Math.min(WSB - 0.32, AXLE_F - ARCH - ARCH_M - 0.12), sb = BELT - 0.1;
+    cyl(0.055, ROOF + 0.12 - sb, 8, M.plastic, 'y', sx, (ROOF + 0.12 + sb)/2, sz);
     box(0.16, 0.12, 0.2, M.plastic, sx, ROOF + 0.16, sz + 0.05);
-    box(0.12, 0.06, 0.3, M.plastic, sx + 0.04, 0.62, sz + 0.1);
+    box(0.13, 0.08, 0.22, M.plastic, sx + 0.03, sb, sz - 0.05);
   }
   // ---- the hood ----
   if ((opt.hood | 0) === 1) box(1.5, 0.01, o.sport ? 0.9 : 1.05, M.matte, 0, BELT + 0.014, o.sport ? 1.65 : 1.72).rotation.x = 0.08;
@@ -11397,38 +11455,48 @@ function buildWagon(opts){
   if ((opt.hood | 0) === 3) for (const s of [1, -1]) box(0.3, 0.012, 0.9, M.matte, s * 0.45, BELT + 0.016, 1.72).rotation.x = 0.08;   // louvred vents
   // ---- decals ----
   const decal = opt.decal | 0;
+  const DX = o.woodie ? 0.025 : o.sport ? 0.02 : 0;   // stand the stickers off the woodie's panels and the sport's cladding
   if (decal === 1) {
     // sponsor stickers on the doors and the back glass
     for (const s of [1, -1]) {
-      const x = s * (SIDE + 0.01);
+      const x = s * (SIDE + 0.01 + DX);
       box(0.01, 0.12, 0.5, M.decA, x, 0.74, 0.3); box(0.01, 0.08, 0.34, M.decB, x, 0.58, 0.25);
-      box(0.01, 0.1, 0.4, M.decC, x, 0.72, -0.75); box(0.01, 0.07, 0.28, M.white, x, 0.58, -0.8);
+      // the rear door carries the rally roundel when there is one
+      if (o.livery !== 2) { box(0.01, 0.1, 0.4, M.decC, x, 0.72, -0.6); box(0.01, 0.07, 0.28, M.white, x, 0.58, -0.62); }
     }
     box(0.6, 0.08, 0.01, M.decA, 0, BELT + 0.12, RB - 0.02);
   } else if (decal === 2) {
     // hot rod flames licking back from the front wheels
     const fl = new THREE.Shape(); fl.moveTo(0, 0);
     [[0.35, 0.12], [0.55, 0.02], [0.8, 0.16], [1.05, 0.05], [1.35, 0.2], [1.1, 0.26], [0.85, 0.22], [0.6, 0.3], [0.3, 0.24], [0, 0.3]].forEach(p=> fl.lineTo(p[0], p[1]));
-    const flG = new THREE.ShapeGeometry(fl);
+    // they start just behind the front arch, so they never paint across the wheel
+    const flG = new THREE.ShapeGeometry(fl), fz = sideSpans(-2, 2.2, 0.5).find(q => q[0] < 0 && q[1] > 0)[1] - 0.02;
+    const fk = o.livery === 2 ? Math.min(1, (fz + 0.22)/1.35) : 1;    // short of the roundel
     for (const s of [1, -1]) for (const [m, k, dy] of [[M.flameO, 1, 0], [M.flameY, 0.7, 0.05]]) {
-      const f = add(flG, m, s * (SIDE + 0.012 + (k < 1 ? 0.004 : 0)), 0.5 + dy, 2.2, car);
-      f.rotation.y = s > 0 ? Math.PI/2 : -Math.PI/2; f.scale.set(k, k, 1);
-      if (s < 0) { f.rotation.y = -Math.PI/2; f.position.z = 2.2; f.scale.x = -k; }
+      const f = add(flG, m, s * (SIDE + 0.012 + DX + (k < 1 ? 0.004 : 0)), 0.5 + dy, fz, car);
+      f.rotation.y = s > 0 ? Math.PI/2 : -Math.PI/2; f.scale.set(k*fk, k, 1);
+      if (s < 0) { f.rotation.y = -Math.PI/2; f.scale.x = -k*fk; }
     }
   } else if (decal === 3) {
     // a chequered band along each sill
-    for (const s of [1, -1]) for (let i = 0; i < 26; i++) for (const r of [0, 1])
-      box(0.01, 0.06, 0.13, (i + r) % 2 ? M.trim : M.white, s * (SIDE + 0.01), 0.42 + r*0.06, -1.7 + i*0.13);
+    // squares only where the sill is solid: none across the wheel openings
+    for (const [a, b] of sideSpans(-2.2, 2.15, 0.39)) {
+      const n = Math.floor((b - a)/0.13), a0 = (a + b)/2 - n*0.065;
+      for (const s of [1, -1]) for (let i = 0; i < n; i++) for (const r of [0, 1])
+        box(0.01, 0.06, 0.13, (i + r) % 2 ? M.trim : M.white, s * (SIDE + 0.01 + DX), 0.42 + r*0.06, a0 + 0.065 + i*0.13);
+    }
   }
   // ---- the kit: ladder, tent, exhaust, whip aerial ----
   if (A.ladder) {
-    const lx = -(SIDE + 0.05);
-    for (const z of [-1.95, -1.65]) cyl(0.02, ROOF - 0.35, 6, M.trim, 'y', lx, (ROOF + 0.45)/2 + 0.05, z);
-    for (let y = 0.5; y < ROOF; y += 0.18) cyl(0.015, 0.3, 6, M.trim, 'z', lx, y, -1.8);
+    // up the back corner from just above the rear arch, clear of the wheel
+    // (on the sport, whose roof ends sooner, it climbs just ahead of the hatch)
+    const lx = -(SIDE + 0.05), ly = ARCH_TOP + 0.04, lz = o.sport ? -1.42 : -1.8;
+    for (const z of [lz - 0.15, lz + 0.15]) cyl(0.02, ROOF + 0.1 - ly, 6, M.trim, 'y', lx, (ROOF + 0.1 + ly)/2, z);
+    for (let y = ly + 0.06; y < ROOF; y += 0.16) cyl(0.015, 0.3, 6, M.trim, 'z', lx, y, lz);
   }
   if ((opt.tent | 0) > 0) {
     // a folded rooftop tent in its hard cover, on the back half of the roof
-    const ty = A.rack ? RY + 0.05 : ROOF + 0.05, z0 = RZ1 + 0.35, z1 = RZ1 + 1.25;
+    const ty = A.rack ? RY + 0.05 : ROOF + 0.05, z0 = tentZ - tentL/2, z1 = tentZ + tentL/2;
     box(1.34, 0.26, z1 - z0, M.tent, 0, ty + 0.13, (z0 + z1)/2);
     box(1.36, 0.03, z1 - z0 + 0.02, M.matte, 0, ty + 0.27, (z0 + z1)/2);
     box(1.36, 0.02, 0.02, M.white, 0, ty + 0.14, z1 + 0.005);
@@ -11438,9 +11506,10 @@ function buildWagon(opts){
   if (ex === 1) for (const s of [1, -1]) for (const d of [-0.06, 0.06]) cyl(0.045, 0.2, 10, M.chrome, 'z', s * 0.55 + d, 0.22, -2.5);
   if (ex === 2) for (const s of [1, -1]) {
     // side pipes along the sills, chrome, with a heat shield over them
-    cyl(0.055, 1.6, 10, M.chrome, 'z', s * (SIDE + 0.1), 0.3, -0.1);
-    box(0.08, 0.03, 1.2, M.matte, s * (SIDE + 0.1), 0.37, -0.1);
-    cyl(0.065, 0.08, 10, M.trim, 'z', s * (SIDE + 0.1), 0.3, -0.92);
+    const [a, b] = sideSpans(-1.2, 1.2, 0, ARCH_M + 0.06)[0], py = o.safari ? 0.19 : 0.3;
+    cyl(0.055, b - a - 0.08, 10, M.chrome, 'z', s * (SIDE + 0.1), py, (a + b)/2);
+    box(0.08, 0.03, (b - a)*0.7, M.matte, s * (SIDE + 0.1), py + 0.07, (a + b)/2);
+    cyl(0.065, 0.08, 10, M.trim, 'z', s * (SIDE + 0.1), py, a + 0.06);
   }
   if (A.whip) {
     // a whip aerial on the back corner with a pennant on top, for being seen over the dunes
@@ -11466,14 +11535,16 @@ function buildWagon(opts){
   // ---- livery ----
   if (o.livery === 1) {
     for (const x of [-0.18, 0.18]) {
-      box(0.16, 0.008, 1.1, M.stripe, x, BELT + 0.008, 1.7).rotation.x = 0.08;
+      box(0.16, 0.008, 1.1, M.stripe, x, BELT + ((opt.hood | 0) === 1 ? 0.02 : 0.008), 1.7).rotation.x = 0.08;
       box(0.16, 0.008, WST - RT + 0.15, M.stripe, x, ROOF + 0.045, (WST + RT)/2);
     }
   } else if (o.livery === 2) {
+    const LX = o.woodie ? 0.025 : 0;
     for (const s of [1, -1]) {
-      cyl(0.24, 0.012, 16, M.stripe, 'x', s * 0.912, 0.62, -0.5);
-      box(0.013, 0.3, 0.07, M.plastic, s * 0.915, 0.62, -0.5);            // a "1" on the roundel
-      box(0.012, 0.06, 3.9, M.stripe, s * 0.911, 0.42, 0);
+      cyl(0.24, 0.012, 16, M.stripe, 'x', s * (0.912 + LX), 0.62, -0.5);
+      box(0.013, 0.3, 0.07, M.plastic, s * (0.915 + LX), 0.62, -0.5);            // a "1" on the roundel
+      // the sill stripe gives way to the chequers when they're on
+      if ((opt.decal | 0) !== 3) for (const [a, b] of sideSpans(-2.2, 2.2, 0.39)) box(0.012, 0.06, b - a, M.stripe, s * (0.911 + LX), 0.42, (a + b)/2);
     }
   }
 
