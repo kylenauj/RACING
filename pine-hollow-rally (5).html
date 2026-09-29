@@ -116,7 +116,9 @@
     transform:skewX(-9deg);transition:transform .08s,background .08s;
   }
   .item > *{transform:skewX(9deg);}
-  .item small{font-family:var(--body);font-weight:600;font-size:.72em;letter-spacing:0;color:#b9cdb4;}
+  .item small{font-family:var(--body);font-weight:600;font-size:.72em;letter-spacing:0;color:#b9cdb4;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+  .item > span:first-child,.item .tro + span{white-space:nowrap;}
   .item.sel{color:var(--ink);background:var(--signal);transform:skewX(-9deg) translateX(10px);}
   .item.sel small{color:#3a2c08;}
   .item:focus-visible{outline:3px solid #fff;outline-offset:3px;}
@@ -10098,39 +10100,71 @@ function snowify(g){
   return g;
 }
 /* ---- the Swamp Cup's trees (unit height, vertex coloured, like the conifers) ---- */
-/* a weeping willow: a short leaning trunk forking into a few limbs, a loose dome
-   of crown, and a curtain of long strands hanging from its rim almost to the ground */
+/* a weeping willow: a stout leaning trunk forking into arching limbs, and off them a
+   cascade of drooping crowns, each a soft dome that flows down into a skirt of hanging
+   leaves with a ragged fringe, layered round a big central one so the whole tree reads
+   as curtains falling over curtains almost to the ground */
 function willowGeometry(){
   const pos = [], col = [], c = new THREE.Color(), R = (a, b)=> a + Math.random()*(b - a);
   const put = (geo, shade)=>{ const g = geo.index ? geo.toNonIndexed() : geo, a = g.attributes.position;
     for(let i=0;i<a.count;i++){ pos.push(a.getX(i), a.getY(i), a.getZ(i)); shade(a.getY(i)); col.push(c.r, c.g, c.b); } };
-  const lean = R(-0.06, 0.06);
-  const trunk = new THREE.CylinderGeometry(0.035, 0.06, 0.34, 7); trunk.translate(lean*0.5, 0.17, 0);
-  put(trunk, ()=> c.setHSL(0.08, 0.22, 0.17 + Math.random()*0.05));
-  for(let k=0;k<4;k++){                                   // the limbs, forking out and up
-    const a = k/4*Math.PI*2 + R(0, 0.8), l = new THREE.CylinderGeometry(0.012, 0.028, 0.34, 5);
-    l.translate(0, 0.17, 0); l.rotateZ(0.55 + R(0, 0.25)); l.rotateY(a); l.translate(lean, 0.3, 0);
-    put(l, ()=> c.setHSL(0.08, 0.2, 0.2));
+  const tri = (A, B, C, ca, cb, cc)=>{ pos.push(...A, ...B, ...C); col.push(...ca, ...cb, ...cc); };
+  const hsl = (h, s2, l)=>{ c.setHSL(h, s2, Math.max(0.04, l)); return [c.r, c.g, c.b]; };
+  const lean = R(-0.07, 0.07), lz = R(-0.04, 0.04);
+  // the trunk, thick at the foot, and the limbs arching out of its fork
+  const trunk = new THREE.CylinderGeometry(0.045, 0.085, 0.42, 8); trunk.translate(0, 0.21, 0);
+  { const tp = trunk.attributes.position; for(let v=0; v<tp.count; v++){ const y = tp.getY(v); tp.setX(v, tp.getX(v) + y*lean*1.2); tp.setZ(v, tp.getZ(v) + y*lz*1.2); } }
+  put(trunk, y=> c.setHSL(0.07, 0.2, 0.15 + y*0.12 + Math.random()*0.03));
+  const fork = [lean*0.5, 0.4, lz*0.5];
+  for(let k=0;k<5;k++){
+    const a = k/5*Math.PI*2 + R(-0.3, 0.3), l = new THREE.CylinderGeometry(0.012, 0.03, 0.3, 5);
+    l.translate(0, 0.15, 0); l.rotateZ(0.7 + R(0, 0.35)); l.rotateY(a); l.translate(...fork);
+    put(l, ()=> c.setHSL(0.07, 0.18, 0.2));
   }
-  for(let k=0;k<15;k++){                                  // the crown: a full, soft dome
-    const a = k/15*Math.PI*2 + R(0, 0.4), rr = k < 3 ? R(0, 0.1) : R(0.16, 0.34), r = R(0.13, 0.2);
-    const b = new THREE.IcosahedronGeometry(r, 1); b.scale(1.15, 0.72, 1.15);
-    b.translate(lean + Math.cos(a)*rr, 0.64 + R(0, 0.08) - rr*0.3, Math.sin(a)*rr);
-    put(b, y=> c.setHSL(0.2 + Math.random()*0.05, 0.42 + Math.random()*0.15, 0.28 + (y - 0.5)*0.5 + Math.random()*0.06));
+  const hue = R(0.19, 0.23);
+  /* one drooping crown: a low dome over a rim, a skirt that bells out a little and falls,
+     and a hem cut into long and short points; a dark core inside fills the gaps */
+  const crown = (cx, cy, cz, r, drop, lit)=>{
+    const N = 14, rim = [], mid = [], tip = [], apex = [cx, cy + r*0.55, cz], sp = R(0, 1);
+    for(let n=0;n<N;n++){
+      const a = sp + n/N*Math.PI*2, ca = Math.cos(a), sa = Math.sin(a), rr = r*R(0.92, 1.08);
+      rim.push([cx + ca*rr, cy + R(-0.02, 0.02), cz + sa*rr]);
+      mid.push([cx + ca*rr*1.13, cy - drop*R(0.38, 0.5), cz + sa*rr*1.13]);
+      const at = a + Math.PI/N, ct = Math.cos(at), st = Math.sin(at);
+      tip.push([cx + ct*rr*1.08, cy - drop*(n % 2 ? R(0.72, 0.88) : R(0.95, 1.12)), cz + st*rr*1.08]);
+    }
+    const top = hsl(hue - 0.01, 0.52, 0.44*lit), up = hsl(hue, 0.5, 0.36*lit), mi = hsl(hue + 0.01, 0.47, 0.27*lit), lo = hsl(hue + 0.02, 0.45, 0.17*lit);
+    for(let n=0;n<N;n++){
+      // (every other fall of leaves a shade lighter, so the skirt reads as hanging strands)
+      const m = (n + 1) % N, band = n % 2 ? 0.84 : 1.12, jit = ()=> band*R(0.93, 1.07), J = v=> v.map(x=> x*jit());
+      tri(apex, rim[m], rim[n], top, J(up), J(up));                          // the dome
+      tri(rim[n], rim[m], mid[m], J(up), J(up), J(mi));                      // the skirt
+      tri(rim[n], mid[m], mid[n], J(up), J(mi), J(mi));
+      tri(mid[n], mid[m], tip[n], J(mi), J(mi), lo);                         // the fringe
+    }
+    // the dark heart of it, so you never see sky through the notches in the hem
+    const core = new THREE.IcosahedronGeometry(r*0.92, 0); core.scale(1, (drop*0.7)/(r*0.92), 1); core.translate(cx, cy - drop*0.38, cz);
+    put(core, ()=> c.setHSL(hue + 0.03, 0.4, 0.1*lit));
+  };
+  const cx = lean*0.9, cz = lz*0.9;
+  crown(cx, 0.8, cz, 0.3, 0.52, 1.08);                                     // the big one on top
+  const n2 = 6;
+  for(let k=0;k<n2;k++){                                                  // falling away round it
+    const a = k/n2*Math.PI*2 + R(-0.25, 0.25), d = R(0.2, 0.3);
+    crown(cx + Math.cos(a)*d, R(0.6, 0.7), cz + Math.sin(a)*d, R(0.17, 0.23), R(0.36, 0.48), R(0.88, 1.0));
   }
-  /* the curtain: a couple of hundred fine strands off the rim of the dome, each running out a
-     little and then hanging straight down, most of the way to the ground */
-  const sp = [];
-  for(let k=0;k<230;k++){
-    const a = Math.random()*Math.PI*2, rr = R(0.2, 0.46), top = 0.74 - rr*0.42 + R(-0.03, 0.03);
-    const len = R(0.34, 0.6), w = R(0.009, 0.018), ox = Math.cos(a), oz = Math.sin(a), tx = -oz*w, tz = ox*w;
-    const P0 = [lean + ox*rr, top, oz*rr], P1 = [P0[0] + ox*0.05, top - len*0.3, P0[2] + oz*0.05], P2 = [P1[0] + ox*0.012, Math.max(0.04, top - len), P1[2] + oz*0.012];
-    const seg = (A, B, wa, wb)=> sp.push(A[0] - tx*wa, A[1], A[2] - tz*wa,  A[0] + tx*wa, A[1], A[2] + tz*wa,  B[0] + tx*wb, B[1], B[2] + tz*wb,
-                                        A[0] - tx*wa, A[1], A[2] - tz*wa,  B[0] + tx*wb, B[1], B[2] + tz*wb,  B[0] - tx*wb, B[1], B[2] - tz*wb);
-    seg(P0, P1, 1, 0.85); seg(P1, P2, 0.85, 0.3);
+  for(let k=0;k<3;k++){                                                   // and a few peeking out on top
+    const a = Math.random()*Math.PI*2, d = R(0.06, 0.14);
+    crown(cx + Math.cos(a)*d, R(0.88, 0.95), cz + Math.sin(a)*d, R(0.12, 0.16), R(0.14, 0.2), 1.15);
   }
-  { const g2 = new THREE.BufferGeometry(); g2.setAttribute("position", new THREE.Float32BufferAttribute(sp, 3));
-    put(g2, y=> c.setHSL(0.19 + Math.random()*0.05, 0.5, 0.26 + (0.7 - y)*0.25 + Math.random()*0.05)); }
+  // loose strands hanging past the hem, catching the light
+  for(let k=0;k<44;k++){
+    const a = Math.random()*Math.PI*2, rr = R(0.3, 0.5), topY = R(0.36, 0.5), len = R(0.1, 0.2), w = R(0.008, 0.014);
+    const x = cx + Math.cos(a)*rr, z = cz + Math.sin(a)*rr, tx = -Math.sin(a)*w, tz = Math.cos(a)*w;
+    const cl = hsl(hue, 0.5, R(0.24, 0.34)), ce = hsl(hue + 0.01, 0.5, R(0.3, 0.4));
+    tri([x - tx, topY, z - tz], [x + tx, topY, z + tz], [x, Math.max(0.05, topY - len), z], cl, cl, ce);
+    tri([x + tx, topY, z + tz], [x - tx, topY, z - tz], [x, Math.max(0.05, topY - len), z], cl, cl, ce);
+  }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
@@ -14492,14 +14526,15 @@ function drawHUDInner(dt, alongNow){
   } else {
     const rb = recordFor().bestLap;
     hudText("RECORD LAP", W-12*k, 20*k, UI.label, UI.dim, "right");
-    hudText(rb != null ? fmt(rb) : "--'--\"--", W-10*k, 50*k, UI.value*0.8, UI.ink, "right");
+    hudText(rb != null ? fmt(rb) : "\u2014", W-10*k, 50*k, UI.value*0.8, UI.ink, "right");
   }
-  hudText("BEST TIME", W-12*k, 72*k, UI.label, UI.dim, "right");
+  // the best laps so far this race: nothing until there is one
   const top = state.lapTimes.slice().sort((x,y)=>x-y).slice(0,3);
-  for(let i=0;i<3;i++){
+  if(top.length) hudText(top.length > 1 ? "BEST LAPS" : "BEST LAP", W-12*k, 72*k, UI.label, UI.dim, "right");
+  for(let i=0;i<top.length;i++){
     const y = (88 + i*15)*k;
     hudText(String(i+1), W-84*k, y, UI.label, UI.key, "right");
-    hudText(top[i] !== undefined ? fmt(top[i]) : "--'--\"--", W-10*k, y, UI.small, UI.ink, "right");
+    hudText(fmt(top[i]), W-10*k, y, UI.small, UI.ink, "right");
   }
 
   }
@@ -15367,11 +15402,22 @@ function drawLights(lit, green){
     }
   }
 }
-function drawBig(text, y, size, col, scale, alpha){
+function drawBig(text, y, size, col, scale, alpha, plate){
   hud.save();
   hud.globalAlpha = alpha;
   hud.translate(HUD_W/2, y);
   hud.scale(scale, scale);
+  if(plate){
+    // the big calls sit on a slanted ink plate, like the menus, so the scenery never reads through them
+    const k = HK, px = size*k*1.12;
+    hud.font = 'italic 800 ' + Math.round(px) + 'px "Saira Condensed", "Arial Narrow", Arial, sans-serif';
+    const w = hud.measureText(text).width + 44*k, h = px*1.05, sk = h*0.16, top = -px*0.86;
+    const slab = (dx, dy, fill)=>{ hud.beginPath(); hud.moveTo(-w/2 + sk + dx, top + dy); hud.lineTo(w/2 + sk + dx, top + dy);
+      hud.lineTo(w/2 - sk + dx, top + h + dy); hud.lineTo(-w/2 - sk + dx, top + h + dy); hud.closePath(); hud.fillStyle = fill; hud.fill(); };
+    slab(5*k, 5*k, "#000");
+    slab(0, 0, "rgba(15,36,25,.92)");
+    hud.lineWidth = 3*k; hud.strokeStyle = "#000"; hud.stroke();
+  }
   hudText(text, 0, 0, size, col, "center");
   hud.restore();
 }
@@ -15394,7 +15440,7 @@ function drawOverlay(dt){
   if(BANNER.t < BANNER.dur){
     const tIn = Math.min(1, BANNER.t/0.14);
     const a = Math.min(1, (BANNER.dur - BANNER.t)/0.35);
-    drawBig(BANNER.text, H*0.36, UI.value*1.6, BANNER.col, 1.5 - tIn*0.5, a);
+    drawBig(BANNER.text, H*0.36, UI.value*1.6, BANNER.col, 1.5 - tIn*0.5, a, true);
     if(BANNER.sub) drawBig(BANNER.sub, H*0.36 + 26*k, UI.small*1.3, BANNER.subCol, 1, a);
   }
   if(SPLIT.t > 0 && !(BANNER.t < BANNER.dur)){
@@ -15791,18 +15837,17 @@ function drawThumb(cv, id){
 function trackFacts(id){
   const t = TRACKS[id], rec = SAVE.records[t.name] || {};
   if(t.expedition) return '<div class="facts">' + [["Trail", (trackThumb(id).len/1000).toFixed(2) + " km round"], ["Camps", String((t.camps || []).length)],
-    ["Best climb", rec.summit != null ? fmt(rec.summit) : "none yet"]].map(b => '<span>' + b[0] + '<b>' + esc(b[1]) + '</b></span>').join("") + '</div>';
+    ["Best climb", rec.summit != null ? fmt(rec.summit) : "\u2014"]].map(b => '<span>' + b[0] + '<b>' + esc(b[1]) + '</b></span>').join("") + '</div>';
   const bits = [["Length", (trackThumb(id).len/1000).toFixed(2) + " km"]];
   if(id === TRACK_ID) bits.push(["Typical lap", fmt(LAP_TEST.lap)]);
-  bits.push(["Best lap", rec.bestLap != null ? fmt(rec.bestLap) : "none yet"]);
+  bits.push(["Best lap", rec.bestLap != null ? fmt(rec.bestLap) : "\u2014"]);
   if(rec.race5 != null) bits.push(["Best 5 laps", fmt(rec.race5)]);
   if(rec.race3 != null) bits.push(["Best 3 laps", fmt(rec.race3)]);
   return '<div class="facts">' + bits.map(b => '<span>' + b[0] + '<b>' + esc(b[1]) + '</b></span>').join("") + '</div>';
 }
 function detailHTML(id){
   const t = TRACKS[id];
-  const blurb = t.blurb.charAt(0).toUpperCase() + t.blurb.slice(1) + ".";
-  return '<h3>' + esc(t.name) + '</h3><p>' + esc(blurb) + ' Laid out after ' + esc(t.after) + '.</p>' + trackFacts(id);
+  return '<h3>' + esc(t.name) + '</h3>' + trackFacts(id);
 }
 function standingsRows(){
   const C = SAVE.champ;
@@ -15843,40 +15888,23 @@ function showTitle(){
   UIEL.firstChild.addEventListener("click", ()=>{ if(MENU.id === "scTitle"){ startAudio(); SFX.ok(); showMain(); } });
 }
 
-const MODE_DESC = {
-  champ:"Five cups: Summer, Fall, Winter, Desert and the Swamp Cup, four rounds each. Three laps a round against the same three drivers, points 10, 6, 4 and 3, saved between sessions.",
-  race:"Any circuit, five laps, the full field.",
-  trial:"Three laps with the road to yourself. Your best lap on each circuit is saved and comes back as a ghost to chase.",
-  exped:"No rivals, no laps, no map: a long day's climb. Wade the swamp, run up the creek, grind up the switchbacks and over the snow to the summit cairn, calling at every camp on the way; the compass points to the next one. The car is in low range, the mud holds you and anything steeper than about half is a wall, so pick your line."
-};
 function showMain(sel){
-  const C = SAVE.champ;
-  const champSub = C && !C.done ? CUPS[C.cup || 0].name + ", round " + (C.round+1) + " of " + CHAMP_ROUNDS.length : "";
-  const DESC = {
-    solo:"On your own against the computer: the championship cups, a quick race on any circuit, time trials against your own ghost, and the long expeditions.",
-    multi:"Race your friends over the internet: host a room, share the code or the link, see who has joined in the lobby, then the host picks the circuit and everyone races it live. Three laps, and your best lap goes on the circuit's leaderboard.",
-    garage:"Pick your wagon (box, sport, woodie or safari), then its paint, roof, decals, lamps and underglow, its rims and tyres, and the kit: rack, tent, snorkel, ladder, lamps and more. Saved for every race.",
-    opts:"Rival pace, sound, camera, gearbox and the arcade filter.",
-    help:"Keyboard and gamepad controls, and how the drift turbo works."
-  };
   openScreen("scMain",
     '<div class="cols"><div class="left">' +
     '<div class="logo2" style="margin-bottom:22px">' + logoImg("small") + '</div>' +
     '<div class="menu">' +
-    '<button class="item" data-act="solo" data-k="solo"><span>SINGLE PLAYER</span><small>' + (champSub || "championship, race, time trial, expedition") + '</small></button>' +
-    '<button class="item" data-act="multi" data-k="multi"><span>MULTIPLAYER</span><small>' + (NET.on ? "back to your room" : "race friends online") + '</small></button>' +
+    '<button class="item" data-act="solo" data-k="solo"><span>SINGLE PLAYER</span></button>' +
+    '<button class="item" data-act="multi" data-k="multi"><span>MULTIPLAYER</span></button>' +
     '<button class="item" data-act="garage" data-k="garage"><span>GARAGE</span></button>' +
     '<button class="item" data-act="opts" data-k="opts"><span>OPTIONS</span></button>' +
     '<button class="item" data-act="help" data-k="help"><span>HOW TO DRIVE</span></button>' +
-    '</div></div><div class="right"><div class="note detail" id="mainNote"></div></div></div>',
+    '</div></div><div class="right"></div></div>',
     { sel: sel || 0, back: showTitle,
-      onSel: el => { const n = document.getElementById("mainNote"); if(n) n.innerHTML = '<p>' + DESC[el.dataset.k] + '</p>'; },
       acts:{ solo:()=>{ SFX.ok(); showSolo(); },
              multi:()=>{ SFX.ok(); if(NET.on) showLobby(); else if(NET_CFG.enabled) showOnline(); else showNetOff(); },
              garage:()=>{ SFX.ok(); showGarage(()=> showMain(MI("garage")), ()=> showMain(MI("garage"))); },
              opts:()=>{ SFX.ok(); showOptions(()=> showMain(MI("opts"))); },
              help:()=>{ SFX.ok(); showHelp(()=> showMain(MI("help"))); } } });
-  MENU.onSel(MENU.items[MENU.sel]);
 }
 /* single player: the four ways to race the computer */
 function showSolo(sel){
@@ -15890,24 +15918,22 @@ function showSolo(sel){
     '<button class="item" data-act="trial" data-k="trial"><span>TIME TRIAL</span></button>' +
     '<button class="item" data-act="exped" data-k="exped"><span>EXPEDITION</span></button>' +
     '<button class="item back" data-act="back" data-k="back"><span>BACK</span></button>' +
-    '</div></div><div class="right"><div class="note detail" id="soloNote"></div></div></div>',
+    '</div></div><div class="right"></div></div>',
     { sel: sel || 0, back: ()=> showMain(MI("solo")),
-      onSel: el => { const n = document.getElementById("soloNote"); if(n) n.innerHTML = MODE_DESC[el.dataset.k] ? '<p>' + MODE_DESC[el.dataset.k] + '</p>' : ''; },
       acts:{ champ:()=>{ SFX.ok(); showChamp(); },
              race:()=>{ SFX.ok(); showTracks("race"); },
              trial:()=>{ SFX.ok(); showTracks("trial"); },
              exped:()=>{ SFX.ok(); showTracks("expedition"); },
              back:()=>{ SFX.back(); showMain(MI("solo")); } } });
-  MENU.onSel(MENU.items[MENU.sel]);
 }
 /* multiplayer where the page may not reach the room server (inside a Claude preview) */
 function showNetOff(){
   openScreen("scNetOff",
     '<div class="cols"><div class="left"><h2 class="head">Multiplayer</h2>' +
     '<div class="menu">' +
-    '<button class="item" data-act="try"><span>TRY ANYWAY</span><small>it may not connect from here</small></button>' +
+    '<button class="item" data-act="try"><span>TRY ANYWAY</span></button>' +
     '<button class="item back" data-act="back"><span>BACK</span></button>' +
-    '</div></div><div class="right"><div class="note detail"><p>Online races need the game on a web page of its own, such as your own site. In this preview the page is boxed in and usually can\'t reach the race server, so it is switched off here. Put the game on your site and MULTIPLAYER goes straight to hosting and joining rooms.</p></div></div></div>',
+    '<p class="dimtx" style="margin-top:12px">Online play needs the game on your own website.</p></div><div class="right"></div></div>',
     { sel: 0, back: ()=> showMain(MI("multi")),
       acts:{ try:()=>{ SFX.ok(); NET_CFG.enabled = true; showOnline(); },
              back:()=>{ SFX.back(); showMain(MI("multi")); } } });
@@ -15952,8 +15978,7 @@ function showTracks(mode, group){
       const rec = SAVE.records[TRACKS[id].name] || {};
       const best = exped ? (rec.summit != null ? "summit " + fmt(rec.summit) : "") : (rec.bestLap != null ? "best lap " + fmt(rec.bestLap) : "");
       return '<button class="tk" style="--tkc:' + trackCol(TRACKS[id]) + '" data-track="' + id + '"><canvas width="132" height="132"></canvas><span>' +
-      esc(TRACKS[id].name) + '</span><small>' + esc(TRACKS[id].shape.split(/\s+[\u2014-]\s+/)[0].toLowerCase()) +
-      '</small>' + (best ? '<em>' + best + '</em>' : '') + '</button>'; }).join("") + '</div>' +
+      esc(TRACKS[id].name) + '</span><small>' + (trackThumb(id).len/1000).toFixed(1) + ' km</small>' + (best ? '<em>' + best + '</em>' : '') + '</button>'; }).join("") + '</div>' +
     '<div class="detail" id="tkDetail"></div>' +
     '<div class="menu" style="margin-top:14px;max-width:260px"><button class="item back" data-act="back"><span>BACK</span></button></div></div>',
     { grid:true, sel: (exped ? 0 : GP_GROUPS.length) + Math.max(0, at), back: ()=> mode === "online" ? (NET.on ? showLobby() : showOnline()) : menuFor(mode),
@@ -16012,20 +16037,20 @@ function showChamp(){
     '<div class="cols"><div class="left"><h2 class="head">Championship</h2><div class="menu">' +
     (C ? '<button class="item" data-act="cont"><span>CONTINUE</span><small>' + esc(CUPS[C.cup || 0].name) + ', round ' + (C.round+1) + ': ' +
          esc(TRACKS[CHAMP_ROUNDS[C.round]].name) + '</small></button>' : '') +
-    '<button class="item" data-act="summer" data-k="0">' + trophySVG("summer", cupMetal(0)) + '<span>' + (C ? 'NEW ' : 'START ') + 'SUMMER CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds') + '</small></button>' +
-    '<button class="item" data-act="fall" data-k="1">' + trophySVG("fall", cupMetal(1)) + '<span>' + (C ? 'NEW ' : 'START ') + 'FALL CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds in the maples') + '</small></button>' +
-    '<button class="item" data-act="winter" data-k="2">' + trophySVG("winter", cupMetal(2)) + '<span>' + (C ? 'NEW ' : 'START ') + 'WINTER CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds on snow and ice') + '</small></button>' +
-    '<button class="item" data-act="desert" data-k="3">' + trophySVG("desert", cupMetal(3)) + '<span>' + (C ? 'NEW ' : 'START ') + 'DESERT CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds in the red rock') + '</small></button>' +
-    '<button class="item" data-act="swamp" data-k="4">' + trophySVG("swamp", cupMetal(4)) + '<span>' + (C ? 'NEW ' : 'START ') + 'SWAMP CUP</span><small>' + (C ? 'Clears your points' : 'Four rounds in the bayou') + '</small></button>' +
+    '<button class="item" data-act="summer" data-k="0">' + trophySVG("summer", cupMetal(0)) + '<span>' + (C ? 'NEW ' : 'START ') + 'SUMMER CUP</span>' + (C ? '<small>Clears your points</small>' : '') + '</button>' +
+    '<button class="item" data-act="fall" data-k="1">' + trophySVG("fall", cupMetal(1)) + '<span>' + (C ? 'NEW ' : 'START ') + 'FALL CUP</span>' + (C ? '<small>Clears your points</small>' : '') + '</button>' +
+    '<button class="item" data-act="winter" data-k="2">' + trophySVG("winter", cupMetal(2)) + '<span>' + (C ? 'NEW ' : 'START ') + 'WINTER CUP</span>' + (C ? '<small>Clears your points</small>' : '') + '</button>' +
+    '<button class="item" data-act="desert" data-k="3">' + trophySVG("desert", cupMetal(3)) + '<span>' + (C ? 'NEW ' : 'START ') + 'DESERT CUP</span>' + (C ? '<small>Clears your points</small>' : '') + '</button>' +
+    '<button class="item" data-act="swamp" data-k="4">' + trophySVG("swamp", cupMetal(4)) + '<span>' + (C ? 'NEW ' : 'START ') + 'SWAMP CUP</span>' + (C ? '<small>Clears your points</small>' : '') + '</button>' +
     '<button class="item back" data-act="back"><span>BACK</span></button></div></div>' +
     '<div class="right"><div id="cupNote"></div>' +
-    (C ? standingsTable() : '<div class="note"><p>Three laps a round. Finish first for 10 points, then 6, 4 and 3. Most points at the end takes the cup.</p></div>') +
+    (C ? standingsTable() : '') +
     '</div></div>',
     { back: ()=> showSolo(0),
       onSel: el => {
         const k = el.dataset.k !== undefined ? +el.dataset.k : shown;
         const n = document.getElementById("cupNote");
-        if(n) n.innerHTML = '<table class="grid" style="margin-bottom:18px">' + cupTable(k) + '</table>';
+        if(n) n.innerHTML = '<div class="detail" style="margin:0 0 18px"><h3>' + esc(CUPS[k].name) + '</h3><table class="grid">' + cupTable(k) + '</table></div>';
       },
       acts:{ cont:()=>{ SFX.ok(); champRound(); },
              summer:()=> start(0),
@@ -16061,13 +16086,10 @@ function showOptions(back){
     OPTS.map(O => '<button class="item opt" data-opt="' + O.key + '"><span>' + esc(O.label) +
                   '</span><span class="val">' + optValue(O) + '</span></button>').join("") +
     '<button class="item back" data-act="back"><span>DONE</span></button></div></div>' +
-    '<div class="right"><div class="note detail" id="optNote"></div>' +
-    '<div class="hint"><kbd>\u2190</kbd><kbd>\u2192</kbd> change &nbsp; <kbd>Esc</kbd> back</div></div></div>',
+    '<div class="right"><div class="hint"><kbd>\u2190</kbd><kbd>\u2192</kbd> change &nbsp; <kbd>Esc</kbd> back</div></div></div>',
     { cls: state.phase === "menu" ? "dim" : "veil", back,
-      onSel: el => { const O = OPTS.find(o => o.key === el.dataset.opt);
-                     document.getElementById("optNote").innerHTML = O ? '<p>' + O.desc + '</p>' : ''; },
       acts:{ back:()=>{ SFX.back(); back(); } } });
-  MENU.onSel(MENU.items[0]);
+  if(MENU.onSel) MENU.onSel(MENU.items[0]);
 }
 
 /* cat: which tab is open; sel: which item to land on (the tab itself when
@@ -16088,23 +16110,18 @@ function showGarage(next, back, cat, sel){
     '<div class="cols"><div class="left garage"><h2 class="head">Garage</h2>' +
     '<div class="cuptabs gtabs">' + GCATS.map((c, k)=>
       '<button class="cuptab' + (k === cat ? ' on' : '') + '" data-act="gcat" data-gcat="' + k + '"><span>' + c.name + '</span></button>').join("") + '</div>' +
-    '<div class="gsub">' + esc(GCATS[cat].desc) + '</div>' +
     '<div class="menu">' +
     list.map(O => '<button class="item opt" data-opt="' + O.key + '"><span>' + esc(O.label) +
                   '</span><span class="val">' + optValue(O) + '</span></button>').join("") +
     '<button class="item" data-act="go"><span>DONE</span></button>' +
     '<button class="item back" data-act="back"><span>BACK</span></button></div>' +
-    '<div class="garnote" id="garNote"></div>' +
     '<div class="hint"><kbd>\u2190</kbd><kbd>\u2192</kbd> tab or change &nbsp; <kbd>\u2191</kbd><kbd>\u2193</kbd> pick &nbsp; <kbd>Enter</kbd> done</div></div>' +
     '<div class="right"></div></div>',
     { cls:"garage", back: leave(back), sel: sel === undefined ? GCATS.length : sel,
-      onSel: el => { const O = GOPTS.find(o => o.key === el.dataset.opt);
-                     const n = document.getElementById("garNote");
-                     if(n) n.innerHTML = O ? '<p>' + O.desc + '</p>' : el.dataset.gcat !== undefined ? '<p>' + esc(GCATS[+el.dataset.gcat].desc) + '</p>' : ''; },
       acts:{ gcat: el=>{ SFX.move(); showGarage(next, back, +el.dataset.gcat, +el.dataset.gcat); },
              go: ()=>{ SFX.ok(); leave(next)(); }, back: ()=>{ SFX.back(); leave(back)(); } } });
   MENU.garage = {next, back, cat};
-  MENU.onSel(MENU.items[MENU.sel]);
+  if(MENU.onSel) MENU.onSel(MENU.items[MENU.sel]);
 }
 /* the garage camera: a slow turn round your car, parked on the grid */
 function garageCam(dt){
@@ -16580,12 +16597,12 @@ function showOnline(prefill){
     '<div class="cols"><div class="left"><h2 class="head">Multiplayer</h2>' +
     '<label class="dimtx" for="netName">YOUR NAME</label><input id="netName" maxlength="16" autocomplete="off" value="' + esc(nick) + '" ' + netInputStyle() + '>' +
     '<div class="menu" style="margin-top:14px">' +
-    '<button class="item" data-act="host"><span>HOST A RACE</span><small>open a room, share the code, pick the circuit</small></button>' +
+    '<button class="item" data-act="host"><span>HOST A RACE</span></button>' +
     '<button class="item" data-act="join"><span>JOIN WITH CODE</span></button>' +
     '</div><input id="netCode" maxlength="4" autocomplete="off" placeholder="CODE" value="' + esc(prefill || "") + '" ' + netInputStyle() + '>' +
     '<div class="menu" style="margin-top:14px"><button class="item back" data-act="back"><span>BACK</span></button></div>' +
     '<p class="dimtx" id="netMsg" style="margin-top:10px"></p></div>' +
-    '<div class="right"><div class="note detail"><p>Race up to five friends. The host opens a room and shares the code (or the invite link). Everyone waits in the lobby, where you can see who has joined; then the host picks the circuit and starts, and the whole room goes there together. Three laps, no computer rivals, and your best lap goes on the circuit\'s leaderboard.</p></div></div></div>',
+    '<div class="right"></div></div>',
     { sel: prefill ? 1 : 0, back: ()=> showMain(MI("multi")),
       acts:{ host: ()=>{ if(!netSaveNick()) return; SFX.ok(); netEnter(netCode(), true); },
              join: ()=>{ if(!netSaveNick()) return; const c = (document.getElementById("netCode").value || "").toUpperCase().replace(/[^A-Z]/g, "");
