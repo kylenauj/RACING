@@ -990,7 +990,7 @@ const TRACKS = [
           [460,-140],[505,-80],[458,-20],[500,40],[470,100],[460,140],
           // round the whirlpool
           [476,178],[523,182],[549,211],[545,258],[505,286],[457,274],[439,242],[405,195],
-          // down into the grotto and out across the geyser field
+          // down into the grotto (a long one) and out across the geyser field
           [340,215],[270,245],[190,258],[110,262],[40,266],[-30,270],[-100,272],
           // the riverboat
           [-170,268],[-240,255],[-300,220],[-330,160],
@@ -1000,8 +1000,8 @@ const TRACKS = [
           [-300,-292],[-324,-298],[-342,-316],[-348,-340],[-342,-364],[-324,-382],[-300,-388],[-276,-382],[-261,-368],
           // over the band stand and home along the pier
           [-225,-420],[-170,-446],[-110,-450]],
-    hills:[[190,262,95,26],[-240,340,110,12],[560,-40,120,8],[-470,-200,150,10]],
-    jumps:[], fords:[[-200,262]],
+    hills:[[300,236,85,24],[185,258,105,30],[70,264,90,26],[-240,340,110,12],[560,-40,120,8],[-470,-200,150,10]],
+    jumps:[], fords:[[-225,258]],
     mud:[[[40,266],[-30,270]]],
     flats:[[495,230,120],[-300,-340,95]],
     lake:{at:[200,-450], rx:255, rz:85},
@@ -1011,20 +1011,21 @@ const TRACKS = [
     leaps:[{at:[-345,90], height:2.8, gap:18, reach:80}],
     bigJumps:[[[-160,-448],3.6]],
     tunnels:[{from:[490,-330], to:[495,-230]}],
-    caves:[{from:[270,245], to:[110,262]}],
-    spans:[{at:[-190,352], road:1, span:18, depth:4, wall:11, reach:90},
-           {at:[-285,318], road:1, span:16, depth:4, wall:10, reach:80}],
+    caves:[{from:[335,218], to:[30,266]}],
+    // (the channels under the treetop bridges stay under the bridges: no sheet of water out to the main road)
+    spans:[{at:[-252,322], road:1, span:18, depth:4, wall:11, reach:24},
+           {at:[-318,292], road:1, span:16, depth:4, wall:10, reach:22}],
     geysers:8,
     branches:[
       // the gator's back: up its tail, along its spine and off its snout
-      {a:[495,-200], b:[470,100], via:[[560,-130],[580,-30],[545,60]],
+      {a:[495,-200], b:[470,100], via:[[540,-138],[578,-30],[545,60]],
        half:5.0, jumps:[[0.5,30,8,3.4,48]], tune:0.1, label:"GATOR BACK", mainLabel:"CATTAIL CANYON"},
-      // the treetop road: rope bridges between the cypress trunks
-      {a:[-100,272], b:[-330,160], via:[[-140,340],[-230,355],[-310,300]],
-       half:4.6, jumps:[], tune:0.1, label:"TREETOPS", mainLabel:"RIVERBOAT"},
-      // the mushroom hill: down the side of the falls, bouncing cap to cap
-      {a:[-358,-40], b:[-225,-420], via:[[-430,-90],[-455,-200],[-430,-310],[-330,-440]],
-       half:5.0, jumps:[], tune:0, mushrooms:true, label:"MUSHROOM HILL", mainLabel:"WATERFALL"}
+      // the treetop road: rope bridges between the cypress trunks (it leaves at an easy angle, a plain Y)
+      {a:[-160,268], b:[-330,160], via:[[-222,298],[-275,328],[-322,286]],
+       half:4.8, jumps:[], tune:0.1, label:"TREETOPS", mainLabel:"BAYOU ROAD"},
+      // the mushroom forest: a flowing run down the side of the falls, under the caps, with one jump
+      {a:[-358,-40], b:[-225,-420], via:[[-392,-112],[-440,-205],[-428,-312],[-330,-440]],
+       half:5.4, jumps:[[0.5,26,7,2.6,46]], tune:0, mushrooms:true, label:"MUSHROOM FOREST", mainLabel:"WATERFALL"}
     ]}
 ];
 
@@ -1367,7 +1368,7 @@ if(DESERT){
    air, and everything that is lava on the volcano is glowing swamp water. */
 const GATOR = !!TRACK.gator;
 const ANIMS_LATE = [];                // per frame, for set pieces built before the prop kit exists
-const WHIRL_R = 36;                   // the whirlpool: a funnel sunk in the middle of the banked ring
+const WHIRL_R = 48;                   // the whirlpool: a funnel sunk in the middle of the banked ring, its lip at the road's inside edge
 if(GATOR){
   scene.fog.color.set(0xe9a2a6); SKY.set(0xf2b08c); scene.fog.near = 220; scene.fog.far = 1150;
   hemi.color.set(0xffc6dc); hemi.groundColor.set(0x3c4a5e); hemi.intensity = 0.98;
@@ -1444,7 +1445,8 @@ function macro(x, z){
   /* Gator Gulch's whirlpool: a funnel in the middle of the ring road, deepest at the drain */
   if(GATOR && BOWL.on){
     const d = Math.hypot(x - BOWL.x, z - BOWL.z);
-    if(d < WHIRL_R + 4) h -= 12*Math.pow(1 - smoothstep(3, WHIRL_R + 4, d), 1.6);
+    // steep at the lip, so the road runs round the rim of it, then down to the drain
+    if(d < WHIRL_R + 1.5){ const u = 1 - smoothstep(2, WHIRL_R + 1.5, d); h -= 16*Math.pow(u, 0.75); }
   }
   /* the lake: a basin sunk below a level taken from the lowest point of its
      shore, so the water can never spill over */
@@ -7967,75 +7969,90 @@ if(GATOR){
     for(let k=0;k<n;k++){
       const i = wrapIdx(P0, a + Math.round((k + 0.5)/n*span)), lane = [2.2, -2.2, 0.3, -2.4, 2.4, -0.3, 2.0][k];
       const f = frm(P0, i), x = f.p.x + f.nx*lane, z = f.p.z + f.nz*lane, y = surfaceY(x, z);
+      /* a vent in the road, not a thing on it: a patch of wet, cracked mud
+         flush with the surface, a low blister in the middle, a dark mouth */
       const g = new THREE.Group(); g.position.set(x, y, z);
-      const ring = addTo(g, new THREE.Mesh(new THREE.TorusGeometry(1.9, 0.45, 6, 16), lam(0x5a3a22)), 0, 0.1, 0); ring.rotation.x = Math.PI/2;
-      const pool = addTo(g, new THREE.Mesh(new THREE.CircleGeometry(1.8, 16), new THREE.MeshLambertMaterial({color:0x6a4428, emissive:0x3a1a08})), 0, 0.08, 0); pool.rotation.x = -Math.PI/2;
+      const flat = new THREE.MeshLambertMaterial({color:0x4a3020, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
+      const patch = addTo(g, new THREE.Mesh(new THREE.CircleGeometry(3.4, 20), flat), 0, 0.04, 0); patch.rotation.x = -Math.PI/2;
+      const crack = []; for(let q=0;q<9;q++){ const a = q/9*Math.PI*2 + rnd()*0.4, r1 = 1.0 + rnd()*0.4, r2 = 2.6 + rnd()*0.8;
+        crack.push(Math.cos(a)*r1, 0.07, Math.sin(a)*r1, Math.cos(a + 0.15)*r2, 0.07, Math.sin(a + 0.15)*r2); }
+      const cg = new THREE.BufferGeometry(); cg.setAttribute("position", new THREE.Float32BufferAttribute(crack, 3));
+      g.add(new THREE.LineSegments(cg, new THREE.LineBasicMaterial({color:0x22140a})));
+      const blister = new THREE.Mesh(new THREE.SphereGeometry(1.4, 14, 6, 0, Math.PI*2, 0, Math.PI/2), lam(0x5a3a24)); blister.scale.y = 0.18; blister.position.y = 0.02; g.add(blister);
+      const pool = addTo(g, new THREE.Mesh(new THREE.CircleGeometry(0.7, 14), new THREE.MeshLambertMaterial({color:0x2a1a10, emissive:0x3a1a08})), 0, 0.27, 0); pool.rotation.x = -Math.PI/2;
       scene.add(g);
       GEYS.push({x, z, y, i, lane, t:1 + k*0.55, on:0, pool, emit:0});
     }
     orbRow(P0, a + Math.round(span*0.15), 0, 3, 8); orbRow(P0, a + Math.round(span*0.6), 0, 3, 8);
-    boostPad(P0, byM(P0, CAVE.b, 12), 0);                                            // out of the grotto and across the geysers
+    // (no boost out of the grotto: it threw you clean over the geysers)
   }
 
-  /* ---- 8a. the sunken riverboat (the main road through the second split) ---- */
-  if(FORD_I >= 0){
-    const c = byM(P0, FORD_I, 46), L = Math.round(30/seg), P = P0;
-    const white = lam(0xf2efe6), red = lam(0xc2382a), wood = lam(0x8a6040), black = lam(0x1b1b1b), gold = basic(0xffd27a);
-    const hull = new THREE.Group();
-    for(let k=c - L; k<=c + L; k++){
-      const f = frm(P, k), u = (k - c)/L, taper = u > 0.7 ? (u - 0.7)/0.3 : 0, half = f.half + 2.6 - taper*1.5, y0 = f.p.y + BED;
-      const yaw = Math.atan2(f.t.x, f.t.z), H = 6.6;
-      for(const sd of [-1, 1]){
-        const x = f.p.x + f.nx*sd*half, z = f.p.z + f.nz*sd*half;
-        const w = addTo(hull, new THREE.Mesh(new THREE.BoxGeometry(0.5, H + 1.2, seg*1.03), white), x, y0 + H/2 - 0.8, z); w.rotation.y = yaw;
-        if(k % 1 === 0){ const st = addTo(hull, new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, seg*1.05), red), x, y0 + 1.1, z); st.rotation.y = yaw; }
-        if(k % Math.round(4/seg) === 0){ const ph = addTo(hull, new THREE.Mesh(new THREE.CircleGeometry(0.42, 10), gold), x + f.nx*sd*0.27, y0 + 3.3, z + f.nz*sd*0.27); ph.lookAt(x + f.nx*sd*5, y0 + 3.3, z + f.nz*sd*5); }
-      }
-      // the deck overhead (the ballroom's ceiling), and the upper deck's cabins and rail
-      const dk = addTo(hull, new THREE.Mesh(new THREE.BoxGeometry((half + 0.6)*2, 0.5, seg*1.03), wood), f.p.x, y0 + H, f.p.z); dk.rotation.y = yaw;
-      if(Math.abs(u) < 0.62){ const cb = addTo(hull, new THREE.Mesh(new THREE.BoxGeometry((half - 1.4)*2, 3.2, seg*1.03), white), f.p.x, y0 + H + 1.85, f.p.z); cb.rotation.y = yaw;
-        if(k % Math.round(5/seg) === 0) for(const sd of [-1, 1]){ const wn = addTo(hull, new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.4, 1.4), lam(0xffd27a, 0xffb040, 0.8)), f.p.x + f.nx*sd*(half - 1.35), y0 + H + 2.0, f.p.z + f.nz*sd*(half - 1.35)); wn.rotation.y = yaw; } }
-      if(k % Math.round(2/seg) === 0) for(const sd of [-1, 1]) addTo(hull, new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.1, 0.12), white), f.p.x + f.nx*sd*(half + 0.3), y0 + H + 0.8, f.p.z + f.nz*sd*(half + 0.3));
-    }
-    // the two tall stacks with their crowns, and the name board
-    const fs = frm(P, c + Math.round(L*0.45));
+  /* ---- 8a. the riverboat: the GATOR QUEEN, moored out in the lagoon beside the
+     pier, listing a little, her wheel still turning; you pass her at the start
+     of every lap. The bayou road crosses the creek her lost logs drift down. ---- */
+  if(FORD_I >= 0 && LAKE.on){
+    const P = P0;
+    // out on the water off the pier, a third of the way along it, clear of the road
+    let bi = 0; for(let i=0;i<P.N/2;i++){ const p = P.pts[i]; if(lakeE(p.x, p.z) < 0.9){ bi = i; if(i*seg > 120) break; } }
+    const bf = frm(P, bi), side = (LAKE.z - bf.p.z)*bf.nz + (LAKE.x - bf.p.x)*bf.nx > 0 ? -1 : 1;
+    const cx = bf.p.x + bf.nx*side*34, cz = bf.p.z + bf.nz*side*34, wl0 = LAKE.level;
+    const boat = new THREE.Group(), B = new THREE.Group(); boat.add(B); boat.name = "gatorQueen";
+    const white = lam(0xf4efe2), cream = lam(0xe8dcc0), red = lam(0xc2382a), black = lam(0x1b1b1b), wood = lam(0x8a6040), glass = lam(0x2a3a4a, 0xffc060, 0.55);
+    // the hull: a long flat-bottomed shape with a pointed bow, white over red at the waterline
+    const hullShape = (w, len, bow)=>{ const sh = new THREE.Shape(); sh.moveTo(-len/2, -w/2); sh.lineTo(len/2 - bow, -w/2); sh.quadraticCurveTo(len/2, -w/2*0.4, len/2 + 1, 0);
+      sh.quadraticCurveTo(len/2, w/2*0.4, len/2 - bow, w/2); sh.lineTo(-len/2, w/2); sh.lineTo(-len/2, -w/2); return sh; };
+    const extr = (sh, h, m)=>{ const g = new THREE.ExtrudeGeometry(sh, {depth:h, bevelEnabled:false}); g.rotateX(-Math.PI/2); return new THREE.Mesh(g, m); };
+    B.add(extr(hullShape(11, 42, 7), 1.6, red));
+    const h2 = extr(hullShape(11.2, 42.2, 7), 2.4, white); h2.position.y = 1.6; B.add(h2);
+    const deck = extr(hullShape(12.4, 43, 7.4), 0.35, wood); deck.position.y = 4.0; B.add(deck);
+    // the main deck house: a long saloon of windows, posts and a rail all round
+    const saloon = new THREE.Mesh(new THREE.BoxGeometry(30, 3.6, 8.4), cream); saloon.position.set(-3, 6.15, 0); B.add(saloon);
+    for(let q=0;q<11;q++) for(const sd of [-1, 1]){ const w = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.8, 0.1), glass); w.position.set(-16.5 + q*2.7, 6.4, sd*4.25); B.add(w); }
+    const upper = new THREE.Mesh(new THREE.BoxGeometry(34, 0.3, 11.6), white); upper.position.set(-2, 8.1, 0); B.add(upper);
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(20, 2.8, 7), white); cabin.position.set(-5, 9.65, 0); B.add(cabin);
+    for(let q=0;q<7;q++) for(const sd of [-1, 1]){ const w = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 0.1), glass); w.position.set(-13 + q*2.8, 9.8, sd*3.55); B.add(w); }
+    const pilot = new THREE.Mesh(new THREE.BoxGeometry(4.4, 2.6, 4.4), white); pilot.position.set(3.5, 12.35, 0); B.add(pilot);
+    const proof = new THREE.Mesh(new THREE.ConeGeometry(3.6, 1.4, 4), red); proof.rotation.y = Math.PI/4; proof.position.set(3.5, 14.35, 0); B.add(proof);
+    // posts and rails along both decks
+    for(const lvl of [[4.35, 21, 6.0], [8.25, 17, 5.7]]) for(const sd of [-1, 1]){
+      for(let q=-lvl[1]; q<=lvl[1]-4; q+=2.2) addTo(B, new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.9, 0.14), white), q, lvl[0] + 0.95, sd*lvl[2]);
+      addTo(B, new THREE.Mesh(new THREE.BoxGeometry(lvl[1]*2 - 3, 0.14, 0.14), red), -1.5, lvl[0] + 1.85, sd*lvl[2]);
+      addTo(B, new THREE.Mesh(new THREE.BoxGeometry(lvl[1]*2 - 3, 0.1, 0.1), white), -1.5, lvl[0] + 1.0, sd*lvl[2]); }
+    // the stacks forward of the pilot house, with their feathered crowns
     for(const sd of [-1, 1]){
-      const x = fs.p.x + fs.nx*sd*2.6, z = fs.p.z + fs.nz*sd*2.6, y0 = fs.p.y + BED + 10;
-      addTo(hull, new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.0, 14, 10), black), x, y0 + 7, z);
-      for(let q=0;q<8;q++){ const cr = addTo(hull, new THREE.Mesh(new THREE.ConeGeometry(0.4, 1.4, 4), black), x + Math.cos(q*0.785)*1.1, y0 + 14.4, z + Math.sin(q*0.785)*1.1); cr.rotation.set(Math.sin(q*0.785)*0.4, 0, -Math.cos(q*0.785)*0.4); }
-    }
-    mergeStatic(hull); hull.traverse(o=>{ if(o.isMesh) o.castShadow = true; }); scene.add(hull);
+      addTo(B, new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.8, 12, 12), black), 9.5, 14, sd*2.2);
+      for(let q=0;q<8;q++){ const cr = addTo(B, new THREE.Mesh(new THREE.ConeGeometry(0.34, 1.3, 4), black), 9.5 + Math.cos(q*0.785)*0.95, 20.4, sd*2.2 + Math.sin(q*0.785)*0.95); cr.rotation.set(Math.sin(q*0.785)*0.4, 0, -Math.cos(q*0.785)*0.4); } }
+    // her name on the paddle box
+    { const cv = document.createElement("canvas"); cv.width = 512; cv.height = 128; const g2 = cv.getContext("2d");
+      g2.fillStyle = "#f4efe2"; g2.fillRect(0, 0, 512, 128); g2.strokeStyle = "#c2382a"; g2.lineWidth = 10; g2.strokeRect(6, 6, 500, 116);
+      g2.fillStyle = "#1b1b1b"; g2.font = "italic 900 64px Georgia, serif"; g2.textAlign = "center"; g2.textBaseline = "middle"; g2.fillText("GATOR QUEEN", 256, 68);
+      const nm = new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cv)});
+      for(const sd of [-1, 1]){ const b2 = new THREE.Mesh(new THREE.PlaneGeometry(10, 2.5), nm); b2.position.set(-3, 9.9, sd*3.56); b2.rotation.y = sd > 0 ? 0 : Math.PI; B.add(b2); } }
+    mergeStatic(B);
+    // the stern wheel, turning slowly
+    const wheel = new THREE.Group(); wheel.position.set(-24.5, 4.2, 0); boat.add(wheel);
+    for(const sd of [-1, 1]) addTo(wheel, new THREE.Mesh(new THREE.TorusGeometry(4.6, 0.22, 6, 26), red), 0, 0, sd*4.6).rotation.set(0, 0, 0);
+    for(let q=0;q<12;q++){ const a = q/12*Math.PI*2;
+      const bl = addTo(wheel, new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.9, 9.4), red), Math.cos(a)*3.8, Math.sin(a)*3.8, 0); bl.rotation.z = a;
+      const sp2 = addTo(wheel, new THREE.Mesh(new THREE.BoxGeometry(0.12, 4.6, 0.12), black), Math.cos(a)*2.3, Math.sin(a)*2.3, 0); sp2.rotation.z = a + Math.PI/2; }
+    wheel.children.forEach(o=>{ if(o.geometry && o.geometry.type === "TorusGeometry") o.rotation.set(0, 0, 0); });
+    // moored alongside the pier, bow the way you are going, listing a little
+    const f = bf, yaw = Math.atan2(f.t.x, f.t.z) - Math.PI/2;
+    boat.position.set(cx, wl0 - 1.1, cz);
+    // a gangway of planks out to her from the pier
+    { const w = new THREE.Group(), sx = bf.p.x + bf.nx*side*(bf.half + 1.6), sz = bf.p.z + bf.nz*side*(bf.half + 1.6), ex = cx - bf.nx*side*6.5, ez = cz - bf.nz*side*6.5;
+      const L2 = Math.hypot(ex - sx, ez - sz), ux = (ex - sx)/L2, uz = (ez - sz)/L2;
+      for(let m=0; m<L2; m+=1.3){ const x = sx + ux*m, z = sz + uz*m, y = wl0 + 1.0 + m/L2*2.2;
+        addTo(w, new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.16, 1.1), wood), x, y, z).rotation.y = Math.atan2(ux, uz);
+        if(Math.round(m/1.3) % 3 === 0) for(const sd of [-1, 1]) addTo(w, new THREE.Mesh(new THREE.BoxGeometry(0.22, 3.2, 0.22), wood), x + uz*sd*1.4, wl0 - 0.2, z - ux*sd*1.4); }
+      mergeStatic(w); scene.add(w); } boat.rotation.set(0, yaw, 0); B.rotation.z = 0.02; B.rotation.x = 0.06;
+    boat.traverse(o=>{ if(o.isMesh) o.castShadow = true; }); scene.add(boat);
+    ANIMS.push(t=>{ wheel.rotation.z = -t*0.9; boat.position.y = wl0 - 1.1 + Math.sin(t*0.6)*0.05; });
     // smoke from the stacks
-    ANIMS.push(t=>{ if(!STEAM || state.phase === "menu" || Math.random() > 0.25) return;
-      for(const sd of [-1, 1]) STEAM.spawn(fs.p.x + fs.nx*sd*2.6, fs.p.y + BED + 25, fs.p.z + fs.nz*sd*2.6, 1.2, 2.5, 0.6, {life:5, size:[2, 9], col:[0.35, 0.3, 0.38], alpha:0.5, heat:0.2, drag:0.4, grav:-0.4}); });
-    // the paddlewheel at the stern, turning
-    {
-      const fp = frm(P, c + L + Math.round(4/seg)), g = new THREE.Group(), R = 5.5;
-      g.position.set(fp.p.x, fp.p.y + BED + 4.4, fp.p.z); g.rotation.y = Math.atan2(fp.nx, fp.nz);
-      const wheel = new THREE.Group(); g.add(wheel);
-      for(const s of [-1, 1]){ const rim = addTo(wheel, new THREE.Mesh(new THREE.TorusGeometry(R, 0.25, 6, 24), red), 0, 0, s*(fp.half + 1.5)); void rim; }
-      for(let q=0;q<10;q++){ const a = q/10*Math.PI*2;
-        const bl = addTo(wheel, new THREE.Mesh(new THREE.BoxGeometry(0.4, 2.2, (fp.half + 1.5)*2), red), Math.cos(a)*(R - 1), Math.sin(a)*(R - 1), 0); bl.rotation.z = a; }
-      // up on the stern, clear of the road: it spins over it
-      g.position.y += 3.2;
-      scene.add(g);
-      ANIMS.push(t=>{ wheel.rotation.z = -t*1.4; });
-    }
-    // chandeliers in the ballroom, swaying
-    const chand = [];
-    for(let k=c - L + Math.round(8/seg); k<=c + L - Math.round(8/seg); k+=Math.round(13/seg)){
-      const f = frm(P, k), g = new THREE.Group(); g.position.set(f.p.x, f.p.y + BED + 6.4, f.p.z);
-      addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.4, 4), black), 0, -0.7, 0);
-      addTo(g, new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.08, 5, 14), lam(0xd8b050)), 0, -1.5, 0).rotation.x = Math.PI/2;
-      for(let q=0;q<8;q++) addTo(g, new THREE.Mesh(new THREE.OctahedronGeometry(0.16, 0), basic(0xfff4c8)), Math.cos(q*0.785)*0.9, -1.75, Math.sin(q*0.785)*0.9);
-      addTo(g, new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), basic(0xfff4c8)), 0, -1.6, 0);
-      scene.add(g); chand.push([g, rnd()*6]);
-    }
-    const blight = new THREE.PointLight(0xffd27a, 0, 30, 1.4); scene.add(blight);
-    ANIMS.push(t=>{ chand.forEach(([g, ph])=>{ g.rotation.z = Math.sin(t*1.3 + ph)*0.12; g.rotation.x = Math.sin(t*0.9 + ph)*0.08; });
-      const n = nearest(pose.x, pose.z), inside = n.path === P && Math.abs(n.pi - c) <= L;
-      blight.intensity = inside ? 1.3 : 0; if(inside) blight.position.set(pose.x, pose.y + 4, pose.z); });
-    orbRow(P, c - Math.round(L*0.6), 0, 5, 7);
+    ANIMS.push(t=>{ if(!STEAM || state.phase === "menu" || Math.random() > 0.2) return;
+      const v = new THREE.Vector3(9.5, 21, 2.2).applyMatrix4(boat.matrixWorld);
+      STEAM.spawn(v.x, v.y, v.z, 1.0, 2.2, 0.5, {life:5, size:[2, 9], col:[0.35, 0.3, 0.38], alpha:0.45, heat:0.2, drag:0.4, grav:-0.4}); });
+    orbRow(P, byM(P, FORD_I, -40), 0, 5, 7);
     // logs drifting across the water of the ford in front of the boat
     const FD = FORDS.find(F=> F.path === P0 && Math.abs(F.at - FORD_I) < 4), wl = FD ? FD.level : -1e9;
     for(const k of [0, 1]){
@@ -8051,15 +8068,19 @@ if(GATOR){
   if(B1){
     const P = B1, trunk = lam(0x6b5a4a), moss = lam(0x8aa05a), rail = new THREE.LineBasicMaterial({color:0xe8d8b0});
     const g = new THREE.Group(), railPts = {"-1":[], "1":[]};
-    for(let k=Math.round(30/seg); k<P.N - Math.round(30/seg); k++){
+    // (none of it near either end: the rails and the trunks stood in the fork and across the other road)
+    const own = (x, z, m)=>{ const n = nearest(x, z); return n.path === P || n.dist > n.half + m; };
+    for(let k=Math.round(55/seg); k<P.N - Math.round(55/seg); k++){
       const f = frm(P, k), y = f.p.y + BED;
       if(k % Math.round(3/seg) === 0) for(const sd of [-1, 1]){
         const off = f.half + 0.9, x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off;
+        if(!own(x, z, 3)){ railPts[sd].push(null); continue; }
         addTo(g, new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.3, 0.2), trunk), x, y + 0.55, z);
         railPts[sd].push(x, y + 1.15, z);
       }
       if(k % Math.round(26/seg) === 0) for(const sd of [-1, 1]){
         const off = f.half + 5 + rnd()*3, x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off, g0 = gradedY(x, z), H = 30 + rnd()*14;
+        if(!clearOf(x, z, 4.5)) continue;                                  // a trunk never stands in a road
         addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(1.3, 3.2, H, 10), trunk), x, g0 + H/2 - 1, z);
         // a platform bolted round the trunk at road height, and a lantern
         addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.6, 0.35, 12), lam(0x8a6040)), x, y + 0.2, z);
@@ -8070,7 +8091,11 @@ if(GATOR){
       }
     }
     mergeStatic(g); g.traverse(o=>{ if(o.isMesh) o.castShadow = true; }); scene.add(g);
-    for(const sd of ["-1", "1"]){ const gg = new THREE.BufferGeometry(); gg.setAttribute("position", new THREE.Float32BufferAttribute(railPts[sd], 3)); scene.add(new THREE.Line(gg, rail)); }
+    // the rope, post to post, broken wherever a post was left out
+    for(const sd of ["-1", "1"]){
+      const A = railPts[sd], seg2 = []; let prev = null;
+      for(let q=0; q<A.length; ){ if(A[q] === null){ prev = null; q++; continue; } const cur = [A[q], A[q+1], A[q+2]]; q += 3; if(prev) seg2.push(...prev, ...cur); prev = cur; }
+      const gg = new THREE.BufferGeometry(); gg.setAttribute("position", new THREE.Float32BufferAttribute(seg2, 3)); scene.add(new THREE.LineSegments(gg, rail)); }
     // logs on chains, swinging across the road from beams between the trunks
     for(const u of [0.3, 0.62]){
       const f = frm(P, Math.round(u*P.N)), y = f.p.y + BED, g2 = new THREE.Group();
@@ -8220,35 +8245,59 @@ if(GATOR){
     orbRow(P0, byM(P0, DROP.i, -40), 0, 3, 6);
   }
 
-  /* ---- 11b. the mushroom hill (the third shortcut): giant neon mushrooms, bouncing caps, rolling barrels ---- */
+  /* ---- 11b. the mushroom forest (the third shortcut): a flowing run down the
+     side of the falls through giant glowing mushrooms, the biggest leaning out
+     over the road so you drive under their caps, spores drifting in the air,
+     and one proper jump half way down. Nothing to hit, nothing bouncing you. ---- */
   if(B2){
-    const P = B2, g = new THREE.Group();
-    for(let k=Math.round(20/seg); k<P.N - Math.round(20/seg); k+=Math.round(14/seg)){
+    const P = B2, g = new THREE.Group(), stem = lam(0xf2ecd8, 0x403a30, 0.4), spot = basic(0xffffff);
+    const cap = (x, y, z, cr, c, tx, tz)=>{
+      const m = addTo(g, new THREE.Mesh(capGeo, basic(c)), x, y, z); m.scale.set(cr, cr*0.5, cr);
+      if(tx !== undefined){ m.rotation.z = tz; m.rotation.x = tx; }
+      for(let q=0;q<6;q++){ const a = rnd()*6.28, r = rnd()*cr*0.7; addTo(g, new THREE.Mesh(new THREE.SphereGeometry(cr*0.09, 5, 4), spot), x + Math.cos(a)*r, y + cr*0.48*Math.sqrt(1 - (r/cr)**2), z + Math.sin(a)*r); }
+      // a ring of glow on the ground under it
+      const gl = addTo(g, new THREE.Mesh(new THREE.CircleGeometry(cr*0.9, 16), new THREE.MeshBasicMaterial({color:c, transparent:true, opacity:0.18, depthWrite:false})), x, gradedY(x, z) + 0.08, z); gl.rotation.x = -Math.PI/2;
+    };
+    for(let k=Math.round(35/seg); k<P.N - Math.round(35/seg); k+=Math.round(11/seg)){
+      const f = frm(P, k);
       for(const sd of [-1, 1]){
-        if(rnd() < 0.25) continue;
-        const f = frm(P, k), off = f.half + 4 + rnd()*9, x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off;
-        if(!clearOf(x, z, 2.5)) continue;
-        const H = 4 + rnd()*9, cr = 2.5 + rnd()*4.5, c = NEON[Math.floor(rnd()*NEON.length)], g0 = gradedY(x, z);
-        addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(cr*0.18, cr*0.26, H, 8), lam(0xf2ecd8, 0x403a30, 0.4)), x, g0 + H/2, z);
-        addTo(g, new THREE.Mesh(capGeo, basic(c)), x, g0 + H - 0.2, z).scale.set(cr, cr*0.55, cr);
-        for(let q=0;q<5;q++){ const a = rnd()*6.28, r = rnd()*cr*0.7; addTo(g, new THREE.Mesh(new THREE.SphereGeometry(cr*0.1, 5, 4), basic(0xffffff)), x + Math.cos(a)*r, g0 + H - 0.2 + cr*0.5*Math.sqrt(1 - (r/cr)**2), z + Math.sin(a)*r); }
+        if(rnd() < 0.2) continue;
+        const arch = rnd() < 0.34, off = arch ? f.half + 2.2 + rnd()*1.5 : f.half + 4 + rnd()*10;
+        const x = f.p.x + f.nx*sd*off, z = f.p.z + f.nz*sd*off;
+        if(!clearOf(x, z, 1.8)) continue;
+        const c = NEON[Math.floor(rnd()*NEON.length)], g0 = gradedY(x, z);
+        if(arch){
+          // a tall one right at the verge, its cap spread out over the road 8 to 10 metres up
+          const H = 8 + rnd()*2, cr = f.half + 1.2;
+          addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(0.6, 1.0, H, 10), stem), x, g0 + H/2, z);
+          cap(x, g0 + H, z, cr, c);
+        } else {
+          const H = 3 + rnd()*9, cr = 2.2 + rnd()*4.5;
+          addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(cr*0.16, cr*0.24, H, 8), stem), x, g0 + H/2, z);
+          cap(x, g0 + H - 0.2, z, cr, c);
+          // little ones round its foot
+          for(let q=0;q<3;q++){ const a = rnd()*6.28, r = cr*0.8 + rnd()*2, h2 = 0.6 + rnd()*1.2, x2 = x + Math.cos(a)*r, z2 = z + Math.sin(a)*r;
+            if(!clearOf(x2, z2, 1)) continue;
+            addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, h2, 6), stem), x2, gradedY(x2, z2) + h2/2, z2);
+            cap(x2, gradedY(x2, z2) + h2, z2, 0.5 + rnd()*0.6, NEON[Math.floor(rnd()*NEON.length)]); }
+        }
       }
     }
     mergeStatic(g); scene.add(g);
-    const a = Math.round(40/seg), b = P.N - Math.round(50/seg);
-    let n = 0;
-    for(let k=a; k<b; k+=Math.round(22/seg), n++) bouncePad(P, k, [0, 1.8, -1.8, 0.5, -0.5, 1.8, -1.8][n % 7], "cap");
-    orbRow(P, Math.round(P.N*0.2), 0, 5, 6); orbRow(P, Math.round(P.N*0.62), 0, 5, 6);
-    // barrels, bouncing down the hill ahead of you
-    for(let q=0;q<4;q++){
-      const g2 = new THREE.Group();
-      addTo(g2, new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 1.5, 12), lam(0x8a5a30)), 0, 0, 0).rotation.z = Math.PI/2;
-      for(const e of [-0.45, 0.45]) addTo(g2, new THREE.Mesh(new THREE.CylinderGeometry(0.78, 0.78, 0.12, 12), lam(0x333333)), e, 0, 0).rotation.z = Math.PI/2;
-      g2.visible = false; scene.add(g2);
-      HAZ.push({kind:"barrel", g:g2, P, s:-1, lane:0, r:1.3, h:1.3, x:0, y:0, z:0, cool:0, spd:0, live:false});
-    }
+    // spores: slow glowing motes rising in the air over the whole run
+    { const pos = [], ph = [];
+      for(let k=0;k<P.N;k+=2){ const f = frm(P, k); for(let q=0;q<3;q++){ const v = (rnd() - 0.5)*2*(f.half + 14), x = f.p.x + f.nx*v, z = f.p.z + f.nz*v; pos.push(x, gradedY(x, z) + rnd()*9, z); ph.push(rnd()*6.28); } }
+      const sg = new THREE.BufferGeometry(); sg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); sg.setAttribute("aPh", new THREE.Float32BufferAttribute(ph, 1));
+      const sm = new THREE.ShaderMaterial({ uniforms:{uTime:{value:0}, uScale:{value:window.innerHeight/2}}, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
+        vertexShader:["attribute float aPh; uniform float uTime, uScale; varying vec3 vC; varying float vA;",
+          "void main(){ vec3 p = position; p.y += mod(uTime*0.6 + aPh*3.0, 9.0) - 2.0; p.x += sin(uTime*0.4 + aPh*5.0)*1.5; p.z += cos(uTime*0.35 + aPh*4.0)*1.5;",
+          "  vec4 mv = modelViewMatrix*vec4(p, 1.0); vA = 0.5 + 0.5*sin(uTime*1.3 + aPh*7.0);",
+          "  vC = mix(vec3(1.0, 0.35, 0.85), vec3(0.3, 0.95, 1.0), fract(aPh*0.37));",
+          "  gl_PointSize = clamp(uScale*0.16/max(1.0, -mv.z), 1.0, 7.0); gl_Position = projectionMatrix*mv; }"].join("\n"),
+        fragmentShader:"varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); if(d > 0.5) discard; gl_FragColor = vec4(vC*vA*(1.0 - d*1.8), 1.0); }" });
+      const pm = new THREE.Points(sg, sm); pm.frustumCulled = false; scene.add(pm); waterMats.push(sm); }
+    orbRow(P, Math.round(P.N*0.22), 0, 5, 6); orbRow(P, Math.round(P.N*0.7), 0, 5, 6);
   }
-
   /* ---- 12. the giant cypress and its frog choir ---- */
   const FROGS = [];
   if(GIANT.on){
@@ -8314,6 +8363,42 @@ if(GATOR){
     boostPad(P0, byM(P0, JUMP_I, 60), 0);
     orbRow(P0, byM(P0, JUMP_I, 70), 0, 4, 6);
   }
+
+  /* ---- the forks: a big board on posts in the gore of every split, facing you as
+     you come to it, each route's name on its own side with a flashing arrow ---- */
+  BRANCHES.forEach(B=>{
+    const t0 = MAIN.tans[B.splitAt];
+    let gk = -1, mp = null;
+    for(let k=0; k<B.N/2; k++){
+      const bp = B.pts[k]; let bd = Infinity, bj = B.splitAt;
+      for(let j=-40; j<=80; j++){ const q = MAIN.pts[wrapIdx(MAIN, B.splitAt + j)], d = (q.x - bp.x)**2 + (q.z - bp.z)**2; if(d < bd){ bd = d; bj = wrapIdx(MAIN, B.splitAt + j); } }
+      if(Math.sqrt(bd) > B.half[k] + MAIN.half[bj] + 4){ gk = k; mp = MAIN.pts[bj]; break; }
+    }
+    if(gk < 0) return;
+    const bp = B.pts[gk], gx = (bp.x + mp.x)/2, gz = (bp.z + mp.z)/2;
+    const lat = (bp.x - mp.x)*(-t0.z) + (bp.z - mp.z)*t0.x;                    // + the shortcut goes left
+    const L = lat > 0 ? B.def.label : B.def.mainLabel, R = lat > 0 ? B.def.mainLabel : B.def.label;
+    const cv = document.createElement("canvas"); cv.width = 1024; cv.height = 256; const c = cv.getContext("2d");
+    c.fillStyle = "#2b1554"; c.fillRect(0, 0, 1024, 256);
+    c.strokeStyle = "#ffe24a"; c.lineWidth = 14; c.strokeRect(8, 8, 1008, 240);
+    c.fillStyle = "#ffe24a"; c.fillRect(506, 20, 12, 216);
+    const arrow = (x, dir)=>{ c.beginPath(); c.moveTo(x, 128); c.lineTo(x + dir*-70, 64); c.lineTo(x + dir*-70, 100); c.lineTo(x + dir*-130, 100); c.lineTo(x + dir*-130, 156); c.lineTo(x + dir*-70, 156); c.lineTo(x + dir*-70, 192); c.closePath(); c.fill(); };
+    c.fillStyle = "#ff3fd2"; arrow(40, -1); c.fillStyle = "#3ff2ff"; arrow(984, 1);
+    c.font = "italic 900 52px 'Saira Condensed', Arial Narrow, Arial, sans-serif"; c.textBaseline = "middle"; c.fillStyle = "#ffffff";
+    const fit = (txt, x, align)=>{ c.textAlign = align; let size = 60; do { c.font = "italic 900 " + size + "px 'Saira Condensed', Arial Narrow, Arial, sans-serif"; size -= 4; } while(c.measureText(txt).width > 300 && size > 26); c.fillText(txt, x, 128); };
+    fit(L || "LEFT", 190, "left"); fit(R || "RIGHT", 834, "right");
+    const sign = new THREE.Group(), gy = gradedY(gx, gz);
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(10, 2.5), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cv), side:THREE.DoubleSide}));
+    board.position.y = 4.4; sign.add(board);
+    for(const sd of [-1, 1]) addTo(sign, new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 5.6, 8), lam(0x333333)), sd*3.6, 2.8, -0.1);
+    const bulbs = [];
+    for(const sd of [-1, 1]) for(let q=0;q<4;q++){ const b = addTo(sign, new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), new THREE.MeshBasicMaterial({color:sd < 0 ? 0xff3fd2 : 0x3ff2ff})), sd*(5.3 + 0*q), 3.4 + q*0.4, 0.1); bulbs.push([b, q, sd]); }
+    // a striped bollard nose at the foot, so the gore itself reads as the place you choose
+    addTo(sign, new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 1.1, 12), lam(0xffe24a)), 0, 0.55, 0.8);
+    sign.position.set(gx, gy, gz); sign.rotation.y = Math.atan2(-t0.x, -t0.z);
+    scene.add(sign);
+    ANIMS.push(t=>{ bulbs.forEach(([b, q, sd])=> b.visible = Math.floor(t*6 - q) % 4 !== 0); });
+  });
 
   /* ---- everywhere: neon mushrooms by the road, fireflies in the air, balloons in the sky ---- */
   {
@@ -11515,6 +11600,17 @@ const MENU_KEYS = { ArrowUp:"up", KeyW:"up", ArrowDown:"down", KeyS:"down",
                     ArrowLeft:"left", KeyA:"left", ArrowRight:"right", KeyD:"right",
                     Enter:"ok", NumpadEnter:"ok", Space:"ok", Escape:"back", Backspace:"back" };
 addEventListener("keydown", e=>{
+  const tgt = e.target;
+  if(tgt && tgt.tagName === "INPUT"){
+    // typing a name or a code: the menu keys are letters too, so they stay out of it
+    if(e.code === "Escape") tgt.blur();
+    if(e.code === "Enter" || e.code === "NumpadEnter"){
+      e.preventDefault(); tgt.blur();
+      const act = tgt.id === "netCode" ? "join" : tgt.id === "netName" ? (document.getElementById("netCode") && document.getElementById("netCode").value ? "join" : "host") : null;
+      const btn = act && UIEL.querySelector('[data-act="' + act + '"]'); if(btn) btn.click();
+    }
+    return;
+  }
   if(GAME.ui){
     const dir = MENU_KEYS[e.code];
     startAudio();
@@ -11531,7 +11627,7 @@ addEventListener("keydown", e=>{
   if(e.code==="KeyC") cycleCamera();
   if(e.code==="KeyM") toggleMute();
   if(e.code==="KeyX") resetCar();
-  if(e.code==="KeyR" && state.phase !== "menu"){ setMode(MODE); resetRace(); }
+  if(e.code==="KeyR" && state.phase !== "menu" && MODE !== "online"){ setMode(MODE); resetRace(); }
   if(e.code==="KeyE"){ trans.auto = false; requestShift(trans.gear+1); }
   if(e.code==="KeyQ"){ trans.auto = false; requestShift(trans.gear-1); }
   if(e.code==="KeyT"){ trans.auto = !trans.auto; S.auto = trans.auto; persist(); }
@@ -12019,9 +12115,12 @@ const drift = { mode:"off", dir:0, hold:0, spacePrev:false,
 const splash = { mud:0, water:0 };
 
 function placeAtStart(){
-  const p = pts[0], t = tans[0];
-  const nx=-t.z, nz=t.x;
-  pose.x = p.x - nx*1.8; pose.z = p.z - nz*1.8;
+  // online everyone has their own slot on the grid, two by two, like the rivals past the line
+  const slot = MODE === "online" && NET.on ? (NET.slot || 0) : -1;
+  const gi = slot < 0 ? 0 : Math.round((24 - Math.floor(slot/2)*7)/segLen);
+  const p = pts[gi], t = tans[gi];
+  const nx=-t.z, nz=t.x, lane = slot < 0 ? 1.8 : (slot % 2 ? -2.2 : 2.2);
+  pose.x = p.x - nx*lane; pose.z = p.z - nz*lane;
   pose.y = p.y; pose.h = Math.atan2(t.x, t.z);
   pose.vx = pose.vz = 0; pose.yawVis = 0; pose.steerIn = 0; pose.steerVis = 0;
   pose.roll = pose.pitch = 0; pose.accLP = 0;
@@ -12034,7 +12133,7 @@ function placeAtStart(){
   splash.mud = splash.water = 0;
   trans.gear = 1; trans.target = 1; trans.dir = 1;
   trans.rpm = DRIVE.idle; trans.shiftT = 0; trans.cut = 0; trans.lock = 0;
-  state.idx = 0; state.prevIdx = 0;
+  state.idx = gi; state.prevIdx = gi;
   gridRivals();
 }
 
@@ -13525,7 +13624,8 @@ const MODES = {
   race:  { laps:5, rivals:true,  label:"Quick race" },
   champ: { laps:3, rivals:true,  label:"Championship" },
   trial: { laps:3, rivals:false, label:"Time trial", ghost:true },
-  expedition: { laps:1, rivals:false, label:"Expedition" }
+  expedition: { laps:1, rivals:false, label:"Expedition" },
+  online: { laps:3, rivals:false, label:"Online race" }
 };
 const CUPS = [ {name:"Summer Cup", rounds:[0, 1, 2, 4]},       // every summer circuit but the test yard
                {name:"Fall Cup",   rounds:[5, 6, 7, 17]},
@@ -13740,6 +13840,7 @@ function stepRivals(dt){
   const playerOn = car.visible && (racing || state.phase === "done") && Math.abs(myLane) < 8;
 
   FIELD.forEach(r=>{
+    if(r.net) return;                              // a friend's car: the network moves it (netFrame)
     const i0 = ((Math.floor(r.s)%NS)+NS)%NS;
     if(moving){
       let target = 30;
@@ -14311,6 +14412,8 @@ function finishRace(){
   banner(FIELD.length ? (GAME.finishPlace === 1 ? "WINNER!" : "FINISH") : "FINISH",
          GAME.finishPlace === 1 ? UI.key : UI.ink, 3.2);
   SFX.finish();
+  if(MODE === "online") netFinish();
+  if((MODE === "online" || MODE === "trial") && state.best) netPostLap(state.best, state.t, MODE === "online");
   if(!TRACK.test){
     const rec = recordFor(), key = "race" + LAPS;
     if(rec[key] == null || state.t < rec[key]){ rec[key] = state.t; GAME.raceRecord = true; }
@@ -14619,6 +14722,7 @@ function showMain(sel){
     race:"Any circuit, five laps, the full field.",
     trial:"Three laps with the road to yourself. Your best lap on each circuit is saved and comes back as a ghost to chase.",
     exped:"No rivals, no laps, no map: a long day's climb. Wade the swamp, run up the creek, grind up the switchbacks and over the snow to the summit cairn, calling at every camp on the way; the compass points to the next one. The car is in low range, the mud holds you and anything steeper than about half is a wall, so pick your line.",
+    online:"Race your friends over the internet: host a room, share the code or the link, and everyone races the same circuit live. Three laps, and your best lap goes on the circuit's leaderboard.",
     garage:"Pick the box wagon or the sport wagon, then its paint, livery, fenders, rims, wheel size and the kit on the roof. Saved for every race.",
     opts:"Rival pace, sound, camera, gearbox and the arcade filter.",
     help:"Keyboard and gamepad controls, and how the drift turbo works."
@@ -14632,6 +14736,7 @@ function showMain(sel){
     '<button class="item" data-act="race" data-k="race"><span>QUICK RACE</span></button>' +
     '<button class="item" data-act="trial" data-k="trial"><span>TIME TRIAL</span></button>' +
     '<button class="item" data-act="exped" data-k="exped"><span>EXPEDITION</span></button>' +
+    (NET_CFG.enabled ? '<button class="item" data-act="online" data-k="online"><span>ONLINE RACE</span><small>with friends</small></button>' : '') +
     '<button class="item" data-act="garage" data-k="garage"><span>GARAGE</span></button>' +
     '<button class="item" data-act="opts" data-k="opts"><span>OPTIONS</span></button>' +
     '<button class="item" data-act="help" data-k="help"><span>HOW TO DRIVE</span></button>' +
@@ -14642,13 +14747,16 @@ function showMain(sel){
              race:()=>{ SFX.ok(); showTracks("race"); },
              trial:()=>{ SFX.ok(); showTracks("trial"); },
              exped:()=>{ SFX.ok(); showTracks("expedition"); },
-             garage:()=>{ SFX.ok(); showGarage(()=> showMain(4), ()=> showMain(4)); },
-             opts:()=>{ SFX.ok(); showOptions(()=> showMain(5)); },
-             help:()=>{ SFX.ok(); showHelp(()=> showMain(6)); } } });
+             online:()=>{ SFX.ok(); if(NET.on) showLobby(); else showOnline(); },
+             garage:()=>{ SFX.ok(); showGarage(()=> showMain(MI("garage")), ()=> showMain(MI("garage"))); },
+             opts:()=>{ SFX.ok(); showOptions(()=> showMain(MI("opts"))); },
+             help:()=>{ SFX.ok(); showHelp(()=> showMain(MI("help"))); } } });
   MENU.onSel(MENU.items[MENU.sel]);
 }
 
-const mainIdx = m => m === "champ" ? 0 : m === "race" ? 1 : m === "trial" ? 2 : 3;
+/* where each entry sits in the main menu (the online one is only there when it is switched on) */
+const MI = k => ["champ", "race", "trial", "exped"].concat(NET_CFG.enabled ? ["online"] : [], ["garage", "opts", "help"]).indexOf(k);
+const mainIdx = m => m === "champ" ? 0 : m === "race" ? 1 : m === "trial" ? 2 : m === "online" ? MI("online") : 3;
 /* The circuits, grouped the way the championship runs them: one Grand Prix
    at a time, picked from a row of tabs, so the list is four circuits and
    not seventeen. Expeditions have their own list. */
@@ -14684,12 +14792,12 @@ function showTracks(mode, group){
       '</small>' + (best ? '<em>' + best + '</em>' : '') + '</button>'; }).join("") + '</div>' +
     '<div class="detail" id="tkDetail"></div>' +
     '<div class="menu" style="margin-top:14px;max-width:260px"><button class="item back" data-act="back"><span>BACK</span></button></div></div>',
-    { grid:true, sel: (exped ? 0 : GP_GROUPS.length) + Math.max(0, at), back: ()=> showMain(mainIdx(mode)),
+    { grid:true, sel: (exped ? 0 : GP_GROUPS.length) + Math.max(0, at), back: ()=> mode === "online" ? (NET.on ? showLobby() : showOnline()) : showMain(mainIdx(mode)),
       onSel: el => { if(el.dataset.track !== undefined)
                        document.getElementById("tkDetail").innerHTML = detailHTML(+el.dataset.track); },
       acts:{ track: el => startMode(mode, +el.dataset.track),
              cup: el => { SFX.move(); showTracks(mode, +el.dataset.cup); },
-             back: ()=>{ SFX.back(); showMain(mainIdx(mode)); } } });
+             back: ()=>{ SFX.back(); mode === "online" ? (NET.on ? showLobby() : showOnline()) : showMain(mainIdx(mode)); } } });
   MENU.mode = mode; MENU.group = gi;
   UIEL.querySelectorAll(".tk canvas").forEach((cv, i)=> drawThumb(cv, ids[i]));
   MENU.onSel(MENU.items[MENU.sel]);
@@ -14709,6 +14817,7 @@ function showReady(mode){
 
 function startMode(mode, id){
   SFX.ok();
+  if(mode === "online"){ netPickTrack(id); return; }
   if(id !== TRACK_ID){ travel(id, {mode, then:"ready"}); return; }
   setMode(mode); resetRace();
 }
@@ -14866,6 +14975,7 @@ function showHelp(back){
 
 /* ---- pause ---- */
 function pauseGame(){
+  if(MODE === "online" && NET.on){ if(!document.hidden && !GAME.ui && state.phase !== "menu") showOnlinePause(); return; }
   if(GAME.ui || GAME.paused) return;
   if(state.phase !== "racing" && state.phase !== "countdown") return;
   GAME.paused = true; setLevels();
@@ -14889,6 +14999,428 @@ function showPause(sel){
              restart:()=>{ SFX.ok(); resetRace(); },
              opts:()=>{ SFX.ok(); showOptions(()=> showPause(2)); },
              quit:()=>{ SFX.back(); enterMenuWorld(); showMain(mainIdx(MODE)); } } });
+}
+
+/* ==== ONLINE: race your friends =========================================
+   A room is a code (four letters). Everyone in it meets on a Supabase
+   Realtime channel: presence says who is here and what they drive, and a
+   few broadcast events carry the lobby (the host changing circuit, the
+   start) and the handshake that lets each pair of browsers open a direct
+   WebRTC data channel. The cars themselves go browser to browser over
+   those channels, twenty times a second, so the free tier's message
+   budget only ever sees the lobby. Where a pair cannot connect directly
+   (a strict network) their cars fall back to the channel, five times a
+   second. Each friend's car is a rival the network drives instead of the
+   AI, so place, results, the minimap and bumping into each other all work
+   the way they do against the computer. Best laps go on a shared board. */
+const NET_CFG = {
+  url: "https://kazkhdzrksanencjghdg.supabase.co",
+  key: "sb_publishable_eOsgxtEe3eowA4Lae5_33Q_jQgS00Pa",          // a publishable key: safe in a web page
+  lib: "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js",
+  ice: [{urls:["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]}],
+  max: 6, laps: 3, hz: 20,
+  enabled: /(^|[#&])(online|mocknet)=1/.test(location.hash)      // shown in the menu once it is finished and tested
+};
+const NET = { on:false, code:null, id:null, name:"", host:false, tx:null, peers:new Map(), metas:[], racing:false,
+              sb:null, status:"", joinedAt:0, sendAcc:0, relayAcc:0, board:null, wantTrack:null,
+              mock: /(^|[#&])mocknet=1/.test(location.hash) };
+const NET_PAINT = ()=> (PAINTS[SAVE.settings.paint | 0] || PAINTS[0]).hex;
+function netNick(){ return (SAVE.settings.nick || "").slice(0, 16); }
+function netCode(){ const A = "ABCDEFGHJKLMNPQRSTUVWXYZ"; let s = ""; for(let k=0;k<4;k++) s += A[Math.floor(Math.random()*A.length)]; return s; }
+function netNewId(){ return Math.random().toString(36).slice(2, 10); }
+
+/* the Supabase library is only fetched when someone goes online */
+let NET_LIB = null;
+function netLib(){
+  if(NET.mock) return Promise.resolve(null);
+  if(window.supabase && window.supabase.createClient) return Promise.resolve(window.supabase);
+  return NET_LIB || (NET_LIB = new Promise((ok, no)=>{
+    const s = document.createElement("script"); s.src = NET_CFG.lib; s.async = true;
+    s.onload = ()=> window.supabase ? ok(window.supabase) : no(new Error("no supabase"));
+    s.onerror = ()=>{ NET_LIB = null; no(new Error("could not load the online library")); };
+    document.head.appendChild(s);
+  }));
+}
+async function netClient(){
+  if(NET.mock) return null;
+  if(NET.sb) return NET.sb;
+  const lib = await netLib();
+  NET.sb = lib.createClient(NET_CFG.url, NET_CFG.key, { auth:{ persistSession:false }, realtime:{ params:{ eventsPerSecond:20 } } });
+  return NET.sb;
+}
+
+/* ---- the channel: presence + a handful of events ----
+   The real one is Supabase Realtime. The stand-in (#mocknet=1) runs the
+   same calls over a BroadcastChannel between tabs of one browser, for testing. */
+const NET_EVENTS = ["sig", "start", "track", "fin", "pos", "abort"];
+async function netTransport(code, meta, h){
+  if(NET.mock){
+    const bc = new BroadcastChannel("pine-" + code), seen = new Map();
+    let mine = meta, dead = false;
+    const sync = ()=> h.sync([mine].concat([...seen.values()].map(v=> v.meta)));
+    const hello = ()=>{ if(!dead) bc.postMessage({k:"pres", from:NET.id, meta:mine}); };
+    bc.onmessage = e=>{
+      const m = e.data;
+      if(m.k === "pres"){ const had = seen.has(m.from); seen.set(m.from, {meta:m.meta, t:performance.now()}); if(!had) hello(); sync(); }
+      else if(m.k === "bye"){ seen.delete(m.from); sync(); }
+      else if(m.k === "ev") h.event(m.event, m.payload);
+    };
+    const tick = setInterval(()=>{ hello(); const now = performance.now(); let gone = false;
+      for(const [id, v] of seen) if(now - v.t > 3500){ seen.delete(id); gone = true; }
+      if(gone) sync(); }, 1000);
+    setTimeout(()=>{ hello(); sync(); h.ready(); }, 50);
+    return {
+      send: (event, payload)=>{ if(!dead) bc.postMessage({k:"ev", event, payload}); },
+      track: m=>{ mine = m; hello(); sync(); },
+      leave: ()=>{ if(dead) return; bc.postMessage({k:"bye", from:NET.id}); dead = true; clearInterval(tick); bc.close(); }
+    };
+  }
+  const sb = await netClient();
+  const ch = sb.channel("pine-" + code, { config:{ broadcast:{ self:false, ack:false }, presence:{ key:NET.id } } });
+  NET_EVENTS.forEach(ev=> ch.on("broadcast", {event:ev}, msg=> h.event(ev, msg.payload)));
+  ch.on("presence", {event:"sync"}, ()=>{
+    const st = ch.presenceState();
+    h.sync(Object.keys(st).map(k=> st[k][st[k].length - 1]).filter(Boolean));
+  });
+  let mine = meta, live = false;
+  ch.subscribe(status=>{
+    if(status === "SUBSCRIBED"){ live = true; ch.track(mine); h.ready(); }
+    else if(status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED"){ live = false; h.error(status); }
+  });
+  return {
+    send: (event, payload)=>{ if(live) ch.send({type:"broadcast", event, payload}); },
+    track: m=>{ mine = m; if(live) ch.track(m); },
+    leave: ()=>{ try{ sb.removeChannel(ch); }catch(e){} }
+  };
+}
+
+/* ---- joining, leaving ---- */
+function netMeta(){
+  return { id:NET.id, name:NET.name, paint:NET_PAINT(), host:NET.host, track:TRACK_ID, racing:NET.racing, at:NET.joinedAt };
+}
+async function netJoin(code, opts){
+  if(NET.on) netLeave(true);
+  Object.assign(NET, { on:true, code, id:netNewId(), name:opts.name, host:!!opts.host, racing:false, status:"connecting",
+                       joinedAt:opts.at || Date.now(), metas:[], wantTrack:null });
+  try{ history.replaceState(null, "", "#track=" + TRACK_ID + "&room=" + code + (NET.mock ? "&mocknet=1" : "")); }catch(e){}
+  try{
+    NET.tx = await netTransport(code, netMeta(), {
+      ready: ()=>{ NET.status = "connected"; netRefresh(); },
+      error: s=>{ NET.status = "lost (" + s + ")"; netRefresh(); },
+      sync: list=> netSync(list),
+      event: (ev, p)=> netEvent(ev, p)
+    });
+  } catch(e){ NET.status = "offline: " + (e.message || e); netRefresh(); }
+  addEventListener("beforeunload", netBye);
+}
+function netBye(){ if(NET.tx) NET.tx.leave(); }
+function netLeave(quiet){
+  if(!NET.on) return;
+  NET.peers.forEach(p=> netDropPeer(p));
+  NET.peers.clear();
+  if(NET.tx) NET.tx.leave();
+  NET.tx = null; NET.on = false; NET.racing = false; NET.metas = [];
+  try{ history.replaceState(null, "", "#track=" + TRACK_ID); }catch(e){}
+  if(!quiet){ FIELD = []; }
+}
+/* whoever has been in the room longest runs it, if its host has gone */
+function netHostId(){
+  const list = NET.metas.slice().sort((a, b)=> (b.host - a.host) || (a.at - b.at) || (a.id < b.id ? -1 : 1));
+  return list.length ? list[0].id : NET.id;
+}
+function netIsHost(){ return netHostId() === NET.id; }
+function netSync(list){
+  NET.metas = list.filter(m=> m && m.id).slice(0, NET_CFG.max + 2);
+  const ids = new Set(NET.metas.map(m=> m.id));
+  // new faces: a car for each, and a direct line to them
+  NET.metas.forEach(m=>{ if(m.id !== NET.id && !NET.peers.has(m.id)) netAddPeer(m); else if(NET.peers.has(m.id)) netUpdatePeer(NET.peers.get(m.id), m); });
+  NET.peers.forEach((p, id)=>{ if(!ids.has(id)) netDropPeer(p); });
+  // a friend who joined by link lands on whatever circuit the host is on
+  const hostM = NET.metas.find(m=> m.id === netHostId());
+  if(hostM && hostM.id !== NET.id && hostM.track !== TRACK_ID && !NET.racing && !NET.wantTrack){
+    NET.wantTrack = hostM.track;
+    travel(hostM.track, {mode:"online", room:NET.code, name:NET.name, at:NET.joinedAt});
+    return;
+  }
+  netRefresh();
+}
+
+/* ---- the cars: each friend is a rival the network drives ---- */
+function netNameTag(name, paint){
+  const c = document.createElement("canvas"); c.width = 256; c.height = 64; const g = c.getContext("2d");
+  g.font = "italic 800 34px 'Saira Condensed', Arial, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+  g.lineWidth = 7; g.strokeStyle = "#000"; g.strokeText(name, 128, 32); g.fillStyle = paint || "#fff"; g.fillText(name, 128, 32);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c), depthTest:false, transparent:true}));
+  sp.scale.set(4.4, 1.1, 1); sp.position.y = 3.3; sp.renderOrder = 9;
+  return sp;
+}
+function netAddPeer(m){
+  const mesh = buildRival(["box", "trail", "pickup"][NET.peers.size % 3], {paint:m.paint || "#cfd3cf", rust:20, num:10 + NET.peers.size});
+  mesh.rotation.order = "YXZ"; mesh.visible = false; scene.add(mesh);
+  const tag = netNameTag(m.name || "Friend", m.paint); mesh.add(tag);
+  const car = { net:true, id:m.id, mesh, tag, def:{name:m.name || "Friend", car:"online", paint:m.paint || "#cfd3cf"},
+                s:0, lap:0, v:0, lane:0, laneT:0, laneRate:0, home:0, finish:null, y:null, vy:0, air:false, pitch:0 };
+  const p = { id:m.id, meta:m, car, pc:null, dc:null, open:false, relay:false, since:performance.now(), last:null, recv:0,
+              sx:0, sy:0, sz:0, sh:0, pend:[] };
+  NET.peers.set(m.id, p);
+  if(NET.id < m.id) netCall(p);                        // one side of each pair makes the offer
+}
+function netUpdatePeer(p, m){ p.meta = m; p.car.def.name = m.name || "Friend"; }
+function netDropPeer(p){
+  try{ if(p.dc) p.dc.close(); }catch(e){}
+  try{ if(p.pc) p.pc.close(); }catch(e){}
+  scene.remove(p.car.mesh);
+  const i = FIELD.indexOf(p.car); if(i >= 0){ FIELD = FIELD.slice(); FIELD.splice(i, 1); }
+  NET.peers.delete(p.id);
+  netRefresh();
+}
+
+/* ---- the direct lines: WebRTC data channels, set up over the room ---- */
+function netPC(p){
+  const pc = new RTCPeerConnection({iceServers:NET_CFG.ice});
+  p.pc = pc;
+  pc.onicecandidate = e=>{ if(e.candidate && NET.tx) NET.tx.send("sig", {to:p.id, from:NET.id, ice:e.candidate.toJSON ? e.candidate.toJSON() : e.candidate}); };
+  pc.onconnectionstatechange = ()=>{ if(pc.connectionState === "failed"){ p.relay = true; p.open = false; netRefresh(); } };
+  pc.ondatachannel = e=> netWire(p, e.channel);
+  return pc;
+}
+function netWire(p, dc){
+  p.dc = dc;
+  dc.onopen = ()=>{ p.open = true; p.relay = false; netRefresh(); };
+  dc.onclose = ()=>{ p.open = false; };
+  dc.onmessage = e=>{ try{ netPose(p, JSON.parse(e.data)); }catch(err){} };
+}
+async function netCall(p){
+  const pc = netPC(p);
+  netWire(p, pc.createDataChannel("cars", {ordered:false, maxRetransmits:0}));
+  try{
+    await pc.setLocalDescription(await pc.createOffer());
+    if(NET.tx) NET.tx.send("sig", {to:p.id, from:NET.id, sdp:pc.localDescription.toJSON ? pc.localDescription.toJSON() : pc.localDescription});
+  } catch(e){ p.relay = true; }
+}
+async function netSignal(m){
+  if(!m || m.to !== NET.id) return;
+  let p = NET.peers.get(m.from);
+  if(!p) return;
+  try{
+    if(m.sdp){
+      if(m.sdp.type === "offer"){
+        if(p.pc) try{ p.pc.close(); }catch(e){}
+        const pc = netPC(p);
+        await pc.setRemoteDescription(m.sdp);
+        await pc.setLocalDescription(await pc.createAnswer());
+        NET.tx.send("sig", {to:p.id, from:NET.id, sdp:pc.localDescription.toJSON ? pc.localDescription.toJSON() : pc.localDescription});
+      } else if(p.pc) await p.pc.setRemoteDescription(m.sdp);
+      // candidates that came in before the description
+      const q = p.pend; p.pend = [];
+      for(const c of q) try{ await p.pc.addIceCandidate(c); }catch(e){}
+    } else if(m.ice){
+      if(p.pc && p.pc.remoteDescription) await p.pc.addIceCandidate(m.ice); else p.pend.push(m.ice);
+    }
+  } catch(e){ p.relay = true; }
+}
+
+/* ---- the events ---- */
+function netEvent(ev, d){
+  if(!d || typeof d !== "object") return;
+  if(ev === "sig") return netSignal(d);
+  if(ev === "pos"){ const p = NET.peers.get(d.from); if(p){ p.relay = p.relay || !p.open; netPose(p, d); } return; }
+  const fromHost = d.from === netHostId();
+  if(ev === "track" && fromHost && typeof d.id === "number" && TRACKS[d.id] && d.id !== TRACK_ID){
+    NET.wantTrack = d.id; travel(d.id, {mode:"online", room:NET.code, name:NET.name, at:NET.joinedAt});
+  }
+  if(ev === "start" && fromHost && d.track === TRACK_ID) netBegin(d.grid || []);
+  if(ev === "abort" && fromHost && NET.racing){ NET.racing = false; enterMenuWorld(); showLobby(); }
+  if(ev === "fin"){ const p = NET.peers.get(d.from); if(p && typeof d.time === "number") p.car.finish = d.time; }
+}
+function netPose(p, d){
+  if(typeof d.x !== "number" || !isFinite(d.x + d.z + (d.y || 0))) return;
+  p.last = d; p.recv = performance.now();
+  if(typeof d.fin === "number") p.car.finish = d.fin;
+}
+
+/* ---- racing ---- */
+function netBegin(grid){
+  NET.racing = true; netTrackMe();
+  setMode("online");
+  FIELD = [...NET.peers.values()].filter(p=> p.meta && !p.meta.spectate).map(p=> p.car);
+  FIELD.forEach(r=>{ r.finish = null; r.lap = 0; r.s = 0; r.mesh.visible = true; });
+  NET.slot = Math.max(0, grid.indexOf(NET.id));
+  resetRace();
+}
+function netStart(){
+  if(!netIsHost()) return;
+  // the grid: host on pole, then everyone in the order they came
+  const grid = NET.metas.slice().sort((a, b)=> (b.id === NET.id) - (a.id === NET.id) || a.at - b.at).map(m=> m.id);
+  NET.tx.send("start", {from:NET.id, track:TRACK_ID, grid});
+  netBegin(grid);
+}
+function netTrackMe(){ if(NET.tx) NET.tx.track(netMeta()); }
+/* where each of the grid's slots is: two by two back from the line */
+function netGridSpot(slot){
+  const row = Math.floor(slot/2), side = slot % 2 ? 1 : -1;
+  return {back: 4 + row*8, lane: side*2.2};
+}
+/* every frame: send yourself, move everyone else */
+function netFrame(dt){
+  if(!NET.on) return;
+  const racing = NET.racing && (state.phase === "racing" || state.phase === "countdown" || state.phase === "done");
+  if(racing){
+    NET.sendAcc += dt; NET.relayAcc += dt;
+    if(NET.sendAcc >= 1/NET_CFG.hz){
+      NET.sendAcc = 0;
+      const r2 = v=> Math.round(v*100)/100;
+      const d = { from:NET.id, x:r2(pose.x), y:r2(pose.y), z:r2(pose.z), h:r2(pose.h + pose.yawVis), p:r2(pose.pitch), r:r2(pose.roll),
+                  vx:r2(pose.vx), vz:r2(pose.vz), lap:state.lap - 1, s:state.idx, fin:state.phase === "done" ? GAME.finishTime : null, t:r2(state.t) };
+      const js = JSON.stringify(d);
+      let relayNeeded = false;
+      NET.peers.forEach(p=>{
+        if(p.open && p.dc && p.dc.readyState === "open"){ try{ p.dc.send(js); }catch(e){} }
+        else if(p.relay || performance.now() - p.since > 7000) relayNeeded = true;
+      });
+      // the fallback: no direct line after seven seconds, so through the room, five times a second
+      if(relayNeeded && NET.relayAcc >= 0.2){ NET.relayAcc = 0; NET.tx.send("pos", d); }
+    }
+  }
+  NET.peers.forEach(p=> netMoveCar(p, dt));
+}
+function netMoveCar(p, dt){
+  const r = p.car, d = p.last;
+  if(!d || !NET.racing){ r.mesh.visible = false; return; }
+  r.mesh.visible = FIELD.includes(r);
+  // where it will be by now: the last word, carried on at its own speed, eased into
+  const age = Math.min(0.35, (performance.now() - p.recv)/1000);
+  const tx = d.x + (d.vx || 0)*age, tz = d.z + (d.vz || 0)*age, ty = d.y;
+  const k = 1 - Math.exp(-dt*14);
+  if(!p.placed || Math.hypot(tx - p.sx, tz - p.sz) > 25){ p.sx = tx; p.sy = ty; p.sz = tz; p.sh = d.h; p.placed = true; }
+  else { p.sx += (tx - p.sx)*k; p.sy += (ty - p.sy)*k; p.sz += (tz - p.sz)*k;
+         let dh = d.h - p.sh; while(dh > Math.PI) dh -= 2*Math.PI; while(dh < -Math.PI) dh += 2*Math.PI; p.sh += dh*k; }
+  r.mesh.position.set(p.sx, p.sy, p.sz);
+  r.mesh.rotation.set(-(d.p || 0), p.sh, -(d.r || 0));
+  r.lap = d.lap | 0; r.s = d.s | 0; r.v = Math.hypot(d.vx || 0, d.vz || 0);
+  const pt = pts[((r.s % NS) + NS) % NS], tn = tans[((r.s % NS) + NS) % NS];
+  r.lane = r.laneT = (p.sx - pt.x)*(-tn.z) + (p.sz - pt.z)*tn.x;
+  r.mesh.userData.wheels && r.mesh.userData.wheels.forEach(w=> w.mesh.rotation.x += r.v*dt/(r.mesh.userData.wheelR || WHEEL_R));
+  // cars are solid: you bump off a friend the way you bump off a rival
+  if(car.visible && state.phase === "racing" && Math.abs(r.lane) < 12){
+    const t = tans[((r.s % NS) + NS) % NS];
+    collideRival(r, t, -t.z, t.x);
+  }
+}
+function netFinish(){
+  if(!NET.on) return;
+  NET.tx && NET.tx.send("fin", {from:NET.id, time:GAME.finishTime, best:state.best});
+}
+
+/* ---- the leaderboard: best laps per circuit, shared ---- */
+async function netPostLap(lapS, raceS, online){
+  const name = netNick(); if(!name || !(lapS > 15) || TRACK.test || EXP.on) return;
+  try{
+    const sb = await netClient(); if(!sb) return;
+    await sb.from("laps").insert({ track:TRACK.name, name, lap_ms:Math.round(lapS*1000), race_ms: raceS ? Math.round(raceS*1000) : null, online:!!online });
+  } catch(e){}
+}
+async function netBoard(){
+  try{
+    const sb = await netClient(); if(!sb) return null;
+    const { data } = await sb.from("laps").select("name,lap_ms").eq("track", TRACK.name).order("lap_ms", {ascending:true}).limit(40);
+    // one line per driver: their best
+    const best = new Map(); (data || []).forEach(r=>{ if(!best.has(r.name)) best.set(r.name, r.lap_ms); });
+    return [...best.entries()].slice(0, 10);
+  } catch(e){ return null; }
+}
+function netBoardHTML(rows){
+  if(!rows) return '<p class="dimtx">Leaderboard offline.</p>';
+  if(!rows.length) return '<p class="dimtx">No laps posted here yet: set the first.</p>';
+  return '<table class="grid">' + rows.map((r, i)=> '<tr' + (r[0] === netNick() ? ' class="you"' : '') + '><td class="p">' + (i+1) + '</td><td class="n">' +
+    esc(r[0]) + '</td><td class="t">' + fmt(r[1]/1000) + '</td></tr>').join("") + '</table>';
+}
+
+/* ---- the screens ---- */
+function netInputStyle(){ return 'style="font:inherit;font-size:22px;padding:8px 12px;width:100%;max-width:320px;box-sizing:border-box;border:3px solid #000;border-radius:6px;background:#f7efd8;color:#1a1410;text-transform:uppercase"'; }
+function showOnline(prefill){
+  const nick = netNick();
+  openScreen("scOnline",
+    '<div class="cols"><div class="left"><h2 class="head">Online race</h2>' +
+    '<label class="dimtx" for="netName">YOUR NAME</label><input id="netName" maxlength="16" autocomplete="off" value="' + esc(nick) + '" ' + netInputStyle() + '>' +
+    '<div class="menu" style="margin-top:14px">' +
+    '<button class="item" data-act="host"><span>HOST A RACE</span><small>pick a circuit, get a code to share</small></button>' +
+    '<button class="item" data-act="join"><span>JOIN WITH CODE</span></button>' +
+    '</div><input id="netCode" maxlength="4" autocomplete="off" placeholder="CODE" value="' + esc(prefill || "") + '" ' + netInputStyle() + '>' +
+    '<div class="menu" style="margin-top:14px"><button class="item back" data-act="back"><span>BACK</span></button></div>' +
+    '<p class="dimtx" id="netMsg" style="margin-top:10px"></p></div>' +
+    '<div class="right"><div class="note detail"><p>Race up to five friends. The host picks the circuit and starts; everyone else joins with the code, or with the link the lobby shows. Three laps, no computer rivals, and your best lap goes on the circuit\'s leaderboard.</p></div></div></div>',
+    { sel: prefill ? 1 : 0, back: ()=> showMain(MI("online")),
+      acts:{ host: ()=>{ if(!netSaveNick()) return; SFX.ok(); NET.pendingHost = netCode(); showTracks("online"); },
+             join: ()=>{ if(!netSaveNick()) return; const c = (document.getElementById("netCode").value || "").toUpperCase().replace(/[^A-Z]/g, "");
+                         if(c.length !== 4){ netMsg("Type the four letter code first."); document.getElementById("netCode").focus(); return; }
+                         SFX.ok(); netEnter(c, false); },
+             back: ()=>{ SFX.back(); showMain(MI("online")); } } });
+  if(prefill && nick){ const j = UIEL.querySelector('[data-act="join"]'); if(j) j.focus(); }
+  else setTimeout(()=>{ const n = document.getElementById("netName"); if(n && !n.value) n.focus(); }, 30);
+}
+function netMsg(t){ const m = document.getElementById("netMsg"); if(m) m.textContent = t; }
+function netSaveNick(){
+  const el = document.getElementById("netName");
+  const v = (el ? el.value : netNick()).trim().replace(/[^\w .'-]/g, "").slice(0, 16);
+  if(!v){ netMsg("Type a name first."); if(el) el.focus(); return false; }
+  SAVE.settings.nick = v; persist(); return true;
+}
+function netEnter(code, host){
+  netJoin(code, {name:netNick(), host});
+  showLobby();
+}
+/* the host picked a circuit: go there with the room */
+function netPickTrack(id){
+  const code = NET.on ? NET.code : (NET.pendingHost || netCode());
+  if(NET.on && NET.tx) NET.tx.send("track", {from:NET.id, id});
+  if(id === TRACK_ID){ if(NET.on) showLobby(); else netEnter(code, true); return; }
+  travel(id, {mode:"online", room:code, name:netNick(), host:true, at:NET.on ? NET.joinedAt : Date.now()});
+}
+function netLink(){ return location.origin + location.pathname + "#room=" + NET.code; }
+function showLobby(sel){
+  if(!NET.on) return showOnline();
+  const host = netIsHost(), me = NET.id;
+  const rows = NET.metas.slice().sort((a, b)=> a.at - b.at).map(m=>{
+    const p = NET.peers.get(m.id);
+    const link = m.id === me ? "you" : p ? (p.open ? "direct" : p.relay ? "relay" : "connecting") : "";
+    return '<tr' + (m.id === me ? ' class="you"' : '') + '><td class="p"><span style="display:inline-block;width:14px;height:14px;border:2px solid #000;border-radius:50%;background:' + esc(m.paint || "#ccc") + '"></span></td>' +
+      '<td class="n">' + esc(m.name || "Friend") + (m.id === netHostId() ? ' (host)' : '') + '</td><td class="x">' + (m.racing ? 'racing' : link) + '</td></tr>';
+  }).join("");
+  openScreen("scLobby",
+    '<div class="cols" style="align-items:flex-start"><div class="left"><h2 class="head">Room ' + esc(NET.code) + '</h2>' +
+    '<p class="dimtx">' + esc(TRACK.name) + ' · ' + NET_CFG.laps + ' laps · ' + esc(NET.status) + '</p>' +
+    '<div class="menu" style="margin-top:12px">' +
+    (host ? '<button class="item" data-act="go"><span>START RACE</span><small>' + (NET.metas.length > 1 ? NET.metas.length + ' drivers' : 'waiting for friends: you can start alone') + '</small></button>' +
+            '<button class="item" data-act="track"><span>CHANGE CIRCUIT</span></button>'
+          : '<button class="item" data-act="wait"><span>WAITING FOR THE HOST</span><small>the race starts when they press start</small></button>') +
+    '<button class="item" data-act="copy"><span>COPY INVITE LINK</span></button>' +
+    '<button class="item back" data-act="leave"><span>LEAVE ROOM</span></button></div>' +
+    '<input id="netLinkBox" readonly value="' + esc(netLink()) + '" ' + netInputStyle().replace("text-transform:uppercase", "font-size:14px") + '></div>' +
+    '<div class="right"><table class="grid">' + rows + '</table><h2 class="head" style="margin-top:16px;font-size:18px">Best laps here</h2><div id="netBoard"><p class="dimtx">Loading…</p></div></div></div>',
+    { sel: sel || 0, back: ()=>{ SFX.back(); netLeave(); showMain(MI("online")); },
+      acts:{ go: ()=>{ SFX.ok(); netStart(); },
+             track: ()=>{ SFX.ok(); showTracks("online"); },
+             wait: ()=>{ SFX.move(); },
+             copy: ()=>{ const b = document.getElementById("netLinkBox"); try{ navigator.clipboard.writeText(netLink()); }catch(e){ if(b){ b.select(); document.execCommand && document.execCommand("copy"); } } SFX.ok(); },
+             leave: ()=>{ SFX.back(); netLeave(); showMain(MI("online")); } } });
+  netBoard().then(rows=>{ const el = document.getElementById("netBoard"); if(el) el.innerHTML = netBoardHTML(rows); });
+}
+/* redraw the lobby as people come and go, without losing the selection */
+function netRefresh(){
+  if(MENU.id === "scLobby") showLobby(MENU.sel);
+}
+function showOnlinePause(){
+  openScreen("scPause",
+    '<div class="cols"><div class="left"><h2 class="head">Online race</h2><p class="dimtx">The race carries on while you are here.</p><div class="menu">' +
+    '<button class="item" data-act="resume"><span>BACK TO THE RACE</span></button>' +
+    (netIsHost() ? '<button class="item" data-act="abort"><span>END RACE FOR EVERYONE</span></button>' : '') +
+    '<button class="item" data-act="lobby"><span>LEAVE RACE</span><small>back to the lobby</small></button>' +
+    '</div></div><div class="right"></div></div>',
+    { cls:"veil", back: ()=>{ closeUI(); },
+      acts:{ resume: ()=>{ SFX.ok(); closeUI(); },
+             abort: ()=>{ SFX.back(); NET.tx && NET.tx.send("abort", {from:NET.id}); NET.racing = false; netTrackMe(); enterMenuWorld(); showLobby(); },
+             lobby: ()=>{ SFX.back(); NET.racing = false; netTrackMe(); enterMenuWorld(); showLobby(); } } });
 }
 
 /* ---- results ---- */
@@ -14926,7 +15458,11 @@ function showResults(){
       .map(r=> '<tr><td class="n">' + r[0] + '</td><td class="t">' + esc(r[1]) + '</td></tr>').join("") + '</table>';
   }
   const acts = {}, items = [];
-  if(MODE === "champ"){
+  if(MODE === "online"){
+    items.push(['lobby', "BACK TO THE LOBBY"], ['leave', "LEAVE ROOM"]);
+    acts.lobby = ()=>{ SFX.ok(); NET.racing = false; netTrackMe(); enterMenuWorld(); showLobby(); };
+    acts.leave = ()=>{ SFX.back(); netLeave(); enterMenuWorld(); showMain(MI("online")); };
+  } else if(MODE === "champ"){
     items.push(['stand', SAVE.champ && SAVE.champ.done ? "FINAL STANDINGS" : "STANDINGS"]);
     acts.stand = ()=>{ SFX.ok(); showStandings(); };
   } else {
@@ -14976,7 +15512,10 @@ function boot(){
   let b = null;
   try{ b = JSON.parse(sessionStorage.getItem(BOOT_KEY) || "null"); sessionStorage.removeItem(BOOT_KEY); }catch(e){}
   document.getElementById("loading").classList.add("gone");
-  if(b && b.mode === "champ" && SAVE.champ && !SAVE.champ.done) showChampIntro();
+  const roomLink = (location.hash.match(/(?:^|[#&])room=([A-Za-z]{4})/) || [])[1];
+  if(b && b.mode === "online" && b.room){ netJoin(b.room, {name:b.name || netNick(), host:!!b.host, at:b.at}); showLobby(); }
+  else if(roomLink){ showOnline(roomLink.toUpperCase()); }
+  else if(b && b.mode === "champ" && SAVE.champ && !SAVE.champ.done) showChampIntro();
   else if(b && b.then === "ready" && MODES[b.mode]) showReady(b.mode);
   else showTitle();
 }
@@ -15337,6 +15876,7 @@ function frame(now){
 
     info = stepCar(dt);
     stepRivals(dt);
+    netFrame(dt);
     stepLeafPiles(dt);
     stepCritters(dt);
     stepLava(dt);
