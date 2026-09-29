@@ -1735,10 +1735,13 @@ function causeway(P){
   /* it runs on, out from the raised stretch, until it has come down to the
      land: not cut off at some distance from the shore, which left a wall */
   const near = i=>{ const p = P.pts[i]; return Math.hypot((p.x - LAKE.x)/LAKE.rx, (p.z - LAKE.z)/LAKE.rz) < 3.2; };
-  const drop = 0.14*P.seg, go = Array.from(P.pts, (p, i)=> near(i));
+  /* but a shortcut's stretch still joined to the main road stays the main road's height: raised
+     off a main road falling faster than 14%, it left a step of 1.8m where the two parted */
+  const drop = 0.14*P.seg, go = Array.from(P.pts, (p, i)=> near(i) && !(P.share && P.share[i] > 0.9));
   for(let pass=0; pass<2; pass++){
-    for(let i=1;i<P.N;i++) if((go[i] || go[i-1]) && P.pts[i].y < P.pts[i-1].y - drop){ P.pts[i].y = P.pts[i-1].y - drop; go[i] = true; }
-    for(let i=P.N-2;i>=0;i--) if((go[i] || go[i+1]) && P.pts[i].y < P.pts[i+1].y - drop){ P.pts[i].y = P.pts[i+1].y - drop; go[i] = true; }
+    const held = i=> P.share && P.share[i] > 0.9;
+    for(let i=1;i<P.N;i++) if(!held(i) && (go[i] || go[i-1]) && P.pts[i].y < P.pts[i-1].y - drop){ P.pts[i].y = P.pts[i-1].y - drop; go[i] = true; }
+    for(let i=P.N-2;i>=0;i--) if(!held(i) && (go[i] || go[i+1]) && P.pts[i].y < P.pts[i+1].y - drop){ P.pts[i].y = P.pts[i+1].y - drop; go[i] = true; }
     if(P.closed && (go[0] || go[P.N-1])) P.pts[0].y = Math.max(P.pts[0].y, P.pts[P.N-1].y - drop);
   }
 }
@@ -4008,7 +4011,11 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
              : "col = mix(col, col*vec3(0.62, 0.64, 0.66), clamp(wet*1.4, 0.0, 1.0)*max(onRoad, verge));",
       "diffuseColor.rgb *= col;"
     ].join("\n"))
-    .replace("#include <color_fragment>", "");
+    .replace("#include <color_fragment>", "")
+    /* the ground is marked in the frame's alpha (0.5) so the Print ink draws no crease lines on it:
+       every sag, crest and rut facet of the heightfield inked a stray stroke across the road that
+       began and ended nowhere. Its outline against the sky or a farther hill is still inked. */
+    .replace("#include <dithering_fragment>", "#include <dithering_fragment>\ngl_FragColor.a = 0.5;");
 };
 
 {
@@ -10005,6 +10012,7 @@ const postMat = new THREE.ShaderMaterial({
     "    float wc = 1.0/zc;",
     "    float lap = abs(1.0/zl + 1.0/zr + 1.0/zu + 1.0/zd - 4.0*wc)/wc;",
     "    float crease = smoothstep(0.010, 0.030, lap);",
+    "    crease *= smoothstep(0.03, 0.12, abs(texture2D(tDiffuse, uv).a - 0.5));",
     "    float ink = max(sil, crease*0.55)*(1.0 - smoothstep(90.0, 420.0, zc));",
     "    if(dc > 0.99999) ink = 0.0;",
     "    ink *= 1.0 - clamp(texture2D(tFxMask, uv).r*uFxMask*1.3, 0.0, 1.0);",
@@ -12104,6 +12112,7 @@ function drawHUDInner(dt, alongNow){
     hud.fillRect(mx, my, size, size);
     hud.strokeStyle = "#000"; hud.lineWidth = 2*k;
     hud.strokeRect(mx, my, size, size);
+    /* the main road muted, the shortcuts over it in white with a black edge, so they stand out */
     paths.forEach((P, pi)=>{
       hud.beginPath();
       const step = Math.max(1, Math.round(P.N/90));
@@ -12111,11 +12120,15 @@ function drawHUDInner(dt, alongNow){
         const p = P.pts[i];
         i ? hud.lineTo(px(p.x), pz(p.z)) : hud.moveTo(px(p.x), pz(p.z));
       }
+      if(!P.closed){ const p = P.pts[P.N-1]; hud.lineTo(px(p.x), pz(p.z)); }
       if(P.closed) hud.closePath();
-      hud.lineWidth = (pi ? 2.0 : 3.4)*k;
-      hud.strokeStyle = pi ? "rgba(150,190,220,.75)" : "#dfe7ec";
       hud.lineJoin = "round"; hud.lineCap = "round";
-      hud.stroke();
+      if(pi){
+        hud.lineWidth = 4.4*k; hud.strokeStyle = "#000"; hud.stroke();
+        hud.lineWidth = 2.4*k; hud.strokeStyle = "#ffffff"; hud.stroke();
+      } else {
+        hud.lineWidth = 3.4*k; hud.strokeStyle = "rgba(120,150,170,.9)"; hud.stroke();
+      }
     });
     hud.fillStyle = UI.key;
     hud.fillRect(px(pts[0].x)-2*k, pz(pts[0].z)-2*k, 4*k, 4*k);
