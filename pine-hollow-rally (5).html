@@ -1217,30 +1217,46 @@ const TRACKS = [
      and the scree; the valleys between are swamp, and the ground between
      the two is mud. */
   { name:"SAWTOOTH RIDGE", special:true, alpine:true, after:"a mountain range in the thaw", relief:1.0, rollers:0.6,
-    blurb:"straight up the face of a snowy peak and straight down into Dead Man's Bog, up and over a bigger peak, a long plunge off its east face into the second swamp, then over the last tooth to the flag, with mud all the way",
+    blurb:"twist up through the infield, S-bends up the face of a snowy peak and a single lane along its ridge, plunge into Dead Man's Bog (or take the dry line round it), S-bends up a bigger peak, a long plunge off its east face through the second swamp (or round it on the logging road), then a chicane over the last tooth to the flag",
     kit:["crest","kicker"],
     shape:"THE SAWTOOTH \u2014 peak to swamp to peak",
     feature:"two snowy summits with a swamp in the valley below each, and no switchbacks: straight up and straight down",
-    ctrl:[[81,-567],[-54,-574],[-189,-556],
-          // straight up the south face of the first peak, over its snowy top
-          [-304,-520],[-392,-452],[-452,-364],[-489,-277],[-502,-202],[-475,-115],
-          // straight down into the valley and across Dead Man's Bog
-          [-418,-34],[-344,40],[-263,97],[-176,130],[-81,140],
-          // straight up the second, bigger peak and over its top
-          [0,159],[74,202],[135,259],[189,300],[256,321],[338,305],[412,254],
-          // the long plunge off its east face, into the second swamp
-          [473,169],[506,68],[497,-40],[452,-135],[385,-216],[300,-277],
-          // over the last tooth and home
-          [240,-354],[213,-446],[173,-533]],
+    /* (generated: a base line through the infield, up the first peak's east face, down to the bog, up
+       the big peak, down to the second swamp and over the last tooth, with long fast sweeps laid over
+       the climbs, so they stay flat out, and a chicane over the tooth) */
+    ctrl:[[81,-567],[53,-572],[24,-575],[-5,-576],[-34,-576],[-62,-573],[-91,-569],[-119,-563],[-145,-551],[-167,-533],
+          [-184,-509],[-194,-483],[-195,-454],[-187,-426],[-175,-400],[-156,-379],[-133,-361],[-112,-342],[-93,-320],[-76,-297],
+          [-69,-269],[-72,-241],[-85,-215],[-109,-201],[-138,-195],[-166,-198],[-193,-209],[-219,-221],[-246,-232],[-255,-241],
+          [-264,-250],[-275,-255],[-286,-259],[-297,-261],[-309,-262],[-321,-261],[-332,-259],[-343,-255],[-354,-250],[-365,-245],
+          [-375,-239],[-385,-232],[-395,-226],[-405,-221],[-415,-221],[-427,-224],[-438,-224],[-466,-216],[-490,-200],[-506,-177],
+          [-512,-149],[-507,-120],[-492,-96],[-471,-75],[-449,-58],[-426,-41],[-404,-21],[-385,0],[-365,21],[-344,40],
+          [-321,58],[-298,75],[-274,91],[-248,104],[-222,116],[-195,125],[-167,132],[-138,135],[-109,137],[-81,140],
+          [-52,145],[-24,151],[3,160],[22,185],[29,194],[36,202],[43,209],[52,215],[60,221],[69,225],
+          [78,230],[88,234],[99,238],[110,242],[122,246],[152,255],[163,259],[172,264],[177,274],[180,287],
+          [186,298],[212,310],[239,319],[268,321],[297,318],[324,310],[351,299],[376,284],[398,267],[419,247],
+          [438,225],[454,201],[469,176],[489,154],[502,147],[512,139],[516,128],[518,117],[515,104],[508,91],
+          [505,79],[507,50],[507,21],[504,-7],[498,-36],[489,-63],[478,-89],[464,-115],[449,-139],[433,-163],
+          [415,-185],[395,-206],[374,-226],[350,-242],[325,-257],[303,-275],[282,-295],[264,-317],[247,-341],[237,-367],
+          [242,-380],[249,-392],[249,-403],[245,-413],[234,-422],[222,-430],[215,-440],[206,-467],[197,-494],[184,-520],
+          [164,-540],[138,-553],[110,-561],[82,-567]],
     /* (laid out in a model of the land so no climb or drop is much steeper than 45%: the car
        still makes it up at that, just, with a run at it, and the swamps sit on the valley floors) */
     hills:[[-520,-223,320,125],[270,308,370,135],[-215,120,240,-34],[430,-200,230,-34],[243,-418,170,50]],
     jumps:[], fords:[],
-    mud:[[[-304,-520],[-392,-452]], [[-418,-34],[-344,40]], [[0,159],[74,202]], [[497,-40],[452,-135]], [[240,-354],[213,-446]]],
+    mud:[[[-195,-480],[-175,-400]], [[-418,-34],[-344,40]], [[0,159],[74,202]], [[497,-40],[452,-135]], [[240,-354],[213,-446]]],
+    /* the road's width: out wide and flat across the swamps, down to a single lane along each summit ridge */
+    widths:[[[-263,97],[-81,140],11], [[452,-135],[385,-216],11], [[-440,-224],[-472,-76],3.1], [[189,300],[338,305],3.1]],
     swamps:[{at:[-205,122], r:90, name:"DEAD MAN'S BOG"}, {at:[422,-185], r:82, name:"SAWTOOTH SWAMP"}],
     flats:[[-54,-567,110]],
     treeline:72, snowline:95,
-    branches:[]}
+    branches:[
+      // round the north shore of the bog on dry ground: one lane through the trees, and a jump
+      {a:[-418,-34], b:[0,159], via:[[-365,62],[-322,150],[-250,236],[-150,240],[-60,205]],
+       half:3.4, jumps:[[0.55,24,7,2.2,44]], tune:0.3, label:"DRY LINE", mainLabel:"THE BOG"},
+      // round the east shore of the second swamp: a wide graded logging road, flat out
+      {a:[497,-40], b:[268,-318], via:[[540,-120],[542,-220],[482,-300],[400,-332],[322,-334]],
+       half:9, jumps:[], tune:0, fast:true, label:"LOGGING ROAD", mainLabel:"THE SWAMP"}
+    ]}
 ];
 
 /* ---- paths -------------------------------------------------------- */
@@ -1428,7 +1444,7 @@ const MUD_EXP = [0.95, 0.028], MUD_RACE = [0.03, 0.0005];
 /* the Sawtooth's hills: how much harder than life a descent throws the car on, and how far past
    top speed it may carry it (m/s: up to 'over', 'overPer' for each unit of grade, settling back
    at 'settle' a second once the road levels) */
-const ALP = {fall:1.5, over:18, overPer:45, settle:3};
+const ALP = {fall:1.5, over:18, overPer:45, settle:3, climb:4};   // (climb: a surge up the faces, m/s^2 per unit of grade)
 function routingTest(P){
   const N = P.N, seg = P.seg, R = radiiOf(P);
   const TOTALS = [24.0, 15.5, 10.8, 7.7, 5.5];
@@ -1449,7 +1465,7 @@ function routingTest(P){
      just as they do for the player's car */
   const HILL = !!TRACK.alpine, gr = new Float64Array(N), W = Math.max(1, Math.round(1.6/seg));
   if(HILL) for(let i=0;i<N;i++) gr[i] = (P.pts[(i + W)%N].y - P.pts[(i - W + N)%N].y)/(2*W*seg);
-  const pull = g=> g > 0 ? 0 : 9.8*g/Math.sqrt(1 + g*g)*ALP.fall, grip = g=> 1;
+  const pull = g=> g > 0 ? -g*ALP.climb : 9.8*g/Math.sqrt(1 + g*g)*ALP.fall, grip = g=> 1;
   // how far past top speed the hill has carried them, sample by sample (it settles over distance)
   const over = new Float64Array(N);
   if(HILL) for(let pass=0; pass<2; pass++) for(let i=0;i<N;i++){
@@ -3360,7 +3376,7 @@ BRANCHES.forEach(P=>{
 BRANCHES.forEach(P=> causeway(P));
 // the road itself eased before its crests and jumps are built on it (easeRoad, below)
 if(!TRACK.expedition && !TRACK.test){
-  BRANCHES.forEach(P=>{ if(!P.def.leap && !P.def.even) easeRoad(P, 0.22, roadHold(P, 12)); });
+  BRANCHES.forEach(P=>{ if(!P.def.leap && !P.def.even) easeRoad(P, TRACK.alpine ? 0.45 : 0.22, roadHold(P, 12)); });
 }
 BRANCHES.forEach(P=>{
   if(!P.def.leap && !P.def.even) addCrests(P, TRACK._crestRnd);   // a built ramp stays true
@@ -13903,11 +13919,11 @@ function stepCarInner(dt){
     hillA = -9.8*grade/Math.sqrt(1 + grade*grade);
     // past about 55% the wheels just dig in: the switchbacks are the way up
     climbGrip = 1 - 0.88*smoothstep(0.40, 0.64, grade) - (offRoad ? 0.12*smoothstep(0.3, 0.5, grade) : 0);
-    /* The Sawtooth is for going fast. Up the face of a peak the car keeps all its speed; down the
+    /* The Sawtooth is for going fast. Up the face of a peak the car surges on; down the
        other side the hill throws it on, harder than it really would, and past top speed: the
        limit lifts with the slope and only settles back gradually once the road levels out. */
     if(TRACK.alpine){
-      hillA = grade > 0 ? 0 : hillA*ALP.fall; climbGrip = 1;
+      hillA = grade > 0 ? grade*ALP.climb : hillA*ALP.fall; climbGrip = 1;
       pose.over = Math.max(Math.min(ALP.over, -grade*ALP.overPer), (pose.over || 0) - ALP.settle*dt);
     }
     pose.grade = grade;
