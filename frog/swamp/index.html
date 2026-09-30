@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mechanics Test Marsh</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  /* Layout: the room fills the top; controls, stations and the mechanic
+     notes stack underneath in one column. Same tokens as the frog viewer. */
+  :root {
+    --bg: #e8eee7; --panel: #f6f9f4; --ink: #142219; --muted: #56685b; --line: #c5d2c6;
+    --accent: #d8385d; --accent-ink: #ffffff; --well: #d7e2d7;
+    --display: "Pixelify Sans", "Courier New", monospace;
+    --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+    --hud-ink: #f5f7e8; --hud-shadow: #10261b; --box: rgba(14, 26, 18, .9);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1914; --panel: #16231c; --ink: #e2ece4; --muted: #93a898; --line: #2a3d31;
+      --accent: #ff6f8e; --accent-ink: #1a0a10; --well: #1d2e24; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1914; --panel: #16231c; --ink: #e2ece4; --muted: #93a898; --line: #2a3d31;
+    --accent: #ff6f8e; --accent-ink: #1a0a10; --well: #1d2e24; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 var(--body); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 56px; display: grid; gap: 28px; }
+  h1, h2 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; }
+  h1 { font-size: clamp(28px, 5vw, 44px); line-height: 1; }
+  h2 { font-size: 22px; line-height: 1.1; }
+  p { margin: 0; max-width: 68ch; }
+  .muted { color: var(--muted); }
+  .eyebrow { font: 600 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  header { display: grid; gap: 8px; }
+  section { display: grid; gap: 12px; min-width: 0; }
+
+  /* ---- stage ---- */
+  .stage { position: relative; justify-self: center; max-width: 100%; width: 100%; border-radius: 6px; overflow: hidden; background: #2a5d6b; box-shadow: 0 0 0 1px var(--line); }
+  .stage canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; image-rendering: crisp-edges; }
+  .hud { position: absolute; left: 2%; right: 2%; top: 3%; display: flex; gap: 18px; align-items: center; pointer-events: none;
+    font: 500 clamp(12px, 1.9vw, 20px)/1 var(--display); color: var(--hud-ink);
+    text-shadow: 1px 1px 0 var(--hud-shadow), -1px 1px 0 var(--hud-shadow), 1px -1px 0 var(--hud-shadow), -1px -1px 0 var(--hud-shadow); }
+  .hearts { display: flex; gap: 4px; }
+  .hearts i { width: .9em; height: .8em; background: #3a2230; box-shadow: 0 0 0 2px var(--hud-shadow); clip-path: polygon(0 20%, 20% 0, 45% 0, 50% 15%, 55% 0, 80% 0, 100% 20%, 100% 50%, 50% 100%, 0 50%); }
+  .hearts i.on { background: #ff5f7e; }
+  .sac { opacity: .75; } .sac.full { opacity: 1; color: #ffd84a; }
+  .toast { position: absolute; left: 50%; top: 12%; transform: translateX(-50%); max-width: 90%;
+    font: 500 clamp(11px, 1.6vw, 17px)/1.3 var(--display); color: var(--hud-ink); background: var(--box);
+    padding: .4em .8em; border-radius: 3px; text-align: center; pointer-events: none; }
+  .sign, .dialog { position: absolute; left: 3%; right: 3%; bottom: 4%; background: var(--box); color: var(--hud-ink);
+    border: 2px solid #c9975a; border-radius: 3px; padding: .6em .9em; font: 500 clamp(11px, 1.7vw, 18px)/1.35 var(--display); pointer-events: none; }
+  .dialog { border-color: #a5e05a; display: grid; gap: .25em; }
+  .dialog b { color: #a5e05a; font-weight: 700; }
+  .dialog small { color: #93a898; font-size: .75em; font-family: var(--mono); }
+  .bubbles { position: absolute; inset: 0; pointer-events: none; }
+  .bubble { position: absolute; transform: translate(-50%, -100%); white-space: nowrap; background: #f5f7e8; color: #142219;
+    font: 500 clamp(10px, 1.4vw, 15px)/1 var(--display); padding: .3em .5em; border-radius: 3px; box-shadow: 0 0 0 2px #10261b; }
+  .bubble.hint { background: #10261b; color: #a5e05a; box-shadow: none; }
+  .readout { position: absolute; right: 2%; top: 3%; margin: 0; background: rgba(0,0,0,.6); color: #d9f2d0;
+    font: 11px/1.35 var(--mono); padding: 4px 6px; border-radius: 3px; white-space: pre; pointer-events: none; }
+  .sign[hidden], .dialog[hidden], .toast[hidden], .readout[hidden] { display: none; }
+
+  /* ---- controls ---- */
+  .bar { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; justify-content: space-between; }
+  .keys { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; color: var(--muted); }
+  kbd { font: 600 12px/1 var(--mono); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; padding: 3px 6px; }
+  .toggles { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 14px; }
+  .toggles label { display: inline-flex; gap: 6px; align-items: center; }
+  button { font: 600 14px/1 var(--mono); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 4px;
+    padding: 10px 14px; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; }
+  button:hover { border-color: var(--muted); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button.down, button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .pad { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+  .pad .cluster { display: grid; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(2, 44px); gap: 6px; }
+  .pad .actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .pad .actions button { min-width: 76px; padding-block: 14px; }
+  @media (hover: hover) and (pointer: fine) { .pad { display: none; } }
+
+  .stations { display: flex; flex-wrap: wrap; gap: 8px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: grid; gap: 8px; align-content: start; }
+  .card h3 { margin: 0; font: 700 17px/1.2 var(--display); }
+  .card p, .card li { font-size: 15px; color: var(--muted); }
+  .card ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+  .w { font: 600 12px/1 var(--mono); padding: 2px 6px; border-radius: 3px; background: var(--well); color: var(--ink); white-space: nowrap; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <span class="eyebrow">Longleg Frog · metroidvania prototype</span>
+    <h1>Mechanics Test Marsh</h1>
+    <p class="muted">A single room with every swamp piece the full game will need: water, lily pads, cattails, boardwalks, bog, NPCs, bugs and a gate puzzle. It exists to tune the frog's signature move, the Weight Rule.</p>
+  </header>
+
+  <section aria-label="Test room">
+    <div class="stage" id="stage">
+      <canvas id="swamp" width="384" height="216" aria-label="Swamp test room. Arrow keys move, Space jumps, X uses the tongue, C croaks."></canvas>
+      <div class="hud">
+        <span class="hearts" id="hearts"></span>
+        <span>Flies <span id="flies">0</span></span>
+        <span class="sac">Sac: <span id="sac">empty</span></span>
+      </div>
+      <div class="bubbles" id="bubbles"></div>
+      <div class="toast" id="toast" hidden></div>
+      <div class="sign" id="sign" hidden></div>
+      <div class="dialog" id="dialog" hidden><b id="dialogName"></b><span id="dialogText"></span><small id="dialogMore"></small></div>
+      <pre class="readout" id="readout" hidden></pre>
+    </div>
+
+    <div class="pad" aria-label="Touch controls">
+      <div class="cluster">
+        <span></span><button data-key="up" aria-label="Up">▲</button><span></span>
+        <button data-key="left" aria-label="Left">◀</button><button data-key="down" aria-label="Down">▼</button><button data-key="right" aria-label="Right">▶</button>
+      </div>
+      <div class="actions">
+        <button data-key="croak">Croak</button>
+        <button data-key="talk">Talk</button>
+        <button data-key="jump">Jump</button>
+        <button data-key="tongue" class="primary">Tongue</button>
+      </div>
+    </div>
+
+    <div class="bar">
+      <div class="keys">
+        <span><kbd>←</kbd><kbd>→</kbd> move</span>
+        <span><kbd>Space</kbd> hop, hold to leap</span>
+        <span><kbd>X</kbd> tongue, hold to swing</span>
+        <span><kbd>↑</kbd>/<kbd>↓</kbd>+<kbd>X</kbd> aim</span>
+        <span><kbd>C</kbd> croak</span>
+        <span><kbd>↓</kbd> or <kbd>E</kbd> talk</span>
+        <span><kbd>↓</kbd>+<kbd>Space</kbd> drop through planks</span>
+      </div>
+      <div class="toggles">
+        <label for="debugToggle"><input type="checkbox" id="debugToggle"> Hitboxes &amp; weights <kbd>G</kbd></label>
+        <label for="slowToggle"><input type="checkbox" id="slowToggle"> Slow motion</label>
+        <button id="restartBtn">Reset room <kbd>R</kbd></button>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="stTitle">
+    <h2 id="stTitle">Jump to a station</h2>
+    <div class="stations">
+      <button data-warp="3,15">1 · Long legs</button>
+      <button data-warp="20,10">2 · Boardwalk &amp; flies</button>
+      <button data-warp="33,12">3 · Pond</button>
+      <button data-warp="64,12">4 · Bog pit swing</button>
+      <button data-warp="80,12">5 · Gate &amp; target</button>
+      <button data-warp="93,6">Finish</button>
+    </div>
+  </section>
+
+  <section aria-labelledby="ruleTitle">
+    <h2 id="ruleTitle">The Weight Rule</h2>
+    <p class="muted">The tongue sticks to whatever it hits, and the lighter side moves. The frog weighs 3. Turn on hitboxes to see every object's weight in the room.</p>
+    <div class="grid2">
+      <div class="card">
+        <h3>Lighter: it comes to you</h3>
+        <ul>
+          <li><span class="w">W0</span> flies are eaten and heal one heart</li>
+          <li><span class="w">W1</span> pebbles go in the throat sac; X spits them back out</li>
+          <li><span class="w">W1</span> dragonflies are worth three flies</li>
+          <li><span class="w">W2</span> shell beetles flip over on the first lick, get eaten on the second</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Level with you: you drag it</h3>
+        <ul>
+          <li><span class="w">W2</span> lily pads slide across the water toward you, so you can build your own bridge</li>
+        </ul>
+        <h3>Heavier: you go to it</h3>
+        <ul>
+          <li><span class="w">W∞</span> cattails and rings: tap to zip, hold to swing, ↑/↓ to reel</li>
+          <li><span class="w">W5</span> Mossback the turtle: tongue him to hop aboard, croak to call him over</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Why it carries a whole game</h3>
+        <p>One button and one number cover pickup, traversal, puzzles and combat. Later areas only need to change weights: a gulped stone makes the frog heavier (sinks, breaks planks, now drags things that used to drag it), a bubble makes it lighter. Bosses can be heavier or lighter by phase.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="../frog.js"></script>
+<script src="../frog-anims.js"></script>
+<script src="room.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
