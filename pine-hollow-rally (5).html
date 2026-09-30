@@ -15199,7 +15199,7 @@ function lbTableHTML(name, label, mark){
   for(let k=0;k<10;k++){
     const r = rows[k], me = !!(r && mark && !lit && r.ms === mark.ms && r.i === mark.i); if(me) lit = true;
     cells += '<div class="lbr' + (me ? ' me' : '') + (r ? '' : ' none') + '"><span class="rk">' + (k + 1) + '</span><span class="ini">' + (r ? esc(r.i) : '–––') +
-             '</span><span class="tm">' + (r ? fmt(r.ms/1000) : '–:––.––') + '</span></div>';
+             '</span><span class="tm">' + (r ? fmt(r.ms/1000) : '—') + '</span></div>';
   }
   return '<div class="lb" data-lb="' + esc(name) + '" data-lbl="' + esc(label) + '"><div class="lbhead"><span>' + esc(label) + '</span><span class="scope">' + (world ? 'WORLD' : 'THIS PC') + '</span></div>' +
          '<div class="lbgrid">' + cells + '</div></div>';
