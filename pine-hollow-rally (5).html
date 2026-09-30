@@ -13229,9 +13229,9 @@ function makeEngine(dest, full){
   e.shaper.curve = curve; e.shaper.oversample = "4x";
   const F = (type, f, q, g)=>{ const b = actx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; if(g !== undefined) b.gain.value = g; return b; };
   e.hp = F("highpass", 32, 0.7);
-  e.boom = F("peaking", 92, 1.1, 6);
+  e.boom = F("peaking", 68, 1.1, 6);
   e.growl = F("peaking", 240, 1.0, 7);
-  e.rasp = F("peaking", 1250, 0.9, 0);
+  e.rasp = F("peaking", 780, 0.9, 0);
   e.lp = F("lowpass", 1600, 0.6);
   e.drive.connect(e.shaper); e.shaper.connect(e.hp); e.hp.connect(e.boom); e.boom.connect(e.growl); e.growl.connect(e.rasp); e.rasp.connect(e.lp); e.lp.connect(e.out);
   // the pulse trains, on load and off
@@ -13261,7 +13261,7 @@ function makeEngine(dest, full){
 function setEngine(e, rpm, load, vol, now, lag){
   // never quite steady: a slow drift on two slow sines
   e.ph = e.ph === undefined ? Math.random()*10 : e.ph;
-  const cycle = Math.max(4, rpm/120)*(e.voice || 1)*(1 + 0.005*Math.sin(now*1.7 + e.ph) + 0.003*Math.sin(now*4.9 + e.ph*2));
+  const cycle = Math.max(3, rpm/120*ENGINE_PITCH)*(e.voice || 1)*(1 + 0.005*Math.sin(now*1.7 + e.ph) + 0.003*Math.sin(now*4.9 + e.ph*2));
   const fire = cycle*6, r = Math.min(1.1, rpm/DRIVE.redline), L = Math.max(0, Math.min(1, load));
   e.on.o.frequency.setTargetAtTime(cycle, now, lag);
   e.off.o.frequency.setTargetAtTime(cycle, now, lag);
@@ -13274,17 +13274,19 @@ function setEngine(e, rpm, load, vol, now, lag){
   e.off.g.gain.setTargetAtTime(0.9 - L*0.75, now, 0.05);
   e.drive.gain.setTargetAtTime(0.9 + L*1.5 + r*0.4, now, 0.05);
   e.boom.gain.setTargetAtTime(7 - r*3, now, 0.1);
-  e.growl.frequency.setTargetAtTime(210 + r*120, now, 0.1);
-  e.rasp.gain.setTargetAtTime(-3 + L*r*9, now, 0.08);
+  e.growl.frequency.setTargetAtTime(140 + r*90, now, 0.1);
+  e.rasp.gain.setTargetAtTime(-4 + L*r*6, now, 0.08);
   e.lp.frequency.setTargetAtTime(LPA + r*LPB + L*r*LPC, now, 0.06);
-  e.burn.frequency.setTargetAtTime(150 + fire*1.6, now, lag);
+  e.burn.frequency.setTargetAtTime(120 + fire*1.4, now, lag);
   e.burnG.gain.setTargetAtTime((0.2 + L*0.6)*(e.full ? 1 : 0.6), now, 0.06);
-  e.intake.frequency.setTargetAtTime(520 + r*1400, now, 0.08);
+  e.intake.frequency.setTargetAtTime(380 + r*700, now, 0.08);
   e.intakeG.gain.setTargetAtTime(L*(0.01 + r*r*0.045)*(e.full ? 1 : 0.4), now, 0.06);
   e.out.gain.setTargetAtTime(vol*(e.gainK || ENGINE_GAIN)*(0.5 + 0.7*r)*(0.8 + 0.25*L), now, 0.05);
 }
-const ENGINE_GAIN = 2.1;
-const BODY_FIRE = 0.3, BODY_HALF = 0.2, LPA = 380, LPB = 700, LPC = 400, TAU_ON = 0.022, TAU_OFF = 0.034, RING_ON = 0.09, RING_OFF = 0.12;
+const ENGINE_GAIN = 1.3;
+/* the whole engine sits below its textbook pitch: a six's real firing note reads thin and whiny through speakers */
+const ENGINE_PITCH = 0.45;
+const BODY_FIRE = 0.3, BODY_HALF = 0.2, LPA = 300, LPB = 500, LPC = 300, TAU_ON = 0.022, TAU_OFF = 0.034, RING_ON = 0.09, RING_OFF = 0.12;
 function setLevels(){
   if(!actx) return;
   const S = SAVE.settings;
