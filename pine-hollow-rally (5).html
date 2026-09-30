@@ -228,7 +228,9 @@
         border:2px solid #000;background:rgba(0,0,0,.35);color:#9fb6a8;}
   .rtag.ok{background:#5cf07a;color:#0c1a10;}
   .rtag.host{background:var(--signal);color:var(--ink);}
+  .rtag.gar{background:#2f6fa8;color:#f2efe6;}
   .item.wait small{color:#ffb39a;}
+  .item.wait.sel small{color:#8a2c10;}
   .item.on{background:#2f6b3c;}
   .item.on.sel{background:#5cf07a;}
   .chat{border:3px solid var(--ink);background:rgba(10,24,16,.82);box-shadow:4px 4px 0 var(--ink);}
@@ -16970,7 +16972,7 @@ function netSendChat(){
 }
 function netMeta(){
   // (and the wagon you built in the garage, so your friends see you in it)
-  return { id:NET.id, name:NET.name, paint:NET_PAINT(), host:NET.host, track:TRACK_ID, pick:NET.pick, racing:NET.racing, at:NET.joinedAt, car:carOpts(), ready:!!NET.ready };
+  return { id:NET.id, name:NET.name, paint:NET_PAINT(), host:NET.host, track:TRACK_ID, pick:NET.pick, racing:NET.racing, at:NET.joinedAt, car:carOpts(), ready:!!NET.ready, garage:!!NET.inGarage };
 }
 async function netJoin(code, opts){
   if(NET.on) netLeave(true);
@@ -17051,7 +17053,7 @@ function netSync(list){
     return;
   }
   // only redraw when something anyone can see has changed (presence pings arrive all the time)
-  const sig = JSON.stringify(NET.metas.map(m=> [m.id, m.name, m.ready, m.track, m.pick, m.racing, m.paint]));
+  const sig = JSON.stringify(NET.metas.map(m=> [m.id, m.name, m.ready, m.track, m.pick, m.racing, m.paint, m.garage]));
   if(sig !== NET.metaSig || arrived){ NET.metaSig = sig; netRefresh(); }
 }
 
@@ -17091,7 +17093,8 @@ function netAddPeer(m){
 }
 function netAlive(p){ return p.open && performance.now() - p.recv < 8000; }
 function netUpdatePeer(p, m){
-  if(!!p.meta.ready !== !!m.ready && !m.racing && !NET.racing) netSys((m.name || "Friend") + (m.ready ? " is ready" : " isn't ready"));
+  if(!!p.meta.garage !== !!m.garage && !m.racing && !NET.racing) netSys((m.name || "Friend") + (m.garage ? " is in the garage" : " is back from the garage"));
+  else if(!!p.meta.ready !== !!m.ready && !m.racing && !NET.racing) netSys((m.name || "Friend") + (m.ready ? " is ready" : " isn't ready"));
   p.meta = m; p.car.def.name = m.name || "Friend";
   // they changed their wagon in the garage: swap the car over
   const key = JSON.stringify(m.car || null);
@@ -17185,6 +17188,7 @@ function netPose(p, d){
 
 /* ---- racing ---- */
 function netBegin(grid){
+  if(GAME.garage || NET.inGarage){ GAME.garage = false; MENU.garage = null; NET.inGarage = false; rivals.forEach(r=>{ r.mesh.visible = true; r.shadow.visible = true; }); closeUI(); }
   NET.racing = true; netTrackMe();
   setMode("online");
   FIELD = [...NET.peers.values()].filter(p=> p.meta && !p.meta.spectate).map(p=> p.car);
@@ -17404,7 +17408,8 @@ function showLobby(sel){
     const p = NET.peers.get(m.id);
     const fresh = p && now - p.since < 5000;
     const conn = m.id === me ? "" : m.racing ? "racing" : m.track !== TRACK_ID ? "on the way" : p ? (p.open || p.relay ? "" : "connecting") : "";
-    const tag = m.id === hostId ? '<span class="rtag host">HOST</span>'
+    const tag = m.garage ? '<span class="rtag gar">IN GARAGE</span>'
+              : m.id === hostId ? '<span class="rtag host">HOST</span>'
               : m.ready ? '<span class="rtag ok">READY</span>' : '<span class="rtag">NOT READY</span>';
     return '<tr' + (m.id === me ? ' class="you"' : '') + '><td class="p"><span class="dot" style="background:' + safeCol(m.paint) + '"></span></td>' +
       '<td class="n">' + esc(m.name || "Friend") + (m.id === me ? ' <i>(you)</i>' : '') + (fresh ? ' <b class="new">NEW</b>' : '') + '</td>' +
@@ -17425,6 +17430,7 @@ function showLobby(sel){
             '<button class="item" data-act="track"><span>CHOOSE CIRCUIT</span><small>' + esc(pick) + '</small></button>'
           : '<button class="item' + (NET.ready ? ' on' : '') + '" data-act="ready"><span>' + (NET.ready ? 'READY ✓' : 'READY UP') + '</span><small>' +
               esc(arriving || (NET.ready ? 'waiting for the host' : 'press when you are set')) + '</small></button>') +
+    '<button class="item" data-act="garage"><span>GARAGE</span><small>tune your wagon</small></button>' +
     '<button class="item" data-act="copy"><span>COPY INVITE LINK</span>' + (NET.copiedAt && now - NET.copiedAt < 2500 ? '<small>COPIED</small>' : '') + '</button>' +
     '<button class="item back" data-act="leave"><span>LEAVE ROOM</span></button></div>' +
     '<div id="netBoard" class="lobbyboard"></div></div>' +
@@ -17437,6 +17443,13 @@ function showLobby(sel){
                SFX.ok(); netStart(); },
              track: ()=>{ SFX.ok(); showTracks("online"); },
              ready: ()=>{ NET.ready = !NET.ready; NET.ready ? SFX.ok() : SFX.back(); netTrackMe(); netRefresh(); },
+             /* into the garage without leaving the room: you're not ready while you're in there (so the race
+                can't start without you), everyone sees IN GARAGE, and every change reaches them as you make it */
+             garage: ()=>{
+               SFX.ok(); const at = MENU.sel;
+               NET.inGarage = true; NET.ready = false; netTrackMe();
+               const back = ()=>{ NET.inGarage = false; netTrackMe(); if(NET.on) showLobby(at); else showMain(MI("multi")); };
+               showGarage(back, back); },
              copy: ()=>{
                const fallback = ()=>{ const t = document.createElement("textarea"); t.value = netLink(); t.style.cssText = "position:fixed;opacity:0";
                  document.body.appendChild(t); t.select(); try{ document.execCommand("copy"); }catch(e){} t.remove(); };
