@@ -184,6 +184,42 @@
   table.grid tr.you td{background:rgba(255,210,61,.14);}
   table.grid tr.you td.n{color:var(--signal);font-weight:700;}
   .laps{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0;}
+  /* the lobby: room line, drivers with their ready tags, the chat */
+  .lobby h2.head.sub{font-size:18px;margin:18px 0 10px;}
+  .lobby .right h2.head.sub:first-child{margin-top:0;}
+  .roomline{display:flex;align-items:baseline;gap:10px;margin:0 0 14px;flex-wrap:wrap;}
+  .roomline .lbl{font-family:var(--display);font-size:13px;letter-spacing:.12em;color:#9fb6a8;}
+  .roomline .code{font-family:var(--display);font-size:30px;letter-spacing:.18em;background:#000;color:var(--signal);padding:0 8px 0 11px;line-height:1.15;}
+  .dot{display:inline-block;width:12px;height:12px;border:2px solid #000;border-radius:50%;vertical-align:-1px;margin-right:8px;}
+  table.grid.lob td{padding:6px 10px 5px;}
+  table.grid.lob td.p{width:20px;}
+  table.grid.lob td.x{white-space:nowrap;}
+  table.grid.lob tr.empty td{color:#6f8478;font-style:italic;}
+  table.grid.lob i{font-style:normal;color:#9fb6a8;font-size:.85em;}
+  .new{font-family:var(--display);font-size:11px;letter-spacing:.1em;color:var(--ink);background:var(--signal);padding:1px 5px;margin-left:6px;}
+  .conn{font-size:12px;color:#9fb6a8;margin-right:6px;}
+  .rtag{display:inline-block;min-width:78px;text-align:center;font-family:var(--display);font-size:12px;letter-spacing:.1em;padding:2px 8px;
+        border:2px solid #000;background:rgba(0,0,0,.35);color:#9fb6a8;}
+  .rtag.ok{background:#5cf07a;color:#0c1a10;}
+  .rtag.host{background:var(--signal);color:var(--ink);}
+  .item.wait small{color:#ffb39a;}
+  .item.on{background:#2f6b3c;}
+  .item.on.sel{background:#5cf07a;}
+  .chat{border:3px solid var(--ink);background:rgba(10,24,16,.82);box-shadow:4px 4px 0 var(--ink);}
+  .chatlog{height:150px;overflow-y:auto;padding:10px 12px 6px;font-size:15px;line-height:1.35;scrollbar-width:thin;}
+  .chatlog p{margin:0 0 5px;color:#e6ece4;overflow-wrap:anywhere;}
+  .chatlog p b{font-family:var(--display);margin-right:8px;letter-spacing:.02em;color:var(--cream);}
+  .chatlog p .dot{width:9px;height:9px;margin-right:6px;vertical-align:0;}
+  .chatlog p.sys{color:#8fa596;font-style:italic;font-size:13px;}
+  .chatlog .chatempty{color:#6f8478;font-style:italic;}
+  #netChat{display:block;width:100%;box-sizing:border-box;border:0;border-top:2px solid rgba(243,230,196,.18);background:rgba(0,0,0,.35);
+           color:var(--cream);font:inherit;font-size:15px;padding:10px 12px;outline:none;}
+  #netChat:focus{background:rgba(0,0,0,.55);box-shadow:inset 3px 0 0 var(--signal);}
+  #netChat::placeholder{color:#6f8478;}
+  /* the live finish */
+  .livehead{font-family:var(--display);font-size:13px;letter-spacing:.14em;color:#6e6250;margin:0 0 8px;}
+  .livehead.all{color:#2f6b3c;}
+  .detail .racing{font-family:var(--display);font-size:12px;letter-spacing:.1em;color:#a0521c;}
   .rtime{font-family:var(--display);font-weight:800;font-style:italic;font-size:clamp(30px,3.6vw,48px);line-height:1.05;color:var(--cream);
     margin-top:10px;text-shadow:3px 3px 0 var(--ink);font-variant-numeric:tabular-nums;}
   .rsub{font-family:var(--display);font-size:clamp(13px,1.2vw,16px);letter-spacing:.1em;text-transform:uppercase;color:#b9cdb4;margin-top:8px;}
@@ -12965,6 +13001,15 @@ const MENU_KEYS = { ArrowUp:"up", KeyW:"up", ArrowDown:"down", KeyS:"down",
                     Enter:"ok", NumpadEnter:"ok", Space:"ok", Escape:"back", Backspace:"back" };
 addEventListener("keydown", e=>{
   const tgt = e.target;
+  if(tgt && tgt.tagName === "INPUT" && tgt.id === "netChat"){
+    // the chat: Enter sends and stays in the box, Escape leaves it
+    if(e.code === "Enter" || e.code === "NumpadEnter"){ e.preventDefault(); netSendChat(); }
+    if(e.code === "Escape"){ e.preventDefault(); tgt.blur(); }
+    return;
+  }
+  if(GAME.ui && MENU.id === "scLobby" && (e.code === "KeyT" || e.code === "Slash") && !e.repeat){
+    const b = document.getElementById("netChat"); if(b){ e.preventDefault(); b.focus(); return; }
+  }
   if(tgt && tgt.tagName === "INPUT"){
     // typing a name or a code: the menu keys are letters too, so they stay out of it
     if(e.code === "Escape") tgt.blur();
@@ -15035,6 +15080,7 @@ function drawHUDInner(dt, alongNow){
   }
 
   drawOverlay(dt);
+  if(MODE === "online" && NET.feed && NET.feed.length) drawNetFeed(k);
   drawConfetti(dt);
 }
 
@@ -15826,6 +15872,25 @@ function drawLights(lit, green){
     }
   }
 }
+/* who has finished, as it happens: a line each under the clocks, fading after a few seconds */
+function drawNetFeed(k){
+  const now = performance.now(), M = 16*k;
+  NET.feed = NET.feed.filter(f=> now - f.t < 6000);
+  // the label's own measured width (small letter-spaced capitals), then a gap, then the line
+  hud.font = '700 ' + Math.round(UI.label*k) + 'px ' + HUD_FONT;
+  const lw = hud.measureText("FINISH").width + 6*UI.label*k*0.14, gap = 10*k;
+  NET.feed.slice(-4).forEach((f, i)=>{
+    const a = Math.min(1, (6000 - (now - f.t))/600), h = 24*k, y = M + 108*k + i*(h + 8*k);
+    hud.save(); hud.globalAlpha = a;
+    hud.font = 'italic 800 ' + Math.round(UI.small*k*1.12) + 'px ' + HUD_FONT;
+    const tw = hud.measureText(f.text).width, sk = h*0.12;
+    const P = hudPlate(M + 6*k, y, sk*2 + 5*k + 12*k + lw + gap + tw + 12*k, h, f.col);
+    const x0 = P.l(), bl = y + 16.5*k;
+    hudLabel("FINISH", x0, bl, "left", UI.key);
+    hudNum(f.text, x0 + lw + gap, bl + 0.5*k, UI.small, UI.ink);
+    hud.restore();
+  });
+}
 /* confetti over the whole screen for a win: paper squares tumbling down in the game's colours */
 const CONFETTI = [];
 function hudConfetti(n){
@@ -16051,7 +16116,9 @@ function classification(){
  * ------------------------------------------------------------------ */
 const UIEL = document.getElementById("ui");
 const MENU = { id:null, items:[], sel:0, back:null, onSel:null, grid:false, acts:{} };
-const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+/* a colour another player sent us: only ever a hex colour, never anything that could reach into markup */
+const safeCol = c => /^#[0-9a-f]{3,8}$/i.test(String(c || "")) ? c : "#cccccc";
 
 function openScreen(id, html, o){
   o = o || {};
@@ -16456,6 +16523,7 @@ function startMode(mode, id){
 }
 function travel(id, boot){
   try{ sessionStorage.setItem(BOOT_KEY, JSON.stringify(boot)); }catch(e){}
+  try{ if(NET.on && NET.chat) sessionStorage.setItem("pinehollow.chat", JSON.stringify({code:NET.code, chat:NET.chat.slice(-40)})); }catch(e){}
   const L = document.getElementById("loading");
   document.getElementById("lname").textContent = "LOADING \u00b7 " + TRACKS[id].name;
   try{ sessionStorage.setItem("pinehollow.loadname", TRACKS[id].name); }catch(e){}
@@ -16679,7 +16747,7 @@ async function netClient(){
 /* ---- the channel: presence + a handful of events ----
    The real one is Supabase Realtime. The stand-in (#mocknet=1) runs the
    same calls over a BroadcastChannel between tabs of one browser, for testing. */
-const NET_EVENTS = ["sig", "start", "track", "fin", "pos", "abort"];
+const NET_EVENTS = ["sig", "start", "track", "fin", "pos", "abort", "chat"];
 async function netTransport(code, meta, h){
   if(NET.mock){
     const bc = new BroadcastChannel("pine-" + code), seen = new Map();
@@ -16722,9 +16790,37 @@ async function netTransport(code, meta, h){
 }
 
 /* ---- joining, leaving ---- */
+/* ---- the lobby chat, and the lines the room itself writes into it ---- */
+function netChatAdd(name, text, paint, kind){
+  NET.chat = NET.chat || [];
+  NET.chat.push({name: String(name || "").slice(0, 16), text: String(text).slice(0, 140), paint: safeCol(paint || "#dfe7df"), kind: kind || "say", t: Date.now()});
+  if(NET.chat.length > 40) NET.chat.splice(0, NET.chat.length - 40);
+  if(kind !== "sys" && kind !== "me" && actx) blip(1180, 0.05, 0.05);
+  netChatPaint();
+}
+function netSys(text){ netChatAdd("", text, null, "sys"); }
+function netChatHTML(){
+  const L = (NET.chat || []).slice(-30);
+  if(!L.length) return '<p class="chatempty">No messages yet. Say hello.</p>';
+  return L.map(c=> c.kind === "sys" ? '<p class="sys">' + esc(c.text) + '</p>'
+    : '<p><span class="dot" style="background:' + safeCol(c.paint) + '"></span><b>' + esc(c.name) + '</b>' + esc(c.text) + '</p>').join("");
+}
+function netChatPaint(){
+  const el = document.getElementById("netChatLog"); if(!el) return;
+  el.innerHTML = netChatHTML(); el.scrollTop = el.scrollHeight;
+}
+function netSendChat(){
+  const inp = document.getElementById("netChat"); if(!inp) return;
+  const text = inp.value.replace(/\s+/g, " ").trim().slice(0, 140);
+  if(!text) return;
+  const now = performance.now(); if(now - (NET.chatAt || 0) < 350) return;       // (a little breathing room between lines)
+  NET.chatAt = now; inp.value = ""; NET.draft = "";
+  if(NET.tx) NET.tx.send("chat", {from:NET.id, name:NET.name, paint:NET_PAINT(), text});
+  netChatAdd(NET.name, text, NET_PAINT(), "me");
+}
 function netMeta(){
   // (and the wagon you built in the garage, so your friends see you in it)
-  return { id:NET.id, name:NET.name, paint:NET_PAINT(), host:NET.host, track:TRACK_ID, pick:NET.pick, racing:NET.racing, at:NET.joinedAt, car:carOpts() };
+  return { id:NET.id, name:NET.name, paint:NET_PAINT(), host:NET.host, track:TRACK_ID, pick:NET.pick, racing:NET.racing, at:NET.joinedAt, car:carOpts(), ready:!!NET.ready };
 }
 async function netJoin(code, opts){
   if(NET.on) netLeave(true);
@@ -16733,6 +16829,9 @@ async function netJoin(code, opts){
                        // (after the host took everyone to a new circuit: start once they have all arrived)
                        auto: opts.auto ? {n:opts.auto, t:performance.now()} : null });
   clearInterval(NET.autoTimer); NET.autoTimer = setInterval(netAutoStart, 500);
+  NET.chat = []; NET.ready = false; NET.draft = "";
+  try{ const c = JSON.parse(sessionStorage.getItem("pinehollow.chat") || "null"); sessionStorage.removeItem("pinehollow.chat");
+       if(c && c.code === code && Array.isArray(c.chat)) NET.chat = c.chat.slice(-40); }catch(e){}
   try{ history.replaceState(null, "", "#track=" + TRACK_ID + "&room=" + code + (NET.mock ? "&mocknet=1" : "")); }catch(e){}
   try{
     NET.tx = await netTransport(code, netMeta(), {
@@ -16763,7 +16862,7 @@ function netAutoStart(){
 function netBye(){ if(NET.tx) NET.tx.leave(); }
 function netLeave(quiet){
   if(!NET.on) return;
-  NET.peers.forEach(p=> netDropPeer(p));
+  NET.leaving = true; NET.peers.forEach(p=> netDropPeer(p)); NET.leaving = false;
   NET.peers.clear();
   if(NET.tx) NET.tx.leave();
   NET.tx = null; NET.on = false; NET.racing = false; NET.metas = []; NET.ids = null;
@@ -16789,12 +16888,20 @@ function netSync(list){
   NET.peers.forEach((p, id)=>{ if(!ids.has(id) && !netAlive(p)) netDropPeer(p); });
   // a friend who joined by link lands on whatever circuit the host is on
   const hostM = NET.metas.find(m=> m.id === netHostId());
+  // the host picked another circuit: say so, and everyone readies up again for it
+  if(hostM && hostM.id !== NET.id && hostM.pick != null && NET.hostPick !== undefined && hostM.pick !== NET.hostPick && TRACKS[hostM.pick]){
+    netSys("Circuit: " + TRACKS[hostM.pick].name);
+    if(NET.ready){ NET.ready = false; netTrackMe(); }
+  }
+  if(hostM) NET.hostPick = hostM.pick;
   if(hostM && hostM.id !== NET.id && hostM.track !== TRACK_ID && !NET.racing && !NET.wantTrack){
     NET.wantTrack = hostM.track;
     travel(hostM.track, {mode:"online", room:NET.code, name:NET.name, at:NET.joinedAt});
     return;
   }
-  netRefresh();
+  // only redraw when something anyone can see has changed (presence pings arrive all the time)
+  const sig = JSON.stringify(NET.metas.map(m=> [m.id, m.name, m.ready, m.track, m.pick, m.racing, m.paint]));
+  if(sig !== NET.metaSig || arrived){ NET.metaSig = sig; netRefresh(); }
 }
 
 /* ---- the cars: each friend is a rival the network drives ---- */
@@ -16826,12 +16933,14 @@ function netAddPeer(m){
   const p = { id:m.id, meta:m, car, pc:null, dc:null, open:false, relay:false, since:performance.now(), last:null, recv:0,
               sx:0, sy:0, sz:0, sh:0, sp:0, sr:0, pend:[], carKey:JSON.stringify(m.car || null) };
   NET.peers.set(m.id, p);
+  netSys((m.name || "A friend") + " joined");
   // back mid-race (their connection hiccuped): straight back into the field
   if(NET.racing && !m.spectate){ FIELD = FIELD.concat([car]); mesh.visible = true; }
   if(NET.id < m.id) netCall(p);                        // one side of each pair makes the offer
 }
 function netAlive(p){ return p.open && performance.now() - p.recv < 8000; }
 function netUpdatePeer(p, m){
+  if(!!p.meta.ready !== !!m.ready && !m.racing && !NET.racing) netSys((m.name || "Friend") + (m.ready ? " is ready" : " isn't ready"));
   p.meta = m; p.car.def.name = m.name || "Friend";
   // they changed their wagon in the garage: swap the car over
   const key = JSON.stringify(m.car || null);
@@ -16844,6 +16953,7 @@ function netUpdatePeer(p, m){
   }
 }
 function netDropPeer(p){
+  if(!NET.leaving && p.meta) netSys((p.meta.name || "A friend") + " left");
   try{ if(p.dc) p.dc.close(); }catch(e){}
   try{ if(p.pc) p.pc.close(); }catch(e){}
   scene.remove(p.car.mesh);
@@ -16912,12 +17022,14 @@ function netEvent(ev, d){
     NET.wantTrack = d.track; travel(d.track, {mode:"online", room:NET.code, name:NET.name, at:NET.joinedAt});
   }
   if(ev === "abort" && fromHost && NET.racing){ NET.racing = false; enterMenuWorld(); showLobby(); }
-  if(ev === "fin"){ const p = NET.peers.get(d.from); if(p && typeof d.time === "number") p.car.finish = d.time; }
+  if(ev === "fin"){ const p = NET.peers.get(d.from); if(p && typeof d.time === "number") netMarkFinish(p, d.time); }
+  if(ev === "chat" && typeof d.text === "string" && d.from !== NET.id){ const p = NET.peers.get(d.from);
+    netChatAdd(d.name || (p && p.meta.name) || "Friend", d.text, d.paint || (p && p.meta.paint)); }
 }
 function netPose(p, d){
   if(typeof d.x !== "number" || !isFinite(d.x + d.z + (d.y || 0))) return;
   p.last = d; p.recv = performance.now();
-  if(typeof d.fin === "number") p.car.finish = d.fin;
+  if(typeof d.fin === "number") netMarkFinish(p, d.fin);
 }
 
 /* ---- racing ---- */
@@ -16929,7 +17041,17 @@ function netBegin(grid){
   // your slot; anyone the host had not seen yet lines up behind
   const at = grid.indexOf(NET.id);
   NET.slot = at >= 0 ? at : grid.length + [...NET.peers.keys()].filter(id=> !grid.includes(id) && id < NET.id).length;
+  NET.ready = false; NET.feed = [];
   resetRace();
+  /* everyone is put on their own grid slot now, so you see them lined up through the countdown,
+     before the first word from their car arrives */
+  const now = performance.now();
+  NET.peers.forEach(p=>{
+    let slot = grid.indexOf(p.id); if(slot < 0) slot = grid.length + [...NET.peers.keys()].filter(id=> !grid.includes(id) && id < p.id).length;
+    const q = netGridPose(slot);
+    p.last = {x:q.x, y:q.y, z:q.z, h:q.h, p:0, r:0, vx:0, vz:0, lap:0, s:q.i, fin:null};
+    p.recv = now; p.placed = false; p.car.finish = null; p.announced = false;
+  });
 }
 function netStart(){
   if(!netIsHost()) return;
@@ -16946,6 +17068,12 @@ function netStart(){
   netBegin(grid);
 }
 function netTrackMe(){ if(NET.tx) NET.tx.track(netMeta()); }
+/* a grid slot's spot on this circuit, the same way placeAtStart puts you there */
+function netGridPose(slot){
+  const gi = Math.round((24 - Math.floor(slot/2)*7)/segLen), p = pts[wrapIdx(MAIN, gi)], t = tans[wrapIdx(MAIN, gi)];
+  const lane = slot % 2 ? -2.2 : 2.2, x = p.x + t.z*lane, z = p.z - t.x*lane;
+  return {x, z, y:surfaceY(x, z), h:Math.atan2(t.x, t.z), i:wrapIdx(MAIN, gi)};
+}
 /* where each of the grid's slots is: two by two back from the line */
 function netGridSpot(slot){
   const row = Math.floor(slot/2), side = slot % 2 ? 1 : -1;
@@ -16968,9 +17096,9 @@ function netFrame(dt){
       let relayNeeded = false;
       NET.peers.forEach(p=>{
         if(p.open && p.dc && p.dc.readyState === "open"){ try{ p.dc.send(js); }catch(e){} }
-        else if(p.relay || performance.now() - p.since > 7000) relayNeeded = true;
+        else relayNeeded = true;
       });
-      // the fallback: no direct line after seven seconds, so through the room, five times a second
+      // anyone without a direct line yet gets you through the room, five times a second (from the first frame)
       if(relayNeeded && NET.relayAcc >= 0.2){ NET.relayAcc = 0; NET.tx.send("pos", d); }
     }
   }
@@ -17001,6 +17129,44 @@ function netMoveCar(p, dt){
     const t = tans[((r.s % NS) + NS) % NS];
     collideRival(r, t, -t.z, t.x);
   }
+}
+/* someone crossed the line: mark it once, and say so */
+function netMarkFinish(p, time){
+  if(p.car.finish === null || p.car.finish === undefined) p.car.finish = time;
+  if(p.announced || !NET.racing) return;
+  p.announced = true;
+  const all = [...NET.peers.values()].filter(q=> FIELD.includes(q.car) && q.car.finish != null).map(q=> q.car.finish);
+  if(state.phase === "done" && GAME.finishTime != null) all.push(GAME.finishTime);
+  const place = all.filter(t=> t <= time).length;
+  (NET.feed = NET.feed || []).push({text:(p.meta.name || "Friend").toUpperCase() + "  " + ordinal(place).toUpperCase() + "  " + fmt(time), col:safeCol(p.meta.paint), t:performance.now()});
+  if(actx) blip(988, 0.12, 0.07);
+  netLiveRefresh();
+}
+/* the finish, live: everyone's time as they cross the line, and where the rest are until they do */
+function netLiveRows(){
+  const rows = [{name:NET.name || "You", you:true, paint:NET_PAINT(), fin:state.phase === "done" ? GAME.finishTime : null, prog:progressOf(state.lap - 1, state.idx)}];
+  NET.peers.forEach(p=>{ if(!FIELD.includes(p.car)) return;
+    rows.push({name:p.meta.name || "Friend", paint:p.meta.paint, fin:p.car.finish, prog:progressOf(p.car.lap || 0, p.car.s || 0), lap:(p.car.lap || 0) + 1,
+               gone:!NET.ids || !NET.ids.has(p.id)}); });
+  rows.sort((a, b)=> (a.fin != null) !== (b.fin != null) ? (a.fin != null ? -1 : 1) : a.fin != null ? a.fin - b.fin : b.prog - a.prog);
+  return rows;
+}
+function netLiveHTML(){
+  const rows = netLiveRows(), done = rows.filter(r=> r.fin != null).length, lead = rows[0] && rows[0].fin;
+  const all = done === rows.length;
+  return '<div class="livehead' + (all ? ' all' : '') + '">' + (all ? 'EVERYONE\'S IN' : done + ' OF ' + rows.length + ' FINISHED') + '</div>' +
+    '<table class="grid">' + rows.map((r, i)=> '<tr' + (r.you ? ' class="you"' : '') + '><td class="p">' + (r.fin != null ? i + 1 : '–') + '</td>' +
+      '<td class="n"><span class="dot" style="background:' + safeCol(r.paint) + '"></span>' + esc(r.name) + '</td>' +
+      '<td class="t">' + (r.fin != null ? fmt(r.fin) : r.gone ? 'left' : 'lap ' + Math.min(LAPS, r.lap || 1) + '/' + LAPS) + '</td>' +
+      '<td class="x">' + (r.fin != null && i && lead != null ? '+' + (r.fin - lead).toFixed(2) : r.fin == null && !r.gone ? '<span class="racing">racing</span>' : '') + '</td></tr>').join("") + '</table>';
+}
+function netLiveRefresh(){
+  if(MENU.id !== "scResults" || MODE !== "online") return;
+  const el = document.getElementById("netLive"); if(!el) return;
+  el.innerHTML = netLiveHTML();
+  const rows = netLiveRows(), all = rows.every(r=> r.fin != null || r.gone);
+  const b = UIEL.querySelector('[data-act="lobby"] small');
+  if(b) b.textContent = all ? "everyone's in" : "";
 }
 function netFinish(){
   if(!NET.on) return;
@@ -17079,42 +17245,59 @@ function netPickName(){
 function netLink(){ return location.origin + location.pathname + "#room=" + NET.code; }
 function showLobby(sel){
   if(!NET.on) return showOnline();
-  const host = netIsHost(), me = NET.id, now = performance.now();
+  const host = netIsHost(), me = NET.id, now = performance.now(), hostId = netHostId();
   const list = NET.metas.slice().sort((a, b)=> a.at - b.at);
   if(!list.some(m=> m.id === me)) list.unshift(netMeta());
+  const guests = list.filter(m=> m.id !== hostId), readyN = guests.filter(m=> m.ready).length, allReady = readyN === guests.length;
   const rows = list.map(m=>{
     const p = NET.peers.get(m.id);
     const fresh = p && now - p.since < 5000;
-    const link = m.id === me ? "you" : m.racing ? "racing" : m.track !== TRACK_ID ? "on the way" : p ? (p.open ? "ready" : p.relay ? "ready (relay)" : "connecting") : "";
-    return '<tr' + (m.id === me ? ' class="you"' : '') + '><td class="p"><span style="display:inline-block;width:14px;height:14px;border:2px solid #000;border-radius:50%;background:' + esc(m.paint || "#ccc") + '"></span></td>' +
-      '<td class="n">' + esc(m.name || "Friend") + (m.id === netHostId() ? ' (host)' : '') + (fresh ? ' <b style="color:#ffd23f">JUST JOINED</b>' : '') + '</td><td class="x">' + link + '</td></tr>';
+    const conn = m.id === me ? "" : m.racing ? "racing" : m.track !== TRACK_ID ? "on the way" : p ? (p.open || p.relay ? "" : "connecting") : "";
+    const tag = m.id === hostId ? '<span class="rtag host">HOST</span>'
+              : m.ready ? '<span class="rtag ok">READY</span>' : '<span class="rtag">NOT READY</span>';
+    return '<tr' + (m.id === me ? ' class="you"' : '') + '><td class="p"><span class="dot" style="background:' + safeCol(m.paint) + '"></span></td>' +
+      '<td class="n">' + esc(m.name || "Friend") + (m.id === me ? ' <i>(you)</i>' : '') + (fresh ? ' <b class="new">NEW</b>' : '') + '</td>' +
+      '<td class="x">' + (conn ? '<span class="conn">' + conn + '</span> ' : '') + tag + '</td></tr>';
   });
-  for(let k=list.length; k<Math.min(NET_CFG.max, list.length + 2); k++) rows.push('<tr><td class="p"></td><td class="n dimtx">waiting for a friend…</td><td class="x"></td></tr>');
+  for(let k=list.length; k<Math.min(NET_CFG.max, list.length + 1); k++) rows.push('<tr class="empty"><td class="p"></td><td class="n">waiting for a friend…</td><td class="x"></td></tr>');
   const n = list.length, pick = netPickName();
-  const arriving = NET.auto ? 'everyone is on their way: ' + (NET.auto.here || 1) + ' of ' + NET.auto.n + ' here' : '';
+  const arriving = NET.auto ? (NET.auto.here || 1) + ' of ' + NET.auto.n + ' here' : '';
+  // keep what's being typed, and where, across the redraw
+  const ci = document.getElementById("netChat"), typing = ci && document.activeElement === ci;
+  if(ci) NET.draft = ci.value;
   openScreen("scLobby",
-    '<div class="cols" style="align-items:flex-start"><div class="left"><h2 class="head">Lobby</h2>' +
-    '<p style="margin:2px 0 6px">ROOM CODE <b style="font-size:30px;letter-spacing:4px;background:#000;color:#ffd23f;padding:0 8px;border-radius:4px">' + esc(NET.code) + '</b></p>' +
-    '<p class="dimtx">Circuit: <b>' + esc(pick) + '</b> · ' + NET_CFG.laps + ' laps · ' + esc(NET.status) + '</p>' +
-    '<div class="menu" style="margin-top:12px">' +
-    (host ? '<button class="item" data-act="go"><span>START RACE</span><small>' + esc(arriving || (n > 1 ? n + ' drivers' : 'solo')) + '</small></button>' +
+    '<div class="cols lobby" style="align-items:flex-start"><div class="left"><h2 class="head">Lobby</h2>' +
+    '<div class="roomline"><span class="lbl">ROOM</span><b class="code">' + esc(NET.code) + '</b><span class="lbl">' + esc(pick) + ' · ' + NET_CFG.laps + ' LAPS</span></div>' +
+    '<div class="menu">' +
+    (host ? '<button class="item' + (allReady ? '' : ' wait') + '" data-act="go"><span>START RACE</span><small>' +
+              esc(arriving || (guests.length ? readyN + ' of ' + guests.length + ' ready' : 'solo')) + '</small></button>' +
             '<button class="item" data-act="track"><span>CHOOSE CIRCUIT</span><small>' + esc(pick) + '</small></button>'
-          : '<button class="item" data-act="wait"><span>WAITING FOR HOST</span>' + (arriving ? '<small>' + esc(arriving) + '</small>' : '') + '</button>') +
-    '<button class="item" data-act="copy"><span>COPY INVITE LINK</span>' + (NET.copiedAt && now - NET.copiedAt < 2500 ? '<small style="color:inherit">COPIED</small>' : '') + '</button>' +
-    '<button class="item back" data-act="leave"><span>LEAVE ROOM</span></button></div></div>' +
-    '<div class="right"><h2 class="head" style="font-size:18px">Drivers ' + n + '/' + NET_CFG.max + '</h2><table class="grid">' + rows.join("") + '</table>' +
-    '<h2 class="head" style="margin-top:16px;font-size:18px">Best laps: ' + esc(pick) + '</h2><div id="netBoard"><p class="dimtx">Loading…</p></div></div></div>',
+          : '<button class="item' + (NET.ready ? ' on' : '') + '" data-act="ready"><span>' + (NET.ready ? 'READY ✓' : 'READY UP') + '</span><small>' +
+              esc(arriving || (NET.ready ? 'waiting for the host' : 'press when you are set')) + '</small></button>') +
+    '<button class="item" data-act="copy"><span>COPY INVITE LINK</span>' + (NET.copiedAt && now - NET.copiedAt < 2500 ? '<small>COPIED</small>' : '') + '</button>' +
+    '<button class="item back" data-act="leave"><span>LEAVE ROOM</span></button></div>' +
+    '<h2 class="head sub">Best laps</h2><div id="netBoard"><p class="dimtx">Loading…</p></div></div>' +
+    '<div class="right"><h2 class="head sub">Drivers ' + n + '/' + NET_CFG.max + '</h2><table class="grid lob">' + rows.join("") + '</table>' +
+    '<h2 class="head sub">Chat</h2><div class="chat"><div class="chatlog" id="netChatLog">' + netChatHTML() + '</div>' +
+    '<input id="netChat" maxlength="140" autocomplete="off" placeholder="Say something — Enter to send, T to type"></div></div></div>',
     { sel: sel || 0, back: ()=>{ SFX.back(); netLeave(); showMain(MI("multi")); },
-      acts:{ go: ()=>{ SFX.ok(); netStart(); },
+      acts:{ go: ()=>{
+               if(!allReady && !NET.auto){ SFX.wrong(); netSys("Waiting on " + guests.filter(m=> !m.ready).map(m=> m.name || "Friend").join(", ")); return; }
+               SFX.ok(); netStart(); },
              track: ()=>{ SFX.ok(); showTracks("online"); },
-             wait: ()=>{ SFX.move(); },
+             ready: ()=>{ NET.ready = !NET.ready; NET.ready ? SFX.ok() : SFX.back(); netTrackMe(); netRefresh(); },
              copy: ()=>{
                const fallback = ()=>{ const t = document.createElement("textarea"); t.value = netLink(); t.style.cssText = "position:fixed;opacity:0";
                  document.body.appendChild(t); t.select(); try{ document.execCommand("copy"); }catch(e){} t.remove(); };
                try{ navigator.clipboard.writeText(netLink()).catch(fallback); }catch(e){ fallback(); }
                SFX.ok(); NET.copiedAt = performance.now(); netRefresh(); setTimeout(netRefresh, 2600); },
              leave: ()=>{ SFX.back(); netLeave(); showMain(MI("multi")); } } });
-  netBoard(pick).then(rows=>{ const el = document.getElementById("netBoard"); if(el) el.innerHTML = netBoardHTML(rows); });
+  const box = document.getElementById("netChat");
+  if(box){ box.value = NET.draft || ""; box.addEventListener("input", ()=>{ NET.draft = box.value; });
+    if(typing){ box.focus(); box.setSelectionRange(box.value.length, box.value.length); } }
+  netChatPaint();
+  if(NET.boardFor === pick && NET.boardHTML){ const el = document.getElementById("netBoard"); if(el) el.innerHTML = NET.boardHTML; }
+  else netBoard(pick).then(rows=>{ NET.boardFor = pick; NET.boardHTML = netBoardHTML(rows); const el = document.getElementById("netBoard"); if(el) el.innerHTML = NET.boardHTML; });
 }
 /* redraw the lobby as people come and go, without losing the selection */
 function netRefresh(){
@@ -17158,7 +17341,7 @@ function showResults(){
   const badges = (GAME.raceRecord ? '<span class="badge">NEW BEST RACE</span>' : '') +
                  (GAME.lapRecord ? '<span class="badge">NEW BEST LAP</span>' : '');
   let title = FIELD.length ? (GAME.finishPlace === 1 ? "YOU WIN" : ordinal(GAME.finishPlace) + " PLACE") : fmt(GAME.finishTime);
-  let right = table + laps;
+  let right = MODE === "online" ? '<div id="netLive">' + netLiveHTML() + '</div>' + laps : table + laps;
   if(EXP.on){
     title = "SUMMIT";
     const rec = recordFor();
@@ -17169,8 +17352,8 @@ function showResults(){
   }
   const acts = {}, items = [];
   if(MODE === "online"){
-    items.push(['lobby', "BACK TO THE LOBBY"], ['leave', "LEAVE ROOM"]);
-    acts.lobby = ()=>{ SFX.ok(); NET.racing = false; netTrackMe(); enterMenuWorld(); showLobby(); };
+    items.push(['lobby', "BACK TO THE LOBBY", ""], ['leave', "LEAVE ROOM"]);
+    acts.lobby = ()=>{ SFX.ok(); NET.racing = false; NET.ready = false; clearInterval(NET.liveTimer); netTrackMe(); enterMenuWorld(); showLobby(); };
     acts.leave = ()=>{ SFX.back(); netLeave(); enterMenuWorld(); showMain(MI("multi")); };
   } else if(MODE === "champ"){
     items.push(['stand', SAVE.champ && SAVE.champ.done ? "FINAL STANDINGS" : "STANDINGS"]);
@@ -17181,6 +17364,7 @@ function showResults(){
     acts.tracks = ()=>{ SFX.ok(); const m = MODE; enterMenuWorld(); showTracks(m); };
     acts.menu = ()=>{ SFX.back(); const m = MODE; enterMenuWorld(); menuFor(m); };
   }
+  if(MODE === "online"){ clearInterval(NET.liveTimer); NET.liveTimer = setInterval(()=>{ if(MENU.id !== "scResults") return clearInterval(NET.liveTimer); netLiveRefresh(); }, 500); }
   openScreen("scResults",
     '<div class="cols" style="align-items:flex-start"><div class="left">' +
     // the place, big; your time under it; then the circuit and your best lap in small capitals
@@ -17189,7 +17373,7 @@ function showResults(){
     '<div class="rsub">' + esc(TRACK.name) + (!EXP.on && state.best != null && isFinite(state.best) ? ' &middot; best lap ' + fmt(state.best) : '') + '</div>' +
     (EXP.on ? (GAME.raceRecord ? '<span class="badge">NEW BEST CLIMB</span>' : '') : badges) +
     '<div class="menu" style="margin-top:22px">' +
-    items.map(x => '<button class="item" data-act="' + x[0] + '"><span>' + x[1] + '</span></button>').join("") +
+    items.map(x => '<button class="item" data-act="' + x[0] + '"><span>' + x[1] + '</span>' + (x[2] !== undefined ? '<small>' + esc(x[2]) + '</small>' : '') + '</button>').join("") +
     '</div></div><div class="right"><div class="detail" style="margin:0">' + right + '</div></div></div>',
     { cls:"dim", acts });
 }
