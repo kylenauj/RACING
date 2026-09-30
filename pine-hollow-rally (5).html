@@ -10722,6 +10722,218 @@ function bushGeometry(seed){
 }
 
 courseBillboard();
+/* ---- the event dressing: banner ads along the straights and flags on poles ----
+   Vinyl banners strung between two posts down the outside of the straights (the corners have
+   their chevron boards), each a sponsor: the rally itself, the website, and the local firms that
+   put money into it. Flags on tall poles line the start straight and mark every jump, with a pair
+   here and there round the lap, all streaming the same way in the one wind. Everything keeps off
+   the roads, the water, the bridges and the lava, stands on ground near the road's own height,
+   and keeps the trees off the spot it stands on. */
+{
+  const P = MAIN, N = P.N, seg = P.seg, R = radiiOf(P);
+  // is a spot a fair place to stand something? ground, not road, not water, near the road's height
+  const fair = (x, z, roadY, keep)=>{
+    if(inWaterway(x, z) || deckAt(x, z) > 0.2) return false;
+    if((SPANS.length || (LAKE.on && LAKE.lava)) && lavaNear(x, z) > 0.02) return false;
+    if(CAVES.length && caveRoom(x, z)) return false;
+    if(CANYON.on && canyonAt(x, z) > 0.2) return false;
+    const n = nearest(x, z); if(n.dist < n.half + keep) return false;
+    return Math.abs(gradedY(x, z) - roadY) < 2.4;
+  };
+  const clearOfKept = (x, z, r)=> NO_TREES.every(q=> Math.hypot(x - q[0], z - q[1]) > q[2] + r);
+
+  /* -- the sponsors -- */
+  const ink = "#16150f", cream = "#f2efe6";
+  const logoImgEl = document.querySelector("#loading .logoart");
+  const bannerTex = draw => { const cv = noiseCanvas(1024, 160, draw); const t = new THREE.CanvasTexture(cv); t.anisotropy = 4; return t; };
+  const pine = (g, x, y, s, c)=>{ g.fillStyle = c; g.beginPath();
+    [[0,-1],[0.45,-0.35],[0.25,-0.35],[0.6,0.2],[0.35,0.2],[0.75,0.75],[-0.75,0.75],[-0.35,0.2],[-0.6,0.2],[-0.25,-0.35],[-0.45,-0.35]]
+      .forEach((p, k)=> k ? g.lineTo(x + p[0]*s, y + p[1]*s) : g.moveTo(x + p[0]*s, y + p[1]*s));
+    g.closePath(); g.fill(); g.fillRect(x - s*0.1, y + s*0.75, s*0.2, s*0.25); };
+  const word = (g, t, x, y, px, c, align, italic)=>{ g.fillStyle = c; g.textAlign = align || "left"; g.textBaseline = "middle";
+    g.font = (italic === false ? "" : "italic ") + "900 " + px + "px 'Arial Black', Impact, 'Helvetica Neue', Arial, sans-serif"; g.fillText(t, x, y); };
+  const SPONSORS = [
+    // the rally itself: the logo big on dark green, with the chequers either end
+    {name:"rally", draw:(g, W, H)=>{
+      g.fillStyle = "#12291f"; g.fillRect(0, 0, W, H);
+      for(const x0 of [0, W - 96]) for(let r=0;r<5;r++) for(let c=0;c<3;c++){ g.fillStyle = (r + c) % 2 ? cream : ink; g.fillRect(x0 + c*32, r*32, 32, 32); }
+      g.fillStyle = "#ffd23d"; g.fillRect(96, 0, W - 192, 8); g.fillRect(96, H - 8, W - 192, 8);
+    }, logo:true},
+    // the website
+    {name:"site", draw:(g, W, H)=>{
+      g.fillStyle = "#ffd23d"; g.fillRect(0, 0, W, H);
+      g.fillStyle = "#12291f"; g.fillRect(0, 0, 250, H);
+      pine(g, 125, 72, 58, "#ffd23d");
+      word(g, "MORE GAMES AT", 290, 48, 34, "#12291f");
+      word(g, "KYLENAUJ.COM", 286, 108, 82, "#12291f");
+    }},
+    {name:"tyres", draw:(g, W, H)=>{
+      g.fillStyle = ink; g.fillRect(0, 0, W, H);
+      g.strokeStyle = "#f2c230"; g.lineWidth = 14; g.lineCap = "round";
+      for(let k=0;k<3;k++){ g.beginPath(); g.moveTo(60 + k*38, 30); g.quadraticCurveTo(95 + k*38, 80, 70 + k*38, 132); g.stroke(); }
+      word(g, "BEAR CLAW", 230, 62, 72, "#f2c230");
+      word(g, "TYRES · GRIP IN THE MUD", 234, 124, 34, cream);
+    }},
+    {name:"coffee", draw:(g, W, H)=>{
+      g.fillStyle = "#e9dcc0"; g.fillRect(0, 0, W, H);
+      g.fillStyle = "#5a3a22"; g.fillRect(56, 50, 84, 80); g.fillRect(40, 130, 116, 12);
+      g.strokeStyle = "#5a3a22"; g.lineWidth = 12; g.beginPath(); g.arc(142, 88, 22, -1.3, 1.3); g.stroke();
+      g.strokeStyle = "#8a5a34"; g.lineWidth = 6; for(const x of [76, 98, 120]){ g.beginPath(); g.moveTo(x, 40); g.quadraticCurveTo(x + 10, 26, x, 12); g.stroke(); }
+      word(g, "TIMBERLINE", 210, 64, 78, "#5a3a22");
+      word(g, "COFFEE · ROASTED UP THE HILL", 214, 126, 32, "#8a5a34");
+    }},
+    {name:"oil", draw:(g, W, H)=>{
+      g.fillStyle = "#b8281f"; g.fillRect(0, 0, W, H);
+      g.fillStyle = cream; g.fillRect(0, 0, W, 10); g.fillRect(0, H - 10, W, 10);
+      g.beginPath(); g.moveTo(100, 28); g.bezierCurveTo(150, 90, 140, 132, 100, 132); g.bezierCurveTo(60, 132, 50, 90, 100, 28); g.fill();
+      word(g, "HOLLOW CREEK", 200, 64, 72, cream);
+      word(g, "MOTOR OIL · SINCE 1952", 204, 124, 34, "#ffd23d");
+    }},
+    {name:"tackle", draw:(g, W, H)=>{
+      g.fillStyle = "#1f4a6e"; g.fillRect(0, 0, W, H);
+      g.fillStyle = "#8fd3f4"; g.beginPath(); g.ellipse(100, 84, 62, 30, 0, 0, Math.PI*2); g.fill();
+      g.beginPath(); g.moveTo(150, 84); g.lineTo(182, 54); g.lineTo(182, 114); g.closePath(); g.fill();
+      g.fillStyle = "#1f4a6e"; g.beginPath(); g.arc(70, 78, 7, 0, Math.PI*2); g.fill();
+      word(g, "MOOSE LAKE", 220, 62, 74, cream);
+      word(g, "BAIT & TACKLE · OPEN AT DAWN", 224, 124, 32, "#8fd3f4");
+    }},
+    {name:"radio", draw:(g, W, H)=>{
+      g.fillStyle = "#e0601e"; g.fillRect(0, 0, W, H);
+      g.strokeStyle = cream; g.lineWidth = 9; g.lineCap = "round";
+      for(let k=1;k<=3;k++){ g.beginPath(); g.arc(80, 100, k*22, -Math.PI*0.8, -Math.PI*0.2); g.stroke(); }
+      g.fillStyle = cream; g.beginPath(); g.arc(80, 100, 9, 0, Math.PI*2); g.fill();
+      word(g, "RIDGE RUNNER", 190, 62, 72, cream);
+      word(g, "RADIO 88.9 FM · THE RALLY, LIVE", 194, 124, 32, ink);
+    }},
+    {name:"garage", draw:(g, W, H)=>{
+      g.fillStyle = "#2f5a3a"; g.fillRect(0, 0, W, H);
+      g.save(); g.translate(100, 82); g.rotate(-0.7); g.fillStyle = "#d8d4c8";
+      g.fillRect(-9, -8, 18, 70); g.beginPath(); g.arc(0, -22, 26, 0, Math.PI*2); g.fill();
+      g.fillStyle = "#2f5a3a"; g.fillRect(-10, -52, 20, 30); g.restore();
+      word(g, "NORTHWOODS", 200, 62, 76, cream);
+      word(g, "GARAGE · WE FIX WHAT THE HILLS BREAK", 204, 124, 30, "#b9e08a");
+    }}
+  ];
+  const banners = SPONSORS.map(S=>{
+    const t = bannerTex(S.draw);
+    if(S.logo && logoImgEl){
+      // the logo is an image: drawn on once it has loaded
+      const put = ()=>{ const cv = t.image, g = cv.getContext("2d"), h = 138, w = h*184/88; g.imageSmoothingEnabled = false;
+        g.drawImage(logoImgEl, (cv.width - w)/2, (cv.height - h)/2, w, h); t.needsUpdate = true; };
+      if(logoImgEl.complete && logoImgEl.naturalWidth) put(); else logoImgEl.addEventListener("load", put, {once:true});
+    }
+    return new THREE.MeshLambertMaterial({map:t, side:THREE.DoubleSide});
+  });
+
+  /* -- where the banners go: down the straights, a side at a time, a sponsor at a time -- */
+  const BL = 8, BH = 1.25, spots = [];
+  {
+    let i = Math.round(35/seg), side = 1, k = 0;
+    const step = Math.round(12/seg), gap = Math.round(Math.max(110, P.len/14)/seg);
+    while(i < N - Math.round(30/seg)){
+      let ok = true;
+      for(let d=-Math.round(8/seg); d<=Math.round(8/seg) && ok; d+=2) if(R[wrapIdx(P, i + d)] < 150) ok = false;
+      if(ok){
+        const q = P.pts[i], t = P.tans[i], nx = -t.z*side, nz = t.x*side, off = P.half[i] + 3.8;
+        const ends = [-BL/2, BL/2].map(u=> [q.x + nx*off + t.x*u, q.z + nz*off + t.z*u]);
+        const mid = [q.x + nx*off, q.z + nz*off];
+        if([...ends, mid].every(e=> fair(e[0], e[1], q.y, 2.6)) && clearOfKept(mid[0], mid[1], 5)){
+          spots.push({x:mid[0], z:mid[1], tx:t.x, tz:t.z, side, ends, S: k++ % SPONSORS.length});
+          side = -side; i += gap; continue;
+        }
+      }
+      i += step;
+    }
+  }
+  const post = new THREE.MeshLambertMaterial({color:0x5e4b31});
+  const postGeo = new THREE.CylinderGeometry(0.06, 0.07, 2.1, 5), bannerGeo = new THREE.PlaneGeometry(BL, BH);
+  const postIM = new THREE.InstancedMesh(postGeo, post, Math.max(1, spots.length*2)), dummy = new THREE.Object3D();
+  let pn = 0;
+  spots.forEach(s=>{
+    const ya = gradedY(s.ends[0][0], s.ends[0][1]), yb = gradedY(s.ends[1][0], s.ends[1][1]), ym = (ya + yb)/2;
+    s.ends.forEach((e, k)=>{ dummy.position.set(e[0], (k ? yb : ya) + 1.05, e[1]); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); postIM.setMatrixAt(pn++, dummy.matrix); });
+    const m = new THREE.Mesh(bannerGeo, banners[s.S]);
+    m.position.set(s.x, ym + 1.15, s.z);
+    // facing the road (its printed face toward the road), turned a little toward the cars coming
+    m.rotation.set(0, Math.atan2(s.tx, s.tz) + s.side*(Math.PI/2 + 0.36), 0);
+    // leaning with the ground between the posts (its +x end is the post further back up the road on the right, further on on the left)
+    m.rotateZ(Math.atan2(s.side > 0 ? ya - yb : yb - ya, BL));
+    m.castShadow = true; m.receiveShadow = true;
+    scene.add(m);
+    for(let u=-BL/2; u<=BL/2; u+=3) NO_TREES.push([s.x + s.tx*u, s.z + s.tz*u, 3.2]);
+  });
+  postIM.count = pn; postIM.instanceMatrix.needsUpdate = true; postIM.castShadow = true; scene.add(postIM);
+  TRACK._banners = spots.length;
+
+  /* -- the flags: four cloths, all in one wind, waved in the vertex shader -- */
+  const FW = 2.1, FH = 1.3, POLE = 5.2;
+  const flagTex = draw => { const t = new THREE.CanvasTexture(noiseCanvas(256, 160, draw)); t.anisotropy = 4; return t; };
+  const cloths = [
+    // the logo on dark green, with a yellow hoist
+    {draw:(g, W, H)=>{ g.fillStyle = "#12291f"; g.fillRect(0, 0, W, H); g.fillStyle = "#ffd23d"; g.fillRect(0, 0, 14, H); }, logo:true},
+    // the pine on yellow
+    {draw:(g, W, H)=>{ g.fillStyle = "#ffd23d"; g.fillRect(0, 0, W, H); pine(g, W*0.55, H*0.45, 58, "#12291f"); g.fillStyle = "#12291f"; g.fillRect(0, H - 16, W, 16); }},
+    // chequered
+    {draw:(g, W, H)=>{ for(let r=0;r<5;r++) for(let c=0;c<8;c++){ g.fillStyle = (r + c) % 2 ? cream : ink; g.fillRect(c*32, r*32, 32, 32); } }},
+    // a cream pennant with the dark pine and a green band
+    {draw:(g, W, H)=>{ g.fillStyle = cream; g.fillRect(0, 0, W, H); g.fillStyle = "#2f5a3a"; g.fillRect(0, H*0.62, W, H*0.38); pine(g, W*0.5, H*0.38, 44, "#12291f"); }}
+  ];
+  const WIND = {time:{value:0}};
+  const clothMats = cloths.map(C=>{
+    const t = flagTex(C.draw);
+    if(C.logo && logoImgEl){
+      const put = ()=>{ const cv = t.image, g = cv.getContext("2d"), w = 216, h = w*88/184; g.imageSmoothingEnabled = false;
+        g.drawImage(logoImgEl, 26, (cv.height - h)/2, w, h); t.needsUpdate = true; };
+      if(logoImgEl.complete && logoImgEl.naturalWidth) put(); else logoImgEl.addEventListener("load", put, {once:true});
+    }
+    const m = new THREE.MeshLambertMaterial({map:t, side:THREE.DoubleSide});
+    m.onBeforeCompile = sh=>{
+      sh.uniforms.uWind = WIND.time;
+      sh.vertexShader = "uniform float uWind;\n" + sh.vertexShader.replace("#include <begin_vertex>", `#include <begin_vertex>
+        float ph = 0.0;
+        #ifdef USE_INSTANCING
+          ph = instanceMatrix[3].x*0.37 + instanceMatrix[3].z*0.23;
+        #endif
+        float fx = clamp(transformed.x/${FW.toFixed(2)}, 0.0, 1.0);
+        transformed.z += fx*(0.16*sin(uWind*5.5 - transformed.x*3.8 + ph) + 0.05*sin(uWind*9.0 - transformed.x*7.0 + ph*1.7));
+        transformed.y -= fx*fx*0.08 + fx*0.03*sin(uWind*3.0 + ph);`);
+    };
+    return m;
+  });
+  ANIMS.push(tt=>{ WIND.time.value = tt; });
+  const clothGeo = new THREE.PlaneGeometry(FW, FH, 12, 3); clothGeo.translate(FW/2, -FH/2, 0);
+  const flags = [];
+  const windYaw = Math.atan2(0.8, 0.6);                     // the one wind: every flag streams the same way
+  const flagAt = (i, side, off, kind)=>{
+    i = wrapIdx(P, i);
+    const q = P.pts[i], t = P.tans[i], o = P.half[i] + off;
+    const x = q.x - t.z*side*o, z = q.z + t.x*side*o;
+    if(!fair(x, z, q.y, 1.6) || !clearOfKept(x, z, 1.2)) return;
+    if(flags.some(f=> Math.hypot(f.x - x, f.z - z) < 4)) return;
+    flags.push({x, z, y:gradedY(x, z), kind});
+    NO_TREES.push([x, z, 2.6]);
+  };
+  // down both sides of the start straight
+  for(let d=14; d<=90; d+=13) for(const side of [1, -1]) flagAt(Math.round(d/seg), side, 2.6, (d/13 + (side > 0 ? 0 : 1)) % 2 ? 0 : 2);
+  // at every jump
+  const jumps = AUTO_JUMPS.map(a=> a.at).concat((TRACK.jumps || []).map(j=> snapTo(P, j[0])), (TRACK.bigJumps || []).map(j=> snapTo(P, j[0])));
+  jumps.forEach((at, k)=>{ for(const side of [1, -1]) flagAt(at - Math.round(6/seg), side, 3.2, k % 2 ? 1 : 3); });
+  // a pair every so often round the lap
+  for(let d=260; d<P.len - 120; d+=Math.max(230, P.len/9)) for(const side of [1, -1]) flagAt(Math.round(d/seg), side, 3.4, Math.floor(d/230) % 4);
+  // the poles, and a cloth per kind
+  const poleIM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.035, 0.05, POLE, 5), new THREE.MeshLambertMaterial({color:0xd8d4c8}), Math.max(1, flags.length));
+  flags.forEach((f, k)=>{ dummy.position.set(f.x, f.y + POLE/2, f.z); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); poleIM.setMatrixAt(k, dummy.matrix); });
+  poleIM.count = flags.length; poleIM.instanceMatrix.needsUpdate = true; poleIM.castShadow = true; scene.add(poleIM);
+  clothMats.forEach((m, kind)=>{
+    const list = flags.filter(f=> f.kind === kind);
+    if(!list.length) return;
+    const im = new THREE.InstancedMesh(clothGeo, m, list.length);
+    list.forEach((f, k)=>{ dummy.position.set(f.x, f.y + POLE - 0.05, f.z); dummy.rotation.set(0, windYaw + (Math.sin(f.x*0.7 + f.z) * 0.12), 0); dummy.updateMatrix(); im.setMatrixAt(k, dummy.matrix); });
+    im.instanceMatrix.needsUpdate = true; im.frustumCulled = false; im.castShadow = true; im.name = "flags";
+    scene.add(im);
+  });
+  TRACK._flags = flags.length;
+}
 /* ---- plant everything along every path ---- */
 {
   const scatterOn = (P, count, place)=>{
@@ -12093,11 +12305,14 @@ function buildWagon(opts){
       onSides(mLogo, w, w*AR, 0.625, (sp[0] + sp[1])/2);
     };
     const glassH = Math.min(0.34, Math.hypot(RT - RB, ROOF - BELT)*0.62);
-    if (LG === 1) onSides(mLogo, 0.56, 0.56*AR, 0.745, 0.22);          // above the rub strip, below the glass
+    // centred on the front door panel (it runs from 0.1 to 0.96): clear of both shut lines and the handle,
+    // above the rub strip, below the glass
+    // (on the woodie, in the middle of the wood panel, inside its ash frame)
+    if (LG === 1) onSides(mLogo, 0.58, 0.58*AR, o.woodie ? 0.66 : 0.745, 0.53);
     if (LG === 2 || LG === 6) bigSide();
     if (LG === 3 || LG === 6) onRoof(mLogo, o.sport ? 1.12 : 1.3, (o.sport ? 1.12 : 1.3)*AR);
     if (LG === 4 || LG === 6) onGlass(mLogo, glassH/AR, glassH, 0.5);
-    if (LG === 5) { onSides(mBadge, 0.26, 0.26, 0.76, 0.55); onGlass(mBadge, 0.26, 0.26, 0.5); }
+    if (LG === 5) { onSides(mBadge, 0.26, 0.26, 0.76, 0.53); onGlass(mBadge, 0.26, 0.26, 0.5); }
   }
   // ---- the kit: ladder, tent, exhaust, whip aerial ----
   if (A.ladder) {
