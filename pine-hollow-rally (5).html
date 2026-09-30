@@ -1423,9 +1423,12 @@ function easeCorners(P, floor){
   return 60;
 }
 /* how hard the mud holds: [per m/s, per (m/s)^2]. On the expedition it is a bog you plough
-   through at walking pace; on a race circuit it is thick enough to cost you, about 70km/h flat
-   out in the deepest of it, but you can race through it */
-const MUD_EXP = [0.95, 0.028], MUD_RACE = [0.2, 0.004];
+   through at walking pace; on a race circuit it is only a drag, a few km/h off the top */
+const MUD_EXP = [0.95, 0.028], MUD_RACE = [0.03, 0.0005];
+/* the Sawtooth's hills: how much harder than life a descent throws the car on, and how far past
+   top speed it may carry it (m/s: up to 'over', 'overPer' for each unit of grade, settling back
+   at 'settle' a second once the road levels) */
+const ALP = {fall:1.5, over:18, overPer:45, settle:3};
 function routingTest(P){
   const N = P.N, seg = P.seg, R = radiiOf(P);
   const TOTALS = [24.0, 15.5, 10.8, 7.7, 5.5];
@@ -1446,7 +1449,15 @@ function routingTest(P){
      just as they do for the player's car */
   const HILL = !!TRACK.alpine, gr = new Float64Array(N), W = Math.max(1, Math.round(1.6/seg));
   if(HILL) for(let i=0;i<N;i++) gr[i] = (P.pts[(i + W)%N].y - P.pts[(i - W + N)%N].y)/(2*W*seg);
-  const pull = g=> 9.8*g/Math.sqrt(1 + g*g), grip = g=> 1 - 0.88*smoothstep(0.40, 0.64, g);
+  const pull = g=> g > 0 ? 0 : 9.8*g/Math.sqrt(1 + g*g)*ALP.fall, grip = g=> 1;
+  // how far past top speed the hill has carried them, sample by sample (it settles over distance)
+  const over = new Float64Array(N);
+  if(HILL) for(let pass=0; pass<2; pass++) for(let i=0;i<N;i++){
+    const o0 = over[(i - 1 + N)%N] - ALP.settle*seg/40;
+    over[i] = Math.max(0, Math.min(ALP.over, -gr[i]*ALP.overPer), o0);
+  }
+  // (a corner holds its own speed; where the road is straight enough to hold top speed, the hill can carry them past it)
+  if(HILL) for(let i=0;i<N;i++){ const c = cornerHoldSpeed(R[i]); v[i] = c > 43.5 ? 44 + over[i] : c; }
   for(let pass=0; pass<3; pass++){
     for(let i=N-1;i>=0;i--){
       const nx2 = (i+1)%N;
@@ -13599,7 +13610,8 @@ function stepAudio(info, dt){
        and comes back fifteen times a second, and it spits pops. */
     AUD.limT = (AUD.limT || 0) + dt;
     let limiting = false;
-    if(gas && rpm >= DRIVE.redline*0.975){
+    const overTop = TRACK.alpine && (pose.over || 0) > 1 && info.sp > MAXV;      // the hill, not the engine, is doing it
+    if(gas && rpm >= DRIVE.redline*0.975 && !overTop){
       limiting = true;
       if(AUD.limT > 0.065){ AUD.limT = 0; AUD.limOn = !AUD.limOn; if(!AUD.limOn && Math.random() < 0.45) SFX.pop(0.9); }
       if(!AUD.limOn){ rpm *= 0.94; if(onGrid) AUD.revRpm = DRIVE.redline*0.93; }
@@ -13891,8 +13903,15 @@ function stepCarInner(dt){
     hillA = -9.8*grade/Math.sqrt(1 + grade*grade);
     // past about 55% the wheels just dig in: the switchbacks are the way up
     climbGrip = 1 - 0.88*smoothstep(0.40, 0.64, grade) - (offRoad ? 0.12*smoothstep(0.3, 0.5, grade) : 0);
+    /* The Sawtooth is for going fast. Up the face of a peak the car keeps all its speed; down the
+       other side the hill throws it on, harder than it really would, and past top speed: the
+       limit lifts with the slope and only settles back gradually once the road levels out. */
+    if(TRACK.alpine){
+      hillA = grade > 0 ? 0 : hillA*ALP.fall; climbGrip = 1;
+      pose.over = Math.max(Math.min(ALP.over, -grade*ALP.overPer), (pose.over || 0) - ALP.settle*dt);
+    }
     pose.grade = grade;
-  }
+  } else if(TRACK.alpine) pose.over = Math.max(0, (pose.over || 0) - (pose.air ? 0 : ALP.settle*dt));
   let a = hillA;
   const drive = DRIVE.K * torqueCurve(trans.rpm) * DRIVE.totals[trans.gear-1] * traction * climbGrip;
 
@@ -13923,7 +13942,7 @@ function stepCarInner(dt){
   let newAlong = along + a*dt;
   if(!thr && !brk && Math.abs(newAlong) < 0.35) newAlong = 0;   // no creeping
   if(newAlong < -11) newAlong = -11;
-  const ceiling = MAXV + (drift.boostT > 0 ? 8 : 0) + GG.ceil();   // boost lifts the limiter (and in the swamp, the fireflies you carry)
+  const ceiling = MAXV + (drift.boostT > 0 ? 8 : 0) + GG.ceil() + (TRACK.alpine ? pose.over || 0 : 0);   // boost lifts the limiter (and in the swamp, the fireflies you carry; on the Sawtooth, the hill)
   if(newAlong > ceiling) newAlong = ceiling;
   const netA = (newAlong - along)/Math.max(dt, 0.0001);
 
@@ -14786,7 +14805,7 @@ function stepCamera(dt, sp){
     if(!chase){ camera.rotateX(-pose.bP*0.8); camera.rotateZ(pose.bR*0.8); }
     else camera.rotateZ(pose.bR*0.25);
   }
-  const fovT = 62 + Math.min(1, sp/MAXV)*11;      // the frame opens up with speed
+  const fovT = 62 + Math.min(TRACK.alpine ? 1.4 : 1, sp/MAXV)*11;      // the frame opens up with speed (and past top speed down the Sawtooth)
   if(Math.abs(camera.fov - fovT) > 0.01){
     camera.fov += (fovT - camera.fov)*Math.min(1, dt*2.5);
     camera.updateProjectionMatrix();
@@ -16286,7 +16305,7 @@ function resetRace(){
   placeAtStart();
   if(typeof resetPiles === "function") resetPiles();
   resetCritters();
-  EXP.camps.forEach(c=> c.reached = false); EXP.last = -1; EXP.resets = 0;
+  EXP.camps.forEach(c=> c.reached = false); EXP.last = -1; EXP.resets = 0; pose.over = 0;
   car.visible = true; carShadow.visible = true;
   camH = pose.h;
   camera.position.set(pose.x - Math.sin(pose.h)*9.2, pose.y + 3.55, pose.z - Math.cos(pose.h)*9.2);
