@@ -204,7 +204,7 @@
     };
     const throat = pose.throat || 0;
 
-    L.scan(-20, -32, 24, 6, (wx, wy) => {
+    L.scan(-ORIGIN_X, -ORIGIN_Y, CELL_W - ORIGIN_X, CELL_H - ORIGIN_Y, (wx, wy) => {
       const [lx, ly] = F.toLocal(wx, wy);
       // mouth wedge: sweep back onto the lip line and test against the head
       if (jaw > 0.01) {

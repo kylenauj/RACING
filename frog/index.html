@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Longleg Frog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  /* Layout: one column. The pond is the hero, then the animation shelf,
+     the frame inspector, and the sprite's specs. */
+  :root {
+    --bg: #e8eee7;          /* reed-paper green-grey */
+    --panel: #f6f9f4;
+    --ink: #142219;
+    --muted: #56685b;
+    --line: #c5d2c6;
+    --accent: #d8385d;      /* the tongue */
+    --accent-ink: #ffffff;
+    --well: #d7e2d7;        /* behind sprites */
+    --display: "Pixelify Sans", "Courier New", monospace;
+    --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1914; --panel: #16231c; --ink: #e2ece4; --muted: #93a898; --line: #2a3d31;
+      --accent: #ff6f8e; --accent-ink: #1a0a10; --well: #1d2e24; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1914; --panel: #16231c; --ink: #e2ece4; --muted: #93a898; --line: #2a3d31;
+    --accent: #ff6f8e; --accent-ink: #1a0a10; --well: #1d2e24; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.55 var(--body);
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 28px 16px 64px; display: grid; gap: 44px; }
+  h1, h2 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; letter-spacing: .01em; }
+  h1 { font-size: clamp(34px, 6vw, 54px); line-height: 1; }
+  h2 { font-size: 26px; line-height: 1.1; }
+  p { margin: 0; max-width: 65ch; }
+  .muted { color: var(--muted); }
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .eyebrow { font: 600 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+  section { display: grid; gap: 16px; min-width: 0; }
+  .head { display: grid; gap: 10px; }
+  .spec { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 13px/1.4 var(--mono); color: var(--muted); }
+  .spec b { color: var(--ink); font-weight: 600; }
+
+  /* ---- pond ---- */
+  .stage {
+    position: relative; border-radius: 6px; overflow: hidden; outline: none;
+    background: #2a5d6b; box-shadow: 0 0 0 1px var(--line);
+    cursor: pointer; justify-self: center; max-width: 100%;
+  }
+  .stage:focus-visible { box-shadow: 0 0 0 3px var(--accent); }
+  .stage canvas { width: 100%; height: auto; }
+  .hud {
+    position: absolute; left: 10px; right: 10px; top: 8px; display: flex; justify-content: space-between; gap: 12px;
+    font: 500 15px/1.2 var(--display); color: #f5f7e8; text-shadow: 1px 1px 0 #10261b, -1px 1px 0 #10261b, 1px -1px 0 #10261b, -1px -1px 0 #10261b;
+    pointer-events: none;
+  }
+  .hud .mode { opacity: .95; text-align: right; }
+  .pad { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  button {
+    font: 600 14px/1 var(--mono); color: var(--ink); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 4px; padding: 10px 14px; cursor: pointer;
+    touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  }
+  button:hover { border-color: var(--muted); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button.primary, button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .keys { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; font-size: 14px; color: var(--muted); }
+  kbd {
+    font: 600 12px/1 var(--mono); color: var(--ink); background: var(--panel);
+    border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; padding: 3px 6px;
+  }
+
+  /* ---- animation shelf ---- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .tile {
+    display: grid; gap: 8px; padding: 10px; text-align: left; font: inherit; color: inherit;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px; cursor: pointer;
+  }
+  .tile[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: var(--panel); color: inherit; }
+  .tile canvas { width: 100%; aspect-ratio: 72 / 48; max-width: 100%; background: var(--well); border-radius: 3px; }
+  .tile .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .tile .name { font: 700 18px/1 var(--display); }
+  .tag { font: 600 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .tile .meta { font: 12px/1.3 var(--mono); color: var(--muted); }
+
+  /* ---- inspector ---- */
+  .inspector { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 720px) { .inspector { grid-template-columns: minmax(0, 1fr); } }
+  .big { display: grid; gap: 10px; }
+  .big canvas { width: 100%; aspect-ratio: 72 / 48; max-width: 100%; background: var(--well); border-radius: 4px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .controls label { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; color: var(--muted); }
+  .strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; min-width: 0; }
+  .cell { flex: 0 0 auto; display: grid; gap: 4px; padding: 0; background: none; border: 0; color: inherit; cursor: pointer; text-align: left; }
+  .cell canvas { width: 144px; height: 96px; background: var(--well); border-radius: 3px; box-shadow: 0 0 0 1px var(--line); }
+  .cell.on canvas { box-shadow: 0 0 0 2px var(--accent); }
+  .cell .meta { font: 12px/1.2 var(--mono); color: var(--muted); display: flex; gap: 6px; }
+  .hit { color: var(--accent); font-weight: 600; }
+  .notes { font-size: 15px; color: var(--muted); }
+
+  /* ---- specs ---- */
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .sw { display: grid; grid-template-columns: 28px 1fr; gap: 2px 10px; align-items: center; font-size: 13px; }
+  .sw i { grid-row: span 2; width: 28px; height: 28px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.2); }
+  .sw .mono { font-size: 12px; color: var(--muted); }
+  .sheet { overflow-x: auto; background: var(--well); border-radius: 6px; padding: 12px; }
+  .sheet img { display: block; image-rendering: pixelated; width: 864px; max-width: none; }
+  .files { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 15px; }
+  .files code { font: 600 13px var(--mono); }
+
+  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+
+  <header class="head">
+    <span class="eyebrow">8-bit sprite · character + base animations</span>
+    <h1>Longleg Frog</h1>
+    <p class="muted">A pond frog on stilt legs with a sticky tongue. Every frame is drawn from one pixel rig into a 72×48 cell with a 16-colour palette, so new moves are poses, not repaints.</p>
+    <div class="spec" id="spec"></div>
+  </header>
+
+  <section aria-labelledby="pondTitle">
+    <h2 id="pondTitle" class="eyebrow" style="font-family:var(--mono);font-size:12px">The pond</h2>
+    <div class="stage" id="stage" tabindex="0" aria-label="Playable pond. Click, then use the arrow keys, Space and X.">
+      <canvas id="game" width="320" height="160"></canvas>
+      <div class="hud"><span id="score">Flies 0</span><span class="mode" id="mode">Demo</span></div>
+    </div>
+    <div class="pad" id="pad">
+      <button id="bLeft" data-k="left" aria-label="Walk left">◀ Walk</button>
+      <button id="bRight" data-k="right" aria-label="Walk right">Walk ▶</button>
+      <button id="bJump" data-k="jump">Jump</button>
+      <button id="bTongue" data-k="tongue" class="primary">Tongue</button>
+      <button id="bUp" data-k="tongueUp">Tongue ↑</button>
+      <button id="bCroak" data-k="croak">Croak</button>
+      <button id="bHurt" data-k="hurt">Hurt</button>
+    </div>
+    <p class="keys">
+      <span><kbd>←</kbd> <kbd>→</kbd> walk</span>
+      <span><kbd>Space</kbd> jump</span>
+      <span><kbd>X</kbd> tongue</span>
+      <span><kbd>↑</kbd>+<kbd>X</kbd> tongue up</span>
+      <span><kbd>C</kbd> croak</span>
+      <span><kbd>H</kbd> hurt</span>
+    </p>
+  </section>
+
+  <section aria-labelledby="animsTitle">
+    <div class="head">
+      <h2 id="animsTitle">Base animations</h2>
+      <p class="muted">Pick one to step through its frames below.</p>
+    </div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <section aria-labelledby="insTitle">
+    <h2 id="insTitle">Frames: <span id="insName">tongue</span></h2>
+    <div class="inspector">
+      <div class="big">
+        <canvas id="big" width="72" height="48"></canvas>
+        <div class="controls">
+          <button id="iPrev" aria-label="Previous frame">◀</button>
+          <button id="iPlay" aria-pressed="true">Pause</button>
+          <button id="iNext" aria-label="Next frame">▶</button>
+          <label for="iSpeed">Speed
+            <select id="iSpeed"><option value="1">1×</option><option value="0.5">½×</option><option value="0.25">¼×</option></select>
+          </label>
+          <label for="iOnion"><input type="checkbox" id="iOnion"> Onion skin</label>
+        </div>
+        <p class="notes" id="insNotes"></p>
+      </div>
+      <div class="strip" id="strip"></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="sheetTitle">
+    <div class="head">
+      <h2 id="sheetTitle">Sprite sheet</h2>
+      <p class="muted">One row per animation, one 72×48 cell per frame, in the order listed above. The pivot sits at pixel (24, 45), on the ground between the feet. The JSON atlas beside it carries frame durations, loop flags, walk speed and the tongue hitboxes.</p>
+    </div>
+    <div class="sheet"><img src="sprites/frog-sheet.png" alt="Frog sprite sheet with all animation frames" width="864" height="432"></div>
+  </section>
+
+  <section aria-labelledby="palTitle">
+    <h2 id="palTitle">Palette</h2>
+    <div class="swatches" id="swatches"></div>
+  </section>
+
+  <section aria-labelledby="filesTitle">
+    <h2 id="filesTitle">Files</h2>
+    <ul class="files">
+      <li><code>frog/frog.js</code> <span class="muted">the rig and rasteriser: pose in, palette-indexed pixels out</span></li>
+      <li><code>frog/frog-anims.js</code> <span class="muted">every animation as a list of poses with frame times</span></li>
+      <li><code>frog/sprites/frog-sheet.png</code> + <code>.json</code> <span class="muted">sheet and atlas for any engine</span></li>
+      <li><code>node frog/tools/export.js</code> <span class="muted">rebuilds the PNGs and atlas after a pose change</span></li>
+    </ul>
+  </section>
+</main>
+
+<script src="frog.js"></script>
+<script src="frog-anims.js"></script>
+<script>
+(function () {
+  'use strict';
+  const F = window.Frog;
+  const A = F.buildAnims();
+  const NAMES = Object.keys(A);
+  const W = F.CELL_W, H = F.CELL_H, OX = F.ORIGIN_X, OY = F.ORIGIN_Y;
+  const reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const INFO = {
+    idle: { keys: 'none', note: 'Breathes with a throat pulse; blinks on frames 9 and 10.' },
+    walk: { keys: '← →', note: 'Each foot is planted for half the cycle and swings with a high knee lift for the other half. Move the frog at the listed speed so the planted foot does not slide.' },
+    jump: { keys: 'Space', note: 'Two crouch frames of anticipation, a push-off with dust, then legs trailing behind. Apply the upward velocity on frame 2.' },
+    fall: { keys: 'auto', note: 'Loops while airborne and falling. Legs reach down for the landing.' },
+    land: { keys: 'auto', note: 'Squash on impact with dust both sides, then settle back to idle.' },
+    tongue: { keys: 'X', note: 'Wind up, open, three shooting frames, stick, two retract frames with sag, close. Frames 4 and 5 are live: the atlas gives the tip hitbox.' },
+    tongue_up: { keys: '↑ + X', note: 'Same timing as the forward strike, aimed up at 49° for flies overhead.' },
+    croak: { keys: 'C', note: 'The throat sac inflates past the chin, holds, and deflates.' },
+    hurt: { keys: 'H', note: 'One white flash frame, knocked back with stars, then recovers.' },
+  };
+  const ROLES = ['Outline, pupil', 'Green 0: shadow, spots', 'Green 1', 'Green 2', 'Green 3: highlight', 'Belly shade', 'Belly',
+    'Eye white, hit flash', 'Mouth', 'Tongue dark', 'Tongue', 'Tongue light', 'Spark', 'Far-side shadow', 'Dust', 'Dust shade'];
+
+  // pre-render every frame to a 72x48 canvas
+  function toCanvas(px) {
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const id = new ImageData(W, H); F.toRGBA(px, id.data);
+    c.getContext('2d').putImageData(id, 0, 0);
+    return c;
+  }
+  NAMES.forEach(n => A[n].frames.forEach(f => { f.img = toCanvas(f.px); }));
+  const total = n => A[n].frames.reduce((s, f) => s + f.ms, 0);
+
+  // ---- spec line ----
+  const frameCount = NAMES.reduce((s, n) => s + A[n].frames.length, 0);
+  document.getElementById('spec').innerHTML =
+    `<span>cell <b>${W}×${H}</b></span><span>colours <b>${F.PALETTE.length - 1}</b></span>` +
+    `<span>animations <b>${NAMES.length}</b></span><span>frames <b>${frameCount}</b></span>` +
+    `<span>walk speed <b>${A.walk.speed} px/s</b></span>`;
+
+  // ---- palette ----
+  document.getElementById('swatches').innerHTML = F.PALETTE.slice(1).map((hex, i) =>
+    `<div class="sw"><i style="background:${hex}"></i><span>${ROLES[i]}</span><span class="mono">${i + 1} · ${hex}</span></div>`).join('');
+
+  // ---- a tiny animation player ----
+  function Player(name) { this.set(name); }
+  Player.prototype.set = function (name) { this.name = name; this.i = 0; this.t = 0; this.done = false; };
+  Player.prototype.update = function (dt) {
+    const fr = A[this.name].frames, loop = A[this.name].loop;
+    this.t += dt;
+    while (!this.done && this.t >= fr[this.i].ms) {
+      this.t -= fr[this.i].ms;
+      if (this.i < fr.length - 1) this.i++;
+      else if (loop) this.i = 0;
+      else { this.done = true; this.t = 0; }
+    }
+  };
+  Object.defineProperty(Player.prototype, 'frame', { get() { return A[this.name].frames[this.i]; } });
+
+  // =====================================================================
+  // the pond
+  // =====================================================================
+  const game = document.getElementById('game'), g = game.getContext('2d');
+  const SW = game.width, SH = game.height, GROUND = 134;
+  const stage = document.getElementById('stage');
+
+  // scale the stage by whole pixels when there's room for it
+  function fitStage() {
+    const avail = stage.parentElement.clientWidth;
+    const s = Math.floor(avail / SW);
+    stage.style.width = s >= 2 ? (s * SW) + 'px' : '100%';
+  }
+  window.addEventListener('resize', fitStage); fitStage();
+
+  // painted once: sky bands, far trees, reeds, water and the mud bank
+  const bg = document.createElement('canvas'); bg.width = SW; bg.height = SH;
+  (function paint() {
+    const b = bg.getContext('2d');
+    let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const sky = ['#9fd3e0', '#b3dde6', '#c6e6e8', '#d6ecdf'];
+    sky.forEach((c, i) => { b.fillStyle = c; b.fillRect(0, i * 22, SW, 22); });
+    b.fillStyle = '#e6f2dc'; b.fillRect(0, 88, SW, 12);
+    // far tree line
+    b.fillStyle = '#6f9e79';
+    for (let x = 0; x < SW; x++) { const h = 18 + Math.round(6 * Math.sin(x / 13) + 4 * Math.sin(x / 5.3)); b.fillRect(x, 100 - h, 1, h); }
+    b.fillStyle = '#5a8a66';
+    for (let x = 0; x < SW; x++) { const h = 8 + Math.round(4 * Math.sin(x / 9 + 2) + 2 * Math.sin(x / 3.1)); b.fillRect(x, 100 - h, 1, h); }
+    // water
+    b.fillStyle = '#3f8a97'; b.fillRect(0, 100, SW, 30);
+    b.fillStyle = '#5ba7b0';
+    for (let i = 0; i < 40; i++) { const x = Math.floor(rnd() * SW), y = 102 + Math.floor(rnd() * 24); b.fillRect(x, y, 3 + Math.floor(rnd() * 5), 1); }
+    // lily pads
+    [[46, 112], [214, 108], [280, 120]].forEach(([x, y]) => {
+      b.fillStyle = '#2f6b3b'; b.fillRect(x - 7, y, 15, 3); b.fillRect(x - 5, y - 1, 11, 5);
+      b.fillStyle = '#4f9a4a'; b.fillRect(x - 6, y, 13, 2); b.fillRect(x - 4, y - 1, 9, 1);
+      b.fillStyle = '#3f8a97'; b.fillRect(x + 1, y - 1, 1, 2);
+    });
+    // reeds
+    for (let i = 0; i < 26; i++) {
+      const x = Math.floor(rnd() * SW), h = 14 + Math.floor(rnd() * 22);
+      b.fillStyle = rnd() > 0.5 ? '#4d7f45' : '#3d6b3a'; b.fillRect(x, GROUND - h, 1, h);
+      if (rnd() > 0.6) { b.fillStyle = '#6b4a2e'; b.fillRect(x - 1, GROUND - h - 4, 3, 5); }
+    }
+    // mud bank
+    b.fillStyle = '#6b4a2e'; b.fillRect(0, GROUND, SW, SH - GROUND);
+    b.fillStyle = '#56391f';
+    for (let i = 0; i < 90; i++) b.fillRect(Math.floor(rnd() * SW), GROUND + 3 + Math.floor(rnd() * (SH - GROUND - 3)), 2, 1);
+    b.fillStyle = '#6fbf4a'; b.fillRect(0, GROUND, SW, 2);
+    b.fillStyle = '#4d9a3a'; b.fillRect(0, GROUND + 2, SW, 1);
+    for (let x = 0; x < SW; x += 2 + Math.floor(rnd() * 4)) { b.fillStyle = '#6fbf4a'; b.fillRect(x, GROUND - 1 - Math.floor(rnd() * 2), 1, 2); }
+  })();
+
+  // where each attack's tongue tip lands, relative to the pivot
+  const tipOf = n => { const f = A[n].frames.find(fr => fr.hit); return f.tip; };
+  const TIP = { tongue: tipOf('tongue'), tongue_up: tipOf('tongue_up') };
+
+  const Gm = {
+    x: 90, y: 0, vx: 0, vy: 0, dir: 1, air: false, launched: false,
+    state: 'idle', p: new Player('idle'), caught: 0,
+    manual: false, lastInput: -1e9, flies: [], puffs: [],
+    ai: { jumpIn: 3500, croakIn: 6000 },
+  };
+  const LOCKED = { land: 1, tongue: 1, tongue_up: 1, croak: 1, hurt: 1, jump: 1 };
+
+  function spawnFly(delay) {
+    const high = Math.random() < 0.35;
+    const tip = high ? TIP.tongue_up : TIP.tongue;
+    Gm.flies.push({
+      bx: 70 + Math.random() * 180, by: GROUND + tip[1] + (Math.random() * 4 - 2),
+      ph: Math.random() * 6.28, alive: delay ? false : true, wait: delay || 0, x: 0, y: 0,
+    });
+  }
+  for (let i = 0; i < 3; i++) spawnFly(0);
+
+  function setState(s) { Gm.state = s; Gm.p.set(s); }
+
+  // ---- input ----
+  const held = { left: false, right: false, up: false };
+  const pressed = {};
+  const KEYMAP = {
+    ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'up', KeyW: 'up',
+    Space: 'jump', KeyZ: 'jump', KeyX: 'tongue', KeyJ: 'tongue', KeyK: 'tongue', KeyC: 'croak', KeyH: 'hurt',
+  };
+  function touch() { Gm.manual = true; Gm.lastInput = performance.now(); }
+  stage.addEventListener('keydown', e => {
+    const k = KEYMAP[e.code]; if (!k) return;
+    e.preventDefault(); touch();
+    if (k in held) held[k] = true;
+    if (!e.repeat) pressed[k] = true;
+  });
+  stage.addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k && k in held) held[k] = false; });
+  stage.addEventListener('blur', () => { held.left = held.right = held.up = false; });
+  stage.addEventListener('pointerdown', () => stage.focus());
+  document.querySelectorAll('#pad button').forEach(btn => {
+    const k = btn.dataset.k;
+    btn.addEventListener('pointerdown', e => {
+      e.preventDefault(); touch();
+      if (k === 'left' || k === 'right') { held[k] = true; btn.setPointerCapture(e.pointerId); }
+      else if (k === 'tongueUp') { pressed.tongue = true; pressed.aimUp = true; }
+      else pressed[k] = true;
+    });
+    const release = () => { if (k === 'left' || k === 'right') held[k] = false; };
+    btn.addEventListener('pointerup', release); btn.addEventListener('pointercancel', release);
+    btn.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.dispatchEvent(new PointerEvent('pointerdown')); } });
+    btn.addEventListener('keyup', e => { if (e.key === 'Enter' || e.key === ' ') release(); });
+  });
+
+  // demo mode: walk to a fly, face it, strike; hop and croak now and then
+  function demoInput(dt) {
+    const inp = { left: false, right: false, up: false, jump: false, tongue: false, croak: false, hurt: false };
+    const ai = Gm.ai;
+    ai.jumpIn -= dt; ai.croakIn -= dt;
+    if (Gm.air || LOCKED[Gm.state]) return inp;
+    let best = null, bestD = 1e9;
+    for (const f of Gm.flies) {
+      if (!f.alive) continue;
+      const up = f.by < GROUND - 34, reach = (up ? TIP.tongue_up : TIP.tongue)[0];
+      for (const side of [1, -1]) {
+        const want = f.bx - side * reach;
+        if (want < 14 || want > SW - 14) continue;
+        const d = Math.abs(want - Gm.x);
+        if (d < bestD) { bestD = d; best = { want, side, up }; }
+      }
+    }
+    if (ai.croakIn < 0) { ai.croakIn = 7000 + Math.random() * 5000; inp.croak = true; return inp; }
+    if (ai.jumpIn < 0) { ai.jumpIn = 4000 + Math.random() * 4000; inp.jump = true; inp[Gm.dir > 0 ? 'right' : 'left'] = true; return inp; }
+    if (!best) return inp;
+    if (Math.abs(best.want - Gm.x) > 1.5) inp[best.want > Gm.x ? 'right' : 'left'] = true;
+    else if (Gm.dir !== best.side) inp[best.side > 0 ? 'right' : 'left'] = true;
+    else { inp.tongue = true; inp.up = best.up; }
+    return inp;
+  }
+
+  function update(dt, now) {
+    if (Gm.manual && now - Gm.lastInput > 9000) Gm.manual = false;
+    let inp;
+    if (Gm.manual) {
+      inp = { left: held.left, right: held.right, up: held.up || !!pressed.aimUp, jump: !!pressed.jump, tongue: !!pressed.tongue, croak: !!pressed.croak, hurt: !!pressed.hurt };
+    } else inp = demoInput(dt);
+    for (const k in pressed) delete pressed[k];
+    const s = dt / 1000;
+    const move = inp.left ? -1 : inp.right ? 1 : 0;
+
+    if (inp.hurt && Gm.state !== 'hurt') {
+      setState('hurt'); Gm.vx = -Gm.dir * 70;
+    } else if (!Gm.air && !LOCKED[Gm.state]) {
+      if (inp.jump) { setState('jump'); Gm.launched = false; Gm.vx = 0; }
+      else if (inp.tongue) { setState(inp.up ? 'tongue_up' : 'tongue'); Gm.vx = 0; }
+      else if (inp.croak) { setState('croak'); Gm.vx = 0; }
+      else if (move) {
+        Gm.dir = move; Gm.vx = move * A.walk.speed;
+        if (Gm.state !== 'walk') setState('walk');
+      } else { Gm.vx = 0; if (Gm.state !== 'idle') setState('idle'); }
+    }
+
+    Gm.p.update(dt);
+    const st = Gm.state;
+    if (st === 'jump' && !Gm.launched && Gm.p.i >= 2) {
+      Gm.launched = true; Gm.air = true; Gm.vy = -205;
+      const m = inp.left ? -1 : inp.right ? 1 : 0;
+      if (m) Gm.dir = m;
+      Gm.vx = Gm.dir * (m ? 85 : 35);
+    }
+    if (Gm.air) {
+      if (move) Gm.vx += (move * 85 - Gm.vx) * Math.min(1, s * 3);
+      Gm.vy += 560 * s; Gm.y += Gm.vy * s;
+      if (st === 'jump' && Gm.p.done) setState('fall');
+      if (Gm.vy > 0 && st === 'jump' && Gm.p.i >= 3) setState('fall');
+      if (Gm.y >= 0 && Gm.vy > 0) {
+        Gm.y = 0; Gm.vy = 0; Gm.air = false; Gm.vx = 0;
+        setState('land');
+        Gm.puffs.push({ x: Gm.x - 12, y: GROUND - 2, t: 0 }, { x: Gm.x + 12, y: GROUND - 2, t: 0 });
+      }
+    } else if (st === 'hurt') {
+      Gm.vx *= Math.pow(0.02, s);
+    }
+    Gm.x += Gm.vx * s;
+    Gm.x = Math.max(14, Math.min(SW - 14, Gm.x));
+    if (LOCKED[st] && st !== 'jump' && Gm.p.done) setState('idle');
+
+    // tongue vs flies
+    const fr = Gm.p.frame;
+    if ((st === 'tongue' || st === 'tongue_up') && fr.hit && fr.tip) {
+      const tx = Gm.x + Gm.dir * fr.tip[0], ty = GROUND + Gm.y + fr.tip[1];
+      for (const f of Gm.flies) {
+        if (f.alive && Math.abs(f.x - tx) < 8 && Math.abs(f.y - ty) < 8) {
+          f.alive = false; f.gone = true; Gm.caught++;
+          Gm.puffs.push({ x: f.x, y: f.y, t: 0, spark: true });
+          document.getElementById('score').textContent = 'Flies ' + Gm.caught;
+        }
+      }
+    }
+    // flies drift; eaten ones respawn somewhere else
+    Gm.flies = Gm.flies.filter(f => !f.gone);
+    while (Gm.flies.length < 3) spawnFly(1200 + Math.random() * 1500);
+    for (const f of Gm.flies) {
+      if (!f.alive) { f.wait -= dt; if (f.wait <= 0) f.alive = true; }
+      f.ph += s;
+      f.x = f.bx + Math.sin(f.ph * 1.3) * 5;
+      f.y = f.by + Math.sin(f.ph * 2.7) * 2;
+    }
+    Gm.puffs.forEach(p => { p.t += dt; });
+    Gm.puffs = Gm.puffs.filter(p => p.t < 300);
+    document.getElementById('mode').textContent = Gm.manual ? 'You' : 'Demo · click to play';
+  }
+
+  function draw(now) {
+    g.drawImage(bg, 0, 0);
+    // flies
+    for (const f of Gm.flies) {
+      if (!f.alive) continue;
+      const x = Math.round(f.x), y = Math.round(f.y), flap = Math.floor(now / 60) % 2;
+      g.fillStyle = '#e8f4f4'; g.fillRect(x - 1, y - 2 - flap, 2, 1 + flap); g.fillRect(x + 1, y - 2 - flap, 2, 1 + flap);
+      g.fillStyle = '#1b1f22'; g.fillRect(x - 1, y, 4, 2);
+      g.fillStyle = '#b8323f'; g.fillRect(x + 2, y, 1, 1);
+    }
+    // shadow while airborne
+    if (Gm.air) {
+      const w = Math.max(6, 16 + Gm.y / 4);
+      g.fillStyle = 'rgba(20,30,20,.35)'; g.fillRect(Math.round(Gm.x - w / 2), GROUND, Math.round(w), 2);
+    }
+    const fr = Gm.p.frame;
+    g.save();
+    g.translate(Math.round(Gm.x), 0); g.scale(Gm.dir, 1);
+    g.drawImage(fr.img, -OX, Math.round(GROUND + Gm.y) - OY);
+    g.restore();
+    for (const p of Gm.puffs) {
+      const r = 1 + Math.floor(p.t / 80);
+      g.fillStyle = p.spark ? '#ffd84a' : '#d9dccb';
+      for (let a = 0; a < 4; a++) {
+        const dx = [1, -1, 0, 0][a] * r * 2, dy = [0, 0, 1, -1][a] * r * (p.spark ? 2 : 0.5);
+        g.fillRect(Math.round(p.x + dx), Math.round(p.y + dy), 1 + (p.spark ? 0 : 1), 1);
+      }
+    }
+  }
+
+  // =====================================================================
+  // animation shelf + inspector
+  // =====================================================================
+  const grid = document.getElementById('grid');
+  const tiles = NAMES.map(n => {
+    const b = document.createElement('button');
+    b.className = 'tile'; b.id = 'tile-' + n; b.setAttribute('aria-pressed', 'false');
+    const a = A[n];
+    b.innerHTML = `<canvas width="${W}" height="${H}"></canvas>
+      <span class="row"><span class="name">${n.replace('_', ' ')}</span><span class="tag">${a.loop ? 'loop' : 'once'}</span></span>
+      <span class="meta">${a.frames.length} frames · ${total(n)} ms · key ${INFO[n].keys}</span>`;
+    b.addEventListener('click', () => select(n));
+    grid.appendChild(b);
+    return { n, b, ctx: b.querySelector('canvas').getContext('2d'), p: new Player(n), rest: 0 };
+  });
+
+  const big = document.getElementById('big').getContext('2d');
+  const strip = document.getElementById('strip');
+  const ins = { n: 'tongue', i: 0, t: 0, playing: !reduced, speed: 1, onion: false };
+  const playBtn = document.getElementById('iPlay');
+
+  function select(n) {
+    ins.n = n; ins.i = 0; ins.t = 0;
+    document.getElementById('insName').textContent = n.replace('_', ' ');
+    document.getElementById('insNotes').textContent = INFO[n].note + (A[n].speed ? ` Speed: ${A[n].speed} px/s.` : '');
+    tiles.forEach(t => t.b.setAttribute('aria-pressed', String(t.n === n)));
+    strip.innerHTML = '';
+    A[n].frames.forEach((f, i) => {
+      const c = document.createElement('button');
+      c.className = 'cell'; c.id = 'cell-' + n + '-' + i;
+      c.innerHTML = `<canvas width="${W}" height="${H}"></canvas><span class="meta"><span>#${i}</span><span>${f.ms} ms</span>${f.hit ? '<span class="hit">HIT</span>' : ''}</span>`;
+      c.querySelector('canvas').getContext('2d').drawImage(f.img, 0, 0);
+      c.addEventListener('click', () => { ins.i = i; ins.t = 0; setPlaying(false); });
+      strip.appendChild(c);
+    });
+  }
+  function setPlaying(v) { ins.playing = v; playBtn.textContent = v ? 'Pause' : 'Play'; playBtn.setAttribute('aria-pressed', String(v)); }
+  playBtn.addEventListener('click', () => setPlaying(!ins.playing));
+  document.getElementById('iPrev').addEventListener('click', () => { setPlaying(false); ins.i = (ins.i + A[ins.n].frames.length - 1) % A[ins.n].frames.length; });
+  document.getElementById('iNext').addEventListener('click', () => { setPlaying(false); ins.i = (ins.i + 1) % A[ins.n].frames.length; });
+  document.getElementById('iSpeed').addEventListener('change', e => { ins.speed = +e.target.value; });
+  document.getElementById('iOnion').addEventListener('change', e => { ins.onion = e.target.checked; });
+  select('tongue'); setPlaying(!reduced);
+
+  function drawInspector(dt) {
+    const fr = A[ins.n].frames;
+    if (ins.playing) {
+      ins.t += dt * ins.speed;
+      // hold the last frame of one-shot animations a moment before looping
+      const hold = ins.i === fr.length - 1 && !A[ins.n].loop ? 400 : 0;
+      while (ins.t >= fr[ins.i].ms + hold) { ins.t -= fr[ins.i].ms + hold; ins.i = (ins.i + 1) % fr.length; }
+    }
+    big.clearRect(0, 0, W, H);
+    if (ins.onion) {
+      big.globalAlpha = 0.3; big.drawImage(fr[(ins.i + fr.length - 1) % fr.length].img, 0, 0); big.globalAlpha = 1;
+    }
+    big.drawImage(fr[ins.i].img, 0, 0);
+    strip.querySelectorAll('.cell').forEach((c, i) => c.classList.toggle('on', i === ins.i));
+  }
+
+  function drawTiles(dt) {
+    for (const t of tiles) {
+      if (!reduced) {
+        if (t.p.done) { t.rest += dt; if (t.rest > 450) { t.p.set(t.n); t.rest = 0; } }
+        else t.p.update(dt);
+      }
+      t.ctx.clearRect(0, 0, W, H);
+      t.ctx.drawImage(t.p.frame.img, 0, 0);
+    }
+  }
+
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(50, now - last); last = now;
+    update(dt, now); draw(now);
+    drawTiles(dt); drawInspector(dt);
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
