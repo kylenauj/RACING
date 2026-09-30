@@ -1209,6 +1209,37 @@ const TRACKS = [
     wades:[[[150,293],[272,287]], [[345,212],[195,148]], [[150,-230],[40,-205]], [[-150,-180],[-338,-86]], [[-380,20],[-378,212]]],
     cabins:4,
     widths:[[[-340,-80],[-380,200],11], [[180,140],[210,40],3.1], [[-100,-240],[-160,-170],3.2]],
+    branches:[]},
+
+  /* ---- SPECIAL: the Sawtooth, peak to swamp to peak ----
+     No switchbacks: the road goes straight up the face of each peak and
+     straight down the other side. Snow lies on the tops, above the trees
+     and the scree; the valleys between are swamp, and the ground between
+     the two is mud. */
+  { name:"SAWTOOTH RIDGE", special:true, alpine:true, after:"a mountain range in the thaw", relief:1.0, rollers:0.6,
+    blurb:"straight up the face of a snowy peak and straight down into Dead Man's Bog, up and over a bigger peak, a long plunge off its east face into the second swamp, then over the last tooth to the flag, with mud all the way",
+    kit:["crest","kicker"],
+    shape:"THE SAWTOOTH \u2014 peak to swamp to peak",
+    feature:"two snowy summits with a swamp in the valley below each, and no switchbacks: straight up and straight down",
+    ctrl:[[81,-567],[-54,-574],[-189,-556],
+          // straight up the south face of the first peak, over its snowy top
+          [-304,-520],[-392,-452],[-452,-364],[-489,-277],[-502,-202],[-475,-115],
+          // straight down into the valley and across Dead Man's Bog
+          [-418,-34],[-344,40],[-263,97],[-176,130],[-81,140],
+          // straight up the second, bigger peak and over its top
+          [0,159],[74,202],[135,259],[189,300],[256,321],[338,305],[412,254],
+          // the long plunge off its east face, into the second swamp
+          [473,169],[506,68],[497,-40],[452,-135],[385,-216],[300,-277],
+          // over the last tooth and home
+          [240,-354],[213,-446],[173,-533]],
+    /* (laid out in a model of the land so no climb or drop is much steeper than 45%: the car
+       still makes it up at that, just, with a run at it, and the swamps sit on the valley floors) */
+    hills:[[-520,-223,320,125],[270,308,370,135],[-215,120,240,-34],[430,-200,230,-34],[243,-418,170,50]],
+    jumps:[], fords:[],
+    mud:[[[-304,-520],[-392,-452]], [[-418,-34],[-344,40]], [[0,159],[74,202]], [[497,-40],[452,-135]], [[240,-354],[213,-446]]],
+    swamps:[{at:[-205,122], r:90, name:"DEAD MAN'S BOG"}, {at:[422,-185], r:82, name:"SAWTOOTH SWAMP"}],
+    flats:[[-54,-567,110]],
+    treeline:72, snowline:95,
     branches:[]}
 ];
 
@@ -1391,6 +1422,10 @@ function easeCorners(P, floor){
   }
   return 60;
 }
+/* how hard the mud holds: [per m/s, per (m/s)^2]. On the expedition it is a bog you plough
+   through at walking pace; on a race circuit it is thick enough to cost you, about 70km/h flat
+   out in the deepest of it, but you can race through it */
+const MUD_EXP = [0.95, 0.028], MUD_RACE = [0.2, 0.004];
 function routingTest(P){
   const N = P.N, seg = P.seg, R = radiiOf(P);
   const TOTALS = [24.0, 15.5, 10.8, 7.7, 5.5];
@@ -1407,14 +1442,20 @@ function routingTest(P){
   };
   const v = new Float64Array(N);
   for(let i=0;i<N;i++) v[i] = Math.min(44, cornerHoldSpeed(R[i]));
+  /* on a mountain circuit the grade pulls (and past 40% the wheels dig in) and the mud holds,
+     just as they do for the player's car */
+  const HILL = !!TRACK.alpine, gr = new Float64Array(N), W = Math.max(1, Math.round(1.6/seg));
+  if(HILL) for(let i=0;i<N;i++) gr[i] = (P.pts[(i + W)%N].y - P.pts[(i - W + N)%N].y)/(2*W*seg);
+  const pull = g=> 9.8*g/Math.sqrt(1 + g*g), grip = g=> 1 - 0.88*smoothstep(0.40, 0.64, g);
   for(let pass=0; pass<3; pass++){
     for(let i=N-1;i>=0;i--){
       const nx2 = (i+1)%N;
-      v[i] = Math.min(v[i], Math.sqrt(Math.max(0, v[nx2]*v[nx2] + 2*22*seg)));
+      v[i] = Math.min(v[i], Math.sqrt(Math.max(0, v[nx2]*v[nx2] + 2*Math.max(8, 22 + (HILL ? pull(gr[i]) : 0))*seg)));
     }
     for(let i=0;i<N;i++){
       const pv = v[(i-1+N)%N];
-      const a = drive(pv) - (0.0006*pv*pv + 0.30 + pv*0.02);
+      let a = drive(pv)*(HILL ? grip(gr[i]) : 1) - (0.0006*pv*pv + 0.30 + pv*0.02);
+      if(HILL){ const m = P.mud ? P.mud[i] : 0; a -= pull(gr[i]) + m*(MUD_RACE[0]*pv + MUD_RACE[1]*pv*pv); }
       v[i] = Math.min(v[i], Math.sqrt(Math.max(0, pv*pv + 2*a*seg)));
     }
   }
@@ -1624,6 +1665,7 @@ if(SWAMPGP){
   TRACK.wades = (TRACK.wades||[]).map(b=> [mv(b[0]), mv(b[1])]);
   TRACK.widths = (TRACK.widths||[]).map(b=> [mv(b[0]), mv(b[1]), b[2]]);
   if(TRACK.summit) TRACK.summit = mv(TRACK.summit);
+  if(TRACK.swamps) TRACK.swamps = TRACK.swamps.map(w=> Object.assign({}, w, {at: mv(w.at)}));
   TRACK.camps = (TRACK.camps||[]).map(mv);
   TRACK.flats = (TRACK.flats||[]).map(f=> mv([f[0], f[1]]).concat([f[2]]));
   TRACK.branches = TRACK.branches.map(b=> Object.assign({}, b, {a: mv(b.a), b: mv(b.b), via: b.via.map(mv)}));
@@ -1680,13 +1722,13 @@ function macro(x, z){
       h = Math.min(h, h*(1 - w) + (LAKE.frozen ? LAKE.level : LAKE.level - 4.5)*w);
     }
   }
-  /* the swamp: flattened to one level, tussocks standing out of it */
-  if(SWAMP.on){
-    const d = Math.hypot(x - SWAMP.x, z - SWAMP.z);
-    if(d < SWAMP.r*1.2){
-      const w = 1 - smoothstep(SWAMP.r*0.75, SWAMP.r*1.15, d + Math.sin(x*0.04 + z*0.03)*12);
+  /* the swamps: flattened to one level, tussocks standing out of it */
+  for(const S of SWAMPS){
+    const d = Math.hypot(x - S.x, z - S.z);
+    if(d < S.r*1.2){
+      const w = 1 - smoothstep(S.r*0.75, S.r*1.15, d + Math.sin(x*0.04 + z*0.03)*12);
       const hum = 0.55*Math.sin(x*0.21 + Math.sin(z*0.13)*2)*Math.sin(z*0.17 + x*0.05) + 0.25*Math.sin(x*0.5 + z*0.43);
-      h = h*(1 - w) + (SWAMP.level + hum - 0.25)*w;
+      h = h*(1 - w) + (S.level + hum - 0.25)*w;
     }
   }
   /* the quarry: benches cut down into the ground, a flat floor at the bottom */
@@ -1854,7 +1896,7 @@ if(TRACK.gallery){
 (TRACK.washes || []).forEach(w=> SPOTS.push([snapTo(MAIN, w), 35]));
 const FLATS = [];
 const LAKE = {on:false};
-const SWAMP = {on:false};
+const SWAMPS = [];                    // low flats of black water and tussocks the road wades across
 const BOARDWALKS = [];                // the Swamp Cup's boardwalks: stretches of main road on planks over pools (filled in once the road is final)
 let WATERS = false;                   // any standing water the car can wade (set once the pools are known)
 const PROP_KEEP = [];                 // [x, z, r]: ground a set piece stands on, that the forest keeps off
@@ -1874,20 +1916,20 @@ if(TRACK.lake){
   LAKE.frozen = !!(L.frozen && FROZEN) && !LAKE.lava;
   LAKE.on = true;
 }
-/* the swamp: a low flat of black water and tussocks the trail wades across */
-if(TRACK.swamp){
-  const W = TRACK.swamp;
-  Object.assign(SWAMP, {x:W.at[0], z:W.at[1], r:W.r});
+/* the swamps: each a low flat of black water and tussocks the road wades across, its level
+   taken from the land round it before any swamp is sunk in (so one can't set another's) */
+SWAMPS.push(...(TRACK.swamps || (TRACK.swamp ? [TRACK.swamp] : [])).map(W=>{
+  const S = {x:W.at[0], z:W.at[1], r:W.r, name:W.name || "BLACKWATER SWAMP"};
   let lo = Infinity;
-  for(let k=0;k<48;k++){ const a = k/48*Math.PI*2; lo = Math.min(lo, macro(SWAMP.x + Math.cos(a)*SWAMP.r, SWAMP.z + Math.sin(a)*SWAMP.r)); }
-  SWAMP.level = Math.min(lo, macro(SWAMP.x, SWAMP.z)) - 0.6;
-  SWAMP.water = SWAMP.level + 0.12;
-  SWAMP.on = true;
-}
-function swampAt(x, z){
-  if(!SWAMP.on) return 0;
-  return 1 - smoothstep(SWAMP.r*0.72, SWAMP.r*1.02, Math.hypot(x - SWAMP.x, z - SWAMP.z));
-}
+  for(let k=0;k<48;k++){ const a = k/48*Math.PI*2; lo = Math.min(lo, macro(S.x + Math.cos(a)*S.r, S.z + Math.sin(a)*S.r)); }
+  S.level = Math.min(lo, macro(S.x, S.z)) - 0.6;
+  S.water = S.level + 0.12;
+  return S;
+}));
+function swampW(S, x, z){ return 1 - smoothstep(S.r*0.72, S.r*1.02, Math.hypot(x - S.x, z - S.z)); }
+function swampAt(x, z){ let w = 0; for(const S of SWAMPS) w = Math.max(w, swampW(S, x, z)); return w; }
+/* the swamp a point is in, or null */
+function swampOf(x, z){ let b = null, w = 0; for(const S of SWAMPS){ const k = swampW(S, x, z); if(k > w){ w = k; b = S; } } return b; }
 if(TRACK.pit){
   const Q = TRACK.pit;
   Object.assign(PIT, {x:Q.at[0], z:Q.at[1], r:Q.r, depth:Q.depth, benches:Q.benches, span:1 - (Q.floor || 0.28)});
@@ -1974,7 +2016,8 @@ if(!TRACK.test){
     }
     return best;
   };
-  const want = DESERT || TRACK.expedition || GATOR ? 0 : Math.max(0, 2 - (TRACK.fords || []).length);
+  // (not on a mountain circuit: a ford is a level shelf, and on a mountainside that is a wall. Its swamps are the water.)
+  const want = DESERT || TRACK.expedition || TRACK.alpine || GATOR ? 0 : Math.max(0, 2 - (TRACK.fords || []).length);
   for(let k=0;k<want;k++){ const i = pick(35, 70, 0); if(i < 0) break;
     const p = MAIN.pts[i]; TRACK.fords = (TRACK.fords || []).concat([[p.x, p.z]]); taken.push([i, 120]); }
   if(DESERT) for(let k=(TRACK.washes || []).length; k<3; k++){ const i = pick(25, 50, 0); if(i < 0) break;
@@ -2448,7 +2491,7 @@ const AUTO_JUMPS = [];
     busy.push([wrapIdx(MAIN, P.mainTo - Math.round(12/seg)), 50]);
   });
   const gap = (a, b)=>{ const d = Math.abs(a - b) % N; return Math.min(d, N - d)*seg; };
-  const KIT = (TRACK.kit || []).concat(TRACK.test || TRACK.expedition ? [] : ["kicker","crest","rhythm","double","crest","tabletop"]).slice(0, 9);
+  const KIT = (TRACK.kit || []).concat(TRACK.test || TRACK.expedition || TRACK.alpine ? [] : ["kicker","crest","rhythm","double","crest","tabletop"]).slice(0, 9);
   KIT.forEach(type=>{
     const L = JUMP_LEN[type];
     const back = Math.round(L*0.4/seg), fwd = Math.round((L*0.5 + 20)/seg);
@@ -2461,6 +2504,16 @@ const AUTO_JUMPS = [];
       // never where the road climbs through the landing: the hill would eat the landing slope
       { const a0 = MAIN.pts[i].y, a1 = MAIN.pts[((i + Math.round(40/seg))%N + N)%N].y;
         if((a1 - a0)/40 > 0.02) continue; }
+      /* on a mountain the whole jump, run-up to landing, sits where the road is level or falls
+         (a jump off a steep descent flies a long way; one on a climb is a wall) */
+      if(TRACK.alpine){
+        let ok = true; const st = Math.round(10/seg);
+        for(let k=-back; k<=fwd && ok; k+=st){
+          const y0 = MAIN.pts[((i + k)%N + N)%N].y, y1 = MAIN.pts[((i + k + st)%N + N)%N].y;
+          if((y1 - y0)/10 > 0.04 || (y1 - y0)/10 < -0.32) ok = false;
+        }
+        if(!ok) continue;
+      }
       let clear = Infinity;
       for(const b of busy) clear = Math.min(clear, gap(i, b[0]) - b[1] - L*0.4);
       if(clear < 0) continue;
@@ -3623,7 +3676,7 @@ function inWaterway(x, z){
   if(RIVER.on){ const r = riverAt(x, z); if(r && r[0] < RIVER_BANK + 1) return true; }
   if(TOWN.on && Math.hypot(x - TOWN.x, z - TOWN.z) < TOWN.r*0.85) return true;   // the village keeps its own ground
   if(LAKE.on && Math.hypot((x - LAKE.x)/LAKE.rx, (z - LAKE.z)/LAKE.rz) < 1.05) return true;
-  if(SWAMP.on && Math.hypot(x - SWAMP.x, z - SWAMP.z) < SWAMP.r*1.0) return true;
+  for(const S of SWAMPS) if(Math.hypot(x - S.x, z - S.z) < S.r) return true;
   if(BOARDWALKS.length && bwPool(x, z) > 0.25) return true;
   for(let k=0;k<PROP_KEEP.length;k++){ const q = PROP_KEEP[k]; if((x - q[0])**2 + (z - q[1])**2 < q[2]*q[2]) return true; }
   if(PIT.on && Math.hypot(x - PIT.x, z - PIT.z) < PIT.r*1.02) return true;
@@ -3688,7 +3741,7 @@ paths.forEach(P=>{
     });
     if(RIVER.on){ const r = riverAt(p.x, p.z); if(r) wet = Math.max(wet, 1 - smoothstep(RIVER_BED, RIVER_BANK, r[0])); }
     if(LAKE.on && P.surf[i] === SURF.WATER) wet = 1;
-    if(SWAMP.on){ const sw = swampAt(p.x, p.z); wet = Math.max(wet, sw*0.6); P.mud[i] = Math.max(P.mud[i], sw*0.8); }
+    if(SWAMPS.length){ const sw = swampAt(p.x, p.z); wet = Math.max(wet, sw*0.6); P.mud[i] = Math.max(P.mud[i], sw*0.8); }
     P.wet[i] = wet;
   }
 });
@@ -4107,11 +4160,12 @@ function waterTop(x, z){
   for(const W of BOARDWALKS) if(bwWet(W, x, z) > 0.3) top = top === null ? W.level : Math.max(top, W.level);
   if(LAKE.on && !LAKE.frozen && !LAKE.lava && !GATOR && Math.hypot((x - LAKE.x)/LAKE.rx, (z - LAKE.z)/LAKE.rz) < 1.08)
     top = top === null ? LAKE.level : Math.max(top, LAKE.level);
-  if(SWAMP.on && swampAt(x, z) > 0.2) top = top === null ? SWAMP.water : Math.max(top, SWAMP.water);
+  const S = SWAMPS.length ? swampOf(x, z) : null;
+  if(S && swampW(S, x, z) > 0.2) top = top === null ? S.water : Math.max(top, S.water);
   return top;
 }
 const WADE_DEPTH = 0.45;              // how far under the surface the wheels ride, at most
-WATERS = BOARDWALKS.length > 0 || SWAMP.on || (LAKE.on && !LAKE.frozen && !LAKE.lava && !GATOR);
+WATERS = BOARDWALKS.length > 0 || SWAMPS.length > 0 || (LAKE.on && !LAKE.frozen && !LAKE.lava && !GATOR);
 /* how far into a boardwalk's pool a point is (0 on dry land, 1 out in the water) */
 function bwPool(x, z){
   let out = 0;
@@ -4849,7 +4903,7 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
                    0.25 + t*0.08 - steep*0.10,
                    0.33 - t*0.05 + Math.random()*0.03 - steep*0.03);
           // the swamp: black peat and sodden moss
-          if(SWAMP.on){
+          if(SWAMPS.length){
             const sw = swampAt(x, z);
             if(sw > 0) c.lerp(new THREE.Color().setHSL(0.16 + Math.random()*0.04, 0.32, 0.17 + Math.random()*0.05), sw*0.85);
           }
@@ -4887,7 +4941,7 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
           }
           /* on the volcano the snow is thin: drifts of black ash and scree
              show through it in patches, more of them on the steeper ground */
-          if(TRACK.special && !GATOR && t > 0.35){
+          if(TRACK.special && !GATOR && !TRACK.alpine && t > 0.35){
             const nz = Math.sin(x*0.031 + Math.sin(z*0.023)*2.1) + Math.sin(z*0.027 + Math.sin(x*0.019)*1.7) + 0.5*Math.sin((x + z)*0.071);
             const k = smoothstep(0.7, 1.35, nz + steep*0.8 + (Math.random() - 0.5)*0.45);
             if(k > 0) c.lerp(new THREE.Color().setHSL(0.04 + Math.random()*0.03, 0.09, 0.12 + Math.random()*0.09), k*0.9);
@@ -7013,7 +7067,7 @@ if(RIVER.on){
    past the grid, the course's name on it in the season's colours ---- */
 function courseBillboard(){
   const P = MAIN, pal = { summer:["#2f6a3a", "#8fd06a"], fall:["#6a2c12", "#f08a2a"], winter:["#1f4a6e", "#8fd3f4"], desert:["#6a2a16", "#e56a3a"] };
-  const c0 = GATOR ? ["#3a1a5a", "#ff8a6a"] : TRACK.special ? ["#3a1208", "#ff7a2a"] : pal[TRACK.season || "summer"] || pal.summer;
+  const c0 = GATOR ? ["#3a1a5a", "#ff8a6a"] : TRACK.alpine ? ["#24384e", "#cfe3f2"] : TRACK.special ? ["#3a1208", "#ff7a2a"] : pal[TRACK.season || "summer"] || pal.summer;
   // the spot: past the grid, on whichever side the ground sits nearer the road
   let best = null;
   for(let d=100; d<=220; d+=15){
@@ -7654,6 +7708,57 @@ if(GIANT.on){
   roadSign(Math.round(40/MAIN.seg), 1, ["ELDERWOOD", "the old oak, 900 years standing"], "#7a3b1e", "#f7e7c0");
 }
 
+/* a swamp: black water between the tussocks, dead trees standing in it,
+   reeds round the edges and lily pads on the open water */
+function buildSwamp(S){
+  const STEP = 1.6, R2 = S.r*1.1, n = Math.ceil(R2*2/STEP) + 1;
+  const pos = [], uv = [], dep = [], idx = [];
+  for(let r=0;r<n;r++) for(let q=0;q<n;q++){
+    const x = S.x - R2 + q*STEP, z = S.z - R2 + r*STEP;
+    pos.push(x, S.water, z); uv.push(x, z);
+    dep.push(Math.hypot(x - S.x, z - S.z) > R2 ? -1 : Math.max(-1, Math.min(3, S.water - surfaceY(x, z))));
+  }
+  for(let r=0;r<n-1;r++) for(let q=0;q<n-1;q++){
+    const a2 = r*n + q, b2 = a2 + 1, d2 = a2 + n, e2 = d2 + 1;
+    if(dep[a2] <= 0 && dep[b2] <= 0 && dep[d2] <= 0 && dep[e2] <= 0) continue;
+    idx.push(a2, d2, e2, a2, e2, b2);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute("aDepth", new THREE.Float32BufferAttribute(dep, 1));
+  g.setIndex(idx);
+  const wm = new THREE.Mesh(g, waterMaterial()); wm.material.uniforms.uMurk.value = 1; wm.renderOrder = 3; wm.frustumCulled = false; scene.add(wm);
+  const snag = new THREE.MeshLambertMaterial({color:0x6e665a}), reed = new THREE.MeshLambertMaterial({color:0x7a8a3a}), pad = new THREE.MeshLambertMaterial({color:0x4e7a34});
+  for(let k=0, made=0; k<600 && made<46; k++){
+    const a2 = Math.random()*Math.PI*2, d = Math.sqrt(Math.random())*S.r*0.95;
+    const x = S.x + Math.cos(a2)*d, z = S.z + Math.sin(a2)*d;
+    if(!clearOf(x, z, 3)) continue;
+    const tg = new THREE.Group(), h = 4 + Math.random()*6;
+    pcyl(tg, 0.1, 0.28, h, 6, snag, 0, h/2, 0);
+    for(let n=0;n<3;n++){ const br = pcyl(tg, 0.04, 0.09, 1.2 + Math.random()*1.6, 5, snag, 0, h*(0.45 + n*0.17), 0);
+      br.rotation.set(0.9 + Math.random()*0.5, Math.random()*6.28, 0); br.position.x = Math.sin(n*2.1)*0.3; }
+    tg.rotation.z = (Math.random() - 0.5)*0.25;
+    setDown(tg, x, z, Math.random()*6.28); made++;
+  }
+  for(let k=0, made=0; k<3000 && made<420; k++){
+    const a2 = Math.random()*Math.PI*2, d = S.r*(0.3 + Math.random()*0.8);
+    const x = S.x + Math.cos(a2)*d, z = S.z + Math.sin(a2)*d;
+    if(!clearOf(x, z, 1.5)) continue;
+    const deep = S.water - gradedY(x, z);
+    if(deep > 0.25 && Math.random() < 0.45){
+      const lp = new THREE.Mesh(new THREE.CylinderGeometry(0.5 + Math.random()*0.5, 0.5, 0.03, 9), pad);
+      lp.position.set(x, S.water + 0.02, z); scene.add(lp);
+    } else {
+      const rd = new THREE.Mesh(new THREE.ConeGeometry(0.25 + Math.random()*0.2, 1.2 + Math.random()*1.3, 5), reed);
+      rd.position.set(x, Math.max(gradedY(x, z), S.water - 0.3) + 0.6, z); scene.add(rd);
+    }
+    made++;
+  }
+  roadSign(snapTo(MAIN, [S.x + (S.r + 30), S.z]) , 1, [S.name, "keep moving, don't stop in the mud"], "#3a4a2a", "#f2efe6");
+}
+SWAMPS.forEach(buildSwamp);
+
 /* ---- the expedition: base camp, the camps, the summit cairn ----
    Each camp is a couple of tents, a fire with logs round it, a flag on a
    pole and a board with its name and height. The summit has a cairn with
@@ -7751,55 +7856,6 @@ if(TRACK.expedition){
   };
   EXP.camps.forEach(camp);
   ANIMS.push(tt=> fires.forEach((f, k)=>{ const q = 0.8 + 0.25*Math.sin(tt*11 + k*2) + 0.15*Math.sin(tt*23 + k); f.scale.set(q, 0.8 + q*0.5, q); }));
-  /* the swamp: black water between the tussocks, dead trees standing in it,
-     reeds round the edges and lily pads on the open water */
-  if(SWAMP.on){
-    const STEP = 1.6, R2 = SWAMP.r*1.1, n = Math.ceil(R2*2/STEP) + 1;
-    const pos = [], uv = [], dep = [], idx = [];
-    for(let r=0;r<n;r++) for(let q=0;q<n;q++){
-      const x = SWAMP.x - R2 + q*STEP, z = SWAMP.z - R2 + r*STEP;
-      pos.push(x, SWAMP.water, z); uv.push(x, z);
-      dep.push(Math.hypot(x - SWAMP.x, z - SWAMP.z) > R2 ? -1 : Math.max(-1, Math.min(3, SWAMP.water - surfaceY(x, z))));
-    }
-    for(let r=0;r<n-1;r++) for(let q=0;q<n-1;q++){
-      const a2 = r*n + q, b2 = a2 + 1, d2 = a2 + n, e2 = d2 + 1;
-      if(dep[a2] <= 0 && dep[b2] <= 0 && dep[d2] <= 0 && dep[e2] <= 0) continue;
-      idx.push(a2, d2, e2, a2, e2, b2);
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
-    g.setAttribute("aDepth", new THREE.Float32BufferAttribute(dep, 1));
-    g.setIndex(idx);
-    const wm = new THREE.Mesh(g, waterMaterial()); wm.material.uniforms.uMurk.value = 1; wm.renderOrder = 3; wm.frustumCulled = false; scene.add(wm);
-    const snag = new THREE.MeshLambertMaterial({color:0x6e665a}), reed = new THREE.MeshLambertMaterial({color:0x7a8a3a}), pad = new THREE.MeshLambertMaterial({color:0x4e7a34});
-    for(let k=0, made=0; k<600 && made<46; k++){
-      const a2 = Math.random()*Math.PI*2, d = Math.sqrt(Math.random())*SWAMP.r*0.95;
-      const x = SWAMP.x + Math.cos(a2)*d, z = SWAMP.z + Math.sin(a2)*d;
-      if(!clearOf(x, z, 3)) continue;
-      const tg = new THREE.Group(), h = 4 + Math.random()*6;
-      pcyl(tg, 0.1, 0.28, h, 6, snag, 0, h/2, 0);
-      for(let n=0;n<3;n++){ const br = pcyl(tg, 0.04, 0.09, 1.2 + Math.random()*1.6, 5, snag, 0, h*(0.45 + n*0.17), 0);
-        br.rotation.set(0.9 + Math.random()*0.5, Math.random()*6.28, 0); br.position.x = Math.sin(n*2.1)*0.3; }
-      tg.rotation.z = (Math.random() - 0.5)*0.25;
-      setDown(tg, x, z, Math.random()*6.28); made++;
-    }
-    for(let k=0, made=0; k<3000 && made<420; k++){
-      const a2 = Math.random()*Math.PI*2, d = SWAMP.r*(0.3 + Math.random()*0.8);
-      const x = SWAMP.x + Math.cos(a2)*d, z = SWAMP.z + Math.sin(a2)*d;
-      if(!clearOf(x, z, 1.5)) continue;
-      const deep = SWAMP.water - gradedY(x, z);
-      if(deep > 0.25 && Math.random() < 0.45){
-        const lp = new THREE.Mesh(new THREE.CylinderGeometry(0.5 + Math.random()*0.5, 0.5, 0.03, 9), pad);
-        lp.position.set(x, SWAMP.water + 0.02, z); scene.add(lp);
-      } else {
-        const rd = new THREE.Mesh(new THREE.ConeGeometry(0.25 + Math.random()*0.2, 1.2 + Math.random()*1.3, 5), reed);
-        rd.position.set(x, Math.max(gradedY(x, z), SWAMP.water - 0.3) + 0.6, z); scene.add(rd);
-      }
-      made++;
-    }
-    roadSign(snapTo(MAIN, [SWAMP.x + (SWAMP.r + 30), SWAMP.z]) , 1, ["BLACKWATER SWAMP", "keep moving, don't stop in the mud"], "#3a4a2a", "#f2efe6");
-  }
   // the summit: a cairn off the side of the trail, a tall pole and a flag streaming off it
   {
     const t = MAIN.tans[si], nx = -t.z, nz = t.x, off = MAIN.half[si] + 5;
@@ -7818,21 +7874,24 @@ if(TRACK.expedition){
     roadSign(si - Math.round(10/MAIN.seg), -1, ["SUMMIT", TRACK.name + "  \u00b7  " + Math.round(sp.y - EXP.baseY) + " m"], "#d8302a", "#f7f2e6");
   }
   roadSign(Math.round(30/MAIN.seg), 1, [TRACK.name + " BASE CAMP", "summit " + Math.round(sp.y - EXP.baseY) + " m up, two ways"], "#2f5a3a", "#f2efe6");
-  // boulders strewn over the open ground above the trees
-  {
-    const spots = [];
-    for(let n=0;n<2600 && spots.length<520;n++){
-      const x = sp.x + (Math.random() - 0.5)*560, z = sp.z + (Math.random() - 0.5)*560;
-      const y = gradedY(x, z);
-      if(y < TRACK.treeline - 8 || !clearOf(x, z, 3)) continue;
-      spots.push([x, y, z, 0.3 + Math.pow(Math.random(), 2.2)*2.4]);
-    }
-    const inst = new THREE.InstancedMesh(rockGeometry(4.2), new THREE.MeshLambertMaterial({map: rockTex}), spots.length);
-    const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), e3 = new THREE.Euler();
-    spots.forEach((p, i)=>{ e3.set(Math.random()*0.5, Math.random()*6, Math.random()*0.5); q4.setFromEuler(e3);
-      v3.set(p[0], p[1] - p[3]*0.3, p[2]); s3.set(p[3]*(0.8 + Math.random()*0.5), p[3]*0.7, p[3]); m4.compose(v3, q4, s3); inst.setMatrixAt(i, m4); });
-    inst.castShadow = true; scene.add(inst);
+}
+
+/* boulders strewn over the open ground above the trees: round the summit on the expedition,
+   over the whole map on a mountain circuit */
+if(TRACK.treeline){
+  const RX = EXP.on ? EXP.summit.x : 0, RZ = EXP.on ? EXP.summit.z : 0, RS = EXP.on ? 560 : 1000;
+  const spots = [];
+  for(let n=0;n<2600 && spots.length<520;n++){
+    const x = RX + (Math.random() - 0.5)*RS, z = RZ + (Math.random() - 0.5)*RS;
+    const y = gradedY(x, z);
+    if(y < TRACK.treeline - 8 || !clearOf(x, z, 3)) continue;
+    spots.push([x, y, z, 0.3 + Math.pow(Math.random(), 2.2)*2.4]);
   }
+  const inst = new THREE.InstancedMesh(rockGeometry(4.2), new THREE.MeshLambertMaterial({map: rockTex}), spots.length);
+  const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), e3 = new THREE.Euler();
+  spots.forEach((p, i)=>{ e3.set(Math.random()*0.5, Math.random()*6, Math.random()*0.5); q4.setFromEuler(e3);
+    v3.set(p[0], p[1] - p[3]*0.3, p[2]); s3.set(p[3]*(0.8 + Math.random()*0.5), p[3]*0.7, p[3]); m4.compose(v3, q4, s3); inst.setMatrixAt(i, m4); });
+  inst.castShadow = true; scene.add(inst);
 }
 
 /* ---- the slot's walls: sculpted sandstone ----
@@ -13817,7 +13876,7 @@ function stepCarInner(dt){
   if(state.phase === "countdown" && AUD.revRpm) trans.rpm = AUD.revRpm;      // revving it on the grid: the tach follows
   {
     // (racing, soft mud spins the wheels a little too: noise and clods, not lost drive)
-    const muck = pose.air ? 0 : EXP.on ? Math.min(1, mudAmt + wetAmt*0.5) : soft*0.6;
+    const muck = pose.air ? 0 : EXP.on || TRACK.alpine ? Math.min(1, mudAmt + wetAmt*0.5) : soft*0.6;
     const want = thr ? muck*3300*(1 - Math.min(1, Math.abs(along)/18)) : 0;
     trans.spin = (trans.spin || 0) + (want - (trans.spin || 0))*Math.min(1, dt*(want > (trans.spin || 0) ? 6 : 3));
   }
@@ -13826,7 +13885,7 @@ function stepCarInner(dt){
      runs it away downhill), and past about 45% loose ground spins the
      wheels, so the steep way up wants a run at it and the right line. */
   let hillA = 0, climbGrip = 1;
-  if(EXP.on && !pose.air){
+  if((EXP.on || TRACK.alpine) && !pose.air){
     const hx = Math.sin(pose.h), hz = Math.cos(pose.h);
     const grade = (surfaceY(pose.x + hx*1.6, pose.z + hz*1.6) - surfaceY(pose.x - hx*1.6, pose.z - hz*1.6))/3.2;
     hillA = -9.8*grade/Math.sqrt(1 + grade*grade);
@@ -13854,9 +13913,9 @@ function stepCarInner(dt){
      to go (the tyres and the body are pushing a bow wave of it), so in a
      bog you plough along with the engine screaming and the wheels flinging
      it, not cruise. Swamp water drags the same way, a bit less. */
-  if(EXP.on){
-    const muck = mudAmt + wetAmt*0.6;
-    a -= Math.sign(along)*muck*(0.95*Math.abs(along) + 0.028*along*along);
+  if(EXP.on || TRACK.alpine){
+    const muck = mudAmt + wetAmt*0.6, K = EXP.on ? MUD_EXP : MUD_RACE;
+    a -= Math.sign(along)*muck*(K[0]*Math.abs(along) + K[1]*along*along);
   }
   if(pose.air) a = -sgn*0.12;                       // no drive in the air
   if(hand && drift.mode !== "slide") a -= along*0.45;   // only a plain handbrake scrubs
@@ -14518,8 +14577,8 @@ function stepCarInner(dt){
 
   // in thick mud the wheels sink in up to the hubs
   // (and a race car settles a few centimetres into soft mud)
-  pose.sink = (pose.sink || 0) + ((pose.air ? 0 : EXP.on ? Math.min(1, mudAmt*1.1 + wetAmt*0.4)*0.24 : soft*0.07) - (pose.sink || 0))*Math.min(1, dt*3);
-  if((EXP.on || soft > 0.1) && !pose.air && (trans.spin || 0) > 250){
+  pose.sink = (pose.sink || 0) + ((pose.air ? 0 : EXP.on || TRACK.alpine ? Math.min(1, mudAmt*1.1 + wetAmt*0.4)*0.24 : soft*0.07) - (pose.sink || 0))*Math.min(1, dt*3);
+  if((EXP.on || TRACK.alpine || soft > 0.1) && !pose.air && (trans.spin || 0) > 250){
     const k2 = Math.min(1, trans.spin/2600), n = 1 + Math.round(k2*2);
     for(const o of [[-1.22, 0.80], [-1.22,-0.80], [1.3, 0.8], [1.3, -0.8]]){
       if(o[0] > 0 && Math.random() > 0.35) continue;
@@ -14708,6 +14767,8 @@ function stepCamera(dt, sp){
       if(Math.abs(lat) > rm[1]){ const d = (Math.abs(lat) - rm[1])*Math.sign(lat); camera.position.x += t.z*d; camera.position.z -= t.x*d; }
     }
   }
+  // never inside the hill: over a crest onto a steep drop the ground behind the car stands higher than the view
+  if(camMode !== 1){ const gc = gradedY(camera.position.x, camera.position.z) + 1.2; if(camera.position.y < gc) camera.position.y = gc; }
   // rumble only where the surface is actually rough
   if(nearest(pose.x, pose.z).dist > HALF && sp > 4){
     const r = Math.min(0.045, sp*0.0011);
@@ -15589,7 +15650,7 @@ function stepRivals(dt){
       const q = nearest(r.mesh.position.x, r.mesh.position.z);
       // (mud no longer slows the player, so it does not slow the rivals either)
       target *= FROZEN ? 1 - Math.max(q.wet||0, iceAt(r.mesh.position.x, r.mesh.position.z))*0.12
-                       : 1 - (q.wet||0)*0.32;
+                       : 1 - (q.wet||0)*(TRACK.alpine ? 0.1 : 0.32);     // (on the Sawtooth its pace already has the bog's drag in it)
       if(GATOR) target = GG.rival(r, i0, target, dt);
 
       // traffic: anything close ahead in the same lane
@@ -16654,7 +16715,7 @@ const GP_GROUPS = (()=>{
   return g;
 })();
 const SEASON_COL = { summer:"#8fd06a", fall:"#f08a2a", winter:"#8fd3f4", desert:"#e56a3a", swamp:"#3f8a4a" };
-const trackCol = t=> t && t.gator ? "#ff7ac8" : SEASON_COL[(t && t.season) || "summer"];
+const trackCol = t=> t && t.gator ? "#ff7ac8" : t && t.alpine ? "#a9c8e2" : SEASON_COL[(t && t.season) || "summer"];
 function showTracks(mode, group){
   const exped = mode === "expedition";
   let ids, gi = 0;
