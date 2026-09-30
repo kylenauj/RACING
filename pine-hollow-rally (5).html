@@ -12582,7 +12582,7 @@ var hudReady = false;             // set once the HUD canvas exists
 const POST = { on:true, msaa: renderer.capabilities.isWebGL2 };
 /* The Print look: the game as a 1970s rally programme. Brown ink round
    everything, halftone dots in the shadows, cream stock and teal ink. */
-const LOOK = { print:true };
+const LOOK = { print:true, pixel:false };
 const GFX = { fast:false };       // set from options: no shadows, no MSAA
 
 const postScene = new THREE.Scene();
@@ -12635,6 +12635,7 @@ const postMat = new THREE.ShaderMaterial({
     tDepth:   {value: null},
     tFxMask:  {value: null}, uFxMask: {value: 0},
     uPrint:   {value: 1},
+    uPixel:   {value: 0},
     uStock:   {value: WINTER ? new THREE.Vector3(0.90, 0.95, 1.0) : new THREE.Vector3(0.98, 0.93, 0.80)},
     uWarm:    {value: WINTER ? new THREE.Vector3(0.97, 1.0, 1.04) : new THREE.Vector3(1.04, 1.00, 0.90)},
     uNear:    {value: camera.near},
@@ -12646,7 +12647,7 @@ const postMat = new THREE.ShaderMaterial({
     "uniform sampler2D tDiffuse, tBloom;",
     "uniform vec2 uRes, uSunPos;",
     "uniform float uAspect, uSpeed, uSunVis, uFlash, uTime, uFxaa; uniform vec3 uRayCol;",
-    "uniform sampler2D tDepth, tFxMask; uniform float uPrint, uNear, uFar, uInk, uFxMask; uniform vec3 uStock, uWarm;",
+    "uniform sampler2D tDepth, tFxMask; uniform float uPrint, uPixel, uNear, uFar, uInk, uFxMask; uniform vec3 uStock, uWarm;",
     "float linZ(float d){ float z = d*2.0 - 1.0; return 2.0*uNear*uFar/(uFar + uNear - z*(uFar - uNear)); }",
     "varying vec2 vUv;",
 
@@ -12677,8 +12678,17 @@ const postMat = new THREE.ShaderMaterial({
     "vec3 aces(vec3 x){ return clamp((x*(2.51*x + 0.03))/(x*(2.43*x + 0.59) + 0.14), 0.0, 1.0); }",
     "float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }",
 
+    // an ordered dither threshold (4x4 Bayer) for a block
+    "float bayer4(vec2 p){ vec2 q = mod(floor(p), 4.0); float x = q.x, y = q.y;",
+    "  float a = mod(x, 2.0), b = mod(y, 2.0), c = floor(x*0.5), d = floor(y*0.5);",
+    "  float v = 4.0*(2.0*a*(1.0 - b) + 3.0*a*b + 1.0*(1.0 - a)*b) + (2.0*c*(1.0 - d) + 3.0*c*d + (1.0 - c)*d);",
+    "  return (v + 0.5)/16.0; }",
     "void main(){",
     "  vec2 uv = vUv;",
+    // Pixel: the whole frame read in blocks, about 240 lines tall whatever the screen, each block its centre
+    "  float blk = max(2.0, floor(uRes.y/240.0 + 0.5));",
+    "  vec2 bc = floor(gl_FragCoord.xy/blk);",
+    "  if(uPixel > 0.5) uv = (bc + 0.5)*blk/uRes;",
     "  vec2 dir = uv - 0.5;",
     "  float r = length(dir*vec2(uAspect, 1.0));",
     "  vec3 col = base(uv);",
@@ -12774,6 +12784,10 @@ const postMat = new THREE.ShaderMaterial({
     "    float fib = hash(floor(gl_FragCoord.xy/(1.5*uInk)));",
     "    col *= 0.965 + 0.05*fib;",
     "    col = mix(col, vec3(0.17, 0.11, 0.08), ink*0.92);",
+    "  } else if(uPixel > 0.5){",
+    // a limited palette: each channel in a few steps, the steps dithered in the Bayer pattern per block
+    "    float steps = 9.0, th = bayer4(bc) - 0.5;",
+    "    col = floor(col*steps + 0.5 + th*0.7)/steps;",
     "  } else {",
     "    col += (hash(gl_FragCoord.xy + fract(uTime)*97.0) - 0.5)*0.018;",
     "  }",
@@ -12808,7 +12822,7 @@ function sizeRT(){
   postMat.uniforms.tBloom.value = rtA.texture;
   postMat.uniforms.uRes.value.set(w, h);
   postMat.uniforms.uAspect.value = w/h;
-  postMat.uniforms.uFxaa.value = useMsaa ? 0 : 1;
+  postMat.uniforms.uFxaa.value = useMsaa || LOOK.pixel ? 0 : 1;          // (Pixel wants hard edges)
   if(!useMsaa){
     rt.depthTexture = new THREE.DepthTexture(w, h);
     rt.depthTexture.type = THREE.UnsignedIntType;
@@ -12822,6 +12836,7 @@ function sizeRT(){
     postMat.uniforms.tFxMask.value = FX_MASK.rt.texture;
   }
   postMat.uniforms.uPrint.value = LOOK.print && rt.depthTexture ? 1 : 0;
+  postMat.uniforms.uPixel.value = LOOK.pixel ? 1 : 0;
   postMat.uniforms.uInk.value = pr;
   blurMat.uniforms.uDir.value.set(1/bw, 0);
   if(hudReady) sizeHUD();          // the HUD canvas is created further down
@@ -15147,8 +15162,8 @@ function applySettings(){
   trans.auto = S.auto;
   const fast = S.gfx === 1;
   paintCar(PAINTS[Math.max(0, Math.min(PAINTS.length-1, S.paint|0))].hex);
-  const print = S.look !== 1;
-  if(print !== LOOK.print){ LOOK.print = print; sizeRT(); }
+  const print = (S.look | 0) === 0, pixel = (S.look | 0) === 2;
+  if(print !== LOOK.print || pixel !== LOOK.pixel){ LOOK.print = print; LOOK.pixel = pixel; sizeRT(); }
   if(fast !== GFX.fast || !rt){
     GFX.fast = fast;
     sun.castShadow = !fast;
@@ -16222,8 +16237,8 @@ const OPTS = [
   {key:"sfx",    label:"Engine and effects", bar:true, desc:"The engine, gravel, splashes, bumps and the turbo."},
   {key:"paint",  label:"Car paint", vals:PAINTS.map(p=>p.name), swatch:true,
    desc:"The colour of your wagon. It changes as you pick, so you can see it on the car if you open this from the pause menu."},
-  {key:"look",   label:"Look", vals:["Print","Clean"],
-   desc:"Print draws the stage like an old rally programme: ink lines, halftone shadows, cream paper. Clean is the plain render."},
+  {key:"look",   label:"Look", vals:["Print","Clean","Pixel"],
+   desc:"Print draws the stage like an old rally programme: ink lines, halftone shadows, cream paper. Clean is the plain render. Pixel is a chunky 240-line retro picture with a dithered palette."},
   {key:"gfx",    label:"Graphics", vals:["Full","Fast"],
    desc:"Full has soft shadows and multisampled edges. Fast turns both off and renders at standard resolution, for older laptops."}
 ];
