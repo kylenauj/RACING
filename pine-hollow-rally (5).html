@@ -184,6 +184,32 @@
   table.grid tr.you td{background:rgba(255,210,61,.14);}
   table.grid tr.you td.n{color:var(--signal);font-weight:700;}
   .laps{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0;}
+  /* the leaderboards: ten lines in two columns, three initials a line */
+  .lb{margin-top:14px;}
+  .lbhead{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--display);font-size:13px;letter-spacing:.14em;margin:0 0 6px;}
+  .lbhead .scope{font-size:11px;opacity:.65;}
+  .lbgrid{display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:column;grid-template-rows:repeat(5,auto);column-gap:18px;}
+  .lbr{display:grid;grid-template-columns:1.6em 3.4em 1fr;align-items:baseline;padding:3px 6px;border-bottom:1px solid rgba(26,20,16,.14);
+       font-variant-numeric:tabular-nums;}
+  .lbr .rk{font-family:var(--display);color:#a0521c;}
+  .lbr .ini{font-family:var(--display);font-weight:800;letter-spacing:.14em;}
+  .lbr .tm{text-align:right;font-family:var(--display);font-style:italic;}
+  .lbr.none{opacity:.38;}
+  .lbr.me{background:rgba(255,210,61,.6);}
+  .lobbyboard{border:3px solid var(--ink);background:rgba(10,24,16,.82);box-shadow:4px 4px 0 var(--ink);padding:10px 12px 8px;margin-top:18px;}
+  .lobbyboard .lb{margin:0;} .lobbyboard .lbr{border-bottom-color:rgba(243,230,196,.12);} .lobbyboard .lbr .rk{color:var(--signal);}
+  .lobbyboard .lbhead{color:#9fb6a8;}
+  /* NEW RECORD: three big letter slots */
+  .initials{margin:auto;text-align:center;}
+  .initials .rsub{margin:8px 0 26px;}
+  .initials .slots{display:flex;gap:18px;justify-content:center;margin:0 0 26px;}
+  .initials .slot{display:flex;flex-direction:column;align-items:center;width:84px;padding:6px 0;border:3px solid var(--ink);background:rgba(10,24,16,.85);
+                  box-shadow:4px 4px 0 var(--ink);transform:skewX(-9deg);}
+  .initials .slot > *{transform:skewX(9deg);}
+  .initials .slot b{font-family:var(--display);font-weight:800;font-size:64px;line-height:1.1;color:var(--cream);}
+  .initials .slot i{font-style:normal;font-size:14px;color:#6f8478;visibility:hidden;}
+  .initials .slot.on{background:var(--signal);} .initials .slot.on b{color:var(--ink);} .initials .slot.on i{visibility:visible;color:var(--ink);}
+  .initials .hint{justify-content:center;}
   /* the lobby: room line, drivers with their ready tags, the chat */
   .lobby h2.head.sub{font-size:18px;margin:18px 0 10px;}
   .lobby .right h2.head.sub:first-child{margin-top:0;}
@@ -13035,6 +13061,13 @@ addEventListener("keydown", e=>{
     }
     return;
   }
+  // the initials: letters and digits type straight in (so W, A, S and D are letters here, not moves)
+  if(GAME.ui && MENU.type && !e.repeat){
+    const m = e.code.match(/^(?:Key([A-Z])|Digit([0-9])|Numpad([0-9]))$/);
+    if(m){ e.preventDefault(); MENU.type(m[1] || m[2] || m[3]); return; }
+    if(e.code === "Backspace"){ e.preventDefault(); MENU.type("\b"); return; }
+    if(e.code === "Enter" || e.code === "NumpadEnter"){ e.preventDefault(); MENU.type("\n"); return; }
+  }
   if(GAME.ui){
     const dir = MENU_KEYS[e.code];
     startAudio();
@@ -15131,6 +15164,106 @@ const SAVE = (()=>{
 function persist(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(SAVE)); }catch(e){} }
 function recordFor(){ return SAVE.records[TRACK.name] || (SAVE.records[TRACK.name] = {}); }
 
+/* ---- the leaderboards: a top ten for every circuit (best lap) and every expedition (fastest
+   climb), three initials a line, arcade style. Kept on this computer, and shared through the
+   online board wherever the game can reach it (on your own site). ---- */
+const LB = { global:new Map(), busy:new Map(), mark:null };
+const LB_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+const lbInit = s => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 3);
+function lbLocal(name){ SAVE.boards = SAVE.boards || {}; return SAVE.boards[name] || (SAVE.boards[name] = []); }
+function lbRows(name){
+  const seen = new Set(), out = [];
+  lbLocal(name).map(r=> ({i:r.i, ms:r.ms})).concat(LB.global.get(name) || []).sort((a, b)=> a.ms - b.ms).forEach(r=>{
+    const k = r.i + "|" + r.ms; if(seen.has(k)) return; seen.add(k); out.push(r); });
+  return out.slice(0, 10);
+}
+function lbFetch(name){
+  if(!NET_CFG.enabled || NET.mock) return Promise.resolve(null);
+  if(LB.global.has(name)) return Promise.resolve(LB.global.get(name));
+  if(LB.busy.has(name)) return LB.busy.get(name);
+  const pr = (async ()=>{
+    try{
+      const sb = await netClient(); if(!sb) return null;
+      const { data, error } = await sb.from("laps").select("name,lap_ms").eq("track", name).order("lap_ms", {ascending:true}).limit(60);
+      if(error) return null;
+      const rows = (data || []).map(r=> ({i: lbInit(r.name) || "???", ms: r.lap_ms|0})).filter(r=> r.ms > 0);
+      LB.global.set(name, rows); return rows;
+    } catch(e){ return null; } finally { LB.busy.delete(name); }
+  })();
+  LB.busy.set(name, pr); return pr;
+}
+/* the table: ten lines in two columns, your fresh one lit up */
+function lbTableHTML(name, label, mark){
+  const rows = lbRows(name), world = LB.global.has(name);
+  let lit = false, cells = "";
+  for(let k=0;k<10;k++){
+    const r = rows[k], me = !!(r && mark && !lit && r.ms === mark.ms && r.i === mark.i); if(me) lit = true;
+    cells += '<div class="lbr' + (me ? ' me' : '') + (r ? '' : ' none') + '"><span class="rk">' + (k + 1) + '</span><span class="ini">' + (r ? esc(r.i) : '–––') +
+             '</span><span class="tm">' + (r ? fmt(r.ms/1000) : '–:––.––') + '</span></div>';
+  }
+  return '<div class="lb" data-lb="' + esc(name) + '" data-lbl="' + esc(label) + '"><div class="lbhead"><span>' + esc(label) + '</span><span class="scope">' + (world ? 'WORLD' : 'THIS PC') + '</span></div>' +
+         '<div class="lbgrid">' + cells + '</div></div>';
+}
+/* redraw any board on screen once the online one has come in */
+function lbFill(){
+  UIEL.querySelectorAll(".lb[data-lb]").forEach(el=>{
+    const name = el.dataset.lb, label = el.dataset.lbl;
+    if(LB.global.has(name) || !NET_CFG.enabled || NET.mock) return;
+    lbFetch(name).then(()=>{ if(el.isConnected) el.outerHTML = lbTableHTML(name, label, LB.mark && LB.mark.name === name ? LB.mark : null); });
+  });
+}
+/* what this run puts on the board: the best lap on a circuit, the time to the top on an expedition */
+function lbCandidate(){
+  if(TRACK.test) return null;
+  const s0 = EXP.on ? GAME.finishTime : state.best;
+  if(!(s0 > 5) || !isFinite(s0)) return null;
+  const ms = Math.round(s0*1000), rows = lbRows(TRACK.name), rank = rows.filter(r=> r.ms <= ms).length;
+  return rank < 10 ? {name:TRACK.name, ms, rank, label: EXP.on ? "FASTEST CLIMBS" : "BEST LAPS"} : null;
+}
+function lbSubmit(c, ini){
+  const L = lbLocal(c.name); L.push({i:ini, ms:c.ms, d:Date.now()}); L.sort((a, b)=> a.ms - b.ms); L.length = Math.min(L.length, 10);
+  SAVE.initials = ini; persist();
+  LB.mark = {name:c.name, ms:c.ms, i:ini};
+  if(NET_CFG.enabled && !NET.mock) (async ()=>{ try{ const sb = await netClient(); if(!sb) return;
+      await sb.from("laps").insert({ track:c.name, name:ini, lap_ms:c.ms, race_ms: EXP.on ? c.ms : Math.round(state.t*1000), online: MODE === "online" });
+      const g = LB.global.get(c.name); if(g){ g.push({i:ini, ms:c.ms}); g.sort((a, b)=> a.ms - b.ms); } } catch(e){} })();
+}
+/* NEW RECORD: three letters, arcade style. Up and down change the letter, left and right move,
+   or just type them; Enter to sign it, Escape to leave it off the board */
+function showInitials(c, next){
+  const ini = (lbInit(SAVE.initials) + "AAA").slice(0, 3).split(""); let at = 0;
+  const draw = ()=>{
+    const el = document.getElementById("iniSlots"); if(!el) return;
+    el.innerHTML = ini.map((ch, k)=> '<span class="slot' + (k === at ? ' on' : '') + '"><i>▲</i><b>' + ch + '</b><i>▼</i></span>').join("");
+  };
+  // (and a moment's deafness after, so the press that signed doesn't also pick on the next screen)
+  const finish = f=>{ MENU.custom = MENU.type = null; f(); MENU.lockUntil = performance.now() + 400; };
+  const done = ()=> finish(()=>{ SFX.best(); lbSubmit(c, ini.join("")); next(); });
+  openScreen("scInitials",
+    '<div class="initials"><div class="big">NEW RECORD</div>' +
+    '<div class="rtime">' + fmt(c.ms/1000) + '</div>' +
+    '<div class="rsub">' + esc(TRACK.name) + ' · ' + esc(c.label.toLowerCase()) + ' · ' + ordinal(c.rank + 1).toLowerCase() + ' on the board</div>' +
+    '<div class="slots" id="iniSlots"></div>' +
+    '<div class="hint"><kbd>↑</kbd><kbd>↓</kbd> letter &nbsp; <kbd>←</kbd><kbd>→</kbd> move &nbsp; or type &nbsp; <kbd>Enter</kbd> sign &nbsp; <kbd>Esc</kbd> skip</div></div>',
+    { cls:"dim", back: ()=> finish(()=>{ SFX.back(); next(); }), acts:{} });
+  MENU.custom = dir=>{
+    const n = LB_CHARS.length, i = Math.max(0, LB_CHARS.indexOf(ini[at]));
+    if(dir === "up"){ ini[at] = LB_CHARS[(i + 1) % n]; SFX.adjust(); }
+    else if(dir === "down"){ ini[at] = LB_CHARS[(i - 1 + n) % n]; SFX.adjust(); }
+    else if(dir === "left"){ at = Math.max(0, at - 1); SFX.move(); }
+    else if(dir === "right"){ at = Math.min(2, at + 1); SFX.move(); }
+    else if(dir === "ok"){ if(at < 2){ at++; SFX.move(); } else return done(); }
+    else if(dir === "back"){ return MENU.back && MENU.back(); }
+    draw();
+  };
+  MENU.type = ch=>{
+    if(ch === "\b"){ at = Math.max(0, at - 1); SFX.move(); draw(); return; }
+    if(ch === "\n") return done();
+    ini[at] = ch; SFX.adjust(); at = Math.min(2, at + 1); draw();
+  };
+  draw();
+}
+
 /* the garage build, as buildWagon wants it */
 function carOpts(){
   const S = SAVE.settings, C = S.car;
@@ -16063,7 +16196,7 @@ function resetRace(){
   GG.reset();
   CAR_DIRT.uDirt.value = 0; CAR_DIRT.uSnow.value = 0;
   CAR_DIRT.uDirtCol.value.set(DESERT ? 0x9a7650 : WINTER ? 0x6a6a70 : FALL ? 0x4e3622 : 0x4a3524);
-  GAME.wrongT = 0; GAME.stuckT = 0; GAME.placePrev = 0; GAME.placeT = 0; CONFETTI.length = 0;
+  GAME.wrongT = 0; GAME.stuckT = 0; GAME.placePrev = 0; GAME.placeT = 0; CONFETTI.length = 0; GAME.lbAsked = false;
   GAME.lapRecord = false; GAME.raceRecord = false; GAME.orbitA = 0;
   BANNER.dur = 0; SPLIT.t = 0; GHOST.rec = [];
   if(MODE === "trial") GHOST.data = ghostFor(recordFor());
@@ -16096,7 +16229,6 @@ function finishRace(){
          GAME.finishPlace === 1 ? UI.key : UI.ink, 3.2);
   SFX.finish();
   if(MODE === "online") netFinish();
-  if((MODE === "online" || MODE === "trial") && state.best) netPostLap(state.best, state.t, MODE === "online");
   if(!TRACK.test){
     const rec = recordFor(), key = "race" + LAPS;
     if(rec[key] == null || state.t < rec[key]){ rec[key] = state.t; GAME.raceRecord = true; }
@@ -16138,6 +16270,7 @@ const safeCol = c => /^#[0-9a-f]{3,8}$/i.test(String(c || "")) ? c : "#cccccc";
 function openScreen(id, html, o){
   o = o || {};
   UIEL.innerHTML = '<div class="screen on ' + (o.cls || "dim") + '" id="' + id + '">' + html + '</div>';
+  MENU.custom = MENU.type = null;
   MENU.id = id; MENU.back = o.back || null; MENU.onSel = o.onSel || null;
   MENU.grid = !!o.grid; MENU.acts = o.acts || {};
   MENU.items = [...UIEL.querySelectorAll("[data-act],[data-opt],[data-track]")];
@@ -16179,6 +16312,8 @@ function activate(i){
 }
 function menuNav(dir){
   if(!MENU.id) return;
+  if(MENU.custom){ MENU.custom(dir); return; }
+  if(MENU.lockUntil && performance.now() < MENU.lockUntil) return;
   const it = MENU.items[MENU.sel];
   const onTrack = it && it.dataset.track !== undefined;
   if(it && it.dataset.cup !== undefined){
@@ -16374,7 +16509,7 @@ function trackFacts(id){
 }
 function detailHTML(id){
   const t = TRACKS[id];
-  return '<h3>' + esc(t.name) + '</h3>' + trackFacts(id);
+  return '<h3>' + esc(t.name) + '</h3>' + trackFacts(id) + (t.test ? '' : lbTableHTML(t.name, t.expedition ? "FASTEST CLIMBS" : "BEST LAPS"));
 }
 function standingsRows(){
   const C = SAVE.champ;
@@ -16509,7 +16644,7 @@ function showTracks(mode, group){
     '<div class="menu" style="margin-top:14px;max-width:260px"><button class="item back" data-act="back"><span>BACK</span></button></div></div>',
     { grid:true, sel: (exped ? 0 : GP_GROUPS.length) + Math.max(0, at), back: ()=> mode === "online" ? (NET.on ? showLobby() : showOnline()) : menuFor(mode),
       onSel: el => { if(el.dataset.track !== undefined)
-                       document.getElementById("tkDetail").innerHTML = detailHTML(+el.dataset.track); },
+                       document.getElementById("tkDetail").innerHTML = detailHTML(+el.dataset.track); lbFill(); },
       acts:{ track: el => startMode(mode, +el.dataset.track),
              cup: el => { SFX.move(); showTracks(mode, +el.dataset.cup); },
              back: ()=>{ SFX.back(); mode === "online" ? (NET.on ? showLobby() : showOnline()) : menuFor(mode); } } });
@@ -16882,7 +17017,8 @@ function netLeave(quiet){
   if(NET.tx) NET.tx.leave();
   NET.tx = null; NET.on = false; NET.racing = false; NET.metas = []; NET.ids = null;
   try{ history.replaceState(null, "", "#track=" + TRACK_ID); }catch(e){}
-  if(!quiet){ FIELD = []; }
+  // (in the menus the backdrop's own rivals take over again, or they'd stand frozen where they were)
+  if(!quiet){ FIELD = state.phase === "menu" ? rivals : []; }
 }
 /* the one who made the room runs it; if they have gone, whoever has been in it longest */
 function netHostId(){
@@ -17291,7 +17427,7 @@ function showLobby(sel){
               esc(arriving || (NET.ready ? 'waiting for the host' : 'press when you are set')) + '</small></button>') +
     '<button class="item" data-act="copy"><span>COPY INVITE LINK</span>' + (NET.copiedAt && now - NET.copiedAt < 2500 ? '<small>COPIED</small>' : '') + '</button>' +
     '<button class="item back" data-act="leave"><span>LEAVE ROOM</span></button></div>' +
-    '<h2 class="head sub">Best laps</h2><div id="netBoard"><p class="dimtx">Loading…</p></div></div>' +
+    '<div id="netBoard" class="lobbyboard"></div></div>' +
     '<div class="right"><h2 class="head sub">Drivers ' + n + '/' + NET_CFG.max + '</h2><table class="grid lob">' + rows.join("") + '</table>' +
     '<h2 class="head sub">Chat</h2><div class="chat"><div class="chatlog" id="netChatLog">' + netChatHTML() + '</div>' +
     '<input id="netChat" maxlength="140" autocomplete="off" placeholder="Say something — Enter to send, T to type"></div></div></div>',
@@ -17311,8 +17447,7 @@ function showLobby(sel){
   if(box){ box.value = NET.draft || ""; box.addEventListener("input", ()=>{ NET.draft = box.value; });
     if(typing){ box.focus(); box.setSelectionRange(box.value.length, box.value.length); } }
   netChatPaint();
-  if(NET.boardFor === pick && NET.boardHTML){ const el = document.getElementById("netBoard"); if(el) el.innerHTML = NET.boardHTML; }
-  else netBoard(pick).then(rows=>{ NET.boardFor = pick; NET.boardHTML = netBoardHTML(rows); const el = document.getElementById("netBoard"); if(el) el.innerHTML = NET.boardHTML; });
+  { const el = document.getElementById("netBoard"); if(el){ el.innerHTML = lbTableHTML(pick, "BEST LAPS"); lbFill(); } }
 }
 /* redraw the lobby as people come and go, without losing the selection */
 function netRefresh(){
@@ -17334,6 +17469,7 @@ function showOnlinePause(){
 /* ---- results ---- */
 function showResults(){
   GAME.resultsShown = true;
+  if(!GAME.lbAsked){ GAME.lbAsked = true; LB.mark = null; const c = lbCandidate(); if(c){ showInitials(c, showResults); return; } }
   const rows = classification();
   const lead = rows[0].time;
   let gained = null;
@@ -17389,8 +17525,10 @@ function showResults(){
     (EXP.on ? (GAME.raceRecord ? '<span class="badge">NEW BEST CLIMB</span>' : '') : badges) +
     '<div class="menu" style="margin-top:22px">' +
     items.map(x => '<button class="item" data-act="' + x[0] + '"><span>' + x[1] + '</span>' + (x[2] !== undefined ? '<small>' + esc(x[2]) + '</small>' : '') + '</button>').join("") +
-    '</div></div><div class="right"><div class="detail" style="margin:0">' + right + '</div></div></div>',
+    '</div></div><div class="right"><div class="detail" style="margin:0">' + right + '</div>' +
+    (TRACK.test ? '' : '<div class="detail" style="margin:18px 0 0">' + lbTableHTML(TRACK.name, EXP.on ? "FASTEST CLIMBS" : "BEST LAPS", LB.mark) + '</div>') + '</div></div>',
     { cls:"dim", acts });
+  lbFill();
 }
 function showStandings(){
   const C = SAVE.champ;
