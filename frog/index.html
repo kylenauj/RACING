@@ -191,7 +191,7 @@
       <h2 id="sheetTitle">Sprite sheet</h2>
       <p class="muted">One row per animation, one 72×48 cell per frame, in the order listed above. The pivot sits at pixel (24, 45), on the ground between the feet. The JSON atlas beside it carries frame durations, loop flags, walk speed and the tongue hitboxes.</p>
     </div>
-    <div class="sheet"><img src="sprites/frog-sheet.png" alt="Frog sprite sheet with all animation frames" width="864" height="432"></div>
+    <div class="sheet"><img src="sprites/frog-sheet.png" alt="Frog sprite sheet with all animation frames" width="864" height="576"></div>
   </section>
 
   <section aria-labelledby="palTitle">
@@ -230,6 +230,9 @@
     tongue: { keys: 'X', note: 'Wind up, open, three shooting frames, stick, two retract frames with sag, close. Frames 4 and 5 are live: the atlas gives the tip hitbox.' },
     tongue_up: { keys: '↑ + X', note: 'Same timing as the forward strike, aimed up at 49° for flies overhead.' },
     croak: { keys: 'C', note: 'The throat sac inflates past the chin, holds, and deflates.' },
+    run: { keys: '← → (fast)', note: 'Long-legged sprint: a longer stride, higher knee lift and pumping arms. Used above walking speed in the test marsh.' },
+    wall: { keys: 'push into wall', note: 'Sticky toe pads: back to the wall, feet and one hand planted behind. The game flips it to face away from the wall.' },
+    kick: { keys: 'Shift', note: 'The air kick: body stretched flat, long legs driving back. One per jump, refreshed by landing, walls and tongue grabs.' },
     hurt: { keys: 'H', note: 'One white flash frame, knocked back with stars, then recovers.' },
   };
   const ROLES = ['Outline, pupil', 'Green 0: shadow, spots', 'Green 1', 'Green 2', 'Green 3: highlight', 'Belly shade', 'Belly',

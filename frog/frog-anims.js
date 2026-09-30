@@ -210,6 +210,62 @@
     ];
   }
 
+  // ---- run: longer, faster stride with pumping arms ---------------------
+  const RUN_STRIDE = 9, RUN_MS = 60;
+  function run() {
+    const frames = [];
+    for (let i = 0; i < 6; i++) {
+      const p = i / 6, sway = Math.sin(p * TAU);
+      const foot = (ph, cx) => {
+        ph = ((ph % 1) + 1) % 1;
+        if (ph < 0.45) { const t = ph / 0.45; return { x: r1(cx + RUN_STRIDE - 2 * RUN_STRIDE * t), y: -1.3, a: 0 }; }
+        const t = (ph - 0.45) / 0.55, lift = Math.sin(t * Math.PI);
+        return { x: r1(cx - RUN_STRIDE + 2 * RUN_STRIDE * t), y: r1(-1.3 - 8 * lift), a: r1(1.0 * lift - 0.2 * t) };
+      };
+      frames.push({
+        ms: RUN_MS,
+        pose: {
+          body: { x: B.body.x + 2, y: B.body.y + 1 + Math.round(Math.cos(p * TAU * 2) * 1.5), rot: r1(B.body.rot + 0.12) },
+          headRot: -0.12,
+          legs: { near: foot(p, -2), far: foot(p + 0.5, 1) },
+          arms: {
+            near: { x: r1(2.5 - 3.5 * sway), y: r1(4 - 1.5 * Math.abs(sway)), a: 0.2 },
+            far: { x: r1(2.5 + 3.5 * sway), y: r1(4 - 1.5 * Math.abs(sway)), a: 0.2 },
+          },
+        },
+      });
+    }
+    return frames;
+  }
+
+  // ---- wall cling: sticky toe pads on a wall BEHIND the frog -----------
+  // The frog faces away from the wall; the game flips it to match the side.
+  function wall() {
+    const base = {
+      body: { x: 1, y: -23, rot: -0.15 }, eye: 'open',
+      legs: { near: { x: -6, y: -3, a: -1.5 }, far: { x: -5.5, y: -9, a: -1.45 } },
+      arms: { near: { x: 3, y: 3.5, a: 0.4 }, far: { x: -5, y: -8, a: -1.9 } },
+    };
+    return [
+      { ms: 140, pose: base },
+      { ms: 140, pose: Frog.mergePose(base, { body: { y: -22 }, legs: { near: { y: -2.5 } }, arms: { far: { y: -7.5 } } }) },
+    ];
+  }
+
+  // ---- kick: the long-leg air dash, body stretched flat ----------------
+  function kick() {
+    const base = {
+      body: { x: 2, y: -20, rot: 0.55, sx: 1.08, sy: 0.94 }, headRot: -0.5, eye: 'focus',
+      legs: { near: { x: -17, y: -12, a: 2.9 }, far: { x: -15, y: -15, a: 2.95 } },
+      arms: { near: { x: 6, y: -1, a: -0.1 }, far: { x: 6, y: -2.5, a: -0.1 } },
+    };
+    return [
+      { ms: 50, pose: Frog.mergePose(base, { legs: { near: { x: -8, y: -6, a: 1.5 }, far: { x: -6, y: -8, a: 1.5 } } }) },
+      { ms: 90, pose: Frog.mergePose(base, { fx: [{ type: 'speed', x: -20, y: -24, len: 7 }, { type: 'speed', x: -18, y: -17, len: 5 }] }) },
+      { ms: 90, pose: base },
+    ];
+  }
+
   const ANIMS = {
     idle: { loop: true, frames: idle() },
     walk: { loop: true, speed: Math.round((2 * STRIDE) / (4 * WALK_MS / 1000)), frames: walk() },
@@ -219,6 +275,9 @@
     tongue: { loop: false, frames: tongue() },
     tongue_up: { loop: false, frames: tongue({ up: true }) },
     croak: { loop: false, frames: croak() },
+    run: { loop: true, speed: Math.round((2 * RUN_STRIDE) / (2.7 * RUN_MS / 1000)), frames: run() },
+    wall: { loop: true, frames: wall() },
+    kick: { loop: false, frames: kick() },
     hurt: { loop: false, frames: hurt() },
   };
 

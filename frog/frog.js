@@ -56,6 +56,7 @@
     tympanum: { x: 3.2, y: -5.2 },
     nostril: { x: 13, y: -5.2 },
     throat: { x: 8.5, y: 1.2 },
+    neck: { x: 3.5, y: -2.5 },
     spots: [[-3.2, -4, 1.7], [-6.8, -0.6, 1.4], [1.2, -5.2, 1.1]],
     hipNear: { x: -5.5, y: 4 }, hipFar: { x: -2.5, y: 3.5 },
     shoulderNear: { x: 5, y: 3.2 }, shoulderFar: { x: 6.5, y: 2.2 },
@@ -187,57 +188,71 @@
     return [r[0] / this.sx, r[1] / this.sy];
   };
 
+  // The head hangs off the torso on a neck joint, so the torso can stand up
+  // straight while the head stays level (or nods, looks up, recoils).
+  function HeadFrame(F, headRot) { this.F = F; this.r = headRot || 0; this.a = F.a + this.r; }
+  HeadFrame.prototype.toWorld = function (lx, ly) {
+    const q = rotAround(lx, ly, RIG.neck, this.r);
+    return this.F.toWorld(q[0], q[1]);
+  };
+  HeadFrame.prototype.toLocal = function (wx, wy) {
+    const q = this.F.toLocal(wx, wy);
+    return rotAround(q[0], q[1], RIG.neck, -this.r);
+  };
+
   // ---- parts ------------------------------------------------------------
   function ellUV(lx, ly, e) { return [(lx - e.x) / e.rx, (ly - e.y) / e.ry]; }
   function inEll(u, v) { return u * u + v * v <= 1; }
 
   function drawBody(pose, F) {
     const L = new Layer();
+    const H = new HeadFrame(F, pose.headRot);
     const t = RIG.torso, h = RIG.head, mc = RIG.mouthCorner;
     const jaw = pose.jaw || 0;
     const lipDir = [Math.cos(RIG.lipAngle), Math.sin(RIG.lipAngle)];
     // >0 below the lip line
     const side = (x, y) => (x - mc.x) * -lipDir[1] + (y - mc.y) * lipDir[0];
-    const green = (u, v, extra) => {
-      const n = rot(u, v, F.a + (extra || 0));
+    const green = (u, v, extra, base) => {
+      const n = rot(u, v, (base == null ? F.a : base) + (extra || 0));
       return band(light(n[0] * 0.9, n[1] * 0.9));
     };
     const throat = pose.throat || 0;
 
     L.scan(-ORIGIN_X, -ORIGIN_Y, CELL_W - ORIGIN_X, CELL_H - ORIGIN_Y, (wx, wy) => {
       const [lx, ly] = F.toLocal(wx, wy);
+      const [hx, hy] = H.toLocal(wx, wy);
       // mouth wedge: sweep back onto the lip line and test against the head
       if (jaw > 0.01) {
-        const ang = Math.atan2(ly - mc.y, lx - mc.x) - RIG.lipAngle;
+        const ang = Math.atan2(hy - mc.y, hx - mc.x) - RIG.lipAngle;
         if (ang > 0 && ang < jaw) {
-          const q = rotAround(lx, ly, mc, -ang);
+          const q = rotAround(hx, hy, mc, -ang);
           const [u, v] = ellUV(q[0], q[1], h);
           if (inEll(u, v)) {
-            const d = Math.hypot(lx - mc.x, ly - mc.y);
+            const d = Math.hypot(hx - mc.x, hy - mc.y);
             return d < 3 ? C.O : C.M;
           }
         }
       }
       // lower jaw: rotated copy of the head below the lip line
       {
-        const q = rotAround(lx, ly, mc, -jaw);
+        const q = rotAround(hx, hy, mc, -jaw);
         const [u, v] = ellUV(q[0], q[1], h);
         if (inEll(u, v) && side(q[0], q[1]) > 0 && q[0] >= mc.x) {
           if (v > 0.45 && u > -0.35) return C.B1;
-          return green(u, v, jaw);
+          return green(u, v, jaw, H.a);
         }
       }
       // upper head
       {
-        const [u, v] = ellUV(lx, ly, h);
-        if (inEll(u, v) && (side(lx, ly) <= 0 || lx < mc.x)) {
-          return green(u, v);
+        const [u, v] = ellUV(hx, hy, h);
+        if (inEll(u, v) && (side(hx, hy) <= 0 || hx < mc.x)) {
+          return green(u, v, 0, H.a);
         }
       }
       // throat sac
       if (throat > 0) {
         const tr = 2.2 + throat * 2.2;
-        const dx = (lx - RIG.throat.x) / (tr * 1.2), dy = (ly - RIG.throat.y - throat) / tr;
+        const dx = (hx - RIG.throat.x) / (tr * 1.2), dy = (hy - RIG.throat.y - throat) / tr;
         if (dx * dx + dy * dy <= 1) return dy < -0.3 ? C.B0 : C.B1;
       }
       // torso
@@ -253,28 +268,28 @@
       }
       // eye bump
       {
-        const e = RIG.eye, dx = lx - e.x, dy = ly - e.y;
-        if (dx * dx + dy * dy <= e.r * e.r) return green(dx / e.r, dy / e.r);
+        const e = RIG.eye, dx = hx - e.x, dy = hy - e.y;
+        if (dx * dx + dy * dy <= e.r * e.r) return green(dx / e.r, dy / e.r, 0, H.a);
       }
       return 0;
     });
 
     // closed-mouth line: jaw pixels directly under upper-head pixels
     if (jaw < 0.05) {
-      const [ax, ay] = F.toWorld(mc.x - 0.6, mc.y + 0.9);
-      const [bx, by] = F.toWorld(h.x + h.rx - 0.9, mc.y + (h.x + h.rx - mc.x) * Math.tan(RIG.lipAngle));
+      const [ax, ay] = H.toWorld(mc.x - 0.6, mc.y + 0.9);
+      const [bx, by] = H.toWorld(h.x + h.rx - 0.9, mc.y + (h.x + h.rx - mc.x) * Math.tan(RIG.lipAngle));
       line(L, ax, ay, bx, by, C.O);
     }
     // tympanum (ear drum) behind the eye, and a nostril
     {
-      const [x, y] = F.toWorld(RIG.tympanum.x, RIG.tympanum.y);
+      const [x, y] = H.toWorld(RIG.tympanum.x, RIG.tympanum.y);
       L.stamp(['.2.', '242', '.2.'], { '.': 0, '2': C.G0, '4': C.G1 }, x, y);
-      const [nx, ny] = F.toWorld(RIG.nostril.x, RIG.nostril.y);
+      const [nx, ny] = H.toWorld(RIG.nostril.x, RIG.nostril.y);
       L.set(Math.floor(nx + ORIGIN_X), Math.floor(ny + ORIGIN_Y), C.G0);
     }
     L.outline(C.O);
     // eye goes on after the outline so it keeps its own crisp ring
-    const [ex, ey] = F.toWorld(RIG.eye.x, RIG.eye.y);
+    const [ex, ey] = H.toWorld(RIG.eye.x, RIG.eye.y);
     L.stamp(EYES[pose.eye || 'open'], EYE_KEY, ex, ey);
     return L;
   }
@@ -360,7 +375,7 @@
   function drawTongue(F, pose) {
     const tg = pose.tongue;
     const L = new Layer();
-    const [mx, my] = F.toWorld(RIG.mouthCorner.x + 2.5, RIG.mouthCorner.y + 0.8);
+    const [mx, my] = new HeadFrame(F, pose.headRot).toWorld(RIG.mouthCorner.x + 2.5, RIG.mouthCorner.y + 0.8);
     const ang = tg.ang != null ? tg.ang : 0;
     const tx = mx + tg.len * Math.cos(ang), ty = my + tg.len * Math.sin(ang);
     const cx = (mx + tx) / 2 + (tg.sag || 0) * -Math.sin(ang) * 0, cy = (my + ty) / 2 + (tg.sag || 0);
@@ -428,7 +443,7 @@
     body: { x: 1.5, y: -23, rot: -0.22, sx: 1, sy: 1 },
     eye: 'open', jaw: 0, throat: 0,
     legs: { near: { x: -7, y: -1.3, a: 0 }, far: { x: 1, y: -1.3, a: 0 } },
-    arms: { near: { x: 2.8, y: 5.2, a: 0.25 }, far: { x: 2.4, y: 5.0, a: 0.25 } },
+    arms: { near: { x: 2.2, y: 6.2, a: 0.5 }, far: { x: 1.8, y: 6.0, a: 0.5 } },
     tongue: null, fx: [], flash: false,
   };
 
@@ -443,8 +458,16 @@
     return out;
   }
 
+  // Global stance: the torso stands this much more upright than the pose
+  // data says, the head is counter-rotated so it stays level, and the body is
+  // lifted so the long legs straighten out.
+  const POSTURE = { rot: -0.5, lift: -4 };
+
   function renderPose(poseIn) {
     const pose = mergePose(BASE_POSE, poseIn);
+    pose.body.rot += POSTURE.rot;
+    pose.body.y += POSTURE.lift;
+    pose.headRot = (pose.headRot || 0) - POSTURE.rot;
     const F = new BodyFrame(pose.body);
     const out = new Layer();
     out.over(drawArm(F, RIG.shoulderFar, pose.arms.far).remap(FAR_MAP));
@@ -480,7 +503,7 @@
   }
 
   const Frog = {
-    CELL_W, CELL_H, ORIGIN_X, ORIGIN_Y, PALETTE, COLORS: C, RIG, BASE_POSE,
+    CELL_W, CELL_H, ORIGIN_X, ORIGIN_Y, PALETTE, COLORS: C, RIG, BASE_POSE, POSTURE,
     renderPose, mergePose, toRGBA,
   };
 

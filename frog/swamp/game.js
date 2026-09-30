@@ -18,12 +18,19 @@
 
   // ---- tuning (all in px, px/s, px/s^2, s) ------------------------------
   const TUNE = {
-    walk: 72, airAccel: 7, gravity: 720, maxFall: 420,
-    hop: 235, leap: 365, chargeTime: 0.45, coyote: 0.08, jumpBuffer: 0.1,
-    swim: 62, swimUp: 80, float: 70, surfaceHop: 310,
-    tongueRange: 122, tongueSpeed: 620, reelSpeed: 700, aimAssistDeg: 32,
-    zipSpeed: 330, swingPump: 260, reel: 80, ropeMin: 20, ropeMax: 130,
-    padPull: 90, spit: 270,
+    // ground: accelerate hard, turn around even harder
+    run: 128, accel: 1500, turn: 2600, decel: 1700, airAccel: 1100,
+    // jump: instant on press, release early for a short hop
+    jump: 305, jumpCut: 0.45, gravity: 900, fallMult: 1.45, apexMult: 0.55, apexBand: 45, maxFall: 460,
+    superJump: 450, superCharge: 0.28, coyote: 0.1, jumpBuffer: 0.12,
+    // long-leg kick: one air dash, refreshed on landing, walls and tongue grabs
+    dash: 310, dashTime: 0.15, dashCarry: 0.6, swimDash: 230,
+    // sticky toe pads
+    wallSlide: 38, wallSlideFast: 150, wallJumpX: 175, wallJumpY: 300, wallLock: 0.13,
+    swim: 100, swimUp: 95, float: 70, surfaceHop: 330,
+    tongueRange: 122, tongueSpeed: 700, reelSpeed: 800, aimAssistDeg: 32,
+    zipSpeed: 480, swingPump: 380, reel: 110, ropeMin: 20, ropeMax: 130, swingJump: 230,
+    padPull: 110, spit: 270,
     hurtKnock: 130, invuln: 1.2, maxHp: 3,
     croakRadius: 132,
   };
@@ -130,7 +137,8 @@
   const P = {
     x: spawn.x, y: spawn.y, vx: 0, vy: 0, dir: 1,
     ground: false, groundT: 0, plat: null, water: null, surface: false, leaping: false, drop: 0,
-    charging: false, charge: 0, jumpBuf: 0,
+    crouch: 0, crouching: false, jumpBuf: 0, jumping: false,
+    dashT: 0, dashVx: 0, dashVy: 0, canDash: true, dashCool: 0, ghosts: [], wall: 0, wallLock: 0,
     hp: TUNE.maxHp, flies: 0, sac: null, invuln: 0,
     lock: null, lockT: 0, anim: 'idle', ai: 0, at: 0,
     landT: 0, spitT: 0, checkpoint: { x: spawn.x, y: spawn.y }, safe: { x: spawn.x, y: spawn.y },
@@ -142,7 +150,7 @@
   const MAP = {
     ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
     ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down',
-    Space: 'jump', KeyZ: 'jump', KeyX: 'tongue', KeyJ: 'tongue', KeyK: 'tongue',
+    Space: 'jump', KeyZ: 'jump', ShiftLeft: 'dash', ShiftRight: 'dash', KeyL: 'dash', KeyV: 'dash', KeyX: 'tongue', KeyJ: 'tongue', KeyK: 'tongue',
     KeyC: 'croak', KeyE: 'talk', KeyR: 'restart', KeyG: 'debug',
   };
   function press(k) { if (!keys[k]) pressed[k] = true; keys[k] = true; }
@@ -218,7 +226,7 @@
     P.hp -= n || 1;
     P.invuln = TUNE.invuln;
     detachTongue();
-    P.charging = false;
+    P.crouch = 0; P.dashT = 0; P.wall = 0;
     if (P.hp <= 0) {
       P.hp = TUNE.maxHp; P.x = P.checkpoint.x; P.y = P.checkpoint.y; P.vx = P.vy = 0;
       toast('Croaked! Back to the stump.');
@@ -287,7 +295,7 @@
     const [mx, my] = tongueOrigin();
     if (keys.tongue) { tongue.state = 'swing'; tongue.rope = clamp(dist(e.x, e.y, P.x, P.y - 14) - 12, TUNE.ropeMin, TUNE.ropeMax); }
     else tongue.state = 'zip';
-    P.ground = false; P.plat = null; P.charging = false;
+    P.ground = false; P.plat = null; P.crouch = 0; P.canDash = true; P.wall = 0; P.dashT = 0;
     P.leaping = true;
     if (e.kind === 'cattail') e.bend = P.x < e.x ? -3 : 3;
     void mx; void my;
@@ -458,14 +466,14 @@
     const swinging = tongue.state === 'swing' || tongue.state === 'zip';
 
     // talk
-    if (free && (pressed.talk || (pressed.down && !keys.jump && P.ground)) && !P.charging) {
+    if (free && (pressed.talk || (pressed.down && !keys.jump && P.ground))) {
       if (!talk() && pressed.talk) dialog = null;
     }
     if (dialog && dist(dialog.npc.x, dialog.npc.y, P.x, P.y - 10) > 60) { dialog = null; }
     showDialog();
 
     // tongue / spit
-    if (free && pressed.tongue && tongue.state === 'none' && !P.charging) {
+    if (free && pressed.tongue && tongue.state === 'none') {
       if (P.sac) spit(); else fireTongue();
     }
     updateTongue(dt);
@@ -526,54 +534,133 @@
     if (toastT > 0) { toastT -= dt; if (toastT <= 0) ui.toast.hidden = true; }
 
     pickAnim(dt, mx);
+    for (const gh of P.ghosts) gh.t -= dt;
+    P.ghosts = P.ghosts.filter(gh => gh.t > 0);
     for (const k in pressed) delete pressed[k];
     for (const k in released) delete released[k];
+  }
+
+  const approach = (v, t, d) => (v < t ? Math.min(t, v + d) : Math.max(t, v - d));
+
+  function wallSide() {
+    if (P.ground) return 0;
+    const t0 = Math.floor((P.y - BODY_H + 4) / TS), t1 = Math.floor((P.y - 4) / TS);
+    for (const side of [1, -1]) {
+      const tx = Math.floor((P.x + side * (HALF_W + 1)) / TS);
+      let hit = true;
+      for (let ty = t0; ty <= t1; ty++) if (!solid(tx, ty)) hit = false;
+      if (hit) return side;
+    }
+    return 0;
+  }
+
+  function startDash(mx) {
+    let dx = mx, dy = keys.up ? -1 : keys.down && !P.ground ? 1 : 0;
+    if (!dx && !dy) dx = P.dir;
+    const n = Math.hypot(dx, dy);
+    P.dashVx = dx / n * TUNE.dash; P.dashVy = dy / n * TUNE.dash * 0.85;
+    P.dashT = TUNE.dashTime; P.dashCool = 0.22;
+    if (!P.ground) P.canDash = false;
+    if (dx) P.dir = Math.sign(dx);
+    P.wall = 0; P.jumping = false; P.leaping = true; P.plat = null;
+    P.anim = dy < 0 && !dx ? 'jump' : 'kick'; P.ai = 0; P.at = 0;
+    dust(P.x, P.y - 10, 1);
+  }
+
+  function launch(v, big) {
+    P.vy = -v; P.jumping = true; P.leaping = true;
+    P.ground = false; P.plat = null; P.groundT = 0; P.jumpBuf = 0; P.crouch = 0;
+    P.anim = 'jump'; P.ai = 2; P.at = 0;
+    dust(P.x, P.y, big ? 3 : 1);
   }
 
   function stepLand(dt, mx, free) {
     const wasGround = P.ground;
     P.ground = groundBelow() && P.vy >= 0;
-    if (P.ground) P.groundT = TUNE.coyote; else P.groundT = Math.max(0, P.groundT - dt);
-    const canJump = P.groundT > 0 && !P.leaping;
+    if (P.ground) { P.groundT = TUNE.coyote; P.canDash = true; P.wall = 0; P.jumping = false; }
+    else P.groundT = Math.max(0, P.groundT - dt);
+    P.wallLock = Math.max(0, P.wallLock - dt);
+    P.dashCool = Math.max(0, P.dashCool - dt);
+    const busy = tongue.state === 'out' || tongue.state === 'reel' || tongue.state === 'drag' || P.spitT > 0;
 
-    // charge jump: Space down starts the crouch, release launches
-    if (free && P.jumpBuf > 0 && canJump && !P.charging && tongue.state === 'none') {
-      if (keys.down && onOneWay()) { P.drop = 0.25; P.jumpBuf = 0; P.ground = false; P.y += 1; }
-      else { P.charging = true; P.charge = 0; P.jumpBuf = 0; }
+    // ---- kick dash ----
+    if (free && pressed.dash && P.dashT <= 0 && P.dashCool <= 0 && (P.canDash || P.ground)) startDash(mx);
+    if (P.dashT > 0) {
+      P.dashT -= dt;
+      P.vx = P.dashVx; P.vy = P.dashVy;
+      P.ghosts.push({ x: P.x, y: P.y, dir: P.dir, frame: P.frame, t: 0.18 });
+      moveX(P.vx * dt);
+      if (moveY(P.vy * dt)) { P.ground = true; P.vy = 0; }
+      if (P.dashT <= 0) { P.vx = P.dashVx * TUNE.dashCarry; P.vy = P.dashVy * 0.4; }
+      return;
     }
-    if (P.charging) {
-      P.charge += dt;
-      P.vx *= Math.pow(0.001, dt);
-      if (!keys.jump || !free) {
-        const k = clamp(P.charge / TUNE.chargeTime, 0, 1);
-        const big = k > 0.25;
-        P.vy = -(TUNE.hop + (TUNE.leap - TUNE.hop) * k);
-        P.vx = mx * TUNE.walk * (big ? 1.3 : 1);
-        if (mx) P.dir = mx;
-        P.charging = false; P.ground = false; P.plat = null; P.leaping = true; P.groundT = 0;
-        P.anim = 'jump'; P.ai = 2; P.at = 0;
-        dust(P.x, P.y, big ? 2 : 1);
+
+    // ---- crouch: hold Down on the ground to wind up a super leap ----
+    P.crouching = free && P.ground && keys.down && !busy;
+    P.crouch = P.crouching ? P.crouch + dt : 0;
+
+    // ---- jumps ----
+    if (free && P.jumpBuf > 0 && !busy) {
+      if (P.groundT > 0 && !P.leaping) {
+        if (keys.down && onOneWay() && P.crouch < TUNE.superCharge) { P.drop = 0.25; P.jumpBuf = 0; P.ground = false; P.y += 1; }
+        else {
+          const sup = P.crouch >= TUNE.superCharge;
+          launch(sup ? TUNE.superJump : TUNE.jump, sup);
+          if (sup) toast('Long-leg leap!', 0.8);
+        }
+      } else if (P.wall) {
+        P.vx = -P.wall * TUNE.wallJumpX; P.dir = -P.wall;
+        launch(TUNE.wallJumpY, false);
+        P.wall = 0; P.wallLock = TUNE.wallLock; P.canDash = true;
       }
-    } else if (P.ground) {
-      if (free && tongue.state !== 'drag') {
-        P.vx = mx * TUNE.walk;
+    }
+    if (released.jump && P.jumping && P.vy < 0) { P.vy *= TUNE.jumpCut; P.jumping = false; }
+
+    // ---- horizontal ----
+    const target = mx * TUNE.run;
+    if (P.ground) {
+      if (!free) P.vx = P.lock === 'hurt' ? P.vx * Math.pow(0.02, dt) : 0;
+      else if (busy || P.crouching) P.vx = approach(P.vx, 0, TUNE.decel * dt);
+      else {
+        const a = mx && Math.sign(mx) !== Math.sign(P.vx) && P.vx ? TUNE.turn : mx ? TUNE.accel : TUNE.decel;
+        P.vx = approach(P.vx, target, a * dt);
         if (mx) P.dir = mx;
-      } else if (!free && P.lock !== 'hurt') P.vx = 0;
-      else P.vx *= Math.pow(0.02, dt);
-      if (tongue.state === 'out' || tongue.state === 'reel' || tongue.state === 'drag' || P.spitT > 0) P.vx = 0;
-    } else {
-      if (free && mx) { P.vx += (mx * TUNE.walk * 1.15 - P.vx) * Math.min(1, TUNE.airAccel * dt); }
+      }
+    } else if (free && P.wallLock <= 0 && !P.wall) {
+      // keep extra speed from dashes and swings unless steering against it
+      if (mx && !(Math.sign(P.vx) === mx && Math.abs(P.vx) > TUNE.run)) P.vx = approach(P.vx, target, TUNE.airAccel * dt);
+      if (mx) P.dir = mx;
     }
 
-    if (!P.ground) P.vy = Math.min(TUNE.maxFall, P.vy + TUNE.gravity * dt);
+    // ---- gravity ----
+    if (!P.ground) {
+      let g = TUNE.gravity;
+      if (P.vy > 0) g *= TUNE.fallMult;
+      else if (P.jumping && keys.jump && Math.abs(P.vy) < TUNE.apexBand) g *= TUNE.apexMult;
+      P.vy += g * dt;
+      const cap = P.wall ? (keys.down ? TUNE.wallSlideFast : TUNE.wallSlide) : TUNE.maxFall;
+      if (P.vy > cap) P.vy = cap;
+    }
+
     moveX(P.vx * dt);
     const fallV = P.vy;
     const landed = moveY(P.vy * dt);
     if (landed) {
-      if (!wasGround && fallV > 280) { P.landT = 0.22; dust(P.x, P.y, 2); }
-      P.vy = 0; P.ground = true; P.leaping = false;
+      if (!wasGround && fallV > 300) { P.landT = 0.12; dust(P.x, P.y, 2); }
+      P.vy = 0; P.ground = true; P.leaping = false; P.jumping = false; P.wall = 0;
     }
     if (!landed && P.vy >= 0 && !groundBelow()) P.plat = null;
+
+    // ---- sticky feet: grab walls you're falling past while pushing into them ----
+    const side = wallSide();
+    if (!P.ground && free && P.wallLock <= 0) {
+      if (P.wall && (side !== P.wall || mx === -P.wall)) P.wall = 0;
+      else if (!P.wall && side && mx === side && P.vy > -80) {
+        P.wall = side; P.canDash = true; P.vx = 0; P.jumping = false;
+        if (P.vy > 0) P.vy *= 0.3;
+      }
+    }
+    if (P.wall) { P.dir = -P.wall; P.vx = 0; }
   }
 
   function onOneWay() {
@@ -585,20 +672,26 @@
   }
 
   function stepSwim(dt, mx, free) {
-    P.ground = false; P.plat = null; P.charging = false;
+    P.ground = false; P.plat = null; P.crouch = 0; P.wall = 0; P.dashT = 0;
     const surf = surfaceY(P.x, P.y - 12);
     const floatY = surf + 15;
     const leaving = P.leaping && P.vy < 0;
     if (!leaving) P.leaping = false;
     if (free) {
       if (mx) P.dir = mx;
-      P.vx += (mx * TUNE.swim - P.vx) * Math.min(1, 6 * dt);
+      P.vx += (mx * TUNE.swim - P.vx) * Math.min(1, 4 * dt);
       const want = keys.down ? TUNE.swimUp : keys.up ? -TUNE.swimUp : -TUNE.float;
       if (!leaving) P.vy += (want - P.vy) * Math.min(1, 5 * dt);
     }
+    P.dashCool = Math.max(0, P.dashCool - dt);
+    if (free && pressed.dash && P.dashCool <= 0) {
+      const dx = mx || (keys.up || keys.down ? 0 : P.dir), dy = keys.up ? -1 : keys.down ? 1 : 0, n = Math.hypot(dx, dy) || 1;
+      P.vx = dx / n * TUNE.swimDash; P.vy = dy / n * TUNE.swimDash; P.dashCool = 0.35;
+      burst(P.x - P.dir * 8, P.y - 10, '#cfeff2', 5);
+    }
     P.surface = !leaving && P.y <= floatY + 1;
     if (free && P.surface && P.jumpBuf > 0) {
-      P.vy = -TUNE.surfaceHop; P.leaping = true; P.jumpBuf = 0; P.surface = false;
+      P.vy = -TUNE.surfaceHop; P.leaping = true; P.jumping = true; P.jumpBuf = 0; P.surface = false; P.canDash = true;
       splash(P.x, surf); P.anim = 'jump'; P.ai = 2; P.at = 0;
     }
     if (P.leaping) P.vy += TUNE.gravity * dt;
@@ -636,7 +729,7 @@
     if (Math.abs(P.vx) > 20) P.dir = Math.sign(P.vx);
     if (pressed.jump) {
       tongue.state = 'none'; tongue.target = null;
-      P.vy = Math.min(P.vy, 0) - 170; P.leaping = true;
+      P.vx *= 1.15; P.vy = Math.min(P.vy, 0) - TUNE.swingJump; P.leaping = true; P.jumping = true;
     }
   }
 
@@ -760,19 +853,24 @@
   // ---- animation selection ---------------------------------------------
   function pickAnim(dt, mx) {
     let want, rate = 1, pin = null;
+    void mx;
     const tongueBusy = tongue.state === 'out' || tongue.state === 'reel' || tongue.state === 'drag';
     if (P.lock) want = P.lock;
     else if (tongue.state === 'swing' || tongue.state === 'zip') { want = 'jump'; pin = 3; }
     else if (tongueBusy || P.spitT > 0) { want = tongue.up ? 'tongue_up' : 'tongue'; pin = 1; }
-    else if (P.charging) { want = 'jump'; pin = P.charge > 0.12 ? 1 : 0; }
+    else if (P.dashT > 0) { want = P.anim === 'jump' ? 'jump' : 'kick'; if (want === 'jump') pin = 3; }
+    else if (P.wall) want = 'wall';
+    else if (P.crouching) { want = 'jump'; pin = P.crouch > 0.08 ? 1 : 0; }
     else if (P.water && !P.leaping) {
       const moving = Math.abs(P.vx) > 8 || Math.abs(P.vy) > 30 || !P.surface;
-      if (moving) { want = 'swim'; } else want = 'idle';
+      want = moving ? 'swim' : 'idle';
     } else if (!P.ground) {
-      if (P.anim === 'jump' && P.vy < 0) want = 'jump';
+      if (P.anim === 'kick' && P.vy < 60) want = 'kick';
+      else if (P.anim === 'jump' && P.vy < 0) want = 'jump';
       else want = 'fall';
     } else if (P.landT > 0) want = 'land';
-    else if (Math.abs(P.vx) > 4) { want = 'walk'; rate = Math.abs(P.vx) / A.walk.speed; }
+    else if (Math.abs(P.vx) > 70) { want = 'run'; rate = Math.max(0.6, Math.abs(P.vx) / A.run.speed); }
+    else if (Math.abs(P.vx) > 4) { want = 'walk'; rate = Math.max(0.7, Math.abs(P.vx) / A.walk.speed); }
     else want = 'idle';
 
     if (want === 'swim') {
@@ -865,7 +963,7 @@
 
   function draw() {
     // camera follows with a little look-ahead, clamped to the room
-    const lx = P.x + P.dir * 30 - VW / 2, ly = P.y - 30 - VH / 2;
+    const lx = P.x + P.dir * 24 + clamp(P.vx * 0.3, -50, 50) - VW / 2, ly = P.y - 30 + clamp(P.vy * 0.12, -20, 40) - VH / 2;
     cam.x += (clamp(lx, 0, WW - VW) - cam.x) * 0.12;
     cam.y += (clamp(ly, 0, WH - VH) - cam.y) * 0.12;
     const cx = Math.round(cam.x), cy = Math.round(cam.y);
@@ -893,12 +991,19 @@
   function drawFrog() {
     if (P.invuln > 0 && Math.floor(P.invuln * 12) % 2) return;
     const fr = P.frame || A.idle.frames[0];
+    for (const gh of P.ghosts) {
+      if (!gh.frame) continue;
+      g.save(); g.globalAlpha = 0.35 * gh.t / 0.18;
+      g.translate(Math.round(gh.x), 0); g.scale(gh.dir, 1);
+      g.drawImage(gh.frame.img, -F.ORIGIN_X, Math.round(gh.y) - F.ORIGIN_Y);
+      g.restore();
+    }
     g.save();
     g.translate(Math.round(P.x), 0); g.scale(P.dir, 1);
     g.drawImage(fr.img, -F.ORIGIN_X, Math.round(P.y) - F.ORIGIN_Y);
     g.restore();
-    if (P.charging) {
-      const k = clamp(P.charge / TUNE.chargeTime, 0, 1);
+    if (P.crouch > 0.05) {
+      const k = clamp(P.crouch / TUNE.superCharge, 0, 1);
       g.fillStyle = '#12301c'; g.fillRect(Math.round(P.x) - 9, Math.round(P.y) + 3, 18, 3);
       g.fillStyle = k >= 1 ? '#ffd84a' : '#a5e05a'; g.fillRect(Math.round(P.x) - 8, Math.round(P.y) + 4, Math.round(16 * k), 1);
     }
@@ -1214,14 +1319,14 @@
       ui.readout.textContent =
         `x ${P.x.toFixed(0)} y ${P.y.toFixed(0)}  vx ${P.vx.toFixed(0)} vy ${P.vy.toFixed(0)}\n` +
         `${P.ground ? 'ground' : P.water ? (P.surface ? 'surface' : 'swim') : 'air'}  anim ${P.anim}  tongue ${tongue.state}` +
-        (P.charging ? `  charge ${(P.charge / TUNE.chargeTime * 100).toFixed(0)}%` : '') +
+        (P.crouch > 0 ? `  leap ${Math.min(100, P.crouch / TUNE.superCharge * 100).toFixed(0)}%` : '') + (P.wall ? '  WALL' : '') + (P.canDash ? '  kick ready' : '') +
         (tongue.state === 'swing' ? `  rope ${tongue.rope.toFixed(0)}` : '');
     } else ui.readout.hidden = true;
   }
 
   // ---- lifecycle --------------------------------------------------------
   function restart() {
-    Object.assign(P, { x: spawn.x, y: spawn.y, vx: 0, vy: 0, dir: 1, hp: TUNE.maxHp, flies: 0, sac: null, lock: null, charging: false, invuln: 0, checkpoint: { x: spawn.x, y: spawn.y }, safe: { x: spawn.x, y: spawn.y } });
+    Object.assign(P, { x: spawn.x, y: spawn.y, vx: 0, vy: 0, dir: 1, hp: TUNE.maxHp, flies: 0, sac: null, lock: null, crouch: 0, dashT: 0, wall: 0, canDash: true, invuln: 0, checkpoint: { x: spawn.x, y: spawn.y }, safe: { x: spawn.x, y: spawn.y } });
     detachTongue();
     world.gateOpen = 0; world.gateOpening = false; world.bridge = 0; world.bridgeDropping = false;
     for (const e of ents) {
@@ -1283,7 +1388,7 @@
     cam.x = clamp(P.x - VW / 2, 0, WW - VW); cam.y = clamp(P.y - VH / 2, 0, WH - VH);
     requestAnimationFrame(frame);
     const touchOnly = window.matchMedia && matchMedia('(hover: none), (pointer: coarse)').matches;
-    toast(touchOnly ? 'Use the pad below. Hold Jump to leap, hold Tongue to swing.' : 'Arrows move · Space jump (hold to leap) · X tongue · C croak', 4);
+    toast(touchOnly ? 'Use the pad below. Kick dashes in mid-air, hold Tongue to swing.' : 'Arrows run · Space jump · Shift kick · X tongue · C croak', 4);
   }
 
   // test hooks for scripted checks
