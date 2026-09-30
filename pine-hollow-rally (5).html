@@ -11535,6 +11535,51 @@ function dirtify(m){
   };
   m.customProgramCacheKey = ()=> "dirt";
 }
+/* Logo decals: the game's own pixel logo (and the pine badge off the tab icon) as stickers,
+   rasterised four times over so the pixels stay square and crisp, and recoloured per style.
+   The art is read by colour: the light letters, the yellow outline, the dark backing.
+     0 full colour: as drawn
+     1 white vinyl: only the letters, in cream, shaded as drawn
+     2 black vinyl: only the letters, in black, for the pale paints
+     3 gold: gold letters, a cream outline, the dark backing kept */
+const LOGO_DECAL_STYLES = ["Full colour", "White vinyl", "Black vinyl", "Gold"];
+const DECAL_TEX = {};
+function decalTex(kind, style){
+  const key = kind + style;
+  if(DECAL_TEX[key]) return DECAL_TEX[key];
+  const src = kind === "logo" ? ((document.querySelector("#loading .logoart") || {}).src || "")
+                              : ((document.querySelector('link[rel="icon"]') || {}).href || "");
+  const cv = document.createElement("canvas"), tex = new THREE.CanvasTexture(cv);
+  cv.width = 4; cv.height = 4;
+  tex.anisotropy = 4;
+  DECAL_TEX[key] = tex;
+  const img = new Image();
+  img.onload = ()=>{
+    const K = 4, w = (img.naturalWidth || 184)*K, h = (img.naturalHeight || 88)*K;
+    cv.width = w; cv.height = h;
+    const g = cv.getContext("2d"); g.imageSmoothingEnabled = false; g.drawImage(img, 0, 0, w, h);
+    if(style){
+      const d = g.getImageData(0, 0, w, h), px = d.data;
+      for(let i=0;i<px.length;i+=4){
+        if(px[i+3] < 8) continue;
+        const r = px[i], gg = px[i+1], b = px[i+2], l = (r*0.3 + gg*0.59 + b*0.11)/255;
+        const yellow = r > 190 && gg > 150 && b < 120, dark = !yellow && l < 0.3;
+        const set = (c, k)=>{ px[i] = c[0]*k; px[i+1] = c[1]*k; px[i+2] = c[2]*k; };
+        if(style === 1 || style === 2){
+          if(yellow || dark){ px[i+3] = 0; continue; }
+          style === 1 ? set([242, 239, 230], 0.78 + 0.22*l) : set([24, 24, 24], 0.8 + 0.4*l);
+        } else if(style === 3){
+          if(yellow) set([242, 239, 230], 1);
+          else if(!dark) set([255, 206, 58], 0.72 + 0.28*l);
+        }
+      }
+      g.putImageData(d, 0, 0);
+    }
+    tex.needsUpdate = true;
+  };
+  img.src = src;
+  return tex;
+}
 function buildWagon(opts){
   /* The boxy station wagon, built the way the game needs it: a body shell
      that rides on its springs, four wheel pivots and a live rear axle that
@@ -12023,6 +12068,36 @@ function buildWagon(opts){
       for (const s of [1, -1]) for (let i = 0; i < n; i++) for (const r of [0, 1])
         box(0.01, 0.06, 0.13, (i + r) % 2 ? M.trim : M.white, s * (SIDE + 0.01 + DX), 0.42 + r*0.06, a0 + 0.065 + i*0.13);
     }
+  }
+  // ---- logo decals ----
+  /* The game's logo as vinyl: on the front doors, big down each flank between the arches, across the
+     roof (the one you see from the chase view), on the back glass, or the pine badge on the doors
+     and the back glass. Everything reads the right way from where you look at it: the sides from
+     beside the car, the roof and the glass from behind it. */
+  const LG = Math.max(0, Math.min(6, opt.logo | 0)), LS = Math.max(0, Math.min(LOGO_DECAL_STYLES.length - 1, opt.logoCol | 0));
+  if (LG > 0) {
+    const vinyl = kind => new THREE.MeshStandardMaterial({ map: decalTex(kind, LS), transparent: true, alphaTest: 0.4, roughness: 0.55,
+                                                          metalness: 0.05, polygonOffset: true, polygonOffsetFactor: -2, envMap: ENV, envMapIntensity: 0.5 });
+    const mLogo = vinyl("logo"), mBadge = vinyl("badge"), AR = 88/184;
+    const sticker = (m, w, h, x, y, z, rx, ry, rz) => { const d = add(new THREE.PlaneGeometry(w, h), m, x, y, z); d.rotation.set(rx, ry, rz); return d; };
+    const onSides = (m, w, h, y, z) => { for (const s of [1, -1]) sticker(m, w, h, s * (SIDE + 0.016 + DX), y, z, 0, s * Math.PI/2, 0); };
+    // the back glass leans forward toward its top: stick to it, reading from behind
+    const onGlass = (m, w, h, up) => {
+      const lean = Math.atan2(RT - RB, ROOF - BELT), t = up, y = BELT + (ROOF - BELT)*t, z = RB + (RT - RB)*t;
+      sticker(m, w, h, 0, y, z - 0.02*Math.cos(lean), lean, Math.PI, 0);
+    };
+    const onRoof = (m, w, h) => sticker(m, w, h, 0, ROOF + 0.052, (WST + RT)/2 + (o.sport ? 0 : 0.1), -Math.PI/2, 0, Math.PI);
+    const bigSide = () => {
+      const sp = sideSpans(AXLE_R, AXLE_F, 0.4).find(q => q[0] < 0.3 && q[1] > 0.3) || [-0.8, 0.8];
+      const w = Math.min(1.02, (sp[1] - sp[0])*0.92);
+      onSides(mLogo, w, w*AR, 0.625, (sp[0] + sp[1])/2);
+    };
+    const glassH = Math.min(0.34, Math.hypot(RT - RB, ROOF - BELT)*0.62);
+    if (LG === 1) onSides(mLogo, 0.56, 0.56*AR, 0.745, 0.22);          // above the rub strip, below the glass
+    if (LG === 2 || LG === 6) bigSide();
+    if (LG === 3 || LG === 6) onRoof(mLogo, o.sport ? 1.12 : 1.3, (o.sport ? 1.12 : 1.3)*AR);
+    if (LG === 4 || LG === 6) onGlass(mLogo, glassH/AR, glassH, 0.5);
+    if (LG === 5) { onSides(mBadge, 0.26, 0.26, 0.76, 0.55); onGlass(mBadge, 0.26, 0.26, 0.5); }
   }
   // ---- the kit: ladder, tent, exhaust, whip aerial ----
   if (A.ladder) {
@@ -15283,7 +15358,7 @@ const SAVE = (()=>{
                            car:{ model:0, fender:0, rim:0, wheel:1, livery:0, beat:1,
                                  rack:1, spare:1, cans:1, shovel:0, lights:0, flaps:0, bull:0,
                                  stripe:0, tint:0, pod:0, tape:0, ride:1,
-                                 roof:0, hood:0, decal:0, lamps:0, glow:0, tyre:0, tent:0, exhaust:0, flame:0, snorkel:0, ladder:0, whip:0 } },
+                                 roof:0, hood:0, decal:0, logo:0, logoCol:0, lamps:0, glow:0, tyre:0, tent:0, exhaust:0, flame:0, snorkel:0, ladder:0, whip:0 } },
                 records:{}, champ:null };
   try{
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
@@ -15407,7 +15482,7 @@ function carOpts(){
   return { dirt: true, paint: PAINTS[Math.max(0, Math.min(PAINTS.length-1, S.paint|0))].hex, beat: !!C.beat, rust: C.beat ? 38 : 0,
            model: C.model, fender: C.fender, rim: C.rim, wheel: C.wheel, livery: C.livery,
            stripe: C.stripe | 0, tint: !!C.tint, ride: C.ride === undefined ? 1 : C.ride | 0,
-           roof: C.roof | 0, hood: C.hood | 0, decal: C.decal | 0, lamps: C.lamps | 0, glow: C.glow | 0, tyre: C.tyre | 0,
+           roof: C.roof | 0, hood: C.hood | 0, decal: C.decal | 0, logo: C.logo | 0, logoCol: C.logoCol | 0, lamps: C.lamps | 0, glow: C.glow | 0, tyre: C.tyre | 0,
            tent: C.tent | 0, exhaust: C.exhaust | 0, flame: C.flame | 0,
            acc: { rack: !!C.rack, spare: !!C.spare, cans: !!C.cans, shovel: !!C.shovel, lights: !!C.lights, flaps: !!C.flaps, bull: !!C.bull,
                   pod: !!C.pod, tape: !!C.tape, snorkel: !!C.snorkel, ladder: !!C.ladder, whip: !!C.whip } };
@@ -16543,6 +16618,9 @@ const GOPTS = [
   withCat(1, carKey("tint",   "Windows", ["Clear", "Tinted"], "Tinted glass, nearly black from the outside.")),
   withCat(1, carKey("roof",   "Roof", ["Body colour", "White", "Black", "Cream", "Wood grain"], "A two-tone roof: the roof panel and the lip at the back in a colour of its own.")),
   withCat(1, carKey("decal",  "Decals", ["None", "Sponsor stickers", "Flames", "Chequers"], "Stickers on the doors and the back glass, hot rod flames off the front wheels, or a chequered band along the sills.")),
+  withCat(1, carKey("logo",   "Logo decals", ["None", "Door logos", "Big side logos", "Roof logo", "Back glass logo", "Pine badges", "The works"],
+         "The Pine Hollow Rally logo as vinyl: on the doors, big down the flanks, across the roof, on the back glass, the pine badge, or the lot.")),
+  withCat(1, carKey("logoCol", "Logo style", LOGO_DECAL_STYLES, "Full colour as drawn, the letters alone cut in white or black vinyl, or gold letters.")),
   withCat(1, carKey("lamps",  "Headlamps", ["Warm", "Yellow", "Cold white"], "The colour of the lamps: yellow, the old French rally way, or a hard blue-white.")),
   withCat(1, carKey("glow",   "Underglow", ["Off", "Blue", "Green", "Pink", "Amber"], "Coloured light on the ground under the car.")),
   withCat(2, carKey("rim",    "Rims", ["Steel", "Five spoke", "Rally white", "Gold", "Black steel", "Chrome dish", "Bronze"], "What the tyres are wrapped round.")),
