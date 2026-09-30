@@ -16695,13 +16695,22 @@ function showMain(sel){
     '<button class="item" data-act="garage" data-k="garage"><span>GARAGE</span></button>' +
     '<button class="item" data-act="opts" data-k="opts"><span>OPTIONS</span></button>' +
     '<button class="item" data-act="help" data-k="help"><span>HOW TO DRIVE</span></button>' +
+    '<button class="item back" data-act="exit" data-k="exit"><span>EXIT</span><small>back to kylenauj.com</small></button>' +
     '</div></div><div class="right"></div></div>',
     { sel: sel || 0, back: showTitle,
       acts:{ solo:()=>{ SFX.ok(); showSolo(); },
              multi:()=>{ SFX.ok(); if(NET.on) showLobby(); else if(NET_CFG.enabled) showOnline(); else showNetOff(); },
              garage:()=>{ SFX.ok(); showGarage(()=> showMain(MI("garage")), ()=> showMain(MI("garage"))); },
              opts:()=>{ SFX.ok(); showOptions(()=> showMain(MI("opts"))); },
-             help:()=>{ SFX.ok(); showHelp(()=> showMain(MI("help"))); } } });
+             help:()=>{ SFX.ok(); showHelp(()=> showMain(MI("help"))); },
+             exit:()=>{ SFX.back(); exitToSite(); } } });
+}
+/* out of the game and back to the website: the whole window, even when the game sits in a frame on a page */
+const EXIT_URL = "https://kylenauj.com";
+function exitToSite(){
+  try { if(NET.on) netLeave(true); } catch(e){}
+  try { window.top.location.href = EXIT_URL; }
+  catch(e){ location.href = EXIT_URL; }
 }
 /* single player: the four ways to race the computer */
 function showSolo(sel){
@@ -16737,7 +16746,7 @@ function showNetOff(){
 }
 
 /* where each entry sits in the main menu, and the menu a mode goes back to */
-const MI = k => ["solo", "multi", "garage", "opts", "help"].indexOf(k);
+const MI = k => ["solo", "multi", "garage", "opts", "help", "exit"].indexOf(k);
 function menuFor(m){
   if(m === "online") return showMain(MI("multi"));
   showSolo(m === "champ" ? 0 : m === "race" ? 1 : m === "trial" ? 2 : 3);
