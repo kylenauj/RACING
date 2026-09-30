@@ -28,8 +28,8 @@
     // sticky toe pads
     wallSlide: 38, wallSlideFast: 150, wallJumpX: 175, wallJumpY: 300, wallLock: 0.13,
     swim: 100, swimUp: 95, float: 70, surfaceHop: 330,
-    tongueRange: 122, tongueSpeed: 700, reelSpeed: 800, aimAssistDeg: 32,
-    zipSpeed: 480, swingPump: 380, reel: 110, ropeMin: 20, ropeMax: 130, swingJump: 230,
+    tongueRange: 122, tongueSpeed: 700, reelSpeed: 800, aimAssistDeg: 36,
+    zipSpeed: 480, swingPump: 300, swingStart: 170, ropeMin: 24, ropeMax: 130, swingJump: 230,
     padPull: 110, spit: 270,
     hurtKnock: 130, invuln: 1.2, maxHp: 3,
     croakRadius: 132,
@@ -81,7 +81,7 @@
 
   function makeEntity(c, tx, ty, inLiquid) {
     const x = tx * TS + TS / 2, y = ty * TS + TS; // bottom-centre of the cell
-    const e = { ch: c, x, y, x0: x, y0: y, tx, ty, alive: true, t: Math.random() * 10 };
+    const e = { ch: c, x, y, x0: x, y0: y, tx, ty, alive: true, t: Math.random() * 10, hy: 0 };
     switch (c) {
       case 'P': spawn = { x, y }; return;
       case 'S': Object.assign(e, { kind: 'stump', r: 10 }); break;
@@ -90,12 +90,12 @@
       case 'o': Object.assign(e, { kind: 'ring', weight: Infinity, anchor: true, r: 7, y: ty * TS + 4 }); break;
       case 'f': Object.assign(e, { kind: 'fly', weight: 0, r: 6, y: ty * TS + 8 }); break;
       case 'p': Object.assign(e, { kind: 'pebble', weight: 1, r: 6, y: ty * TS + TS - 2, vx: 0, vy: 0, resting: true }); break;
-      case 'b': Object.assign(e, { kind: 'beetle', weight: 2, r: 8, dir: -1, stun: 0, enemy: true }); break;
+      case 'b': Object.assign(e, { kind: 'beetle', weight: 2, r: 8, dir: -1, stun: 0, enemy: true, hy: -4 }); break;
       case 'y': Object.assign(e, { kind: 'dragonfly', weight: 1, r: 7, enemy: true, y: ty * TS + 8 }); break;
       case 'B': Object.assign(e, { kind: 'bell', r: 10, rung: false }); break;
       case 'X': Object.assign(e, { kind: 'target', r: 10, y: ty * TS + 8, hit: false }); break;
       case 'E': case 'T': case 'M': case 'N':
-        Object.assign(e, { kind: 'npc', npc: ROOM.npcs[c], r: c === 'M' ? 16 : 10, say: null, sayT: 0 });
+        Object.assign(e, { kind: 'npc', npc: ROOM.npcs[c], r: c === 'M' ? 16 : 10, say: null, sayT: 0, hy: c === 'E' ? -9 : c === 'N' ? -4 : 0 });
         if (c === 'T') { e.y = ty * TS + 8; e.weight = 1; }
         if (c === 'M') Object.assign(e, { weight: 5, w: 34, y: ty * TS + 1, platform: true, anchor: true, dir: 1, target: null });
         break;
@@ -115,6 +115,7 @@
     return [l * TS, (r + 1) * TS];
   }
   byKind('pad').concat(byKind('npc').filter(n => n.ch === 'M')).forEach(e => { e.span = waterSpan(e); });
+  ents.forEach(e => { e.home = { x0: e.x0, y0: e.y0, x: e.x, y: e.y }; });
 
   // ---- tiles: solidity --------------------------------------------------
   function solid(tx, ty) {
@@ -215,7 +216,7 @@
   function platTop(e) { return e.ch === 'M' ? e.y - 7 : e.y - 1 + e.sink; }
   function groundBelow() {
     const l = Math.floor((P.x - HALF_W) / TS), r = Math.floor((P.x + HALF_W - 0.01) / TS), ty = Math.floor((P.y + 1) / TS);
-    for (let tx = l; tx <= r; tx++) if (solid(tx, ty) || oneWay(tx, ty)) return true;
+    for (let tx = l; tx <= r; tx++) if (solid(tx, ty) || (oneWay(tx, ty) && P.drop <= 0)) return true;
     if (P.plat && Math.abs(P.x - P.plat.x) < P.plat.w / 2 + 2 && Math.abs(P.y - platTop(P.plat)) < 2) return true;
     return false;
   }
@@ -250,14 +251,25 @@
     // aim assist: snap to the closest target inside a cone around the aim
     let best = null, bestA = TUNE.aimAssistDeg * Math.PI / 180;
     for (const e of tongueables()) {
-      const ex = e.x - mx, ey = e.y - my, d = Math.hypot(ex, ey);
-      if (d > TUNE.tongueRange + e.r || d < 4) continue;
+      if (e === P.plat) continue; // never tug the pad you're standing on
+      const ex = e.x - mx, ey = e.y + e.hy - my, d = Math.hypot(ex, ey);
+      if (d > TUNE.tongueRange + e.r || d < 4 || !clearLine(mx, my, e.x, e.y + e.hy)) continue;
       const a = Math.acos(clamp((ex * dx + ey * dy) / d, -1, 1));
       if (a < bestA) { bestA = a; best = e; }
     }
-    if (best) { const d = dist(best.x, best.y, mx, my); dx = (best.x - mx) / d; dy = (best.y - my) / d; if (dx * P.dir < 0) P.dir = -P.dir; }
+    if (best) { const by = best.y + best.hy, d = dist(best.x, by, mx, my); dx = (best.x - mx) / d; dy = (by - my) / d; if (dx * P.dir < 0) P.dir = -P.dir; }
     Object.assign(tongue, { state: 'out', dx, dy, len: 0, target: null, carry: null, up: dy < -0.3, held: true });
     P.anim = tongue.up ? 'tongue_up' : 'tongue';
+  }
+
+  // true when no solid tile sits between two points
+  function clearLine(ax, ay, bx, by) {
+    const n = Math.ceil(dist(ax, ay, bx, by) / 4);
+    for (let i = 1; i < n; i++) {
+      const t = i / n;
+      if (solid(Math.floor((ax + (bx - ax) * t) / TS), Math.floor((ay + (by - ay) * t) / TS))) return false;
+    }
+    return true;
   }
 
   function detachTongue() {
@@ -290,15 +302,24 @@
       if (e.kind === 'pebble') e.resting = false;
       return;
     }
-    // heavier than the frog: the frog goes to it
+    // heavier than the frog: the frog goes to it. Rings and cattails are
+    // swung from; anything else heavy (the turtle) pulls the frog over.
     tongue.target = e;
-    const [mx, my] = tongueOrigin();
-    if (keys.tongue) { tongue.state = 'swing'; tongue.rope = clamp(dist(e.x, e.y, P.x, P.y - 14) - 12, TUNE.ropeMin, TUNE.ropeMax); }
-    else tongue.state = 'zip';
     P.ground = false; P.plat = null; P.crouch = 0; P.canDash = true; P.wall = 0; P.dashT = 0;
     P.leaping = true;
-    if (e.kind === 'cattail') e.bend = P.x < e.x ? -3 : 3;
-    void mx; void my;
+    if (e.kind === 'ring' || e.kind === 'cattail') {
+      tongue.state = 'swing'; tongue.swingT = 0;
+      tongue.rope = clamp(dist(e.x, e.y, P.x, P.y - 14) - 6, TUNE.ropeMin, TUNE.ropeMax);
+      // start the swing moving the way the frog faces, so no pumping is needed
+      const [tx, ty] = swingTangent(e);
+      const s = tx * P.dir >= 0 ? 1 : -1;
+      const along = (P.vx * tx + P.vy * ty) * s;
+      const speed = Math.max(along, TUNE.swingStart);
+      P.vx = tx * s * speed; P.vy = ty * s * speed;
+      if (e.kind === 'cattail') e.bend = P.x < e.x ? -3 : 3;
+    } else {
+      tongue.state = 'zip'; tongue.zipT = 0;
+    }
   }
 
   function deliver(e) {
@@ -334,7 +355,7 @@
       tongue.len += TUNE.tongueSpeed * dt;
       const [tx, ty] = tongueTip();
       for (const e of tongueables()) {
-        if (dist(tx, ty, e.x, e.y) < e.r) { onTongueHit(e); break; }
+        if (e !== P.plat && dist(tx, ty, e.x, e.y + e.hy) < e.r) { onTongueHit(e); break; }
       }
       if (tongue.state === 'out' && (solid(Math.floor(tx / TS), Math.floor(ty / TS)) || tongue.len >= TUNE.tongueRange)) {
         tongue.state = 'reel';
@@ -353,22 +374,19 @@
       tongue.len = dist(pad.x, pad.y, mx, my);
       if (!moved || Math.abs(want - pad.x) < 1 || released.tongue && tongue.len < 30) { tongue.state = 'reel'; tongue.dx = (pad.x - mx) / (tongue.len || 1); tongue.dy = (pad.y - my) / (tongue.len || 1); tongue.target = null; }
     } else if (tongue.state === 'zip') {
+      // head for the top of anything you can stand on, otherwise just below it
       const e = tongue.target;
-      const d = dist(e.x, e.y + 14, P.x, P.y);
-      if (pressed.tongue && d > 24) { tongue.state = 'swing'; tongue.rope = clamp(d, TUNE.ropeMin, TUNE.ropeMax); }
-      else if (d < 16) {
+      const gy = e.platform ? platTop(e) : e.y + 14;
+      const d = dist(e.x, gy, P.x, P.y);
+      if (d < 12 && e.platform) {
+        tongue.state = 'reel'; tongue.len = 10; tongue.target = null;
+        P.x = e.x; P.y = gy; P.vx = P.vy = 0; P.plat = e; P.ground = true; P.leaping = false;
+      } else if (d < 16) {
         tongue.state = 'reel'; tongue.len = 10; tongue.target = null;
         P.vy = -150; P.vx = P.dir * 60;
       } else {
-        P.vx = (e.x - P.x) / d * TUNE.zipSpeed; P.vy = (e.y + 14 - P.y) / d * TUNE.zipSpeed;
+        P.vx = (e.x - P.x) / d * TUNE.zipSpeed; P.vy = (gy - P.y) / d * TUNE.zipSpeed;
       }
-    } else if (tongue.state === 'swing') {
-      if (!keys.tongue) {
-        // snap the tongue back at once so the next anchor can be grabbed mid-air
-        tongue.state = 'none'; tongue.target = null; P.vy -= 40; return;
-      }
-      if (keys.up) tongue.rope = Math.max(TUNE.ropeMin, tongue.rope - TUNE.reel * dt);
-      if (keys.down) tongue.rope = Math.min(TUNE.ropeMax, tongue.rope + TUNE.reel * dt);
     }
   }
 
@@ -405,7 +423,7 @@
     }
     // Mossback hears further than anyone
     const m = ents.find(e => e.ch === 'M');
-    if (m && Math.abs(m.x - P.x) < R * 2.2 && Math.abs(m.y - P.y) < 80) { m.target = P.x; say(m, m.npc.onCroak, 2); }
+    if (m && P.x > m.span[0] - 80 && P.x < m.span[1] + 80 && Math.abs(m.y - P.y) < 100) { m.target = clamp(P.x, m.span[0] + m.w / 2, m.span[1] - m.w / 2); say(m, m.npc.onCroak, 2); }
   }
 
   // ---- talk -------------------------------------------------------------
@@ -445,9 +463,14 @@
   // =======================================================================
   // update
   // =======================================================================
+  function clearEdges() {
+    for (const k in pressed) delete pressed[k];
+    for (const k in released) delete released[k];
+  }
+
   function step(dt) {
     world.time += dt;
-    if (pressed.restart) { restart(); return; }
+    if (pressed.restart) { restart(); clearEdges(); return; }
     if (pressed.debug) { ui.debug.checked = !ui.debug.checked; }
 
     P.invuln = Math.max(0, P.invuln - dt);
@@ -463,7 +486,6 @@
       if (P.lockT <= 0) P.lock = null;
     }
     const free = !P.lock;
-    const swinging = tongue.state === 'swing' || tongue.state === 'zip';
 
     // talk
     if (free && (pressed.talk || (pressed.down && !keys.jump && P.ground))) {
@@ -498,14 +520,13 @@
       P.invuln = 0; hurt(P.x + P.dir, 1);
       P.vx = 0; P.vy = 0;
       toast('The bog bites. Swing across instead.');
-      for (const k in pressed) delete pressed[k];
-      for (const k in released) delete released[k];
+      clearEdges();
       return;
     }
     if (water && !P.water && P.vy > 60) splash(P.x, surfaceY(P.x, P.y - 12));
     P.water = water;
 
-    if (swinging) {
+    if (tongue.state === 'swing' || tongue.state === 'zip') {
       stepSwing(dt, mx);
     } else if (P.water) {
       stepSwim(dt, mx, free);
@@ -536,8 +557,7 @@
     pickAnim(dt, mx);
     for (const gh of P.ghosts) gh.t -= dt;
     P.ghosts = P.ghosts.filter(gh => gh.t > 0);
-    for (const k in pressed) delete pressed[k];
-    for (const k in released) delete released[k];
+    clearEdges();
   }
 
   const approach = (v, t, d) => (v < t ? Math.min(t, v + d) : Math.max(t, v - d));
@@ -577,7 +597,7 @@
   function stepLand(dt, mx, free) {
     const wasGround = P.ground;
     P.ground = groundBelow() && P.vy >= 0;
-    if (P.ground) { P.groundT = TUNE.coyote; P.canDash = true; P.wall = 0; P.jumping = false; }
+    if (P.ground) { P.groundT = TUNE.coyote; P.canDash = true; P.wall = 0; P.jumping = false; P.leaping = false; }
     else P.groundT = Math.max(0, P.groundT - dt);
     P.wallLock = Math.max(0, P.wallLock - dt);
     P.dashCool = Math.max(0, P.dashCool - dt);
@@ -705,32 +725,59 @@
     P.ground = false; P.plat = null;
     if (!e || !e.alive) { detachTongue(); return; }
     if (tongue.state === 'zip') {
+      const bx = P.x, by = P.y;
       moveX(P.vx * dt); moveY(P.vy * dt);
+      // blocked by a wall or out of time: let go instead of hanging forever
+      tongue.zipT += dt;
+      if (tongue.zipT > 0.9 || (tongue.zipT > 0.05 && Math.hypot(P.x - bx, P.y - by) < TUNE.zipSpeed * dt * 0.25)) {
+        tongue.state = 'none'; tongue.target = null; P.vx *= 0.3; P.vy = Math.min(P.vy, 0);
+      }
       return;
     }
-    // pendulum: gravity, pumping, then keep the frog on the rope's circle
+    // pendulum: gravity, optional pumping, then keep the frog on the rope's circle
     P.vy += TUNE.gravity * dt;
-    const px = P.x, py = P.y - 14;
-    let rx = px - e.x, ry = py - e.y;
-    const d0 = Math.hypot(rx, ry) || 1;
-    const tx = -ry / d0, ty = rx / d0; // tangent
-    if (mx) { const s = tx < 0 ? -mx : mx; P.vx += tx * s * TUNE.swingPump * dt; P.vy += ty * s * TUNE.swingPump * dt; P.dir = mx; }
+    const [tx, ty] = swingTangent(e);
+    if (mx) { const s = tx < 0 ? -mx : mx; P.vx += tx * s * TUNE.swingPump * dt; P.vy += ty * s * TUNE.swingPump * dt; }
     P.vx *= Math.pow(0.85, dt);
-    moveX(P.vx * dt); moveY(P.vy * dt);
-    rx = P.x - e.x; ry = P.y - 14 - e.y;
+    const ox = P.x, oy = P.y;
+    moveX(P.vx * dt);
+    const landed = moveY(P.vy * dt);
+    const rx = P.x - e.x, ry = P.y - 14 - e.y;
     const d = Math.hypot(rx, ry) || 1;
     if (d > tongue.rope) {
       const nx = rx / d, ny = ry / d;
+      const bx = P.x, by = P.y;
       P.x = e.x + nx * tongue.rope; P.y = e.y + 14 + ny * tongue.rope;
+      // never let the rope pull the frog into the ground or a wall
+      if (boxInSolid()) { P.x = bx; P.y = by; if (boxInSolid()) { P.x = ox; P.y = oy; } }
       const radial = P.vx * nx + P.vy * ny;
       if (radial > 0) { P.vx -= radial * nx; P.vy -= radial * ny; }
-      moveX(0); moveY(0);
     }
     if (Math.abs(P.vx) > 20) P.dir = Math.sign(P.vx);
-    if (pressed.jump) {
+    // let go: Jump for a boosted leap, Tongue for a plain release; touching down also lets go
+    tongue.swingT += dt;
+    const touchedDown = tongue.swingT > 0.2 && P.vy >= 0 && (landed || groundBelow());
+    if (pressed.jump || pressed.tongue || touchedDown) {
+      const jumpOff = pressed.jump;
       tongue.state = 'none'; tongue.target = null;
-      P.vx *= 1.15; P.vy = Math.min(P.vy, 0) - TUNE.swingJump; P.leaping = true; P.jumping = true;
+      if (jumpOff) { P.vx *= 1.15; P.vy = Math.min(P.vy, 0) - TUNE.swingJump; P.jumping = false; } // full boost, no short-hop cut
+      else if (pressed.tongue) P.vy -= 60;
+      P.leaping = true;
+      delete pressed.tongue; // don't fire a new tongue on the same press
     }
+  }
+
+  // unit tangent of the swing circle at the frog's position
+  function swingTangent(e) {
+    const rx = P.x - e.x, ry = P.y - 14 - e.y, d = Math.hypot(rx, ry) || 1;
+    return [-ry / d, rx / d];
+  }
+
+  function boxInSolid() {
+    const l = Math.floor((P.x - HALF_W) / TS), r = Math.floor((P.x + HALF_W - 0.01) / TS);
+    const t = Math.floor((P.y - BODY_H) / TS), b = Math.floor((P.y - 0.01) / TS);
+    for (let ty = t; ty <= b; ty++) for (let tx = l; tx <= r; tx++) if (solid(tx, ty)) return true;
+    return false;
   }
 
   function dust(x, y, n) {
@@ -767,7 +814,12 @@
           e.bob = Math.sin(e.t * 2) * 0.6;
           break;
         }
-        case 'cattail': e.bend = (e.bend || 0) * Math.pow(0.1, dt); break;
+        case 'cattail':
+          // the head sways; the tongue anchors to wherever it is right now
+          e.bend = (e.bend || 0) * Math.pow(0.1, dt);
+          e.sway = Math.sin(e.t * 1.4) * 1.2 + e.bend;
+          e.x = Math.round(e.x0 + e.sway) + 1; e.y = e.headY + 5;
+          break;
         case 'beetle': stepBeetle(e, dt); break;
         case 'pebble': stepPebble(e, dt); break;
         case 'stump':
@@ -844,7 +896,14 @@
     }
     let nx = clamp(e.x + v * dt, l + e.w / 2, r - e.w / 2);
     if (nx === l + e.w / 2 || nx === r - e.w / 2) { e.dir = -e.dir; if (e.target != null && Math.abs(e.target - nx) > 2) e.target = null; }
-    for (const o of byKind('pad')) if (Math.abs(nx - o.x) < (o.w + e.w) / 2 && Math.abs(o.y - e.y) < 8) { nx = e.x; e.dir = Math.sign(e.x - o.x) || 1; e.target = null; }
+    // nudge lily pads out of the way; stop only if one is wedged
+    for (const o of byKind('pad')) {
+      if (Math.abs(o.y - e.y) >= 8) continue;
+      const gap = (o.w + e.w) / 2 - Math.abs(nx - o.x);
+      if (gap <= 0) continue;
+      const push = Math.sign(o.x - e.x) || 1;
+      if (!movePad(o, push * gap)) { nx = e.x; e.dir = -push; e.target = null; }
+    }
     e.dx = nx - e.x;
     e.x = nx;
     if (e.dx) e.face = Math.sign(e.dx);
@@ -1091,7 +1150,7 @@
   }
 
   function drawCattail(e) {
-    const bend = e.bend || 0, sway = Math.sin(e.t * 1.4) * 1.2 + bend;
+    const sway = e.sway || 0;
     const top = e.headY, bot = e.base;
     for (let y = top; y < bot; y++) {
       const k = (bot - y) / (bot - top);
@@ -1103,7 +1162,6 @@
     g.fillStyle = '#4d7f45';
     for (let i = 0; i < 14; i++) { g.fillRect(e.x0 - 3 - Math.floor(i / 3), bot - 16 - i, 1, 1); g.fillRect(e.x0 + 3 + Math.floor(i / 4), bot - 12 - i, 1, 1); }
     const hx = Math.round(e.x0 + sway);
-    e.x = hx + 1; e.y = top + 5;
     g.fillStyle = '#2e1d0e'; g.fillRect(hx - 2, top - 1, 6, 13);
     g.fillStyle = '#6b4424'; g.fillRect(hx - 1, top, 4, 11);
     g.fillStyle = '#8a5a2b'; g.fillRect(hx - 1, top + 1, 1, 8);
@@ -1325,9 +1383,22 @@
   }
 
   // ---- lifecycle --------------------------------------------------------
-  function restart() {
-    Object.assign(P, { x: spawn.x, y: spawn.y, vx: 0, vy: 0, dir: 1, hp: TUNE.maxHp, flies: 0, sac: null, lock: null, crouch: 0, dashT: 0, wall: 0, canDash: true, invuln: 0, checkpoint: { x: spawn.x, y: spawn.y }, safe: { x: spawn.x, y: spawn.y } });
+  // clear every piece of transient movement state (used by reset, warps, tests)
+  function settle(x, y) {
+    Object.assign(P, {
+      x, y, vx: 0, vy: 0, ground: false, groundT: 0, plat: null, water: null, surface: false,
+      leaping: false, jumping: false, drop: 0, crouch: 0, crouching: false, jumpBuf: 0,
+      dashT: 0, dashCool: 0, canDash: true, wall: 0, wallLock: 0, landT: 0, spitT: 0,
+      lock: null, lockT: 0, ghosts: [],
+    });
     detachTongue();
+    cam.x = clamp(P.x - VW / 2, 0, WW - VW); cam.y = clamp(P.y - VH / 2, 0, WH - VH);
+  }
+
+  function restart() {
+    settle(spawn.x, spawn.y);
+    Object.assign(P, { dir: 1, hp: TUNE.maxHp, flies: 0, sac: null, invuln: 0, checkpoint: { x: spawn.x, y: spawn.y }, safe: { x: spawn.x, y: spawn.y } });
+    ring = null; parts.length = 0;
     world.gateOpen = 0; world.gateOpening = false; world.bridge = 0; world.bridgeDropping = false;
     for (const e of ents) {
       e.alive = true; e.x = e.x0; e.respawn = null; e.carried = false; e.say = null;
@@ -1335,7 +1406,8 @@
       if (e.kind === 'pebble') { e.x = e.x0; e.y = e.y0 - 2; e.resting = true; e.flying = false; }
       if (e.kind === 'bell') e.rung = false;
       if (e.kind === 'target') e.hit = false;
-      if (e.kind === 'beetle') { e.stun = 0; e.y = e.y0; }
+      if (e.kind === 'beetle') { e.stun = 0; e.y = e.y0; e.vx = 0; e.vy = 0; e.dir = -1; }
+      if (e.kind === 'pad') e.sink = 0;
     }
     dialog = null;
     toast('Room reset.');
@@ -1371,14 +1443,14 @@
     document.getElementById('restartBtn').addEventListener('click', restart);
     document.querySelectorAll('[data-warp]').forEach(b => b.addEventListener('click', () => {
       const [tx, ty] = b.dataset.warp.split(',').map(Number);
-      P.x = tx * TS + 8; P.y = ty * TS; P.vx = P.vy = 0; detachTongue(); P.leaping = false;
-      cam.x = clamp(P.x - VW / 2, 0, WW - VW); cam.y = clamp(P.y - VH / 2, 0, WH - VH);
+      settle(tx * TS + 8, ty * TS);
     }));
 
     let last = performance.now(), acc = 0;
     const STEP = 1 / 120;
     function frame(now) {
       let dt = Math.min(0.05, (now - last) / 1000); last = now;
+      if (harness.running) { draw(); requestAnimationFrame(frame); return; }
       if (ui.slow.checked) dt *= 0.3;
       acc += dt;
       while (acc >= STEP) { step(STEP); acc -= STEP; }
@@ -1388,10 +1460,45 @@
     cam.x = clamp(P.x - VW / 2, 0, WW - VW); cam.y = clamp(P.y - VH / 2, 0, WH - VH);
     requestAnimationFrame(frame);
     const touchOnly = window.matchMedia && matchMedia('(hover: none), (pointer: coarse)').matches;
-    toast(touchOnly ? 'Use the pad below. Kick dashes in mid-air, hold Tongue to swing.' : 'Arrows run · Space jump · Shift kick · X tongue · C croak', 4);
+    toast(touchOnly ? 'Use the pad below. Kick dashes in mid-air. Tongue a ring to swing, Jump to let go.' : 'Arrows run · Space jump · Shift kick · X tongue · C croak', 4);
   }
 
-  // test hooks for scripted checks
-  window.SWAMP = { P, tongue, world, ents, press, release, TUNE };
+  // ---- deterministic test driver ---------------------------------------
+  // Runs the real step() on scripted input at a fixed 120 Hz with no
+  // rendering, so every mechanic can be cycled and checked (see tests.js).
+  const ALL_KEYS = ['left', 'right', 'up', 'down', 'jump', 'tongue', 'croak', 'talk', 'dash'];
+  const harness = {
+    running: false,
+    seen: new Set(),
+    reset() {
+      for (const k of ALL_KEYS) keys[k] = false;
+      restart(); clearEdges();
+      for (const e of ents) { Object.assign(e, e.home); e.t = 0; e.scatter = 0; }
+      restart(); clearEdges();
+      toastT = 0; ui.toast.hidden = true;
+    },
+    place(x, y, dir) { settle(x, y); P.dir = dir || 1; },
+    // hold `held` keys for `seconds`; stops early when until() is true. Returns steps run.
+    run(seconds, held, until) {
+      const want = new Set(held || []);
+      const n = Math.max(1, Math.round(seconds * 120));
+      for (let i = 0; i < n; i++) {
+        for (const k of ALL_KEYS) {
+          if (want.has(k) && !keys[k]) press(k);
+          else if (!want.has(k) && keys[k]) release(k);
+        }
+        step(1 / 120);
+        harness.seen.add(P.anim);
+        if (until && until()) return i + 1;
+      }
+      return n;
+    },
+    tap(k, held) { harness.run(1 / 120, [...(held || []), k]); harness.run(1 / 120, held || []); },
+    dialog: () => dialog,
+    ringActive: () => !!ring,
+    solid, oneWay, tileAt, byKind, boxInSolid, spawn, TS, HALF_W, BODY_H, A,
+  };
+
+  window.SWAMP = { P, tongue, world, ents, press, release, TUNE, test: harness };
   init();
 })();

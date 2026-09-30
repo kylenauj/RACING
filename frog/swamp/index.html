@@ -89,6 +89,17 @@
   .card h3 { margin: 0; font: 700 17px/1.2 var(--display); }
   .card p, .card li { font-size: 15px; color: var(--muted); }
   .card ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+  .summary { font: 15px/1.4 var(--mono); }
+  .pass { color: #2f8a3a; } .fail { color: var(--accent); }
+  .results { display: grid; gap: 4px; }
+  .results h3 { margin: 10px 0 2px; font: 700 15px/1.2 var(--display); }
+  .res { display: grid; grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr); gap: 10px; align-items: baseline;
+    padding: 6px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; font-size: 14px; }
+  .res.fail { border-color: var(--accent); }
+  .res .mark { font: 700 11px/1 var(--mono); letter-spacing: .06em; }
+  .res.pass .mark { color: #2f8a3a; } .res.fail .mark { color: var(--accent); }
+  .res .note { font: 12px/1.35 var(--mono); color: var(--muted); }
+  @media (max-width: 560px) { .res { grid-template-columns: 44px minmax(0, 1fr); } .res .note { grid-column: 2; } }
   .w { font: 600 12px/1 var(--mono); padding: 2px 6px; border-radius: 3px; background: var(--well); color: var(--ink); white-space: nowrap; }
 </style>
 </head>
@@ -136,7 +147,7 @@
         <span>hold <kbd>↓</kbd> then <kbd>Space</kbd> big leap</span>
         <span><kbd>Shift</kbd> air kick</span>
         <span>push into walls to cling, <kbd>Space</kbd> wall jump</span>
-        <span><kbd>X</kbd> tongue, hold to swing</span>
+        <span><kbd>X</kbd> tongue; on a ring you swing, <kbd>Space</kbd> lets go</span>
         <span><kbd>↑</kbd>/<kbd>↓</kbd>+<kbd>X</kbd> aim</span>
         <span><kbd>C</kbd> croak</span>
         <span><kbd>↓</kbd> or <kbd>E</kbd> talk</span>
@@ -163,6 +174,16 @@
     </div>
   </section>
 
+  <section aria-labelledby="testTitle">
+    <div class="bar">
+      <h2 id="testTitle">Mechanics test cycle</h2>
+      <button id="runTests" class="primary">Run test cycle</button>
+    </div>
+    <p class="muted">Runs every mechanic through the real game step with scripted input: movement, water, each weight class on the tongue, swinging, croak, talk, hazards, platforms and room checks. The room resets afterward.</p>
+    <p class="summary" id="testSummary">Not run yet.</p>
+    <div class="results" id="testResults"></div>
+  </section>
+
   <section aria-labelledby="ruleTitle">
     <h2 id="ruleTitle">The Weight Rule</h2>
     <p class="muted">The tongue sticks to whatever it hits, and the lighter side moves. The frog weighs 3. Turn on hitboxes to see every object's weight in the room.</p>
@@ -183,7 +204,7 @@
         </ul>
         <h3>Heavier: you go to it</h3>
         <ul>
-          <li><span class="w">W∞</span> cattails and rings: tap to zip, hold to swing, ↑/↓ to reel</li>
+          <li><span class="w">W∞</span> cattails and rings: the tongue latches on and you swing on your own; Jump lets go with a boost</li>
           <li><span class="w">W5</span> Mossback the turtle: tongue him to hop aboard, croak to call him over</li>
         </ul>
       </div>
@@ -199,5 +220,28 @@
 <script src="../frog-anims.js"></script>
 <script src="room.js"></script>
 <script src="game.js"></script>
+<script src="tests.js"></script>
+<script>
+  (function () {
+    const btn = document.getElementById('runTests');
+    const out = document.getElementById('testResults'), sum = document.getElementById('testSummary');
+    const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    btn.addEventListener('click', () => {
+      btn.disabled = true; sum.textContent = 'Running…';
+      setTimeout(() => {
+        const t0 = performance.now();
+        const res = window.SWAMP_TESTS.runAll();
+        const pass = res.filter(r => r.ok).length;
+        sum.innerHTML = `<b class="${pass === res.length ? 'pass' : 'fail'}">${pass}/${res.length} passed</b> · ${((performance.now() - t0) / 1000).toFixed(1)}s`;
+        let group = '';
+        out.innerHTML = res.map(r => {
+          const head = r.group !== group ? `<h3>${esc(group = r.group)}</h3>` : '';
+          return `${head}<div class="res ${r.ok ? 'pass' : 'fail'}"><span class="mark">${r.ok ? 'PASS' : 'FAIL'}</span><span>${esc(r.name)}</span><span class="note">${esc(r.note)}</span></div>`;
+        }).join('');
+        btn.disabled = false;
+      }, 30);
+    });
+  })();
+</script>
 </body>
 </html>

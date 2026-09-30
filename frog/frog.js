@@ -59,7 +59,7 @@
     neck: { x: 3.5, y: -2.5 },
     spots: [[-3.2, -4, 1.7], [-6.8, -0.6, 1.4], [1.2, -5.2, 1.1]],
     hipNear: { x: -5.5, y: 4 }, hipFar: { x: -2.5, y: 3.5 },
-    shoulderNear: { x: 5, y: 3.2 }, shoulderFar: { x: 6.5, y: 2.2 },
+    shoulderNear: { x: 2, y: 0.5 }, shoulderFar: { x: 3.5, y: -0.5 },
     thigh: 11, shin: 13, foot: 8,
     upperArm: 4.5, foreArm: 4.5,
   };
@@ -368,7 +368,9 @@
       capsule(L, j.ex, j.ey, j.ex + 2.2 * Math.cos(ta), j.ey + 2.2 * Math.sin(ta), 0.8, 0.7, { flat: C.G2 });
     }
     capsule(L, j.kx, j.ky, j.ex, j.ey, 1.2, 1.0);
-    capsule(L, sx, sy, j.kx, j.ky, 1.5, 1.2);
+    capsule(L, sx, sy, j.kx, j.ky, 1.7, 1.2);
+    // rounded shoulder so the arm reads as attached to the side of the body
+    capsule(L, sx - 0.5, sy - 0.6, sx + 0.3, sy + 0.2, 2.6, 2.6);
     return L.outline(C.O);
   }
 
@@ -443,7 +445,7 @@
     body: { x: 1.5, y: -23, rot: -0.22, sx: 1, sy: 1 },
     eye: 'open', jaw: 0, throat: 0,
     legs: { near: { x: -7, y: -1.3, a: 0 }, far: { x: 1, y: -1.3, a: 0 } },
-    arms: { near: { x: 2.2, y: 6.2, a: 0.5 }, far: { x: 1.8, y: 6.0, a: 0.5 } },
+    arms: { near: { x: 1.4, y: 7.4, a: 0.9 }, far: { x: 1.2, y: 7.2, a: 0.9 } },
     tongue: null, fx: [], flash: false,
   };
 
@@ -474,7 +476,8 @@
     out.over(drawLeg(F, RIG.hipFar, pose.legs.far).remap(FAR_MAP));
     out.over(drawBody(pose, F));
     out.over(drawLeg(F, RIG.hipNear, pose.legs.near));
-    out.over(drawArm(F, RIG.shoulderNear, pose.arms.near));
+    // near arm one shade lighter so it separates from the torso behind it
+    out.over(drawArm(F, RIG.shoulderNear, pose.arms.near).remap({ 2: 3, 3: 4 }));
     let tip = null;
     if (pose.tongue && pose.tongue.len > 0) {
       const t = drawTongue(F, pose);

@@ -32,8 +32,9 @@ frog weighs 3.
   throat sac, spat back out with X), dragonflies, flipped beetles.
 - Equal-ish things get dragged: lily pads slide across the water, so you can
   build your own bridge.
-- Heavier things pull you: cattails, rings, Mossback the turtle. Tap to zip,
-  hold X to swing, Up/Down to reel.
+- Heavier things pull you: cattails, rings, Mossback the turtle. Rings and cattails:
+  the tongue latches on and you swing by yourself; Jump lets go with a boost.
+  The turtle pulls you onto his shell.
 
 Movement is built to be quick:
 
@@ -45,8 +46,7 @@ Movement is built to be quick:
   wall or grabbing something with the tongue gives it back.
 - **Sticky feet**: push into a wall mid-air to cling and slide slowly; jump to
   kick off it. Chain wall jumps up shafts.
-- Swim faster, with a swim kick (Shift). Tongue zips and swings are faster,
-  and jumping out of a swing gives a boost.
+- Swim faster, with a swim kick (Shift). Tongue zips are faster.
 
 Other frog verbs: croak (rings bellflowers, calls the turtle ferry, NPCs
 answer).
@@ -69,5 +69,19 @@ pond with lily pads, a pebble on the bottom, Tad and Mossback → bog pit swing
 
 Controls: arrows run, Space jump (hold for height), hold Down then Space for
 the long-leg leap, Shift air kick, push into walls to cling and Space to wall
-jump, X tongue (hold to swing, Up/Down + X to aim), C croak, Down or E talk,
+jump, X tongue (Up/Down + X to aim; on a ring you swing, Jump lets go), C croak, Down or E talk,
 tap Down + Space to drop through planks, G hitboxes and weights, R reset.
+
+## Mechanics test cycle
+
+`swamp/tests.js` drives the real game step with scripted input at a fixed
+120 Hz and checks every mechanic: running, jumps (tap, held, long-leg leap,
+coyote time, jump buffer), drop-through, air kick, wall cling and climb,
+swimming, every weight class on the tongue, spitting, the target, swinging
+across the bog pit, zipping onto the turtle, croak, talk, damage, bog,
+checkpoints, moving platforms, warps and reset. It finishes by checking that
+every animation state was reached.
+
+Run it from the page (**Run test cycle** under the room) or headless:
+
+    node frog/tools/test-swamp.js    # needs Playwright; exits 1 on any failure

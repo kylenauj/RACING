@@ -53,7 +53,7 @@ window.SWAMP_ROOM = {
     6: 'STICKY FEET: jump at a wall and push into it to cling. Jump again to kick off the other way. Climb to the top.',
     2: 'THE WEIGHT RULE: X shoots your tongue. Lighter things come to you. Heavier things pull you to them.',
     3: 'POND: Pull the far lily pad over to make a bridge. The pebble on the bottom goes in your throat sac.',
-    4: 'BOG PIT: tongue a ring and HOLD X to swing. Up/Down reels in and out. Let go at the top of the arc.',
+    4: 'BOG PIT: Up+X tongues a ring and you swing on your own. Press Jump near the top of the arc to fly off.',
     5: 'TARGET: with a pebble in your sac, Up+X spits it upward. Hit the target to drop the drawbridge.',
   },
   npcs: {
