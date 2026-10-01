@@ -1077,60 +1077,32 @@ const TRACKS = [
        half:5.0, jumps:[], tune:0, flush:30, hug:true, island:true, label:"LOW ROUTE", mainLabel:"HIGH ROUTE"}
     ]},
 
-  /* ---- SPECIAL: a swamp theme park at sunset ----
-     Start on the pier over the lagoon, bounce down the lily pads, through the
-     hollow log, the gator's back or the cattail canyon, round the whirlpool
-     and down into the glowworm grotto, out across the mud geysers, the
-     riverboat or the treetops, over the vine gorge, down the festival
-     straight, off the waterfall or over the mushroom hill, round the giant
-     cypress, and over the frog band's stage to the flag. */
-  { name:"GATOR GULCH", special:true, gator:true, season:"swamp", after:"a swamp theme park at sunset", relief:0.8, rollers:0.7,
-    blurb:"a swamp theme park at sunset: lily pads that bounce you down the lagoon, a hollow log, a whirlpool, a glowworm grotto, mud geysers, a sunken riverboat, a waterfall and a giant cypress, with boost pads all the way. Grab the fireflies for top speed (up to ten; knocks cost you some), and tap drift in the air to pull a trick: land it for a boost",
-    kit:["crest"],
-    shape:"GATOR GULCH — a swamp at sunset",
-    feature:"lily pads, a whirlpool, a glowworm grotto, mud geysers, a riverboat and a waterfall",
-    ctrl:[[-60,-450],[40,-450],[140,-450],[240,-450],[340,-450],[420,-435],[470,-390],[490,-330],[495,-260],[495,-200],
-          // the cattail canyon: tight S bends between walls of reeds
-          [460,-140],[505,-80],[458,-20],[500,40],[470,100],[460,140],
-          // round the whirlpool
-          [476,178],[523,182],[549,211],[545,258],[505,286],[457,274],[439,242],[405,195],
-          // down into the grotto (a long one) and out across the geyser field
-          [340,215],[270,245],[190,258],[110,262],[40,266],[-30,270],[-100,272],
-          // the riverboat
-          [-170,268],[-240,255],[-300,220],[-330,160],
-          // the vine gorge, the festival straight, the waterfall
-          [-345,90],[-355,10],[-360,-70],[-362,-150],[-360,-215],[-330,-262],
-          // round the giant cypress
-          [-300,-292],[-324,-298],[-342,-316],[-348,-340],[-342,-364],[-324,-382],[-300,-388],[-276,-382],[-261,-368],
-          // over the band stand and home along the pier
-          [-225,-420],[-170,-446],[-110,-450]],
-    hills:[[300,236,85,24],[185,258,105,30],[70,264,90,26],[-240,340,110,12],[560,-40,120,8],[-470,-200,150,10]],
-    jumps:[], fords:[[-225,258]],
-    mud:[[[40,266],[-30,270]]],
-    flats:[[495,230,120],[-300,-340,95]],
-    lake:{at:[200,-450], rx:255, rz:85},
-    bowl:{at:[495,230], r:55, bank:0.42},
-    giantTree:{at:[-300,-340], ring:48, cypress:true},
-    drop:{at:[-362,-150], height:30, top:40, back:220, width:70},
-    leaps:[{at:[-345,90], height:2.8, gap:18, reach:80}],
-    bigJumps:[[[-160,-448],3.6]],
-    tunnels:[{from:[490,-330], to:[495,-230]}],
-    caves:[{from:[335,218], to:[30,266]}],
-    // (the channels under the treetop bridges stay under the bridges: no sheet of water out to the main road)
-    spans:[{at:[-252,322], road:1, span:18, depth:4, wall:11, reach:24},
-           {at:[-318,292], road:1, span:16, depth:4, wall:10, reach:22}],
-    geysers:8,
-    branches:[
-      // the gator's back: up its tail, along its spine and off its snout
-      {a:[495,-200], b:[470,100], via:[[540,-138],[578,-30],[545,60]],
-       half:5.0, jumps:[[0.5,30,8,3.4,48]], tune:0.1, label:"GATOR BACK", mainLabel:"CATTAIL CANYON"},
-      // the treetop road: rope bridges between the cypress trunks (it leaves at an easy angle, a plain Y)
-      {a:[-160,268], b:[-330,160], via:[[-222,298],[-275,328],[-322,286]],
-       half:4.8, jumps:[], tune:0.1, label:"TREETOPS", mainLabel:"BAYOU ROAD"},
-      // the mushroom forest: a flowing run down the side of the falls, under the caps, with one jump
-      {a:[-358,-40], b:[-225,-420], via:[[-392,-112],[-440,-205],[-428,-312],[-330,-440]],
-       half:5.4, jumps:[[0.5,26,7,2.6,46]], tune:0, mushrooms:true, label:"MUSHROOM FOREST", mainLabel:"WATERFALL"}
-    ]},
+  /* ---- SPECIAL: Blossom Run, a cherry blossom valley in spring ----
+     A speedway through the orchards: a long run along the top of the ridge, a plunge off its
+     east end that throws you well past top speed, the valley floor flat out over the boost
+     pads, up and over the lone hill, and a long fast climb back up to the ridge. Pink trees,
+     petals on the wind and on the road, and butterflies everywhere. The hills work like the
+     Sawtooth's: fast up, and down past top speed; the boost pads throw you further still. */
+  { name:"BLOSSOM RUN", special:true, spring:true, hillfast:true, season:"summer", after:"a cherry blossom valley in spring", relief:0.9, rollers:0.35,
+    blurb:"flat out through the cherry orchards: along the ridge, a plunge off its end past top speed, the valley floor over the boost pads, over the lone hill and the long climb home. Hit the boost pads to go faster than the car can on its own",
+    kit:["crest","kicker","tabletop","kicker","crest"],
+    shape:"BLOSSOM RUN \u2014 a spring speedway",
+    feature:"cherry blossoms, butterflies, boost pads, long straights and a plunge past top speed",
+    ctrl:[[-300,-300],[-150,-305],[0,-300],[150,-292],[300,-285],[420,-262],
+          // round off the end of the ridge, and the plunge south
+          [510,-205],[565,-120],[585,-20],[592,90],[590,200],[575,300],
+          // round onto the valley floor and flat out west along it
+          [530,385],[455,440],[360,468],[240,478],[120,482],[0,475],[-90,462],
+          // up and over the lone hill
+          [-180,450],[-270,445],[-360,438],
+          // round the foot of the hills, and the long climb home
+          [-450,405],[-520,340],[-560,250],[-575,150],[-580,40],[-570,-70],[-540,-170],[-480,-245],[-400,-290]],
+    hills:[[-250,-440,330,62],[150,-450,330,68],[440,-340,230,56],[565,-160,150,36],[60,330,330,-22],[-270,470,120,42]],
+    jumps:[], fords:[],
+    flats:[[-300,-300,100]],
+    // the boost pads: on the ridge, over the top of the plunge, down the valley, at the foot of the hill and up the climb
+    pads:[[120,-294],[300,-285],[585,-30],[300,474],[150,481],[0,475],[-130,455],[-578,110],[-575,-30]],
+    branches:[]},
 
   /* ---- THE SWAMP CUP: the bayou, boardwalks, mud and willows ---- */
   { name:"BAYOU BEND", after:"Laguna Seca", relief:0.8, rollers:0.4, season:"swamp", cup:4,
@@ -1497,6 +1469,9 @@ const MUD_EXP = [0.95, 0.028], MUD_RACE = [0.03, 0.0005];
    top speed it may carry it (m/s: up to 'over', 'overPer' for each unit of grade, settling back
    at 'settle' a second once the road levels) */
 const ALP = {fall:1.5, over:18, overPer:45, settle:3, climb:4};   // (climb: a surge up the faces, m/s^2 per unit of grade)
+/* a boost pad: how far past top speed it lifts the limit (m/s, stacking up to max), how long that
+   holds before it fades (s) and how fast it fades (m/s a second), and the shove it gives (m/s^2, for push s) */
+const PAD_SURGE = {add:14, max:24, hold:1.6, fade:3.2, kick:15, push:1.4};
 function routingTest(P){
   const N = P.N, seg = P.seg, R = radiiOf(P);
   const TOTALS = [24.0, 15.5, 10.8, 7.7, 5.5];
@@ -1515,7 +1490,7 @@ function routingTest(P){
   for(let i=0;i<N;i++) v[i] = Math.min(44, cornerHoldSpeed(R[i]));
   /* on a mountain circuit the grade pulls (and past 40% the wheels dig in) and the mud holds,
      just as they do for the player's car */
-  const HILL = !!TRACK.alpine, gr = new Float64Array(N), W = Math.max(1, Math.round(1.6/seg));
+  const HILL = HILLFAST, gr = new Float64Array(N), W = Math.max(1, Math.round(1.6/seg));
   if(HILL) for(let i=0;i<N;i++) gr[i] = (P.pts[(i + W)%N].y - P.pts[(i - W + N)%N].y)/(2*W*seg);
   const pull = g=> g > 0 ? -g*ALP.climb : 9.8*g/Math.sqrt(1 + g*g)*ALP.fall, grip = g=> 1;
   // how far past top speed the hill has carried them, sample by sample (it settles over distance)
@@ -1525,6 +1500,11 @@ function routingTest(P){
     over[i] = Math.max(0, Math.min(ALP.over, -gr[i]*ALP.overPer), o0);
   }
   // (a corner holds its own speed; where the road is straight enough to hold top speed, the hill can carry them past it)
+  /* and the boost pads: a surge past top speed off each one, fading, and a shove while it lasts */
+  const push = new Float64Array(N);
+  if(P === MAIN && TRACK.pads) TRACK.pads.forEach(xz=>{ const p0 = snapTo(P, xz);
+    for(let m=0; m<400; m+=seg){ const i = (p0 + Math.round(m/seg)) % N, sg = PAD_SURGE.max - Math.max(0, m - PAD_SURGE.hold*44)*PAD_SURGE.fade/44;
+      if(sg <= 0) break; over[i] = Math.max(over[i], Math.min(PAD_SURGE.max, sg)); if(m < PAD_SURGE.push*44) push[i] = PAD_SURGE.kick; } });
   if(HILL) for(let i=0;i<N;i++){ const c = cornerHoldSpeed(R[i]); v[i] = c > 43.5 ? 44 + over[i] : c; }
   for(let pass=0; pass<3; pass++){
     for(let i=N-1;i>=0;i--){
@@ -1533,7 +1513,7 @@ function routingTest(P){
     }
     for(let i=0;i<N;i++){
       const pv = v[(i-1+N)%N];
-      let a = drive(pv)*(HILL ? grip(gr[i]) : 1) - (0.0006*pv*pv + 0.30 + pv*0.02);
+      let a = drive(pv)*(HILL ? grip(gr[i]) : 1) - (0.0006*pv*pv + 0.30 + pv*0.02) + push[i];
       if(HILL){ const m = P.mud ? P.mud[i] : 0; a -= pull(gr[i]) + m*(MUD_RACE[0]*pv + MUD_RACE[1]*pv*pv); }
       v[i] = Math.min(v[i], Math.sqrt(Math.max(0, pv*pv + 2*a*seg)));
     }
@@ -1636,6 +1616,9 @@ const TRACK_ID = Math.max(0, Math.min(TRACKS.length-1,
   parseInt((location.hash.match(/track=(\d+)/) || [])[1] || "0", 10) || 0));
 const TRACK = TRACKS[TRACK_ID];
 const FALL = TRACK.season === "fall";
+/* Blossom Run: spring in the cherry orchards. Its hills work like the Sawtooth's (fast up, and down past
+   top speed), and on top of that the boost pads throw you past it */
+const SPRING = !!TRACK.spring, HILLFAST = !!(TRACK.alpine || TRACK.hillfast);
 document.body.dataset.season = TRACK.season || "summer";
 /* the fall palette: maples red, sugar maples orange, birch and aspen gold */
 function fallTint(c, rnd){
@@ -1711,6 +1694,12 @@ if(GLOW){
   hemi.color.set(0x6a8ce0); hemi.groundColor.set(0x101a34); hemi.intensity = 0.85;
   sun.color.set(0xa8c4ff); sun.intensity = 0.62;
 }
+if(SPRING){
+  // a soft spring day: pale blue sky going pink with blossom haze low down, bright gentle light
+  scene.fog.color.set(0xf2dbe6); SKY.set(0xf3dce7); scene.fog.near = 260; scene.fog.far = 1300;
+  hemi.color.set(0xffeaf3); hemi.groundColor.set(0x6c7e56); hemi.intensity = 0.9;
+  sun.color.set(0xfff2ea); sun.intensity = 1.22;
+}
 if(SWAMPGP){
   // (green, close air: the haze on the horizon of the bayou's dark green sky)
   scene.fog.color.set(0x8fa574); SKY.set(0xa9b98a); scene.fog.near = 130; scene.fog.far = 820;
@@ -1738,6 +1727,7 @@ if(SWAMPGP){
   if(TRACK.river) TRACK.river = Object.assign({}, TRACK.river, {from: mv(TRACK.river.from), to: mv(TRACK.river.to),
     downPts: TRACK.river.downPts && TRACK.river.downPts.map(mv), upPts: TRACK.river.upPts && TRACK.river.upPts.map(mv)});
   TRACK.bigJumps = (TRACK.bigJumps||[]).map(j=> [mv(j[0]), j[1]]);
+  TRACK.pads = (TRACK.pads||[]).map(mv);
   TRACK.ridges = (TRACK.ridges||[]).map(r=> mv(r).concat(r.slice(2)));
   TRACK.spans = (TRACK.spans||[]).map(sp=> Object.assign({}, sp, {at: mv(sp.at)}));
   TRACK.leaps = (TRACK.leaps||[]).map(sp=> Object.assign({}, sp, {at: mv(sp.at)}));
@@ -2109,12 +2099,12 @@ if(!TRACK.test){
     return best;
   };
   // (not on a mountain circuit: a ford is a level shelf, and on a mountainside that is a wall. Its swamps are the water.)
-  const want = DESERT || TRACK.expedition || TRACK.alpine || GATOR ? 0 : Math.max(0, 2 - (TRACK.fords || []).length);
+  const want = DESERT || TRACK.expedition || TRACK.alpine || GATOR || SPRING ? 0 : Math.max(0, 2 - (TRACK.fords || []).length);
   for(let k=0;k<want;k++){ const i = pick(35, 70, 0); if(i < 0) break;
     const p = MAIN.pts[i]; TRACK.fords = (TRACK.fords || []).concat([[p.x, p.z]]); taken.push([i, 120]); }
   if(DESERT) for(let k=(TRACK.washes || []).length; k<3; k++){ const i = pick(25, 50, 0); if(i < 0) break;
     const p = MAIN.pts[i]; TRACK.washes = (TRACK.washes || []).concat([[p.x, p.z]]); taken.push([i, 110]); }
-  for(let k=0;k<(TRACK.expedition ? 12 : 5);k++){ const i = pick(18, 35, 0); if(i < 0) break; PITS.push(i); taken.push([i, 120]); SPOTS.push([i, 25]); }
+  for(let k=0;k<(TRACK.expedition ? 12 : SPRING ? 0 : 5);k++){ const i = pick(18, 35, 0); if(i < 0) break; PITS.push(i); taken.push([i, 120]); SPOTS.push([i, 25]); }
 }
 /* how much ice is under a point: the frozen lake, shore to shore */
 function iceAt(x, z){
@@ -2808,6 +2798,7 @@ function addCrests(P, rnd){
     CALM.forEach(c=>{ if(c[2] !== "soft") add2(calmMask(MAIN, [c[0]], Math.min(c[1], 30))); }); }
   stagePath(MAIN, rnd,
     TRACK.test ? ["gravel","rutted","washboard","muddy","hollow","broken"]
+    : SPRING ? ["gravel","paved","gravel","paved","washboard","gravel"]           // Blossom Run: a fast road, no bog to slow it
     : TRACK.expedition ? ["muddy","muddy","rutted","rocky","rocky","broken","single","hollow","muddy","moguls"]
                : ["gravel","rutted","washboard", DESERT ? "washboard" : "muddy","hollow","broken","single",
                   "moguls","moguls","rocky","rocky","paved","paved", DESERT ? "rutted" : "muddy", DESERT ? "rocky" : "muddy"],
@@ -2852,7 +2843,7 @@ function addCrests(P, rnd){
     }
   }
   // no old tarmac anywhere on the volcano: it is a wild road
-  if(TRACK.special) paths.forEach(P=>{ if(P.st_paved) P.st_paved.fill(0); });
+  if(TRACK.special && !SPRING) paths.forEach(P=>{ if(P.st_paved) P.st_paved.fill(0); });
   addCrests(MAIN, rnd);
   /* Launch berms. On the outside of a tighter corner the ground rises into
      a steep earth bank, and running wide into it, or sliding into it, throws
@@ -5057,6 +5048,12 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
             if(leaf && t > 0.15) c.setHSL(0.02 + Math.random()*0.09, 0.55 + Math.random()*0.2, 0.30 + Math.random()*0.08);
             else c.setHSL(0.078 + t*0.07 + Math.random()*0.02, 0.30 + t*0.12 - steep*0.10,
                           0.33 - t*0.02 + Math.random()*0.03 - steep*0.03);
+          } else if(SPRING){
+            // fresh spring grass, and fallen petals drifted pink against the verges
+            const petal = Math.random() < 0.08 + 0.34*(1 - smoothstep(2, 16, edge));
+            if(petal && t > 0.12) c.setHSL(0.93 + Math.random()*0.05, 0.7 + Math.random()*0.25, 0.68 + Math.random()*0.1);
+            else c.setHSL(0.24 + t*0.05 + Math.random()*0.02, 0.44 + t*0.12 - steep*0.12,
+                          0.36 - t*0.03 + Math.random()*0.03 - steep*0.04);
           } else if(GATOR){
             // lush swamp grass, blue-green and saturated, with dark moss in the hollows and warm mud by the road
             const r0 = Math.random(), moss = 0.5 + 0.5*Math.sin(x*0.043 + Math.sin(z*0.031)*2.2)*Math.sin(z*0.037 + x*0.012);
@@ -5266,8 +5263,15 @@ SKYS.glow = { sky:[[0,"#02040e"],[0.2,"#060c24"],[0.36,"#0b1a44"],[0.45,"#123064
            {kind:"sharp", y:-10, amp:110, step:260, col:[16,26,56], haze:[26,52,104], hz:0.4},
            {kind:"forest", y:10, amp:70, step:84, col:[12,22,44], haze:[24,48,96], hz:0.3, speck:[[70,200,255],[120,230,255],[90,120,255]]},
            {kind:"forest", y:30, amp:46, step:56, col:[8,16,32], haze:[18,38,80], hz:0.2, speck:[[60,190,255],[150,240,255]]} ] };
+// spring: soft blue overhead, pink haze at the horizon, over lilac hills and orchards in bloom
+SKYS.spring = { sky:[[0,"#3b78c8"],[0.22,"#669fde"],[0.38,"#a8c8ee"],[0.46,"#e6d0e8"],[0.5,"#f7d8e6"],[1,"#f3dce7"]],
+  halo:[255,240,236], sunR:26, cloud:"cumulus", cloudLit:[255,250,252], cloudShade:[212,186,214],
+  layers:[ {kind:"round", y:-40, amp:180, step:500, col:[168,158,206], haze:[236,214,232], hz:0.55},
+           {kind:"round", y:-14, amp:130, step:300, col:[146,146,188], haze:[230,206,226], hz:0.45},
+           {kind:"forest", y:8, amp:72, step:88, col:[204,122,164], haze:[240,200,220], hz:0.3, speck:[[255,190,214],[255,228,238],[238,148,188]]},
+           {kind:"forest", y:30, amp:48, step:58, col:[112,136,84], haze:[220,200,210], hz:0.2, speck:[[255,170,206],[255,216,232],[255,240,246]]} ] };
 function paintSky(g, w, h){
-  const B = (SWAMPGP ? SKYS.bayou : SKYS[TRACK.season]) || SKYS.summer, hz = h*0.5;
+  const B = (SWAMPGP ? SKYS.bayou : SPRING ? SKYS.spring : SKYS[TRACK.season]) || SKYS.summer, hz = h*0.5;
   const rgb = (c, k, a)=> "rgba(" + c.map(v=> Math.max(0, Math.min(255, Math.round(v*(k || 1))))).join(",") + "," + (a === undefined ? 1 : a) + ")";
   const grd = g.createLinearGradient(0, 0, 0, h);
   B.sky.forEach(s0=> grd.addColorStop(s0[0], s0[1]));
@@ -7440,7 +7444,7 @@ if(RIVER.on){
    past the grid, the course's name on it in the season's colours ---- */
 function courseBillboard(){
   const P = MAIN, pal = { summer:["#2f6a3a", "#8fd06a"], fall:["#6a2c12", "#f08a2a"], winter:["#1f4a6e", "#8fd3f4"], desert:["#6a2a16", "#e56a3a"] };
-  const c0 = GATOR ? ["#3a1a5a", "#ff8a6a"] : TRACK.alpine ? ["#24384e", "#cfe3f2"] : GLOW ? ["#06102a", "#46c8ff"] : TRACK.special ? ["#3a1208", "#ff7a2a"] : pal[TRACK.season || "summer"] || pal.summer;
+  const c0 = GATOR ? ["#3a1a5a", "#ff8a6a"] : SPRING ? ["#b8467c", "#ffd6e6"] : TRACK.alpine ? ["#24384e", "#cfe3f2"] : GLOW ? ["#06102a", "#46c8ff"] : TRACK.special ? ["#3a1208", "#ff7a2a"] : pal[TRACK.season || "summer"] || pal.summer;
   // the spot: past the grid, on whichever side the ground sits nearer the road
   let best = null;
   for(let d=100; d<=220; d+=15){
@@ -10076,6 +10080,83 @@ if(GATOR){
   });
 }
 
+/* ---- Blossom Run: the boost pads ----
+   Pink chevrons let into the road, the arrows running on ahead. Over one and the limiter lifts
+   past the car's own top speed (PAD_SURGE) and it is shoved on, so a chain of them down a
+   straight stacks up; the lift holds a moment, then fades away over the next few hundred metres. */
+const BOOSTPADS = [];
+if(TRACK.pads && TRACK.pads.length){
+  const c = document.createElement("canvas"); c.width = 64; c.height = 128; const g = c.getContext("2d");
+  g.fillStyle = "rgba(226,46,128,0.92)"; g.fillRect(0, 0, 64, 128);
+  const gr = g.createLinearGradient(0, 128, 0, 0); gr.addColorStop(0, "#ffe3f0"); gr.addColorStop(1, "#ffffff");
+  g.fillStyle = gr;
+  for(let k=0;k<2;k++){ const y = 92 - k*64; g.beginPath(); g.moveTo(6, y + 14); g.lineTo(32, y - 14); g.lineTo(58, y + 14); g.lineTo(58, y + 30); g.lineTo(32, y + 2); g.lineTo(6, y + 30); g.closePath(); g.fill(); }
+  const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(1, 2);
+  const mat = new THREE.MeshBasicMaterial({map:tex, transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
+  const rim = new THREE.MeshBasicMaterial({color:0xffffff});
+  const geo = new THREE.PlaneGeometry(1, 1);
+  TRACK.pads.forEach(xz=>{
+    const i = snapTo(MAIN, xz), p = MAIN.pts[i], t = MAIN.tans[i];
+    const W = Math.min(6.4, MAIN.half[i]*2 - 1.4), L = 8, y = surfaceY(p.x, p.z);
+    const m = new THREE.Mesh(geo, mat);
+    m.scale.set(W, L, 1); m.rotation.order = "YXZ";
+    const y2 = surfaceY(p.x + t.x*3, p.z + t.z*3), y1 = surfaceY(p.x - t.x*3, p.z - t.z*3);
+    m.rotation.set(-Math.PI/2 + Math.atan2(y2 - y1, 6), Math.atan2(t.x, t.z) + Math.PI, 0);
+    m.position.set(p.x, y + 0.07, p.z); m.renderOrder = 2; scene.add(m);
+    // white kerbs down either side of it
+    for(const sd of [-1, 1]){ const k = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.12, L), rim);
+      k.position.set(p.x - t.z*sd*(W/2 + 0.2), y + 0.06, p.z + t.x*sd*(W/2 + 0.2)); k.rotation.y = Math.atan2(t.x, t.z); scene.add(k); }
+    BOOSTPADS.push({i, x:p.x, z:p.z, y, tx:t.x, tz:t.z, hw:W/2, hl:L/2, cool:0});
+  });
+  ANIMS.push(t=>{ tex.offset.y = (t*1.8) % 1; });
+}
+function stepPads(dt, nfx, nfz){
+  for(const p of BOOSTPADS){
+    p.cool = Math.max(0, p.cool - dt);
+    if(p.cool > 0) continue;
+    const dx = pose.x - p.x, dz = pose.z - p.z, u = dx*p.tx + dz*p.tz, v = -dx*p.tz + dz*p.tx;
+    if(Math.abs(u) > p.hl + 0.8 || Math.abs(v) > p.hw + 0.8 || pose.y - p.y > 1.5) continue;
+    p.cool = 1.2;
+    pose.surge = Math.min(PAD_SURGE.max, (pose.surge || 0) + PAD_SURGE.add); pose.surgeT = PAD_SURGE.hold;
+    drift.boostT = Math.max(drift.boostT, PAD_SURGE.push); drift.boostPower = Math.max(drift.boostPower, PAD_SURGE.kick);
+    drift.boostTier = Math.max(drift.boostTier, 1); drift.flash = 1;
+    if(typeof postMat !== "undefined") postMat.uniforms.uFlash.value = Math.max(postMat.uniforms.uFlash.value, 0.2);
+    if(actx){ SFX.boost(2); tone(520, 0.2, "triangle", 0.1, 1040); }
+    for(let k=0;k<26;k++) spawnDust(pose.x, pose.y + 0.4, pose.z, [1.0, 0.55 + Math.random()*0.3, 0.8], 0.45, (Math.random() - 0.5)*7, (Math.random() - 0.5)*7, 2 + Math.random()*4);
+  }
+}
+
+/* ---- Blossom Run: torii over the road ----
+   Vermilion gates standing across the road at the start of each long straight, black at the
+   foot and on the upper beam, its ends sweeping up. */
+if(SPRING){
+  const red = new THREE.MeshLambertMaterial({color:0xd8341f, emissive:0x3a0802}), ink = new THREE.MeshLambertMaterial({color:0x1c1414});
+  const gold = new THREE.MeshLambertMaterial({color:0xf2c14e, emissive:0x2a1a00});
+  const box = (g, mat, w, h, d, x, y, z, rz)=>{ const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); if(rz) m.rotation.z = rz; m.castShadow = true; g.add(m); return m; };
+  [[-160,-305],[470,-255],[240,478],[-578,60]].forEach(xz=>{
+    const i = snapTo(MAIN, [xz[0] - TRACK._ox, xz[1] - TRACK._oz]), p = MAIN.pts[i], t = MAIN.tans[i], half = MAIN.half[i] + 2.6;
+    const nx = -t.z, nz = t.x, yl = gradedY(p.x - nx*half, p.z - nz*half), yr = gradedY(p.x + nx*half, p.z + nz*half);
+    const base = Math.min(yl, yr), H = Math.max(8.5, p.y + 7.2 - base);
+    const g = new THREE.Group(); g.position.set(p.x, base, p.z); g.rotation.y = Math.atan2(nx, nz) - Math.PI/2;
+    for(const sd of [-1, 1]){
+      const yb = sd < 0 ? yl : yr;
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, H + (base - yb) + 0.6, 12), red);
+      post.position.set(sd*half, (H + base - yb)/2 + (yb - base) - 0.3, 0); post.castShadow = true; g.add(post);
+      const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.62, 1.1, 12), ink); foot.position.set(sd*half, yb - base + 0.3, 0); g.add(foot);
+      NO_TREES.push([p.x + nx*sd*half, p.z + nz*sd*half, 4]);
+    }
+    // the tie beam, the plaque, and the great upper beam with its ends swept up
+    box(g, red, half*2 + 2.4, 0.55, 0.5, 0, H - 2.2, 0);
+    box(g, red, 0.45, 1.9, 0.4, 0, H - 1.2, 0);
+    box(g, ink, 1.6, 1.1, 0.5, 0, H - 1.25, 0.05);
+    box(g, gold, 1.25, 0.8, 0.52, 0, H - 1.25, 0.06);
+    box(g, red, half*2 + 2.2, 0.6, 0.8, 0, H - 0.05, 0);
+    box(g, ink, half*2 + 2.6, 0.42, 1.05, 0, H + 0.42, 0);
+    for(const sd of [-1, 1]){ box(g, ink, 2.6, 0.42, 1.05, sd*(half + 2.2), H + 0.62, 0, sd*0.16); box(g, red, 2.2, 0.55, 0.8, sd*(half + 1.95), H + 0.2, 0, sd*0.14); }
+    scene.add(g);
+  });
+}
+
 /* ---- Copper Lake: the water, stone along the causeway, a dock and boats ---- */
 if(LAKE.on){
   const STEP = 2, AX = LAKE.rx*1.15, AZ = LAKE.rz*1.15;
@@ -10513,14 +10594,14 @@ if(PIT.on){
   roadSign(i0, 1, ["IRON QUARRY", "heavy vehicles, blasting"], "#e0a21e", "#1f1f1f");
 }
 
-/* ---- leaves coming down, on the fall circuits ---- */
-if(FALL || WINTER){
-  const N = WINTER ? 1400 : 900, BOX = 46, HT = 22;
+/* ---- leaves coming down, on the fall circuits (and blossom, in the spring) ---- */
+if(FALL || WINTER || SPRING){
+  const N = WINTER ? 1400 : SPRING ? 1800 : 900, BOX = 46, HT = 22;
   const pos = new Float32Array(N*3), col = new Float32Array(N*3), ph = new Float32Array(N);
   const c = new THREE.Color();
   for(let i=0;i<N;i++){
     pos[i*3] = (Math.random()-0.5)*BOX*2; pos[i*3+1] = Math.random()*HT; pos[i*3+2] = (Math.random()-0.5)*BOX*2;
-    if(WINTER) c.setRGB(1, 1, 1); else fallTint(c);
+    if(WINTER) c.setRGB(1, 1, 1); else if(SPRING) c.setHSL(0.93 + Math.random()*0.04, 0.8 + Math.random()*0.2, 0.72 + Math.random()*0.1); else fallTint(c);
     col[i*3] = c.r; col[i*3+1] = c.g; col[i*3+2] = c.b; ph[i] = Math.random()*6.28;
   }
   const g = new THREE.BufferGeometry();
@@ -10529,10 +10610,11 @@ if(FALL || WINTER){
   const leafTex = new THREE.CanvasTexture(noiseCanvas(32, 32, (q, w, h)=>{
     q.fillStyle = "#fff"; q.beginPath();
     if(WINTER) q.arc(16, 16, 11, 0, 7);
+    else if(SPRING){ q.moveTo(16, 30); q.quadraticCurveTo(2, 18, 9, 4); q.lineTo(16, 9); q.lineTo(23, 4); q.quadraticCurveTo(30, 18, 16, 30); }
     else { q.moveTo(16, 2); q.quadraticCurveTo(30, 14, 16, 30); q.quadraticCurveTo(2, 14, 16, 2); }
     q.fill();
   }));
-  const pts = new THREE.Points(g, new THREE.PointsMaterial({size: WINTER ? 0.2 : 0.32, map:leafTex, vertexColors:true,
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({size: WINTER ? 0.2 : SPRING ? 0.26 : 0.32, map:leafTex, vertexColors:true,
                                 transparent:true, alphaTest:0.4, depthWrite:false}));
   pts.frustumCulled = false; scene.add(pts);
   let last = 0;
@@ -10541,8 +10623,8 @@ if(FALL || WINTER){
     const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
     for(let i=0;i<N;i++){
       let x = pos[i*3], y = pos[i*3+1], z = pos[i*3+2];
-      y -= dt*(WINTER ? 0.9 + (i%7)*0.1 : 1.1 + (i%7)*0.12);
-      x += Math.sin(t*1.7 + ph[i])*dt*0.9 + dt*0.6;
+      y -= dt*(WINTER ? 0.9 + (i%7)*0.1 : SPRING ? 0.6 + (i%7)*0.08 : 1.1 + (i%7)*0.12);
+      x += Math.sin(t*1.7 + ph[i])*dt*(SPRING ? 1.6 : 0.9) + dt*(SPRING ? 1.4 : 0.6);
       z += Math.cos(t*1.3 + ph[i])*dt*0.6;
       // keep them in a box around the camera, recycled from the top
       if(x - cx > BOX) x -= BOX*2; if(x - cx < -BOX) x += BOX*2;
@@ -10553,6 +10635,62 @@ if(FALL || WINTER){
     }
     g.attributes.position.needsUpdate = true;
   });
+}
+
+/* ---- Blossom Run: butterflies ----
+   Hundreds of them over the verges and the meadows, each wandering its own lazy loop with
+   its wings beating. One pair of wings, instanced, flapped and flown in the vertex shader. */
+if(SPRING){
+  const c = document.createElement("canvas"); c.width = 64; c.height = 64; const g = c.getContext("2d");
+  // one wing, from the body (x = 0) out: the big fore lobe and the smaller hind lobe, a dark rim, pale spots
+  const wing = ()=>{ g.beginPath(); g.moveTo(2, 30); g.bezierCurveTo(14, 2, 52, -4, 60, 12); g.bezierCurveTo(64, 24, 46, 32, 30, 33);
+    g.bezierCurveTo(50, 38, 54, 56, 40, 61); g.bezierCurveTo(26, 64, 10, 50, 2, 36); g.closePath(); };
+  g.fillStyle = "#26181c"; wing(); g.fill();
+  g.save(); g.translate(5, 3); g.scale(0.84, 0.86); g.fillStyle = "#ffffff"; wing(); g.fill(); g.restore();
+  g.fillStyle = "rgba(255,255,255,0.95)"; [[50,14,3],[42,9,2.2],[44,50,2.6]].forEach(q=>{ g.beginPath(); g.arc(q[0], q[1], q[2], 0, 7); g.fill(); });
+  g.fillStyle = "rgba(38,24,28,0.55)"; [[28,18,4],[24,46,3.4]].forEach(q=>{ g.beginPath(); g.arc(q[0], q[1], q[2], 0, 7); g.fill(); });
+  g.fillStyle = "#1a1012"; g.fillRect(0, 22, 3, 22);
+  const tex = new THREE.CanvasTexture(c);
+  // two quads, the wings either side of the body: x is out along the span, z is along the body
+  const base = new THREE.BufferGeometry();
+  base.setAttribute("position", new THREE.Float32BufferAttribute([0,0,-0.5, 1,0,-0.5, 1,0,0.5, 0,0,0.5,  0,0,-0.5, -1,0,-0.5, -1,0,0.5, 0,0,0.5], 3));
+  base.setAttribute("uv", new THREE.Float32BufferAttribute([0,1, 1,1, 1,0, 0,0,  0,1, 1,1, 1,0, 0,0], 2));
+  base.setIndex([0,1,2, 0,2,3, 4,6,5, 4,7,6]);
+  const geo = new THREE.InstancedBufferGeometry(); geo.index = base.index;
+  geo.setAttribute("position", base.attributes.position); geo.setAttribute("uv", base.attributes.uv);
+  const ip = [], ih = [], ic = [], is = [], cc = new THREE.Color();
+  const COLS = [[0.94, 0.7, 0.85], [0.13, 0.9, 0.62], [0, 0, 1], [0.07, 0.9, 0.62], [0.58, 0.7, 0.75], [0.78, 0.55, 0.78], [0.9, 0.75, 0.7]];
+  paths.forEach(P=>{ for(let k=0;k<P.N;k+=Math.round(3/P.seg)){ if(Math.random() > 0.6) continue;
+    const q = P.pts[k], t = P.tans[k], sd = Math.random() < 0.5 ? -1 : 1, off = Math.random()*(P.half[k] + 22);
+    const x = q.x - t.z*sd*off, z = q.z + t.x*sd*off;
+    ip.push(x, gradedY(x, z) + 0.4 + Math.random()*1.8, z); ih.push(Math.random()*100);
+    const h = COLS[Math.floor(Math.random()*COLS.length)]; cc.setHSL(h[0] + (Math.random() - 0.5)*0.03, h[1], h[2]); ic.push(cc.r, cc.g, cc.b);
+    is.push(0.5 + Math.random()*0.3); } });
+  geo.setAttribute("iPos", new THREE.InstancedBufferAttribute(new Float32Array(ip), 3));
+  geo.setAttribute("iPh", new THREE.InstancedBufferAttribute(new Float32Array(ih), 1));
+  geo.setAttribute("iCol", new THREE.InstancedBufferAttribute(new Float32Array(ic), 3));
+  geo.setAttribute("iSc", new THREE.InstancedBufferAttribute(new Float32Array(is), 1));
+  geo.instanceCount = ih.length;
+  const mat = new THREE.ShaderMaterial({ side:THREE.DoubleSide,
+    uniforms:{uTime:{value:0}, uTex:{value:tex}, fogColor:{value:scene.fog.color}, fogNear:{value:scene.fog.near}, fogFar:{value:scene.fog.far}},
+    vertexShader:["uniform float uTime; attribute vec3 iPos, iCol; attribute float iPh, iSc; varying vec2 vUv; varying vec3 vCol; varying float vD;",
+      "void main(){",
+      "  float sp = 0.45 + fract(iPh*7.31)*0.35, t = uTime*sp + iPh;",
+      "  vec3 c = iPos + vec3(sin(t*0.7)*4.0 + sin(t*1.9)*1.2, sin(t*1.3)*0.6 + sin(t*3.1)*0.25, cos(t*0.6)*4.0 + cos(t*2.3)*1.0);",
+      "  vec2 d = vec2(cos(t*0.7)*2.8 + cos(t*1.9)*2.28, -sin(t*0.6)*2.4 - sin(t*2.3)*2.3);",
+      "  float yaw = atan(d.x, d.y), flap = 0.35 + sin(uTime*15.0 + iPh*20.0)*0.95;",
+      "  vec3 p = position; float ax = abs(p.x);",
+      "  vec3 w = vec3(sign(p.x)*ax*cos(flap), ax*sin(flap), p.z*0.9)*iSc;",
+      "  float cy = cos(yaw), sy = sin(yaw);",
+      "  w = vec3(w.x*cy + w.z*sy, w.y, -w.x*sy + w.z*cy);",
+      "  vUv = uv; vCol = iCol;",
+      "  vec4 mv = viewMatrix*vec4(c + w, 1.0); vD = -mv.z; gl_Position = projectionMatrix*mv; }"].join("\n"),
+    fragmentShader:["uniform sampler2D uTex; uniform vec3 fogColor; uniform float fogNear, fogFar; varying vec2 vUv; varying vec3 vCol; varying float vD;",
+      "void main(){ vec4 tx = texture2D(uTex, vUv); if(tx.a < 0.5) discard;",
+      "  vec3 col = mix(tx.rgb*0.12, vCol, tx.r);",
+      "  gl_FragColor = vec4(mix(col, fogColor, smoothstep(fogNear, fogFar, vD)), 1.0); }"].join("\n") });
+  const bm = new THREE.Mesh(geo, mat); bm.frustumCulled = false; scene.add(bm);
+  ANIMS.push(t=>{ mat.uniforms.uTime.value = t; });
 }
 
 /* ---- signage where the alternate routes split off ---- */
@@ -10958,6 +11096,56 @@ function cactusGeometry(){
 }
 /* A broadleaf: a short trunk and a crown of lumpy blobs, drawn pale so
    the per-tree tint gives it its colour (red, orange, gold). */
+/* A cherry in bloom: a dark leaning trunk forking into a few spreading limbs under a wide,
+   flat-topped cloud of blossom, pink with white through it. kind 1 is a weeping cherry: a
+   dome of blossom with strands of it hanging down all round. (unit height, like the others) */
+function cherryGeometry(kind){
+  const pos = [], col = [], c = new THREE.Color();
+  const put = (geo, shade)=>{
+    const g = geo.index ? geo.toNonIndexed() : geo, a = g.attributes.position;
+    for(let i=0;i<a.count;i++){ pos.push(a.getX(i), a.getY(i), a.getZ(i)); shade(a.getY(i)); col.push(c.r, c.g, c.b); }
+  };
+  const bark = ()=> c.setHSL(0.98, 0.2, 0.12 + Math.random()*0.03);
+  const up = new THREE.Vector3(0, 1, 0);
+  const limb = (from, to, r0, r1)=>{ const d = to.clone().sub(from), L = d.length();
+    const g = new THREE.CylinderGeometry(r1, r0, L, 6); g.translate(0, L/2, 0);
+    g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(up, d.normalize()))); g.translate(from.x, from.y, from.z); put(g, bark); };
+  const la = Math.random()*6.28, ln = 0.03 + Math.random()*0.05;
+  const top = new THREE.Vector3(Math.cos(la)*ln, kind === 1 ? 0.42 : 0.3, Math.sin(la)*ln);
+  limb(new THREE.Vector3(0, -0.02, 0), top, 0.036, 0.022);
+  const pink = ()=>{ const r = Math.random();
+    if(r < 0.1) c.setHSL(0.95, 0.7, 0.86);                                                        // nearly white
+    else if(r < 0.7) c.setHSL(0.93 + Math.random()*0.04, 0.78 + Math.random()*0.15, 0.70 + Math.random()*0.07);
+    else c.setHSL(0.92 + Math.random()*0.04, 0.85, 0.60 + Math.random()*0.06); };
+  if(kind === 1){
+    // the weeping cherry: limbs arching up and over, a dome of blossom, and the strands hanging down
+    for(let k=0;k<4;k++){ const a = k/4*6.28 + Math.random()*0.6;
+      limb(top, new THREE.Vector3(top.x + Math.cos(a)*0.14, top.y + 0.18, top.z + Math.sin(a)*0.14), 0.016, 0.008); }
+    for(let k=0;k<10;k++){ const a = k/9*6.28 + Math.random()*0.5, rr = k === 0 ? 0 : 0.16 + Math.random()*0.12;
+      const b = new THREE.IcosahedronGeometry(0.15 + Math.random()*0.07, 0); b.scale(1, 0.75, 1);
+      b.translate(top.x + Math.cos(a)*rr, top.y + 0.2 + Math.random()*0.08 - rr*0.35, top.z + Math.sin(a)*rr); put(b, pink); }
+    for(let k=0;k<20;k++){ const a = k/20*6.28 + Math.random()*0.3, rr = 0.27 + Math.random()*0.08, len = 0.22 + Math.random()*0.26;
+      const s = new THREE.IcosahedronGeometry(1, 0); s.scale(0.05, len/2, 0.05);
+      s.translate(top.x + Math.cos(a)*rr, top.y + 0.18 - len/2 - rr*0.2, top.z + Math.sin(a)*rr); put(s, pink); }
+  } else {
+    // the spreading cherry: four or five limbs fanning out, each with its own cloud of blossom
+    const n = 4 + (Math.random() < 0.5 ? 1 : 0);
+    for(let k=0;k<n;k++){
+      const a = k/n*6.28 + Math.random()*0.7, out = 0.2 + Math.random()*0.1, rise = 0.14 + Math.random()*0.1;
+      const tip = new THREE.Vector3(top.x + Math.cos(a)*out, top.y + rise, top.z + Math.sin(a)*out);
+      limb(top, tip, 0.017, 0.007);
+      for(let j=0;j<4;j++){ const b2 = Math.random()*6.28, rr = Math.random()*0.12, r = 0.11 + Math.random()*0.07;
+        const b = new THREE.IcosahedronGeometry(r, 0); b.scale(1.1, 0.6, 1.1);
+        b.translate(tip.x + Math.cos(b2)*rr, tip.y + 0.02 + Math.random()*0.06, tip.z + Math.sin(b2)*rr); put(b, pink); }
+    }
+    const b = new THREE.IcosahedronGeometry(0.19, 0); b.scale(1.2, 0.6, 1.2); b.translate(top.x, top.y + 0.2, top.z); put(b, pink);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  return g;
+}
 function hardwoodGeometry(kind){
   const pos = [], col = [], c = new THREE.Color();
   const put = (geo, shade)=>{
@@ -11561,10 +11749,11 @@ if(GLOW){
       if(TRACK.treeline && gradedY(x, z) > TRACK.treeline + (Math.random() - 0.7)*14) return false;   // nor above the treeline
       if(DESERT && Math.random() > 0.2) return false;        // the desert is open country
       const kind = GLOW ? (Math.random() < 0.46 ? 0 : (Math.random() < 0.72 ? 1 : 2))
+                 : SPRING ? (Math.random() < 0.6 ? 0 : (Math.random() < 0.75 ? 1 : 2))
                  : FALL ? (Math.random() < 0.22 ? 0 : (Math.random() < 0.55 ? 1 : 2))
                  : DESERT ? (Math.random() < 0.6 ? 0 : (Math.random() < 0.6 ? 1 : 2))
                         : (Math.random() < 0.5 ? 0 : (Math.random() < 0.6 ? 1 : 2));
-      const tall = DESERT ? (kind === 0 ? 5 + Math.random()*5 : 3 + Math.random()*3) : 9 + Math.random()*10;
+      const tall = DESERT ? (kind === 0 ? 5 + Math.random()*5 : 3 + Math.random()*3) : SPRING && kind < 2 ? 8 + Math.random()*6 : 9 + Math.random()*10;
       treeSpots[kind].push([x, gradedY(x,z) - 0.1, z, tall]);
       return true;
     });
@@ -11580,11 +11769,12 @@ if(GLOW){
     if(!list.length) return;
     const inst = new THREE.InstancedMesh(
       GLOW ? (kind < 2 ? glowTreeGeometry(kind).body : coniferGeometry(1))
+      : SPRING ? (kind < 2 ? cherryGeometry(kind) : hardwoodGeometry(1))
       : DESERT ? (kind === 0 ? cactusGeometry() : kind === 1 ? hardwoodGeometry(1) : coniferGeometry(2))
       : SWAMPGP ? (kind === 0 ? willowGeometry() : kind === 1 ? cypressGeometry() : hardwoodGeometry(1))
       : WINTER ? snowify(coniferGeometry(kind))
       : FALL && kind > 0 ? hardwoodGeometry(kind) : coniferGeometry(kind),
-      new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide, emissive: GLOW && kind === 2 ? 0x0b2e5c : 0x000000}),
+      new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide, emissive: GLOW && kind === 2 ? 0x0b2e5c : SPRING && kind < 2 ? 0x2c0e1c : 0x000000}),
       list.length
     );
     list.forEach((p, i)=>{
@@ -11601,6 +11791,8 @@ if(GLOW){
       else if(DESERT){ if(kind === 0){ const k = 0.9 + Math.random()*0.3; tint.setRGB(k, k, k*0.9); }
                        else tint.setHSL(0.2 + Math.random()*0.05, 0.22, 0.42 + Math.random()*0.1); }
       else if(FALL && kind > 0) fallTint(tint);
+      else if(SPRING){ if(kind < 2){ const k = 0.88 + Math.random()*0.16; tint.setRGB(k, k*(0.86 + Math.random()*0.12), k*(0.94 + Math.random()*0.06)); }
+                       else tint.setHSL(0.25 + Math.random()*0.04, 0.5 + Math.random()*0.15, 0.56 + Math.random()*0.1); }   // fresh new leaves
       else if(GLOW){ const k = 0.8 + Math.random()*0.4; tint.setRGB(k*0.92, k, k*1.08); }
       else if(GATOR) tint.setHSL(0.26 + Math.random()*0.14, 0.45 + Math.random()*0.2, 0.52 + Math.random()*0.14);   // lush swamp greens, some teal
       else if(SWAMPGP){ if(kind === 2) tint.setHSL(0.2 + Math.random()*0.08, 0.4 + Math.random()*0.15, 0.36 + Math.random()*0.1);   // gum and oak, green
@@ -11784,6 +11976,7 @@ if(GLOW){
       inst.setMatrixAt(i, m);
       const k2 = 0.8 + Math.random()*0.45;
       if(FALL){ fallTint(tint); tint.multiplyScalar(1.5); }
+      else if(SPRING){ if(Math.random() < 0.4) tint.setHSL(0.93 + Math.random()*0.04, 0.6, 0.78); else tint.setHSL(0.24 + Math.random()*0.04, 0.45, 0.62); }
       else if(WINTER) tint.setRGB(k2*1.15, k2*1.2, k2*1.25);
       else if(DESERT) tint.setRGB(k2*1.1, k2*1.1, k2*0.85);
       else tint.setRGB(k2*(0.9+Math.random()*0.25), k2, k2*0.82);
@@ -14559,7 +14752,7 @@ function stepAudio(info, dt){
        and comes back fifteen times a second, and it spits pops. */
     AUD.limT = (AUD.limT || 0) + dt;
     let limiting = false;
-    const overTop = TRACK.alpine && (pose.over || 0) > 1 && info.sp > MAXV;      // the hill, not the engine, is doing it
+    const overTop = ((HILLFAST && (pose.over || 0) > 1) || (pose.surge || 0) > 1) && info.sp > MAXV;      // the hill, not the engine, is doing it
     if(gas && rpm >= DRIVE.redline*0.975 && !overTop){
       limiting = true;
       if(AUD.limT > 0.065){ AUD.limT = 0; AUD.limOn = !AUD.limOn; if(!AUD.limOn && Math.random() < 0.45) SFX.pop(0.9); }
@@ -14846,7 +15039,7 @@ function stepCarInner(dt){
      runs it away downhill), and past about 45% loose ground spins the
      wheels, so the steep way up wants a run at it and the right line. */
   let hillA = 0, climbGrip = 1;
-  if((EXP.on || TRACK.alpine) && !pose.air){
+  if((EXP.on || HILLFAST) && !pose.air){
     const hx = Math.sin(pose.h), hz = Math.cos(pose.h);
     const grade = (surfaceY(pose.x + hx*1.6, pose.z + hz*1.6) - surfaceY(pose.x - hx*1.6, pose.z - hz*1.6))/3.2;
     hillA = -9.8*grade/Math.sqrt(1 + grade*grade);
@@ -14855,12 +15048,14 @@ function stepCarInner(dt){
     /* The Sawtooth is for going fast. Up the face of a peak the car surges on; down the
        other side the hill throws it on, harder than it really would, and past top speed: the
        limit lifts with the slope and only settles back gradually once the road levels out. */
-    if(TRACK.alpine){
+    if(HILLFAST){
       hillA = grade > 0 ? grade*ALP.climb : hillA*ALP.fall; climbGrip = 1;
       pose.over = Math.max(Math.min(ALP.over, -grade*ALP.overPer), (pose.over || 0) - ALP.settle*dt);
     }
     pose.grade = grade;
-  } else if(TRACK.alpine) pose.over = Math.max(0, (pose.over || 0) - (pose.air ? 0 : ALP.settle*dt));
+  } else if(HILLFAST) pose.over = Math.max(0, (pose.over || 0) - (pose.air ? 0 : ALP.settle*dt));
+  // a boost pad's surge: held a moment, then fading (not while flying)
+  if(pose.surge > 0){ pose.surgeT = (pose.surgeT || 0) - dt; if(pose.surgeT <= 0 && !pose.air) pose.surge = Math.max(0, pose.surge - PAD_SURGE.fade*dt); }
   let a = hillA;
   const drive = DRIVE.K * torqueCurve(trans.rpm) * DRIVE.totals[trans.gear-1] * traction * climbGrip;
 
@@ -14891,7 +15086,7 @@ function stepCarInner(dt){
   let newAlong = along + a*dt;
   if(!thr && !brk && Math.abs(newAlong) < 0.35) newAlong = 0;   // no creeping
   if(newAlong < -11) newAlong = -11;
-  const ceiling = MAXV + (drift.boostT > 0 ? 8 : 0) + GG.ceil() + (TRACK.alpine ? pose.over || 0 : 0);   // boost lifts the limiter (and in the swamp, the fireflies you carry; on the Sawtooth, the hill)
+  const ceiling = MAXV + (drift.boostT > 0 ? 8 : 0) + GG.ceil() + Math.max(HILLFAST ? pose.over || 0 : 0, pose.surge || 0);   // boost lifts the limiter (and in the swamp, the fireflies you carry; on the Sawtooth, the hill)
   if(newAlong > ceiling) newAlong = ceiling;
   const netA = (newAlong - along)/Math.max(dt, 0.0001);
 
@@ -15559,6 +15754,7 @@ function stepCarInner(dt){
     splash.mud = Math.min(1, splash.mud + k2*dt*0.12);
   }
   if(GATOR) GG.stepCar(dt, {hand, steer, nfx, nfz});
+  if(BOOSTPADS.length && state.phase === "racing") stepPads(dt, nfx, nfz);
   if(SWAMPGP) swampStep(dt);
   car.position.set(pose.x, pose.y - (pose.sink || 0), pose.z);
   car.rotation.order = "YXZ";
@@ -15754,7 +15950,7 @@ function stepCamera(dt, sp){
     if(!chase){ camera.rotateX(-pose.bP*0.8); camera.rotateZ(pose.bR*0.8); }
     else camera.rotateZ(pose.bR*0.25);
   }
-  const fovT = 62 + Math.min(TRACK.alpine ? 1.4 : 1, sp/MAXV)*11;      // the frame opens up with speed (and past top speed down the Sawtooth)
+  const fovT = 62 + Math.min(HILLFAST ? 1.5 : 1, sp/MAXV)*11;      // the frame opens up with speed (and past top speed down the Sawtooth)
   if(Math.abs(camera.fov - fovT) > 0.01){
     camera.fov += (fovT - camera.fov)*Math.min(1, dt*2.5);
     camera.updateProjectionMatrix();
@@ -17062,7 +17258,7 @@ function resetCar(at){
   const i = state.idx, p = pts[i], t = tans[i];
   pose.x = p.x; pose.z = p.z; pose.h = Math.atan2(t.x, t.z);
   pose.y = surfaceY(p.x, p.z); pose.lastGy = pose.y;
-  pose.vx = pose.vz = 0; pose.vy = 0; pose.air = false; pose.airT = 0;
+  pose.vx = pose.vz = 0; pose.vy = 0; pose.air = false; pose.airT = 0; pose.surge = 0;
   pose.yawVis = 0; pose.steerIn = 0; pose.steerVis = 0; pose.roll = pose.pitch = 0;
   pose.spring = pose.springV = 0; pose.artPitch = pose.artRoll = pose.artBase = 0; pose.bH = pose.bHv = pose.bP = pose.bPv = pose.bR = pose.bRv = 0;
   drift.mode = "off"; drift.on = false; drift.t = 0; drift.tier = -1; drift.boostT = 0;
@@ -17266,7 +17462,7 @@ function resetRace(){
   camera.position.set(pose.x - Math.sin(pose.h)*9.2, pose.y + 3.55, pose.z - Math.cos(pose.h)*9.2);
   GAME.paused = false; GAME.doneT = 0; GAME.resultsShown = false; GAME.goT = 0;
   GAME.startAt = null; GAME.stallT = 0; GAME.launchFx = 0;
-  GG.reset();
+  GG.reset(); pose.surge = 0; pose.over = 0;
   CAR_DIRT.uDirt.value = 0; CAR_DIRT.uSnow.value = 0;
   CAR_DIRT.uDirtCol.value.set(DESERT ? 0x9a7650 : WINTER ? 0x6a6a70 : FALL ? 0x4e3622 : 0x4a3524);
   GAME.wrongT = 0; GAME.stuckT = 0; GAME.placePrev = 0; GAME.placeT = 0; CONFETTI.length = 0; GAME.lbAsked = false;
@@ -18693,6 +18889,8 @@ const PILES = [];                      // (kept for the debug handle)
 const PILE_KIND = TRACK.season === "winter" || TRACK.season === "desert" ? "none" : FALL ? "fall" : "summer";
 function pileColour(c){
   const r = Math.random();
+  // Blossom Run: drifts of fallen cherry petals, pink and white
+  if(SPRING) return r < 0.15 ? c.setHSL(0.95, 0.75, 0.86) : c.setHSL(0.92 + Math.random()*0.05, 0.8 + Math.random()*0.2, 0.66 + Math.random()*0.1);
   // Glowcap Hollow: fallen glowing leaves, deep blue through to bright cyan, lighting the road
   if(GLOW) return r < 0.55 ? c.setRGB(0.05, 0.28 + Math.random()*0.18, 0.62 + Math.random()*0.25)
                 : r < 0.85 ? c.setRGB(0.18, 0.62 + Math.random()*0.2, 0.95) : c.setRGB(0.55, 0.9, 1.0);
