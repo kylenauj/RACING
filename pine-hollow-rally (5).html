@@ -1078,30 +1078,36 @@ const TRACKS = [
     ]},
 
   /* ---- SPECIAL: Blossom Run, a cherry blossom valley in spring ----
-     A speedway through the orchards: a long run along the top of the ridge, a plunge off its
-     east end that throws you well past top speed, the valley floor flat out over the boost
-     pads, up and over the lone hill, and a long fast climb back up to the ridge. Pink trees,
+     A speedway through the orchards: fast esses along the top of the ridge, a plunge off its
+     east end that throws you well past top speed into a hairpin, the valley snaking over the
+     rollers and the boost pads, off the lone hill, and esses up the long climb to the ridge. Pink trees,
      petals on the wind and on the road, and butterflies everywhere. The hills work like the
      Sawtooth's: fast up, and down past top speed; the boost pads throw you further still. */
   { name:"BLOSSOM RUN", special:true, spring:true, hillfast:true, season:"summer", after:"a cherry blossom valley in spring", relief:0.9, rollers:0.35,
-    blurb:"flat out through the cherry orchards: along the ridge, a plunge off its end past top speed, the valley floor over the boost pads, over the lone hill and the long climb home. Hit the boost pads to go faster than the car can on its own",
+    blurb:"flat out through the cherry orchards: esses along the ridge, a plunge off its end past top speed into a hairpin, the valley snake over the rollers, off the lone hill and esses up the climb home. Hit the boost pads to go faster than the car can on its own, then find the brakes",
     kit:["crest","kicker","tabletop","kicker","crest"],
     shape:"BLOSSOM RUN \u2014 a spring speedway",
-    feature:"cherry blossoms, butterflies, boost pads, long straights and a plunge past top speed",
-    ctrl:[[-300,-300],[-150,-305],[0,-300],[150,-292],[300,-285],[420,-262],
-          // round off the end of the ridge, and the plunge south
-          [510,-205],[565,-120],[585,-20],[592,90],[590,200],[575,300],
-          // round onto the valley floor and flat out west along it
-          [530,385],[455,440],[360,468],[240,478],[120,482],[0,475],[-90,462],
-          // up and over the lone hill
-          [-180,450],[-270,445],[-360,438],
-          // round the foot of the hills, and the long climb home
-          [-450,405],[-520,340],[-560,250],[-575,150],[-580,40],[-570,-70],[-540,-170],[-480,-245],[-400,-290]],
-    hills:[[-250,-440,330,62],[150,-450,330,68],[440,-340,230,56],[565,-160,150,36],[60,330,330,-22],[-270,470,120,42]],
+    feature:"cherry blossoms, butterflies, boost pads, a plunge past top speed into a hairpin, and esses taken flat out",
+    ctrl:[[-300,-300],[-200,-302],[-110,-292],
+          // the ridge: fast esses along its spine, flat out only on the perfect line
+          [-25,-258],[60,-286],[145,-326],[230,-292],[315,-258],[395,-276],
+          // round off the end of the ridge, and the plunge south, straight down
+          [470,-248],[530,-190],[562,-110],[576,-20],[584,80],[588,190],[588,290],
+          // the hairpin at the foot of it: stand on the brakes from flat out
+          [582,356],[566,392],[542,398],[526,378],[518,346],[490,322],[440,318],
+          // the valley snake: S-bends over the rollers, boost in and brake
+          [380,330],[300,362],[215,398],[130,380],[45,348],[-40,372],[-105,410],
+          // up and off the lone hill, and a fast left-right where you land
+          [-180,446],[-270,445],[-350,430],[-415,395],[-470,340],
+          // the climb home: esses up the hillside, and round onto the ridge
+          [-520,280],[-552,205],[-585,130],[-560,55],[-532,-20],[-555,-95],[-568,-165],[-532,-238],[-460,-282],[-385,-298]],
+    hills:[[-250,-440,330,62],[150,-450,330,68],[440,-340,230,56],[565,-160,150,36],[60,330,330,-22],[-270,470,120,42],
+           // rollers along the valley floor: crests to fly off at speed
+           [300,368,42,7],[170,392,40,6],[0,356,42,7],[-70,392,36,5]],
     jumps:[], fords:[],
     flats:[[-300,-300,100]],
-    // the boost pads: on the ridge, over the top of the plunge, down the valley, at the foot of the hill and up the climb
-    pads:[[120,-294],[300,-285],[585,-30],[300,474],[150,481],[0,475],[-130,455],[-578,110],[-575,-30]],
+    // the boost pads: off the grid, into the ridge esses, over the top of the plunge and down it, out of the hairpin, through the valley snake, at the foot of the hill and up the climb
+    pads:[[-200,-302],[-25,-258],[230,-292],[576,-20],[586,170],[400,326],[130,380],[-40,372],[-180,446],[-560,55],[-555,-95]],
     branches:[]},
 
   /* ---- THE SWAMP CUP: the bayou, boardwalks, mud and willows ---- */
@@ -1471,7 +1477,7 @@ const MUD_EXP = [0.95, 0.028], MUD_RACE = [0.03, 0.0005];
 const ALP = {fall:1.5, over:18, overPer:45, settle:3, climb:4};   // (climb: a surge up the faces, m/s^2 per unit of grade)
 /* a boost pad: how far past top speed it lifts the limit (m/s, stacking up to max), how long that
    holds before it fades (s) and how fast it fades (m/s a second), and the shove it gives (m/s^2, for push s) */
-const PAD_SURGE = {add:14, max:24, hold:1.6, fade:3.2, kick:15, push:1.4};
+const PAD_SURGE = {add:16, max:30, hold:2.0, fade:3.0, kick:18, push:1.5};
 function routingTest(P){
   const N = P.N, seg = P.seg, R = radiiOf(P);
   const TOTALS = [24.0, 15.5, 10.8, 7.7, 5.5];
@@ -11096,49 +11102,66 @@ function cactusGeometry(){
 }
 /* A broadleaf: a short trunk and a crown of lumpy blobs, drawn pale so
    the per-tree tint gives it its colour (red, orange, gold). */
-/* A cherry in bloom: a dark leaning trunk forking into a few spreading limbs under a wide,
-   flat-topped cloud of blossom, pink with white through it. kind 1 is a weeping cherry: a
-   dome of blossom with strands of it hanging down all round. (unit height, like the others) */
-function cherryGeometry(kind){
+/* A cherry in bloom: a dark trunk forking into spreading limbs, under a rounded, billowing crown
+   made of many small clusters of blossom, paler where the light catches the top and a deeper pink
+   underneath; white flecks through it. kind 1 is a weeping cherry: arching limbs, a dome of blossom,
+   and chains of it cascading down all round. leafy: the same tree in fresh spring green. (unit height) */
+function cherryGeometry(kind, leafy){
   const pos = [], col = [], c = new THREE.Color();
   const put = (geo, shade)=>{
     const g = geo.index ? geo.toNonIndexed() : geo, a = g.attributes.position;
     for(let i=0;i<a.count;i++){ pos.push(a.getX(i), a.getY(i), a.getZ(i)); shade(a.getY(i)); col.push(c.r, c.g, c.b); }
   };
-  const bark = ()=> c.setHSL(0.98, 0.2, 0.12 + Math.random()*0.03);
+  const bark = ()=> c.setHSL(0.98, 0.22, 0.13 + Math.random()*0.03);
   const up = new THREE.Vector3(0, 1, 0);
   const limb = (from, to, r0, r1)=>{ const d = to.clone().sub(from), L = d.length();
-    const g = new THREE.CylinderGeometry(r1, r0, L, 6); g.translate(0, L/2, 0);
-    g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(up, d.normalize()))); g.translate(from.x, from.y, from.z); put(g, bark); };
-  const la = Math.random()*6.28, ln = 0.03 + Math.random()*0.05;
-  const top = new THREE.Vector3(Math.cos(la)*ln, kind === 1 ? 0.42 : 0.3, Math.sin(la)*ln);
-  limb(new THREE.Vector3(0, -0.02, 0), top, 0.036, 0.022);
-  const pink = ()=>{ const r = Math.random();
-    if(r < 0.1) c.setHSL(0.95, 0.7, 0.86);                                                        // nearly white
-    else if(r < 0.7) c.setHSL(0.93 + Math.random()*0.04, 0.78 + Math.random()*0.15, 0.70 + Math.random()*0.07);
-    else c.setHSL(0.92 + Math.random()*0.04, 0.85, 0.60 + Math.random()*0.06); };
+    const g = new THREE.CylinderGeometry(r1, r0, L, 5); g.translate(0, L/2, 0);
+    g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(up, d.normalize())));
+    g.translate(from.x, from.y, from.z); put(g, bark); };
+  // the crown's colour, by height through it: light on top, deeper underneath
+  let cy = 0.6, ch = 0.2;
+  const bloom = (white)=> y=>{ const k = Math.max(-1, Math.min(1, (y - cy)/ch));
+    if(leafy) return c.setHSL(0.25 + Math.random()*0.03, 0.5 + Math.random()*0.1, 0.42 + k*0.1 + Math.random()*0.04);
+    if(white) return c.setHSL(0.95, 0.6, 0.86 + k*0.05);
+    return c.setHSL(0.935 + Math.random()*0.03, 0.78 + Math.random()*0.12, 0.66 + k*0.09 + Math.random()*0.04); };
+  const cluster = (x, y, z, r, sq)=>{ const b = new THREE.IcosahedronGeometry(r, 0);
+    b.rotateX(Math.random()*3); b.rotateY(Math.random()*3); b.scale(1, sq || 0.82, 1); b.translate(x, y, z);
+    put(b, bloom(!leafy && Math.random() < 0.12)); };
+  const la = Math.random()*6.28, ln = 0.02 + Math.random()*0.04;
   if(kind === 1){
-    // the weeping cherry: limbs arching up and over, a dome of blossom, and the strands hanging down
-    for(let k=0;k<4;k++){ const a = k/4*6.28 + Math.random()*0.6;
-      limb(top, new THREE.Vector3(top.x + Math.cos(a)*0.14, top.y + 0.18, top.z + Math.sin(a)*0.14), 0.016, 0.008); }
-    for(let k=0;k<10;k++){ const a = k/9*6.28 + Math.random()*0.5, rr = k === 0 ? 0 : 0.16 + Math.random()*0.12;
-      const b = new THREE.IcosahedronGeometry(0.15 + Math.random()*0.07, 0); b.scale(1, 0.75, 1);
-      b.translate(top.x + Math.cos(a)*rr, top.y + 0.2 + Math.random()*0.08 - rr*0.35, top.z + Math.sin(a)*rr); put(b, pink); }
-    for(let k=0;k<20;k++){ const a = k/20*6.28 + Math.random()*0.3, rr = 0.27 + Math.random()*0.08, len = 0.22 + Math.random()*0.26;
-      const s = new THREE.IcosahedronGeometry(1, 0); s.scale(0.05, len/2, 0.05);
-      s.translate(top.x + Math.cos(a)*rr, top.y + 0.18 - len/2 - rr*0.2, top.z + Math.sin(a)*rr); put(s, pink); }
+    // the weeping cherry
+    const top = new THREE.Vector3(Math.cos(la)*ln, 0.5, Math.sin(la)*ln);
+    limb(new THREE.Vector3(0, -0.02, 0), top, 0.034, 0.02);
+    cy = 0.62; ch = 0.3;
+    const arches = [];
+    for(let k=0;k<5;k++){ const a = k/5*6.28 + Math.random()*0.5;
+      const tip = new THREE.Vector3(top.x + Math.cos(a)*0.16, top.y + 0.12 + Math.random()*0.04, top.z + Math.sin(a)*0.16);
+      limb(top, tip, 0.014, 0.006); arches.push(tip); }
+    for(let k=0;k<7;k++){ const a = Math.random()*6.28, rr = Math.random()*0.14;
+      cluster(top.x + Math.cos(a)*rr, top.y + 0.14 + Math.random()*0.06, top.z + Math.sin(a)*rr, 0.09 + Math.random()*0.04); }
+    // the cascades: chains of blossom falling from the rim of the dome, leaning out a little as they go
+    for(let k=0;k<13;k++){ const a = k/13*6.28 + Math.random()*0.3, r0 = 0.17 + Math.random()*0.06, n = 3 + (Math.random() < 0.5 ? 1 : 0);
+      for(let j=0;j<n;j++){ const rr = r0 + j*0.025, y = top.y + 0.1 - j*0.1 - Math.random()*0.02;
+        cluster(top.x + Math.cos(a)*rr, y, top.z + Math.sin(a)*rr, 0.055 - j*0.007, 1.5); } }
   } else {
-    // the spreading cherry: four or five limbs fanning out, each with its own cloud of blossom
-    const n = 4 + (Math.random() < 0.5 ? 1 : 0);
+    // the spreading cherry: the trunk forks into three or four limbs, each forking again
+    const top = new THREE.Vector3(Math.cos(la)*ln, 0.3, Math.sin(la)*ln);
+    limb(new THREE.Vector3(0, -0.02, 0), top, 0.036, 0.024);
+    cy = 0.6; ch = 0.18;
+    const tips = [], n = 3 + (Math.random() < 0.6 ? 1 : 0);
     for(let k=0;k<n;k++){
-      const a = k/n*6.28 + Math.random()*0.7, out = 0.2 + Math.random()*0.1, rise = 0.14 + Math.random()*0.1;
-      const tip = new THREE.Vector3(top.x + Math.cos(a)*out, top.y + rise, top.z + Math.sin(a)*out);
-      limb(top, tip, 0.017, 0.007);
-      for(let j=0;j<4;j++){ const b2 = Math.random()*6.28, rr = Math.random()*0.12, r = 0.11 + Math.random()*0.07;
-        const b = new THREE.IcosahedronGeometry(r, 0); b.scale(1.1, 0.6, 1.1);
-        b.translate(tip.x + Math.cos(b2)*rr, tip.y + 0.02 + Math.random()*0.06, tip.z + Math.sin(b2)*rr); put(b, pink); }
+      const a = k/n*6.28 + Math.random()*0.7;
+      const mid = new THREE.Vector3(top.x + Math.cos(a)*0.12, top.y + 0.13 + Math.random()*0.04, top.z + Math.sin(a)*0.12);
+      limb(top, mid, 0.02, 0.013);
+      for(const f of [-0.45, 0.45]){ const b = a + f + (Math.random() - 0.5)*0.3, out = 0.1 + Math.random()*0.06;
+        const tip = new THREE.Vector3(mid.x + Math.cos(b)*out, mid.y + 0.09 + Math.random()*0.06, mid.z + Math.sin(b)*out);
+        limb(mid, tip, 0.012, 0.005); tips.push(tip); }
     }
-    const b = new THREE.IcosahedronGeometry(0.19, 0); b.scale(1.2, 0.6, 1.2); b.translate(top.x, top.y + 0.2, top.z); put(b, pink);
+    // blossom over every tip, and the dome between them filled in so the crown is one billowing cloud
+    tips.forEach(tp=>{ cluster(tp.x, tp.y + 0.02, tp.z, 0.1 + Math.random()*0.03);
+      const a = Math.random()*6.28; cluster(tp.x + Math.cos(a)*0.07, tp.y + 0.07, tp.z + Math.sin(a)*0.07, 0.07 + Math.random()*0.03); });
+    for(let k=0;k<9;k++){ const a = Math.random()*6.28, u = Math.sqrt(Math.random()), rr = u*0.3;
+      cluster(top.x + Math.cos(a)*rr, cy + 0.06 + (1 - u)*0.1 + (Math.random() - 0.5)*0.05, top.z + Math.sin(a)*rr, 0.09 + Math.random()*0.04); }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
@@ -11753,7 +11776,7 @@ if(GLOW){
                  : FALL ? (Math.random() < 0.22 ? 0 : (Math.random() < 0.55 ? 1 : 2))
                  : DESERT ? (Math.random() < 0.6 ? 0 : (Math.random() < 0.6 ? 1 : 2))
                         : (Math.random() < 0.5 ? 0 : (Math.random() < 0.6 ? 1 : 2));
-      const tall = DESERT ? (kind === 0 ? 5 + Math.random()*5 : 3 + Math.random()*3) : SPRING && kind < 2 ? 8 + Math.random()*6 : 9 + Math.random()*10;
+      const tall = DESERT ? (kind === 0 ? 5 + Math.random()*5 : 3 + Math.random()*3) : SPRING ? 8 + Math.random()*6 : 9 + Math.random()*10;
       treeSpots[kind].push([x, gradedY(x,z) - 0.1, z, tall]);
       return true;
     });
@@ -11769,7 +11792,7 @@ if(GLOW){
     if(!list.length) return;
     const inst = new THREE.InstancedMesh(
       GLOW ? (kind < 2 ? glowTreeGeometry(kind).body : coniferGeometry(1))
-      : SPRING ? (kind < 2 ? cherryGeometry(kind) : hardwoodGeometry(1))
+      : SPRING ? cherryGeometry(kind === 2 ? 0 : kind, kind === 2)
       : DESERT ? (kind === 0 ? cactusGeometry() : kind === 1 ? hardwoodGeometry(1) : coniferGeometry(2))
       : SWAMPGP ? (kind === 0 ? willowGeometry() : kind === 1 ? cypressGeometry() : hardwoodGeometry(1))
       : WINTER ? snowify(coniferGeometry(kind))
@@ -11791,8 +11814,7 @@ if(GLOW){
       else if(DESERT){ if(kind === 0){ const k = 0.9 + Math.random()*0.3; tint.setRGB(k, k, k*0.9); }
                        else tint.setHSL(0.2 + Math.random()*0.05, 0.22, 0.42 + Math.random()*0.1); }
       else if(FALL && kind > 0) fallTint(tint);
-      else if(SPRING){ if(kind < 2){ const k = 0.88 + Math.random()*0.16; tint.setRGB(k, k*(0.86 + Math.random()*0.12), k*(0.94 + Math.random()*0.06)); }
-                       else tint.setHSL(0.25 + Math.random()*0.04, 0.5 + Math.random()*0.15, 0.56 + Math.random()*0.1); }   // fresh new leaves
+      else if(SPRING){ const k = 0.9 + Math.random()*0.16; tint.setRGB(k, k*(0.9 + Math.random()*0.1), k*(0.95 + Math.random()*0.05)); }   // (the colour is in the tree)
       else if(GLOW){ const k = 0.8 + Math.random()*0.4; tint.setRGB(k*0.92, k, k*1.08); }
       else if(GATOR) tint.setHSL(0.26 + Math.random()*0.14, 0.45 + Math.random()*0.2, 0.52 + Math.random()*0.14);   // lush swamp greens, some teal
       else if(SWAMPGP){ if(kind === 2) tint.setHSL(0.2 + Math.random()*0.08, 0.4 + Math.random()*0.15, 0.36 + Math.random()*0.1);   // gum and oak, green
