@@ -11836,7 +11836,7 @@ if(GLOW){
     if(GLOW && kind < 2){
       const gi = new THREE.InstancedMesh(glowTreeGeometry(kind).glow, GLOW_TREE_MAT, list.length);
       for(let i=0;i<list.length;i++){ inst.getMatrixAt(i, m); gi.setMatrixAt(i, m); }
-      gi.instanceMatrix.needsUpdate = true; gi.castShadow = false; scene.add(gi);
+      gi.instanceMatrix.needsUpdate = true; gi.castShadow = false; gi.userData.lod = "glow"; scene.add(gi);
     }
   });
 
@@ -12207,19 +12207,20 @@ function setFade(m, a){
    distance, small stones stop being drawn once the fog has them, and only the cells round the
    car cast shadows (the shadow map covers a little over a hundred metres round it anyway) */
 const FOREST_LOD = [];
-const LOD_KIND = { tree:{far:260, cull:Infinity}, bush:{far:170, cull:620}, rock:{far:Infinity, cull:560}, stone:{far:Infinity, cull:230} };
+const LOD_KIND = { glow:{far:Infinity, cull:380}, tree:{far:260, cull:Infinity}, bush:{far:170, cull:620}, rock:{far:Infinity, cull:560}, stone:{far:Infinity, cull:230} };
 const LOD_SHADOW = 115;
+let LODK = 1;                          // (scaled down by Auto graphics on a slow machine)
 function updateForestLOD(){
   if(!FOREST_LOD.length) return;
   const cp = camera.position, fx = pose.x, fz = pose.z;
   for(const L of FOREST_LOD){
     const d = L.c.distanceTo(cp) - L.R, K = LOD_KIND[L.kind];
     // (a little either way of each line so a cell sitting on it doesn't flicker)
-    const wasFar = L.far ? L.far.visible : false, far = wasFar ? d > K.far - 12 : d > K.far + 12;
-    const gone = d > K.cull;
+    const wasFar = L.far ? L.far.visible : false, far = wasFar ? d > K.far*LODK - 12 : d > K.far*LODK + 12;
+    const gone = d > K.cull*(L.kind === "tree" ? 1 : LODK);
     L.near.visible = !far && !gone;
     if(L.far) L.far.visible = far && !gone;
-    L.near.castShadow = L.near.visible && Math.hypot(L.c.x - fx, L.c.z - fz) - L.R < LOD_SHADOW;
+    L.near.castShadow = L.kind !== "glow" && L.near.visible && Math.hypot(L.c.x - fx, L.c.z - fz) - L.R < LOD_SHADOW;
   }
 }
 function chunkInstances(){
@@ -16361,6 +16362,8 @@ function drawHUDInner(dt, alongNow){
   }
 
   if(GATOR && state.phase !== "menu") GG.hud(hud, W, H, k);
+  if(SAVE.settings.fps && state.phase !== "menu" && GAME.fps)
+    hudText(Math.round(GAME.fps) + " FPS" + (SAVE.settings.gfx === 2 ? "  AUTO " + (4 - AUTOQ.q) + "/4" : ""), W/2, 92*k, UI.small, "#ffffff", "center");
   /* minimap, bottom right (not on an expedition: finding the way is the point) */
   if(!EXP.on){
     const size = 96*k, mx = W - size - 16*k, my = H - size - 16*k;          // (on the same 16px edge as the plates)
@@ -16427,7 +16430,7 @@ const SAVE_KEY = "pinehollow.save.v1";
 const BOOT_KEY = "pinehollow.boot";
 const SAVE = (()=>{
   const def = { settings:{ master:0.1, music:0.5, sfx:0.9, vol10:true, cam:0, auto:true, filter:true,
-                           res:1, hud:1, diff:1, units:1, gfx:0, look:0, paint:0, notes:1,
+                           res:1, hud:1, diff:1, units:1, gfx:2, gfxAuto:true, autoQ:0, fps:0, look:0, paint:0, notes:1,
                            car:{ model:0, fender:0, rim:0, wheel:1, livery:0, beat:1,
                                  rack:1, spare:1, cans:1, shovel:0, lights:0, flaps:0, bull:0,
                                  stripe:0, tint:0, pod:0, tape:0, ride:1,
@@ -16440,6 +16443,7 @@ const SAVE = (()=>{
       Object.assign(def.settings, s.settings || {});
       def.settings.car = Object.assign({}, carDef, (s.settings && s.settings.car) || {});
       if(!(s.settings && s.settings.vol10)){ def.settings.master = 0.1; def.settings.vol10 = true; }   // start quiet, once
+      if(!(s.settings && s.settings.gfxAuto)){ if(def.settings.gfx === 0) def.settings.gfx = 2; def.settings.gfxAuto = true; }   // Full becomes Auto, once
       def.records = s.records || {};
       def.champ = s.champ || null;
     }
@@ -16573,22 +16577,55 @@ function rebuildCar(){
   // in an online room: tell the others, so they see the new wagon too
   try{ if(NET.on) netTrackMe(); }catch(e){}
 }
+/* ---- the picture's quality, and Auto ----
+   Not every machine holds the full picture: a laptop on its built-in graphics, a browser on
+   battery or at 150% display scaling. On Auto the game watches its own frame rate during a race
+   and when it can't keep up it steps the picture down (resolution first, then how far out the
+   trees keep their detail, then the shadows), and steps back up when there is room again. Where
+   it settles is remembered for next time. */
+const AUTOQ = { q:Math.max(0, Math.min(3, SAVE.settings.autoQ | 0)), t:0, n:0, hold:4, good:0, clock:0, upAt:-1e9, floor:0 };
+const AUTOQ_LEVELS = [ {pr:1.0, lod:1.0, shadow:true}, {pr:0.8, lod:0.8, shadow:true}, {pr:0.66, lod:0.62, shadow:false}, {pr:0.55, lod:0.5, shadow:false} ];
+function applyQuality(){
+  const S = SAVE.settings, auto = S.gfx === 2, fast = S.gfx === 1, L = AUTOQ_LEVELS[AUTOQ.q];
+  const base = Math.min(window.devicePixelRatio || 1, 1.5);
+  GFX.sig = S.gfx + ":" + AUTOQ.q;
+  GFX.fast = fast || (auto && AUTOQ.q >= 2);
+  sun.castShadow = fast ? false : auto ? L.shadow : true;
+  LODK = fast ? 0.8 : auto ? L.lod : 1;
+  renderer.setPixelRatio(fast ? 1 : auto ? Math.max(0.5, base*L.pr) : base);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  sizeRT();
+}
+function stepAutoQuality(realDt){
+  GAME.fpsT = (GAME.fpsT || 0) + realDt; GAME.fpsN = (GAME.fpsN || 0) + 1;
+  if(GAME.fpsT >= 0.5){ GAME.fps = GAME.fpsN/GAME.fpsT; GAME.fpsT = GAME.fpsN = 0; }
+  if(SAVE.settings.gfx !== 2 || state.phase !== "racing" || GAME.paused || document.hidden || realDt > 0.25){ AUTOQ.t = AUTOQ.n = 0; return; }
+  AUTOQ.clock += realDt; AUTOQ.hold = Math.max(0, AUTOQ.hold - realDt);
+  AUTOQ.t += realDt; AUTOQ.n++;
+  if(AUTOQ.t < 2) return;
+  const fps = AUTOQ.n/AUTOQ.t; AUTOQ.t = AUTOQ.n = 0;
+  if(AUTOQ.hold > 0) return;
+  if(fps < 47 && AUTOQ.q < 3){
+    // (straight back down after trying a step up: that step is too much here, so stop trying it)
+    if(AUTOQ.clock - AUTOQ.upAt < 20) AUTOQ.floor = AUTOQ.q + 1;
+    AUTOQ.q++; AUTOQ.good = 0; AUTOQ.hold = 3;
+  } else if(fps > 57 && AUTOQ.q > AUTOQ.floor){
+    AUTOQ.good += 2;
+    if(AUTOQ.good < 16) return;
+    AUTOQ.q--; AUTOQ.good = 0; AUTOQ.hold = 3; AUTOQ.upAt = AUTOQ.clock;
+  } else { AUTOQ.good = 0; return; }
+  SAVE.settings.autoQ = AUTOQ.q; persist();
+  applyQuality();
+}
 function applySettings(){
   const S = SAVE.settings;
   rebuildCar();
   camMode = S.cam;
   trans.auto = S.auto;
-  const fast = S.gfx === 1;
   paintCar(PAINTS[Math.max(0, Math.min(PAINTS.length-1, S.paint|0))].hex);
   const print = (S.look | 0) === 0, pixel = (S.look | 0) === 2;
   if(print !== LOOK.print || pixel !== LOOK.pixel){ LOOK.print = print; LOOK.pixel = pixel; sizeRT(); }
-  if(fast !== GFX.fast || !rt){
-    GFX.fast = fast;
-    sun.castShadow = !fast;
-    renderer.setPixelRatio(fast ? 1 : Math.min(window.devicePixelRatio, 1.5));
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    sizeRT();
-  }
+  if(S.gfx + ":" + AUTOQ.q !== GFX.sig || !rt) applyQuality();
   sizeHUD();
   setLevels();
 }
@@ -17665,8 +17702,9 @@ const OPTS = [
    desc:"The colour of your wagon. It changes as you pick, so you can see it on the car if you open this from the pause menu."},
   {key:"look",   label:"Look", vals:["Print","Clean","Pixel"],
    desc:"Print draws the stage like an old rally programme: ink lines, halftone shadows, cream paper. Clean is the plain render. Pixel is a chunky 240-line retro picture with a dithered palette."},
-  {key:"gfx",    label:"Graphics", vals:["Full","Fast"],
-   desc:"Full has soft shadows and multisampled edges. Fast turns both off and renders at standard resolution, for older laptops."}
+  {key:"gfx",    label:"Graphics", vals:["Full","Fast","Auto"],
+   desc:"Auto watches the frame rate during a race and trades resolution, far detail and shadows for smoothness when the machine can't keep up (laptops, browsers on battery). Full always draws everything; Fast turns shadows and multisampling off at standard resolution."},
+  {key:"fps",    label:"Frame rate", vals:["Hidden","Shown"], desc:"Shows frames a second at the top of the screen during a race."}
 ];
 /* ---- the garage: what you drive, and what you bolt on it ---- */
 const onoff = ["Off", "On"];
@@ -19300,6 +19338,7 @@ function stepDust(dt){
 function frame(now){
   requestAnimationFrame(frame);
   let dt = (now - last)/1000; last = now;
+  if(dt > 0) stepAutoQuality(dt);
   // the first frame after a slow load can be stamped before `last` was taken,
   // which made dt negative and ran the rivals backwards off the lap
   dt = Math.max(0, Math.min(dt, 0.05));
