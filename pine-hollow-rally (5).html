@@ -1291,10 +1291,12 @@ const TRACKS = [
                [182,-480,7,6],[195,-640,7,5]],
     spans:[{at:[-352,-100], road:-1, span:60, depth:26, wall:52, reach:120, giant:true, shared:0},
            // the broken bridge: a log trestle over the gorge, its middle gone; flat out off the end
-           {at:[150,-356], road:-1, span:40, depth:18, wall:32, reach:60, broken:12, kick:3.8, shared:0}],
+           {at:[150,-356], road:-1, span:40, depth:18, wall:32, reach:60, broken:12, kick:3.8, shared:0},
+           // the old bridge on the long way round: a plain log trestle, nothing missing
+           {at:[-296,186], road:2, span:20, depth:8, wall:16, reach:40, shared:0}],
     // the two jumps straight across the river (their gaps are measured off the river itself)
     leaps:[{at:[-300,245], height:3.6, river:true, shared:0}, {at:[-290,-346], height:4.2, river:true, shared:0}],
-    widths:[[[-347,-160],[-357,-40],3.9]],
+    widths:[[[-347,-160],[-357,-40],3.9], [[-232,-388],[-318,-322],3.7]],
     flats:[[-60,-405,110]],
     branches:[
       // the grove: a short cut through the thickest of the giants, under their caps
@@ -1302,7 +1304,10 @@ const TRACKS = [
        half:5.0, jumps:[[0.5,24,7,2.2,44]], tune:0.1, label:"THE GROVE", mainLabel:"THE RIDGE"},
       // the hops: straight across the inside of the hill, over two crests, while the road goes round it
       {a:[276,-28], b:[300,-342], via:[[290,-100],[304,-180],[306,-262]],
-       half:4.8, jumps:[[0.3,24,7,2.6,46],[0.68,24,7,2.8,48]], tune:0.2, label:"THE HOPS", mainLabel:"THE HILL"}
+       half:4.8, jumps:[[0.3,24,7,2.6,46],[0.68,24,7,2.8,48]], tune:0.2, label:"THE HOPS", mainLabel:"THE HILL"},
+      // the old bridge: round the river jump, downstream to a log bridge and back
+      {a:[-351,123], b:[-204,258], via:[[-326,170],[-296,186],[-268,204]],
+       half:5.2, jumps:[], tune:0, fast:true, label:"OLD BRIDGE", mainLabel:"RIVER JUMP"}
     ]}
 ];
 
@@ -11293,6 +11298,15 @@ if(GLOW){
     paths.forEach(P=>{ for(let k=0;k<P.N;k+=2){ const q = P.pts[k], t = P.tans[k];
       for(let n=0;n<2;n++){ const sd = rnd() < 0.5 ? -1 : 1, off = rnd()*(P.half[k] + 22), x = q.x - t.z*sd*off, z = q.z + t.x*sd*off;
         pos.push(x, gradedY(x, z) + 0.8 + rnd()*7, z); ph.push(rnd()*6.28); } } });
+    // they love the water: a thin drift of them down the whole river, low over the glow
+    if(GRIV.on) GRIV.pts.forEach((q, k)=>{ if(rnd() < 0.55){ const w = rivWater(q[0], q[1]); if(w === null) return;
+      const a = rnd()*6.28, r = rnd()*GRIV.hw[k]; pos.push(q[0] + Math.cos(a)*r, w + 0.4 + rnd()*3.5, q[1] + Math.sin(a)*r); ph.push(rnd()*6.28); } });
+    // and swarm thick where the road crosses it: a cloud over every jump and bridge to fly through
+    SPANS.forEach(sp=>{ if(!sp.shared) return;
+      const half = (sp.gap || (sp.gapS ? sp.gapS*sp.P.seg*2 : sp.S*sp.P.seg))/2 + 12, nx = -sp.tz, nz = sp.tx;
+      const low = (rivWater(sp.x, sp.z) ?? sp.y - 6) + 0.5, high = sp.y + 9;
+      for(let n=0;n<700;n++){ const u = (rnd()*2 - 1)*half, v = (rnd()*2 - 1)*(rnd()*20 + 4);
+        pos.push(sp.x + sp.tx*u + nx*v, low + rnd()*(high - low), sp.z + sp.tz*u + nz*v); ph.push(rnd()*6.28); } });
     const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("aPh", new THREE.Float32BufferAttribute(ph, 1));
     const mat = new THREE.ShaderMaterial({ uniforms:{uTime:{value:0}, uScale:{value:window.innerHeight/2}}, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
       vertexShader:["attribute float aPh; uniform float uTime, uScale; varying float vA; varying vec3 vC;",
@@ -15979,7 +15993,7 @@ function drawNoteTile(sh, cx, y, s, alpha){
     ink(n.sev === 0 ? "H" : String(n.sev), x + w*0.76, y + h*0.8, 34*s, col);
   } else {
     const label = n.kind === "fork" ? (n.label ? n.label.split(" ")[0] : "SPLIT")
-      : {lavaleap:"LAVA JUMP", tunnel:"TUNNEL", overpass:"BRIDGE", bridge:"BRIDGE", jump:"JUMP", bigjump:"BIG JUMP", ridge:"RIDGE", water:"WATER", creek:"CREEK", mud:"MUD", crossing:"CROSSING", ice:"ICE", crest:"CREST", bumps:"BUMPS"}[n.kind] || n.kind.toUpperCase();
+      : {lavaleap: GLOW ? "RIVER JUMP" : "LAVA JUMP", tunnel:"TUNNEL", overpass:"BRIDGE", bridge:"BRIDGE", jump:"JUMP", bigjump:"BIG JUMP", ridge:"RIDGE", water:"WATER", creek:"CREEK", mud:"MUD", crossing:"CROSSING", ice:"ICE", crest:"CREST", bumps:"BUMPS"}[n.kind] || n.kind.toUpperCase();
     // a warning mark: an ink triangle with the colour inside
     const tx = x + 19*k*s, ty = y + h*0.2, ts = h*0.56;
     hud.beginPath(); hud.moveTo(tx, ty); hud.lineTo(tx + ts*0.6, ty + ts); hud.lineTo(tx - ts*0.6, ty + ts); hud.closePath();
@@ -18679,6 +18693,9 @@ const PILES = [];                      // (kept for the debug handle)
 const PILE_KIND = TRACK.season === "winter" || TRACK.season === "desert" ? "none" : FALL ? "fall" : "summer";
 function pileColour(c){
   const r = Math.random();
+  // Glowcap Hollow: fallen glowing leaves, deep blue through to bright cyan, lighting the road
+  if(GLOW) return r < 0.55 ? c.setRGB(0.05, 0.28 + Math.random()*0.18, 0.62 + Math.random()*0.25)
+                : r < 0.85 ? c.setRGB(0.18, 0.62 + Math.random()*0.2, 0.95) : c.setRGB(0.55, 0.9, 1.0);
   if(PILE_KIND === "fall") return fallTint(c);
   // late summer: green going brown and gold
   if(r < 0.45) return c.setHSL(0.22 + Math.random()*0.06, 0.45, 0.34 + Math.random()*0.1);
@@ -18726,7 +18743,8 @@ const LITTER = { items:[], leaf:null, stick:null, home:[] };
     lg.setIndex([0,1,5, 1,2,5, 2,4,5, 2,3,4]); lg.computeVertexNormals(); }
   const sg = new THREE.CylinderGeometry(0.022, 0.03, 0.9, 5); sg.rotateZ(Math.PI/2);
   const nL = items.filter(o=> !o.kind).length, nS = items.length - nL;
-  if(nL){ LITTER.leaf = new THREE.InstancedMesh(lg, new THREE.MeshLambertMaterial({side:THREE.DoubleSide}), nL); scene.add(LITTER.leaf); }
+  // (in Glowcap Hollow they shine on their own, unlit, like the leaves still up in the trees)
+  if(nL){ LITTER.leaf = new THREE.InstancedMesh(lg, GLOW ? new THREE.MeshBasicMaterial({side:THREE.DoubleSide}) : new THREE.MeshLambertMaterial({side:THREE.DoubleSide}), nL); scene.add(LITTER.leaf); }
   if(nS){ LITTER.stick = new THREE.InstancedMesh(sg, new THREE.MeshLambertMaterial({color: DESERT ? 0x9a7a52 : 0x5e4630}), nS);
           LITTER.stick.castShadow = true; scene.add(LITTER.stick); }
   const c = new THREE.Color();
