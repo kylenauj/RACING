@@ -1270,11 +1270,17 @@ const TRACKS = [
     kit:["crest","kicker"],
     shape:"GLOWCAP HOLLOW \u2014 a forest that glows",
     feature:"giant glowing mushrooms, glowworms, glowbugs, glowing pools and crystals, all at night",
-    ctrl:[[0,-400],[-120,-412],[-240,-386],[-330,-306],[-356,-196],[-318,-96],[-372,6],[-418,118],[-364,226],[-252,282],[-150,246],[-66,300],
+    ctrl:[[0,-400],[-120,-412],[-240,-386],[-322,-320],
+          // the long straight down to the ravine, across the fallen giant, and on
+          [-342,-200],[-352,-100],[-362,0],[-374,100],[-352,206],[-252,282],[-150,246],[-66,300],
           [36,362],[156,344],[246,266],[258,152],[196,62],[276,-28],[380,-58],[442,-158],[402,-280],[300,-342],[190,-300],[96,-362]],
-    hills:[[-360,-150,170,24],[60,330,150,20],[390,-160,160,28],[-210,90,190,-10],[200,120,120,14]],
+    hills:[[-310,-330,150,16],[60,330,150,20],[390,-160,160,28],[-210,90,190,-10],[200,120,120,14]],
     jumps:[], fords:[],
-    mud:[[[-318,-96],[-372,6]], [[196,62],[276,-28]]],
+    mud:[[[196,62],[276,-28]]],
+    /* THE FALLEN GIANT: a tree that came down across a ravine, so long ago its top is worn flat,
+       and the road runs along it. 26m down, the ravine floor is a stream of glowing water */
+    spans:[{at:[-352,-100], road:-1, span:60, depth:26, wall:52, reach:120, giant:true}],
+    widths:[[[-347,-160],[-357,-40],3.9]],
     flats:[[-60,-405,110]],
     branches:[
       // the grove: a short cut through the thickest of the giants, under their caps
@@ -3511,7 +3517,7 @@ function passIdx(P, at, pass, skip){
   }
   const p = P.pts[i], t = P.tans[i];
   const sp = {P, i, S, x:p.x, z:p.z, y:p.y, tx:t.x, tz:t.z, grade:g, span:d.span, depth:d.depth || 0,
-              wall:d.wall, reach:d.reach || 0, low:(d.depth || 0) < 8, ph: SPANS.length*1.7, over:!!d.over, Q, j};
+              wall:d.wall, reach:d.reach || 0, low:(d.depth || 0) < 8, ph: SPANS.length*1.7, over:!!d.over, Q, j, giant:!!d.giant};
   sp.floor = d.over ? Q.pts[j].y + BED : sp.y + BED - sp.depth;
   sp.lava = d.over ? -1e9 : sp.floor + (sp.low ? 1.0 : 1.6);
   for(let k=-S;k<=S;k++) P.deck[wrapIdx(P, i + k)] = 1;
@@ -3968,7 +3974,7 @@ const NOTES = (()=>{
   }
   return out;
 })();
-const NOTE_WORDS = { bridgeout:"bridge out, jump, flat out", lavaleap:"lava jump, flat out, don't lift", tunnel:"into the ice tunnel", overpass:"over the bridge", bridge:"log bridge, lava below", jump:"jump", bigjump:"big jump, keep straight", ridge:"ice ridge, jump", water:"water", creek:"into the creek",
+const NOTE_WORDS = { bridgeout:"bridge out, jump, flat out", lavaleap:"lava jump, flat out, don't lift", tunnel:"into the ice tunnel", overpass:"over the bridge", bridge: GLOW ? "the fallen giant, keep it straight" : "log bridge, lava below", jump:"jump", bigjump:"big jump, keep straight", ridge:"ice ridge, jump", water:"water", creek:"into the creek",
                      mud:"mud", crossing:"crossing", ice:"onto ice", crest:"over crest", bumps:"bumps" };
 function noteSay(n){
   if(n.kind === "fork") return (n.label ? n.label.toLowerCase() : "shortcut") + " " + (n.dir > 0 ? "left" : "right");
@@ -4760,7 +4766,7 @@ function paintCanvas(base, rustAmt){
 /* ---- where the lava fissures run on the volcano: jagged cracks a few
    metres off the verge, on the flat, clear of the set pieces ---- */
 const FISS_ROWS = [];
-if(TRACK.special && !GATOR && (SPANS.length || CRATER.on)){
+if(TRACK.special && !GATOR && !GLOW && (SPANS.length || CRATER.on)){
   const P = MAIN, seg = P.seg, clear = (i, x, z)=>{
     if(i*seg < 160 || (P.N - i)*seg < 60) return false;
     if(SPANS.some(sp=> Math.hypot(x - sp.x, z - sp.z) < 55)) return false;
@@ -5480,7 +5486,7 @@ function lavaMaterial(flow){
       "  float gl = pow(1.0 - abs(normalize(cameraPosition - vWorld).y), 3.0);",
       "  col += vec3(0.5, 0.14, 0.02)*gl*smoothstep(0.2, 0.8, vDepth);",
       // in the swamp the same rivers are glowing water: the molten seams cyan, the crust deep teal
-      GATOR ? "  col = vec3(col.b*0.55 + col.g*0.08, col.g*0.85 + col.r*0.38, col.r*1.05 + col.g*0.1);" : "",
+      GATOR || GLOW ? "  col = vec3(col.b*0.55 + col.g*0.08, col.g*0.85 + col.r*0.38, col.r*1.05 + col.g*0.1);" : "",
       "  float fd = length(cameraPosition - vWorld);",
       "  col = mix(col, fogColor, smoothstep(fogNear, fogFar, fd)*0.55);",
       "  gl_FragColor = vec4(col, 1.0);",
@@ -5718,6 +5724,137 @@ FORDS.forEach(F=>{
   scene.add(gate);
 }
 
+/* ---- the fallen giant: one tree for a bridge ----
+   A trunk twelve metres across, its top worn flat as a road where it runs across the ravine,
+   buried in the banks at both ends: the root plate splayed out at one, the snapped crown at the
+   other. Dark bark with a little light in it, both edges of the flat lined with glowing moss
+   so you can see where it falls away, glowing shelf fungus up its flanks, glowing moss hanging
+   from its belly into the dark, and broken branch stubs. */
+function buildGiantLog(sp, at, L0, L1, seg){
+  const R = 7, FLAT = 0.7, NR = 56, ext = Math.round(14/seg), rnd = seeded(2025);
+  /* bark: deep grooves running the length of the trunk, knots and long cracks (the canvas's x is
+     round the trunk, its y along it), tiled round the trunk and down its length */
+  const barkTex = new THREE.CanvasTexture(noiseCanvas(512, 512, (c, W, H)=>{
+    c.fillStyle = "#5c6a88"; c.fillRect(0, 0, W, H);
+    for(let k=0;k<70;k++){ let x = rnd()*W; const w = 2 + rnd()*7, dark = rnd() < 0.7;
+      c.strokeStyle = dark ? "rgba(14,18,34," + (0.5 + rnd()*0.4).toFixed(2) + ")" : "rgba(170,190,225," + (0.12 + rnd()*0.18).toFixed(2) + ")"; c.lineWidth = w;
+      c.beginPath(); c.moveTo(x, -10); for(let y=0;y<=H + 10;y+=16){ x += (rnd() - 0.5)*5; c.lineTo(x, y); } c.stroke(); }
+    for(let k=0;k<7;k++){ const x = rnd()*W, y = rnd()*H, rx = 10 + rnd()*14, ry = 18 + rnd()*30;
+      c.fillStyle = "rgba(10,12,24,.85)"; c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, 7); c.fill();
+      c.strokeStyle = "rgba(150,170,210,.35)"; c.lineWidth = 3; c.beginPath(); c.ellipse(x, y, rx*1.6, ry*1.5, 0, 0, 7); c.stroke(); }
+  }));
+  barkTex.wrapS = barkTex.wrapT = THREE.RepeatWrapping; barkTex.anisotropy = 4;
+  const g = new THREE.Group(), glow = new THREE.Group();
+  const frame = s0 => { const q = at(s0); return {q, nx:-q.tz, nz:q.tx, cy: q.y - 0.12 - FLAT*R}; };
+  // the trunk: rings along it, the top of each cut flat
+  {
+    const pos = [], col = [], idx = [], uv = []; let rows = 0;
+    for(let s0=L0 - ext; s0<=L1 + ext; s0+=Math.max(1, Math.round(1/seg))){
+      const f = frame(Math.max(L0 - ext, Math.min(L1 + ext, s0))), along = s0*seg;
+      for(let k=0;k<=NR;k++){
+        const a = k/NR*Math.PI*2, ridge = 1 + 0.035*Math.sin(a*11 + along*0.15) + 0.02*Math.sin(a*5 - along*0.07);
+        let lx = Math.cos(a)*R*ridge, ly = Math.sin(a)*R*ridge;
+        const top = ly >= FLAT*R;
+        if(top) ly = FLAT*R;
+        pos.push(f.q.x + f.nx*lx, f.cy + ly, f.q.z + f.nz*lx); uv.push(k/NR*7, along/14);
+        // bark: blue-grey, ridged darker; the worn top paler, with the wheel tracks in it
+        const n = 0.85 + 0.3*rnd();
+        // (the worn top paler, the flanks darker and darker toward the belly)
+        if(top) col.push(0.62*n, 0.66*n, 0.78*n);
+        else { const lit = 0.3 + 0.5*Math.max(0, Math.sin(a)); col.push(lit*n, lit*n, lit*1.05*n); }
+      }
+      if(rows) for(let k=0;k<NR;k++){ const a0 = (rows - 1)*(NR + 1) + k, b0 = rows*(NR + 1) + k; idx.push(a0, b0, a0 + 1, a0 + 1, b0, b0 + 1); }
+      rows++;
+    }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({vertexColors:true, map:barkTex, emissive:0x2a3a62, emissiveMap:barkTex, side:THREE.DoubleSide}));
+    m.castShadow = true; m.receiveShadow = true; g.add(m);
+  }
+  const fx = new THREE.Vector3();
+  const pt = (s0, lx, ly)=>{ const f = frame(s0); return fx.set(f.q.x + f.nx*lx, f.cy + ly, f.q.z + f.nz*lx).clone(); };
+  const glowM = c => new THREE.MeshBasicMaterial({color:c});
+  const bark = new THREE.MeshLambertMaterial({color:0x1c2232, emissive:0x070d1a});
+  // glowing moss along both edges of the flat top: the line you steer by
+  const flatX = R*Math.sqrt(1 - FLAT*FLAT);
+  for(const sd of [-1, 1]){
+    const pos = [];
+    for(let s0=L0 - ext*0.6; s0<L1 + ext*0.6; s0+=Math.max(1, Math.round(1/seg))){
+      const a = pt(s0, sd*(flatX - 0.1), FLAT*R + 0.05), b = pt(s0, sd*(flatX + 0.55), FLAT*R - 0.35);
+      pos.push(a.x, a.y, a.z, b.x, b.y, b.z);
+    }
+    const idx = []; for(let k=0;k<pos.length/6 - 1;k++){ const i0 = k*2; idx.push(i0, i0 + 2, i0 + 1, i0 + 1, i0 + 2, i0 + 3); }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx);
+    glow.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color:0x37c8ff, side:THREE.DoubleSide})));
+  }
+  // shelf fungus up the flanks, in clusters, glowing; and hanging moss from the belly
+  const shelfGeo = new THREE.CylinderGeometry(1, 1, 0.12, 14, 1, false, 0, Math.PI);
+  const hang = [];
+  for(let s0=L0 - ext*0.5; s0<L1 + ext*0.5; s0+=Math.round(3/seg)){
+    for(const sd of [-1, 1]){
+      if(rnd() < 0.4) continue;
+      const a = sd > 0 ? -0.25 + rnd()*0.5 : Math.PI - 0.25 + rnd()*0.5, n = 2 + Math.floor(rnd()*4);
+      for(let q=0;q<n;q++){
+        const aa = a + (rnd() - 0.5)*0.4, rr = 0.5 + rnd()*0.9, c = rnd() < 0.8 ? 0x46d4ff : 0x7a6bff;
+        const base = pt(s0 + (rnd() - 0.5)*2/seg, Math.cos(aa)*R*1.02, Math.sin(aa)*R*1.02);
+        const m = new THREE.Mesh(shelfGeo, glowM(c)); m.position.copy(base); m.scale.set(rr, 1, rr*0.8);
+        const f = frame(s0); m.rotation.y = Math.atan2(f.nx*Math.cos(aa), f.nz*Math.cos(aa)) - Math.PI/2; glow.add(m);
+      }
+    }
+    // moss hanging down off the belly, glowing toward its tips
+    for(let q=0;q<4;q++){
+      const aa = -Math.PI/2 + (rnd() - 0.5)*2.2, top = pt(s0 + (rnd() - 0.5)*2/seg, Math.cos(aa)*R*0.98, Math.sin(aa)*R*0.98), L = 1.5 + rnd()*7;
+      hang.push(top.x, top.y, top.z, top.x, top.y - L, top.z);
+    }
+  }
+  { const lg = new THREE.BufferGeometry(); lg.setAttribute("position", new THREE.Float32BufferAttribute(hang, 3));
+    glow.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({color:0x2a9fe0, transparent:true, opacity:0.55, blending:THREE.AdditiveBlending, depthWrite:false})));
+    const tips = []; for(let k=0;k<hang.length;k+=6) tips.push(hang[k + 3], hang[k + 4], hang[k + 5]);
+    const tg = new THREE.BufferGeometry(); tg.setAttribute("position", new THREE.Float32BufferAttribute(tips, 3));
+    glow.add(new THREE.Points(tg, new THREE.PointsMaterial({color:0x8fe8ff, size:0.45, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false}))); }
+  // glowing moss in patches over the flanks, below the road's edge
+  { const mossGeo = new THREE.SphereGeometry(1, 8, 5), mm = new THREE.MeshBasicMaterial({color:0x1d8fd0});
+    for(let s0=L0 - ext*0.6; s0<L1 + ext*0.6; s0+=Math.round(2/seg)){
+      for(let q=0;q<3;q++){
+        const sd = rnd() < 0.5 ? -1 : 1, aa = (sd > 0 ? 0 : Math.PI) + sd*(-0.9 + rnd()*1.55);
+        const c = pt(s0 + (rnd() - 0.5)*2/seg, Math.cos(aa)*R*0.995, Math.sin(aa)*R*0.995), f = frame(s0);
+        const m = new THREE.Mesh(mossGeo, mm); m.position.copy(c);
+        const nrm = new THREE.Vector3(f.nx*Math.cos(aa), Math.sin(aa), f.nz*Math.cos(aa)).normalize();
+        m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), nrm); m.scale.set(0.6 + rnd()*1.4, 0.06, 0.4 + rnd()*1.0); glow.add(m);
+      }
+    } }
+  // broken branch stubs out of the flanks, below the road
+  for(let k=0;k<9;k++){
+    const s0 = L0 + (L1 - L0)*(0.08 + rnd()*0.84), sd = rnd() < 0.5 ? -1 : 1, aa = (sd > 0 ? 0 : Math.PI) + (rnd() - 0.6)*0.9*sd;
+    const a = pt(s0, Math.cos(aa)*R*0.9, Math.sin(aa)*R*0.9), out = pt(s0 + (rnd() - 0.5)*3/seg, Math.cos(aa)*(R + 3 + rnd()*4), Math.sin(aa)*(R + 3 + rnd()*4) + rnd()*2);
+    const d = out.clone().sub(a), c = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.7, d.length(), 7), bark);
+    c.position.copy(a).addScaledVector(d, 0.5); c.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); g.add(c);
+  }
+  // the root plate at the near end, roots splayed out sideways and down into the bank (never over the road)
+  { const s0 = L0 - ext, f = frame(s0), back = new THREE.Vector3(-f.q.tx, 0, -f.q.tz);
+    for(let k=0;k<16;k++){
+      const a = k/16*Math.PI*2, ox = Math.cos(a)*R*0.8, oy = Math.sin(a)*R*0.8;
+      if(oy > R*0.35 && Math.abs(ox) < R*0.9) continue;
+      const A = pt(s0, ox, oy), dir = new THREE.Vector3(f.nx*Math.cos(a), Math.sin(a)*0.5 - 0.35, f.nz*Math.cos(a)).addScaledVector(back, 0.6).normalize();
+      const L = 6 + rnd()*7, B = A.clone().addScaledVector(dir, L);
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 1.1, L, 6), bark); c.position.copy(A).addScaledVector(dir, L/2);
+      c.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir); g.add(c);
+      if(rnd() < 0.6){ const tip = new THREE.Mesh(new THREE.SphereGeometry(0.35, 6, 4), glowM(0x5ae0ff)); tip.position.copy(B); glow.add(tip); }
+    } }
+  // the snapped crown at the far end: splinters sticking out round the break, clear of the road
+  { const s0 = L1 + ext, f = frame(s0), fwd = new THREE.Vector3(f.q.tx, 0, f.q.tz);
+    for(let k=0;k<14;k++){
+      const a = k/14*Math.PI*2, ox = Math.cos(a)*R*0.75, oy = Math.sin(a)*R*0.75;
+      if(oy > R*0.3 && Math.abs(ox) < R*0.9) continue;
+      const A = pt(s0, ox, oy), L = 2 + rnd()*4, dir = fwd.clone().addScaledVector(new THREE.Vector3(f.nx*Math.cos(a), Math.sin(a), f.nz*Math.cos(a)), 0.5).normalize();
+      const c = new THREE.Mesh(new THREE.ConeGeometry(0.6 + rnd()*0.5, L, 5), bark); c.position.copy(A).addScaledVector(dir, L/2);
+      c.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir); g.add(c);
+    } }
+  g.traverse(o=>{ if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+  scene.add(g); scene.add(glow);
+  // trees keep off the log where it lies in the banks
+  for(let s0=L0 - ext; s0<=L1 + ext; s0+=Math.round(6/seg)){ const q = at(Math.max(L0 - ext, Math.min(L1 + ext, s0))); NO_TREES.push([q.x, q.z, R + 3]); }
+}
 /* ---- the log bridges, and the lava under them ----
    A deck of logs laid across two big stringers, log rails on posts, and
    under a crevasse bridge, trestle bents of logs braced in X's standing
@@ -5740,7 +5877,8 @@ if(SPANS.length){
       const T = P.tans[wrapIdx(P, Math.round(s0))];
       return {x: A.x + (B.x - A.x)*f, z: A.z + (B.z - A.z)*f, y: pathY(P, s0) + BED, tx:T.x, tz:T.z, half:P.half[wrapIdx(P, Math.round(s0))]}; };
     const Sv = Math.min(sp.S, Math.round((sp.wall + 1.5)/seg)), L0 = -Sv, L1 = Sv;
-    if(!sp.leap){
+    if(sp.giant) buildGiantLog(sp, at, L0, L1, seg);
+    if(!sp.leap && !sp.giant){
     const inGap = s0 => sp.gapS && Math.abs(s0) < sp.gapS - 0.4;
     // the deck: logs across, a hand's width apart
     for(let s0=L0; s0<=L1; s0+=0.5/seg){
@@ -6207,7 +6345,7 @@ function caveRoom(x, z){
    fissures steaming in the snow beside the road, the charred skeletons of
    trees the lava has reached, and black basalt tumbled over the snowfields
    round the cone ---- */
-if(TRACK.special && !GATOR && (SPANS.length || CRATER.on)){
+if(TRACK.special && !GATOR && !GLOW && (SPANS.length || CRATER.on)){
   const P = MAIN, seg = P.seg, clear = (i, x, z)=>{
     if(i*seg < 160 || (P.N - i)*seg < 60) return false;                                   // the start
     if(SPANS.some(sp=> Math.hypot(x - sp.x, z - sp.z) < 55)) return false;
@@ -6539,7 +6677,7 @@ if(TRACK.geysers && LAKE.on && LAKE.lava){
   }
 
 }
-if(SPANS.length && TRACK.geysers && !GATOR){
+if(SPANS.length && TRACK.geysers && !GATOR && !GLOW){
   for(let k=0;k<10;k++){
     const i = wrapIdx(MAIN, Math.round((80 + k*110)/MAIN.seg)), p = MAIN.pts[i], t = MAIN.tans[i], sd = k % 2 ? 1 : -1, off = MAIN.half[i] + 5 + Math.random()*4;
     const x = p.x - t.z*sd*off, z = p.z + t.x*sd*off;
@@ -6735,7 +6873,7 @@ function stepSetPieces(dt){
     if(E.kind === "fall"){
       if(Math.random() < dt*10) SPRAY.spawn(E.x + (Math.random() - 0.5)*2, E.y, E.z + (Math.random() - 0.5)*2, (Math.random() - 0.5)*3, 2 + Math.random()*4, (Math.random() - 0.5)*3,
                                             {life:0.9 + Math.random()*0.6, size:[0.7, 0.3], col:HOT_RGB(), heat:1, grav:9});
-      if(Math.random() < dt*3) STEAM.spawn(E.x, E.y + 0.5, E.z, 0, 1.5 + Math.random(), 0, {life:3, size:[1.5, 5], col: GATOR ? [0.7, 0.85, 0.95] : [0.35, 0.33, 0.32], alpha:0.35, heat:GATOR ? 0.3 : 1.2, drag:0.8, grav:-0.4});
+      if(Math.random() < dt*3) STEAM.spawn(E.x, E.y + 0.5, E.z, 0, 1.5 + Math.random(), 0, {life:3, size:[1.5, 5], col: GATOR || GLOW ? [0.7, 0.85, 0.95] : [0.35, 0.33, 0.32], alpha:0.35, heat:GATOR ? 0.3 : 1.2, drag:0.8, grav:-0.4});
     } else {
       if(Math.random() < dt*22){ const v = (Math.random() - 0.5)*18;
         SPRAY.spawn(E.x - E.tz*v, E.y + 0.3, E.z + E.tx*v, (Math.random() - 0.5), 3 + Math.random()*5, (Math.random() - 0.5),
@@ -6753,8 +6891,8 @@ function stepSetPieces(dt){
   });
 }
 /* the lava's own light: one warm lamp, kept on the nearest lava to the car */
-const LAVA_LIGHT = (SPANS.length || (LAKE.on && LAKE.lava)) ? new THREE.PointLight(GATOR ? 0x3ccfff : 0xff6a20, 0, 70, 1.6) : null;
-const HOT_RGB = GATOR ? ()=> [0.35 + Math.random()*0.2, 0.85 + Math.random()*0.15, 1.0] : ()=> [1.0, 0.45 + Math.random()*0.35, 0.08];
+const LAVA_LIGHT = (SPANS.length || (LAKE.on && LAKE.lava)) ? new THREE.PointLight(GATOR || GLOW ? 0x3ccfff : 0xff6a20, 0, 70, 1.6) : null;
+const HOT_RGB = GATOR || GLOW ? ()=> [0.35 + Math.random()*0.2, 0.85 + Math.random()*0.15, 1.0] : ()=> [1.0, 0.45 + Math.random()*0.35, 0.08];
 if(LAVA_LIGHT) scene.add(LAVA_LIGHT);
 function stepLava(dt){
   stepSetPieces(dt);
@@ -10476,11 +10614,14 @@ function glowTreeGeometry(kind){
   const put = (geo, mtx, col, P, C, jit)=>{
     const g = geo.index ? geo.toNonIndexed() : geo; g.applyMatrix4(mtx);
     const a = g.attributes.position;
-    for(let i=0;i<a.count;i++){ P.push(a.getX(i), a.getY(i), a.getZ(i)); const k = 1 + (jit ? (R() - 0.5)*jit : 0); C.push(col[0]*k, col[1]*k, col[2]*k); }
+    let k = 1;
+    for(let i=0;i<a.count;i++){ P.push(a.getX(i), a.getY(i), a.getZ(i)); if(i % 3 === 0) k = 1 + (jit ? (R() - 0.5)*jit : 0); C.push(col[0]*k, col[1]*k, col[2]*k); }
   };
   const M = (x, y, z, rx, ry, rz, sx, sy, sz)=> new THREE.Matrix4().compose(new THREE.Vector3(x, y, z),
     new THREE.Quaternion().setFromEuler(new THREE.Euler(rx || 0, ry || 0, rz || 0)), new THREE.Vector3(sx || 1, sy || 1, sz || 1));
-  const bark = [0.13, 0.12, 0.17], leaf = ()=> [0.08 + R()*0.04, 0.2 + R()*0.08, 0.27 + R()*0.08];
+  const bark = [0.13, 0.12, 0.17];
+  // glowing leaves: deep blue to bright cyan, every facet its own shade, so the clumps shimmer
+  const leafGlow = k=> { k = k || 1; return R() < 0.75 ? [0.04*k, (0.26 + R()*0.14)*k, (0.5 + R()*0.2)*k] : [0.12*k, 0.16*k, (0.55 + R()*0.15)*k]; };
   // a ribbon hanging from (x, y, z) for len, dark at the top and bright at the foot, with a bead on the end
   const strand = (x, y, z, len, w, bright)=>{
     const a = R()*Math.PI, dx = Math.cos(a)*w, dz = Math.sin(a)*w, top = [0.03, 0.08, 0.2], foot = bright;
@@ -10501,7 +10642,7 @@ function glowTreeGeometry(kind){
       put(new THREE.CylinderGeometry(0.012, 0.024, L, 5), M(x + Math.cos(a)*L*0.45, y - 0.06 + L*0.2, z + Math.sin(a)*L*0.45, 0, -a, Math.PI/2 - 0.5), bark, bp, bc, 0.15);
       blobs.push([x + Math.cos(a)*L*0.9, y + 0.02 + R()*0.06, z + Math.sin(a)*L*0.9, 0.12 + R()*0.05]); }
     blobs.push([x, y + 0.12, z, 0.17], [x + (R() - 0.5)*0.1, y + 0.2, z + (R() - 0.5)*0.1, 0.12]);
-    blobs.forEach(b=>{ put(new THREE.IcosahedronGeometry(b[3], 0), M(b[0], b[1], b[2], R(), R(), R(), 1, 0.78, 1), leaf(), bp, bc, 0.25);
+    blobs.forEach(b=>{ put(new THREE.IcosahedronGeometry(b[3], 0), M(b[0], b[1], b[2], R(), R(), R(), 1, 0.78, 1), leafGlow(), gp, gc, 0.7);
       // the leaves catch the light: glowing specks scattered over each clump
       for(let n=0;n<10;n++){ const u = new THREE.Vector3(R() - 0.5, (R() - 0.3)*0.8, R() - 0.5).normalize().multiplyScalar(b[3]*0.96);
         put(new THREE.TetrahedronGeometry(0.014 + R()*0.01, 0), M(b[0] + u.x, b[1] + u.y*0.78, b[2] + u.z, R()*6, R()*6, 0), glowCol(), gp, gc); }
@@ -10511,8 +10652,8 @@ function glowTreeGeometry(kind){
   } else {
     // a slender trunk, a dark dome, and a curtain of fronds round its rim glowing toward their tips
     put(new THREE.CylinderGeometry(0.026, 0.055, 0.62, 6), M(0, 0.31, 0, (R() - 0.5)*0.08, 0, (R() - 0.5)*0.08), bark, bp, bc, 0.15);
-    put(new THREE.SphereGeometry(0.25, 9, 5, 0, Math.PI*2, 0, Math.PI*0.55), M(0, 0.58, 0, 0, R()*6, 0, 1, 0.62, 1), leaf(), bp, bc, 0.25);
-    put(new THREE.IcosahedronGeometry(0.1, 0), M(0, 0.72, 0, R(), R(), R()), leaf(), bp, bc, 0.25);
+    put(new THREE.SphereGeometry(0.25, 9, 5, 0, Math.PI*2, 0, Math.PI*0.55), M(0, 0.58, 0, 0, R()*6, 0, 1, 0.62, 1), leafGlow(0.8), gp, gc, 0.7);
+    put(new THREE.IcosahedronGeometry(0.1, 0), M(0, 0.72, 0, R(), R(), R()), leafGlow(), gp, gc, 0.7);
     for(let n=0;n<44;n++){ const a = n/44*Math.PI*2 + R()*0.1, r = 0.17 + R()*0.08, y = 0.6 + (0.25 - r)*0.6;
       strand(Math.cos(a)*r, y, Math.sin(a)*r, 0.2 + R()*0.26, 0.006, glowCol()); }
     for(let n=0;n<8;n++){ const u = new THREE.Vector3(R() - 0.5, R()*0.5, R() - 0.5).normalize().multiplyScalar(0.25);
@@ -10848,7 +10989,8 @@ if(GLOW){
     g.fillStyle = r; g.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(cv); })();
   const glowGeo = new THREE.PlaneGeometry(1, 1); glowGeo.rotateX(-Math.PI/2);
   const glowMat = new THREE.MeshBasicMaterial({map:glowTex, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, opacity:0.55});
-  const ok = (x, z, m)=>{ if(inWaterway(x, z) || deckAt(x, z) > 0.2) return false; const n = nearest(x, z); return n.dist > n.half + m; };
+  const ok = (x, z, m)=>{ if(inWaterway(x, z) || deckAt(x, z) > 0.2) return false; if(SPANS.length && lavaNear(x, z) > 0.15) return false;
+    const n = nearest(x, z); return n.dist > n.half + m; };
 
   /* -- the mushrooms: [x, z, height, cap radius, colour, lean x, lean z] -- */
   const shrooms = [];
@@ -11274,7 +11416,7 @@ if(GLOW){
       : SWAMPGP ? (kind === 0 ? willowGeometry() : kind === 1 ? cypressGeometry() : hardwoodGeometry(1))
       : WINTER ? snowify(coniferGeometry(kind))
       : FALL && kind > 0 ? hardwoodGeometry(kind) : coniferGeometry(kind),
-      new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide}),
+      new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide, emissive: GLOW && kind === 2 ? 0x0b2e5c : 0x000000}),
       list.length
     );
     list.forEach((p, i)=>{
@@ -14686,7 +14828,7 @@ function stepCarInner(dt){
     const f = spanFind(pose.x, pose.z, 4.5);
     if(f && pose.y > pathY(f[0].P, f[1]) + BED - 2.5){
       const P = f[0].P, j = wrapIdx(P, Math.round(f[1])), pB = P.pts[j], tB = P.tans[j];
-      const nx2 = -tB.z, nz2 = tB.x, lat = (pose.x - pB.x)*nx2 + (pose.z - pB.z)*nz2, lim = f[3] + 0.55;
+      const nx2 = -tB.z, nz2 = tB.x, lat = (pose.x - pB.x)*nx2 + (pose.z - pB.z)*nz2, lim = f[3] + (f[0].giant ? 0.2 : 0.55);   // (on the giant: the car's flank at the moss)
       if(Math.abs(lat) > lim){
         const push = (Math.abs(lat) - lim)*Math.sign(lat);
         pose.x -= nx2*push; pose.z -= nz2*push;
