@@ -1078,36 +1078,36 @@ const TRACKS = [
     ]},
 
   /* ---- SPECIAL: Blossom Run, a cherry blossom valley in spring ----
-     A speedway through the orchards: fast esses along the top of the ridge, a plunge off its
-     east end that throws you well past top speed into a hairpin, the valley snaking over the
-     rollers and the boost pads, off the lone hill, and esses up the long climb to the ridge. Pink trees,
+     A speedway through the orchards: fast sweepers along the top of the ridge, a plunge off its
+     east end that throws you well past top speed, a long braking zone into the hairpin at the foot
+     of it, boost out along the valley, fly the lone hill, and sweep up the long climb to the ridge. Pink trees,
      petals on the wind and on the road, and butterflies everywhere. The hills work like the
      Sawtooth's: fast up, and down past top speed; the boost pads throw you further still. */
   { name:"BLOSSOM RUN", special:true, spring:true, hillfast:true, season:"summer", after:"a cherry blossom valley in spring", relief:0.9, rollers:0.35,
-    blurb:"flat out through the cherry orchards: esses along the ridge, a plunge off its end past top speed into a hairpin, the valley snake over the rollers, off the lone hill and esses up the climb home. Hit the boost pads to go faster than the car can on its own, then find the brakes",
-    kit:["crest","kicker","tabletop","kicker","crest"],
+    blurb:"flat out through the cherry orchards: sweepers along the ridge, a plunge off its end past top speed and hard on the brakes for the hairpin at the bottom, boost out along the valley, fly the lone hill and sweep up the climb home. Hit the boost pads to go faster than the car can on its own",
+    kit:[],
     shape:"BLOSSOM RUN \u2014 a spring speedway",
     feature:"cherry blossoms, butterflies, boost pads, a plunge past top speed into a hairpin, and esses taken flat out",
-    ctrl:[[-300,-300],[-200,-302],[-110,-292],
-          // the ridge: fast esses along its spine, flat out only on the perfect line
-          [-25,-258],[60,-286],[145,-326],[230,-292],[315,-258],[395,-276],
-          // round off the end of the ridge, and the plunge south, straight down
-          [470,-248],[530,-190],[562,-110],[576,-20],[584,80],[588,190],[588,290],
-          // the hairpin at the foot of it: stand on the brakes from flat out
-          [582,356],[566,392],[542,398],[526,378],[518,346],[490,322],[440,318],
-          // the valley snake: S-bends over the rollers, boost in and brake
-          [380,330],[300,362],[215,398],[130,380],[45,348],[-40,372],[-105,410],
-          // up and off the lone hill, and a fast left-right where you land
-          [-180,446],[-270,445],[-350,430],[-415,395],[-470,340],
-          // the climb home: esses up the hillside, and round onto the ridge
-          [-520,280],[-552,205],[-585,130],[-560,55],[-532,-20],[-555,-95],[-568,-165],[-532,-238],[-460,-282],[-385,-298]],
-    hills:[[-250,-440,330,62],[150,-450,330,68],[440,-340,230,56],[565,-160,150,36],[60,330,330,-22],[-270,470,120,42],
-           // rollers along the valley floor: crests to fly off at speed
-           [300,368,42,7],[170,392,40,6],[0,356,42,7],[-70,392,36,5]],
-    jumps:[], fords:[],
-    flats:[[-300,-300,100]],
-    // the boost pads: off the grid, into the ridge esses, over the top of the plunge and down it, out of the hairpin, through the valley snake, at the foot of the hill and up the climb
-    pads:[[-200,-302],[-25,-258],[230,-292],[576,-20],[586,170],[400,326],[130,380],[-40,372],[-180,446],[-560,55],[-555,-95]],
+    ctrl:[[-330,-300],[-298,-300],[-265,-300],[-233,-300],[-201,-300],[-169,-300],[-136,-300],[-104,-300],[-71,-296],[-40,-284],[-26,-275],[-13,-266],
+          [13,-248],[41,-231],[72,-221],[104,-219],[136,-225],[166,-239],[192,-257],[218,-275],[247,-291],[280,-299],[297,-300],[314,-300],
+          [347,-298],[378,-292],[408,-282],[437,-267],[463,-248],[477,-234],[501,-196],[508,-164],[508,-132],[508,-100],[508,-68],[508,-36],
+          [508,-4],[508,28],[508,60],[508,92],[508,124],[508,156],[508,188],[508,220],[508,244],[508,285],[508,318],[508,350],
+          [496,379],[465,388],[440,368],[417,344],[386,332],[370,330],[354,330],[322,330],[290,330],[258,330],[226,330],[194,330],
+          [170,330],[130,339],[112,348],[74,372],[46,389],[17,405],[-15,411],[-47,411],[-79,411],[-111,411],[-143,411],[-175,411],
+          [-207,411],[-239,411],[-271,411],[-303,411],[-335,411],[-367,411],[-399,411],[-431,405],[-457,386],[-473,358],[-476,334],[-476,294],
+          [-476,261],[-476,228],[-474,196],[-468,165],[-458,134],[-445,105],[-432,76],[-422,54],[-409,16],[-403,-16],[-402,-44],[-402,-80],
+          [-402,-112],[-402,-144],[-402,-176],[-402,-208],[-402,-232],[-389,-270],[-365,-292]],
+    /* (laid out from straights and arcs: every bend's radius picked for the speed you arrive at it,
+       so a boost is room to use, and the two slow corners come at the end of a long braking zone) */
+    hills:[[-250,-440,330,62],[150,-450,330,68],[440,-340,230,56],[565,-160,150,36],[60,330,330,-22],
+           // the lone hill on the valley floor, to fly off; and a roller in the valley S-bends
+           [-215,411,105,38],[70,374,34,5]],
+    jumps:[[[266,330],1.8]], fords:[],
+    bigJumps:[[[-215,411],2.6]],
+    flats:[[-250,-300,110]],
+    // the boost pads: off the grid, over the top of the plunge, out of the hairpin, on into the lone
+    // hill, and up the climb (each only where the road ahead has room to use it: see BOOSTPADS)
+    pads:[[-213,-300],[508,-110],[380,330],[-27,411],[-476,290],[-402,-90]],
     branches:[]},
 
   /* ---- THE SWAMP CUP: the bayou, boardwalks, mud and willows ---- */
@@ -1478,6 +1478,21 @@ const ALP = {fall:1.5, over:18, overPer:45, settle:3, climb:4};   // (climb: a s
 /* a boost pad: how far past top speed it lifts the limit (m/s, stacking up to max), how long that
    holds before it fades (s) and how fast it fades (m/s a second), and the shove it gives (m/s^2, for push s) */
 const PAD_SURGE = {add:16, max:30, hold:2.0, fade:3.0, kick:18, push:1.5};
+/* where the boost pads go: each one only where the next 160m has no bend the boosted car can't hold
+   (it moves up to 60m to find such a spot, or is left out). Shared by the pads and the rivals' pace. */
+let PAD_SPOTS = null;
+function padSpots(){
+  if(PAD_SPOTS) return PAD_SPOTS;
+  const PR = radiiOf(MAIN), roomAt = i=>{ for(let m=0; m<=160; m+=2){ if(PR[wrapIdx(MAIN, i + Math.round(m/MAIN.seg))] < 150) return false; } return true; };
+  PAD_SPOTS = [];
+  (TRACK.pads || []).forEach(xz=>{
+    let i = snapTo(MAIN, xz);
+    if(!roomAt(i)){ let f = -1; for(let d=4; d<=60 && f < 0; d+=4) for(const sg of [1, -1]){ const j = wrapIdx(MAIN, i + sg*Math.round(d/MAIN.seg)); if(roomAt(j)){ f = j; break; } }
+      if(f < 0) return; i = f; }
+    PAD_SPOTS.push(i);
+  });
+  return PAD_SPOTS;
+}
 function routingTest(P){
   const N = P.N, seg = P.seg, R = radiiOf(P);
   const TOTALS = [24.0, 15.5, 10.8, 7.7, 5.5];
@@ -1508,10 +1523,11 @@ function routingTest(P){
   // (a corner holds its own speed; where the road is straight enough to hold top speed, the hill can carry them past it)
   /* and the boost pads: a surge past top speed off each one, fading, and a shove while it lasts */
   const push = new Float64Array(N);
-  if(P === MAIN && TRACK.pads) TRACK.pads.forEach(xz=>{ const p0 = snapTo(P, xz);
+  if(P === MAIN && TRACK.pads) padSpots().forEach(p0=>{
     for(let m=0; m<400; m+=seg){ const i = (p0 + Math.round(m/seg)) % N, sg = PAD_SURGE.max - Math.max(0, m - PAD_SURGE.hold*44)*PAD_SURGE.fade/44;
       if(sg <= 0) break; over[i] = Math.max(over[i], Math.min(PAD_SURGE.max, sg)); if(m < PAD_SURGE.push*44) push[i] = PAD_SURGE.kick; } });
-  if(HILL) for(let i=0;i<N;i++){ const c = cornerHoldSpeed(R[i]); v[i] = c > 43.5 ? 44 + over[i] : c; }
+  // (past top speed a bend holds what keeps the pull at top speed's: v^2/R = 44 x the turn rate there)
+  if(HILL) for(let i=0;i<N;i++){ const c = cornerHoldSpeed(R[i]); v[i] = c > 43.5 ? Math.min(44 + over[i], Math.sqrt(R[i]*44*2.05*0.45)) : c; }
   for(let pass=0; pass<3; pass++){
     for(let i=N-1;i>=0;i--){
       const nx2 = (i+1)%N;
@@ -2635,7 +2651,7 @@ const AUTO_JUMPS = [];
     busy.push([wrapIdx(MAIN, P.mainTo - Math.round(12/seg)), 50]);
   });
   const gap = (a, b)=>{ const d = Math.abs(a - b) % N; return Math.min(d, N - d)*seg; };
-  const KIT = (TRACK.kit || []).concat(TRACK.test || TRACK.expedition || TRACK.alpine ? [] : ["kicker","crest","rhythm","double","crest","tabletop"]).slice(0, 9);
+  const KIT = (TRACK.kit || []).concat(TRACK.test || TRACK.expedition || TRACK.alpine || SPRING ? [] : ["kicker","crest","rhythm","double","crest","tabletop"]).slice(0, 9);
   KIT.forEach(type=>{
     const L = JUMP_LEN[type];
     const back = Math.round(L*0.4/seg), fwd = Math.round((L*0.5 + 20)/seg);
@@ -10101,8 +10117,8 @@ if(TRACK.pads && TRACK.pads.length){
   const mat = new THREE.MeshBasicMaterial({map:tex, transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
   const rim = new THREE.MeshBasicMaterial({color:0xffffff});
   const geo = new THREE.PlaneGeometry(1, 1);
-  TRACK.pads.forEach(xz=>{
-    const i = snapTo(MAIN, xz), p = MAIN.pts[i], t = MAIN.tans[i];
+  padSpots().forEach(i=>{
+    const p = MAIN.pts[i], t = MAIN.tans[i];
     const W = Math.min(6.4, MAIN.half[i]*2 - 1.4), L = 8, y = surfaceY(p.x, p.z);
     const m = new THREE.Mesh(geo, mat);
     m.scale.set(W, L, 1); m.rotation.order = "YXZ";
@@ -15181,8 +15197,13 @@ function stepCarInner(dt){
   // steering authority tapers with speed and off the ribbon
   const sp = Math.abs(newAlong);
   const auth = Math.min(1, sp/7) * (1 - Math.min(0.5, sp/MAXV*0.55)) * (offRoad?0.86:1);
-  const rate = 2.05 * auth * (hand?1.25:1);
-  pose.steerIn += (steer - pose.steerIn) * Math.min(1, dt*8);
+  /* Past the car's own top speed (down a hill, off a boost pad) the same lock would throw it sideways
+     harder and harder: past it, how fast it turns falls away with speed, so the pull through a bend
+     stays what it is at top speed and a tap of the key is a small correction, not a lurch. The wheel
+     also winds on more gently up there. */
+  const fast = sp > MAXV ? MAXV/sp : 1;
+  const rate = 2.05 * auth * (hand?1.25:1) * fast;
+  pose.steerIn += (steer - pose.steerIn) * Math.min(1, dt*8*Math.sqrt(fast));
   pose.h += pose.steerIn * rate * dt * Math.sign(newAlong || 1);
 
   // grip: lateral velocity bleeds off, slower on mud and under handbrake
