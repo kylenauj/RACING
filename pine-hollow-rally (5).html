@@ -11115,7 +11115,7 @@ function cherryGeometry(kind, leafy){
   const bark = ()=> c.setHSL(0.98, 0.22, 0.13 + Math.random()*0.03);
   const up = new THREE.Vector3(0, 1, 0);
   const limb = (from, to, r0, r1)=>{ const d = to.clone().sub(from), L = d.length();
-    const g = new THREE.CylinderGeometry(r1, r0, L, 5); g.translate(0, L/2, 0);
+    const g = new THREE.CylinderGeometry(r1, r0, L, 5, 1, true); g.translate(0, L/2, 0);      // (open ended: the ends are inside the blossom or the ground)
     g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(up, d.normalize())));
     g.translate(from.x, from.y, from.z); put(g, bark); };
   // the crown's colour, by height through it: light on top, deeper underneath
@@ -11124,7 +11124,7 @@ function cherryGeometry(kind, leafy){
     if(leafy) return c.setHSL(0.25 + Math.random()*0.03, 0.5 + Math.random()*0.1, 0.42 + k*0.1 + Math.random()*0.04);
     if(white) return c.setHSL(0.95, 0.6, 0.86 + k*0.05);
     return c.setHSL(0.935 + Math.random()*0.03, 0.78 + Math.random()*0.12, 0.66 + k*0.09 + Math.random()*0.04); };
-  const cluster = (x, y, z, r, sq)=>{ const b = new THREE.IcosahedronGeometry(r, 0);
+  const cluster = (x, y, z, r, sq, small)=>{ const b = small ? new THREE.OctahedronGeometry(r, 0) : new THREE.IcosahedronGeometry(r, 0);
     b.rotateX(Math.random()*3); b.rotateY(Math.random()*3); b.scale(1, sq || 0.82, 1); b.translate(x, y, z);
     put(b, bloom(!leafy && Math.random() < 0.12)); };
   const la = Math.random()*6.28, ln = 0.02 + Math.random()*0.04;
@@ -11142,7 +11142,7 @@ function cherryGeometry(kind, leafy){
     // the cascades: chains of blossom falling from the rim of the dome, leaning out a little as they go
     for(let k=0;k<13;k++){ const a = k/13*6.28 + Math.random()*0.3, r0 = 0.17 + Math.random()*0.06, n = 3 + (Math.random() < 0.5 ? 1 : 0);
       for(let j=0;j<n;j++){ const rr = r0 + j*0.025, y = top.y + 0.1 - j*0.1 - Math.random()*0.02;
-        cluster(top.x + Math.cos(a)*rr, y, top.z + Math.sin(a)*rr, 0.055 - j*0.007, 1.5); } }
+        cluster(top.x + Math.cos(a)*rr, y, top.z + Math.sin(a)*rr, 0.055 - j*0.007, 1.5, true); } }
   } else {
     // the spreading cherry: the trunk forks into three or four limbs, each forking again
     const top = new THREE.Vector3(Math.cos(la)*ln, 0.3, Math.sin(la)*ln);
@@ -11159,8 +11159,8 @@ function cherryGeometry(kind, leafy){
     }
     // blossom over every tip, and the dome between them filled in so the crown is one billowing cloud
     tips.forEach(tp=>{ cluster(tp.x, tp.y + 0.02, tp.z, 0.1 + Math.random()*0.03);
-      const a = Math.random()*6.28; cluster(tp.x + Math.cos(a)*0.07, tp.y + 0.07, tp.z + Math.sin(a)*0.07, 0.07 + Math.random()*0.03); });
-    for(let k=0;k<9;k++){ const a = Math.random()*6.28, u = Math.sqrt(Math.random()), rr = u*0.3;
+      const a = Math.random()*6.28; cluster(tp.x + Math.cos(a)*0.07, tp.y + 0.07, tp.z + Math.sin(a)*0.07, 0.07 + Math.random()*0.03, 0.82, true); });
+    for(let k=0;k<7;k++){ const a = Math.random()*6.28, u = Math.sqrt(Math.random()), rr = u*0.3;
       cluster(top.x + Math.cos(a)*rr, cy + 0.06 + (1 - u)*0.1 + (Math.random() - 0.5)*0.05, top.z + Math.sin(a)*rr, 0.09 + Math.random()*0.04); }
   }
   const g = new THREE.BufferGeometry();
@@ -12207,9 +12207,63 @@ function setFade(m, a){
    distance, small stones stop being drawn once the fog has them, and only the cells round the
    car cast shadows (the shadow map covers a little over a hundred metres round it anyway) */
 const FOREST_LOD = [];
-const LOD_KIND = { glow:{far:Infinity, cull:380}, tree:{far:260, cull:Infinity}, bush:{far:170, cull:620}, rock:{far:Infinity, cull:560}, stone:{far:Infinity, cull:230} };
+const LOD_KIND = { prop:{far:Infinity, cull:520}, glow:{far:Infinity, cull:380}, tree:{far:260, cull:Infinity}, bush:{far:170, cull:620}, rock:{far:Infinity, cull:560}, stone:{far:Infinity, cull:230} };
 const LOD_SHADOW = 115;
 let LODK = 1;                          // (scaled down by Auto graphics on a slow machine)
+/* ---- everything else that stands still: drawn only when it can be seen ----
+   The forest has its LOD cells; the rest (signs, banners, flags, fences, mushrooms, the props in
+   their hundreds) used to be drawn every frame however far off, and instanced sets of them even
+   when behind the camera. Each piece gets a sphere round it once; each frame it is left out past a
+   distance that grows with its size (and shrinks when Auto graphics steps down), and an instanced
+   set is left out when its sphere is off screen. Only pieces near the car cast shadows. Leaving out
+   is done with a layer the camera doesn't draw, so nothing here fights the game's own .visible.
+   Anything that moves (the cars, the ghost, a wheel) drops out of this and is always drawn. */
+const STATIC_CULL = { list:null, n:-1, frustum:new THREE.Frustum(), m:new THREE.Matrix4(), sph:new THREE.Sphere(), k:1, scan:0 };
+const CULL_LAYER = 31;
+function staticCullScan(){
+  const L = [], v = new THREE.Vector3(), m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), q = new THREE.Quaternion();
+  scene.updateMatrixWorld();
+  scene.traverse(o=>{
+    if(!o.isMesh || o.isSkinnedMesh || o.userData.chunk || o.userData.noCull) return;
+    const g = o.geometry; if(!g || !g.attributes.position) return;
+    if(g.isInstancedBufferGeometry && !o.isInstancedMesh) return;        // shader-placed instances: bounds unknown
+    if(o.isInstancedMesh && o.instanceMatrix.usage === THREE.DynamicDrawUsage) return;
+    if(!g.boundingSphere) g.computeBoundingSphere();
+    let c, r;
+    if(o.isInstancedMesh){
+      const pts = []; let gr = g.boundingSphere.radius, mx = 0;
+      for(let i=0;i<o.count;i++){ o.getMatrixAt(i, m4); m4.decompose(v, q, sc); pts.push(v.clone().applyMatrix4(o.matrixWorld)); mx = Math.max(mx, sc.x, sc.y, sc.z); }
+      if(!pts.length) return;
+      c = new THREE.Vector3(); pts.forEach(p=> c.add(p)); c.divideScalar(pts.length);
+      r = 0; pts.forEach(p=> r = Math.max(r, p.distanceTo(c))); r += gr*mx*Math.max(1, o.matrixWorld.getMaxScaleOnAxis()) + g.boundingSphere.center.length()*mx;
+    } else {
+      const S = g.boundingSphere.clone().applyMatrix4(o.matrixWorld); c = S.center; r = S.radius;
+    }
+    if(!(r < 250) || !isFinite(c.x)) return;                              // the land, the road, the sky: always
+    L.push({o, c, r, mask:o.layers.mask, cast:o.castShadow, fc:o.frustumCulled, inst:!!o.isInstancedMesh,
+            x:o.matrixWorld.elements[12], y:o.matrixWorld.elements[13], z:o.matrixWorld.elements[14], live:true});
+  });
+  STATIC_CULL.list = L; STATIC_CULL.n = scene.children.length;
+}
+function updateStaticCull(){
+  if(!STATIC_CULL.list || STATIC_CULL.n !== scene.children.length){
+    if(STATIC_CULL.list) STATIC_CULL.list.forEach(e=>{ if(e.live){ e.o.layers.mask = e.mask; e.o.castShadow = e.cast; } });
+    staticCullScan();
+  }
+  const SC = STATIC_CULL, cp = camera.position, far = scene.fog ? scene.fog.far : 2000, K = LODK;
+  camera.updateMatrixWorld(); SC.m.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); SC.frustum.setFromProjectionMatrix(SC.m);
+  const racing = state.phase !== "menu";
+  for(const e of SC.list){
+    if(!e.live) continue;
+    const w = e.o.matrixWorld.elements;
+    if(Math.abs(w[12] - e.x) + Math.abs(w[13] - e.y) + Math.abs(w[14] - e.z) > 0.01){ e.live = false; e.o.layers.mask = e.mask; e.o.castShadow = e.cast; continue; }   // it moves
+    const d = Math.hypot(e.c.x - cp.x, e.c.y - cp.y, e.c.z - cp.z) - e.r;
+    let out = racing && d > Math.min(far, (240 + e.r*10)*K);
+    if(!out && e.inst && !e.fc){ SC.sph.center.copy(e.c); SC.sph.radius = e.r; out = !SC.frustum.intersectsSphere(SC.sph); }
+    e.o.layers.mask = out ? (1 << CULL_LAYER) : e.mask;
+    if(e.cast) e.o.castShadow = !out && Math.hypot(e.c.x - pose.x, e.c.z - pose.z) - e.r < 140;
+  }
+}
 function updateForestLOD(){
   if(!FOREST_LOD.length) return;
   const cp = camera.position, fx = pose.x, fz = pose.z;
@@ -12217,7 +12271,7 @@ function updateForestLOD(){
     const d = L.c.distanceTo(cp) - L.R, K = LOD_KIND[L.kind];
     // (a little either way of each line so a cell sitting on it doesn't flicker)
     const wasFar = L.far ? L.far.visible : false, far = wasFar ? d > K.far*LODK - 12 : d > K.far*LODK + 12;
-    const gone = d > K.cull*(L.kind === "tree" ? 1 : LODK);
+    const gone = d > Math.min(K.cull*(L.kind === "tree" ? 1 : LODK), scene.fog ? scene.fog.far : Infinity);
     L.near.visible = !far && !gone;
     if(L.far) L.far.visible = far && !gone;
     L.near.castShadow = L.kind !== "glow" && L.near.visible && Math.hypot(L.c.x - fx, L.c.z - fz) - L.R < LOD_SHADOW;
@@ -12268,6 +12322,8 @@ function chunkInstances(){
       im.instanceMatrix.needsUpdate = true;
       if(im.instanceColor) im.instanceColor.needsUpdate = true;
       im.renderOrder = src.renderOrder;
+      // (an InstancedMesh is made never to be culled; this one's sphere is its cell's, so let the camera cull it)
+      im.frustumCulled = true;
       im.castShadow = true;
       im.receiveShadow = false;
       im.userData = Object.assign({}, src.userData, {chunk:true});
@@ -12281,11 +12337,11 @@ function chunkInstances(){
         const fm = new THREE.InstancedMesh(g3, src.material, ids.length);
         fm.instanceMatrix.copy(im.instanceMatrix); fm.instanceMatrix.needsUpdate = true;
         if(im.instanceColor){ fm.instanceColor = new THREE.InstancedBufferAttribute(im.instanceColor.array.slice(), 3); }
-        fm.castShadow = false; fm.receiveShadow = false; fm.visible = false;
+        fm.castShadow = false; fm.receiveShadow = false; fm.visible = false; fm.frustumCulled = true;
         fm.userData = {chunk:true, farTree:true}; fm.renderOrder = src.renderOrder;
         scene.add(fm);
         FOREST_LOD.push({kind:lk, near:im, far:fm, c:g2.boundingSphere.center, R:g2.boundingSphere.radius});
-      } else if(lk) FOREST_LOD.push({kind:lk, near:im, far:null, c:g2.boundingSphere.center, R:g2.boundingSphere.radius});
+      } else FOREST_LOD.push({kind:lk || "prop", near:im, far:null, c:g2.boundingSphere.center, R:g2.boundingSphere.radius});
     });
     scene.remove(src);
   });
@@ -13847,6 +13903,15 @@ const POST = { on:true, msaa: renderer.capabilities.isWebGL2 };
    everything, halftone dots in the shadows, cream stock and teal ink. */
 const LOOK = { print:true, pixel:false };
 const GFX = { fast:false };       // set from options: no shadows, no MSAA
+/* which graphics chip the browser is drawing with: shown beside the frame rate, and if it is none
+   at all (hardware acceleration off, so the processor draws every pixel) the menus say so */
+{
+  let name = "";
+  try{ const gl = renderer.getContext(), ext = gl.getExtension("WEBGL_debug_renderer_info");
+       name = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER) || ""); }catch(e){}
+  GFX.gpu = name.replace(/^ANGLE \((.*)\)$/, "$1").replace(/\s*Direct3D.*$/i, "").replace(/,?\s*(vs|ps)_\d_\d.*$/i, "").split(",").slice(-1)[0].trim().slice(0, 48);
+  GFX.soft = /swiftshader|basic render|llvmpipe|softpipe|software/i.test(name);
+}
 
 const postScene = new THREE.Scene();
 const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -16362,8 +16427,10 @@ function drawHUDInner(dt, alongNow){
   }
 
   if(GATOR && state.phase !== "menu") GG.hud(hud, W, H, k);
-  if(SAVE.settings.fps && state.phase !== "menu" && GAME.fps)
+  if(SAVE.settings.fps && state.phase !== "menu" && GAME.fps){
     hudText(Math.round(GAME.fps) + " FPS" + (SAVE.settings.gfx === 2 ? "  AUTO " + (4 - AUTOQ.q) + "/4" : ""), W/2, 92*k, UI.small, "#ffffff", "center");
+    if(GFX.gpu) hudText(GFX.gpu + (GFX.soft ? " (NO GPU)" : ""), W/2, 92*k + UI.small*1.3, UI.small*0.75, GFX.soft ? "#ff8a6a" : "#d8d2c4", "center");
+  }
   /* minimap, bottom right (not on an expedition: finding the way is the point) */
   if(!EXP.on){
     const size = 96*k, mx = W - size - 16*k, my = H - size - 16*k;          // (on the same 16px edge as the plates)
@@ -16585,6 +16652,17 @@ function rebuildCar(){
    it settles is remembered for next time. */
 const AUTOQ = { q:Math.max(0, Math.min(3, SAVE.settings.autoQ | 0)), t:0, n:0, hold:4, good:0, clock:0, upAt:-1e9, floor:0 };
 const AUTOQ_LEVELS = [ {pr:1.0, lod:1.0, shadow:true}, {pr:0.8, lod:0.8, shadow:true}, {pr:0.66, lod:0.62, shadow:false}, {pr:0.55, lod:0.5, shadow:false} ];
+function softNote(){
+  if(GFX.note) return GFX.note;
+  const d = document.createElement("div");
+  d.style.cssText = "position:fixed;left:50%;bottom:18px;transform:translateX(-50%);max-width:min(640px,calc(100vw - 32px));z-index:60;" +
+    "background:#1b1712;color:#f2ead8;border:2px solid #ff8a6a;border-radius:6px;padding:12px 40px 12px 16px;font:14px/1.45 system-ui,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.4)";
+  d.innerHTML = "<b style='color:#ff8a6a'>This browser isn't using your graphics card</b>, so the game will run slowly. " +
+    "Turn on <b>Use graphics acceleration when available</b> (Edge: Settings &rarr; System and performance; Chrome: Settings &rarr; System), then restart the browser." +
+    "<button aria-label='Dismiss' style='position:absolute;right:8px;top:6px;background:none;border:0;color:#f2ead8;font-size:20px;cursor:pointer'>&times;</button>";
+  d.querySelector("button").onclick = ()=>{ GFX.softDismissed = true; d.style.display = "none"; GFX.softShown = false; };
+  document.body.appendChild(d); GFX.note = d; return d;
+}
 function applyQuality(){
   const S = SAVE.settings, auto = S.gfx === 2, fast = S.gfx === 1, L = AUTOQ_LEVELS[AUTOQ.q];
   const base = Math.min(window.devicePixelRatio || 1, 1.5);
@@ -19339,6 +19417,8 @@ function frame(now){
   requestAnimationFrame(frame);
   let dt = (now - last)/1000; last = now;
   if(dt > 0) stepAutoQuality(dt);
+  if(GFX.soft){ const show = state.phase === "menu" && !GFX.softDismissed;
+    if(show !== GFX.softShown){ GFX.softShown = show; softNote().style.display = show ? "block" : "none"; } }
   // the first frame after a slow load can be stamped before `last` was taken,
   // which made dt negative and ran the rivals backwards off the lap
   dt = Math.max(0, Math.min(dt, 0.05));
@@ -19411,6 +19491,7 @@ function frame(now){
   }
   skyDome.position.set(camera.position.x, 0, camera.position.z);  // horizon stays put
   updateForestLOD();
+  updateStaticCull();
   updateOccluders(dt);
   stepAudio(info, dt);
   stepAmbience(run ? dt : 0);
