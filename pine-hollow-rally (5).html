@@ -12299,10 +12299,15 @@ function buildWagon(opts){
       sticker(m, w, h, 0, y, z - 0.02*Math.cos(lean), lean, Math.PI, 0);
     };
     const onRoof = (m, w, h) => sticker(m, w, h, 0, ROOF + 0.052, (WST + RT)/2 + (o.sport ? 0 : 0.1), -Math.PI/2, 0, Math.PI);
+    /* as big as the flank between the arches allows: from just over the sill to just under the
+       glass, and as long as the panel is at the height of its lowest edge */
     const bigSide = () => {
-      const sp = sideSpans(AXLE_R, AXLE_F, 0.4).find(q => q[0] < 0.3 && q[1] > 0.3) || [-0.8, 0.8];
-      const w = Math.min(1.02, (sp[1] - sp[0])*0.92);
-      onSides(mLogo, w, w*AR, 0.625, (sp[0] + sp[1])/2);
+      const y0 = 0.33, y1 = BELT - 0.025;
+      let h = y1 - y0;
+      const sp = sideSpans(AXLE_R, AXLE_F, y0).find(q => q[0] < 0.3 && q[1] > 0.3) || [-0.8, 0.8];
+      let w = h/AR;
+      if (w > (sp[1] - sp[0])*0.94) { w = (sp[1] - sp[0])*0.94; h = w*AR; }
+      onSides(mLogo, w, h, y0 + h/2 + ((y1 - y0) - h)/2, (sp[0] + sp[1])/2);
     };
     const glassH = Math.min(0.34, Math.hypot(RT - RB, ROOF - BELT)*0.62);
     // centred on the front door panel (it runs from 0.1 to 0.96): clear of both shut lines and the handle,
