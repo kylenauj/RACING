@@ -1259,6 +1259,27 @@ const TRACKS = [
       // round the east shore of the second swamp: a wide graded logging road, flat out
       {a:[497,-40], b:[268,-318], via:[[540,-120],[542,-220],[482,-300],[400,-332],[322,-334]],
        half:9, jumps:[], tune:0, fast:true, label:"LOGGING ROAD", mainLabel:"THE SWAMP"}
+    ]},
+
+  /* ---- SPECIAL: Glowcap Hollow, a forest that glows in the dark ----
+     The glowworm grotto's light out under the night sky: giant mushrooms glowing blue,
+     some leaning out over the road, glowworms on threads under their caps, glowbugs
+     everywhere, pools of glowing water and blue crystal, and the road picked out in studs. */
+  { name:"GLOWCAP HOLLOW", special:true, season:"glow", after:"a forest that glows in the dark", relief:1.0, rollers:0.8,
+    blurb:"night in a forest of giant glowing mushrooms: under the arches of their caps, past pools of glowing water and blue crystal, through clouds of glowbugs, and round the grove of giants",
+    kit:["crest","kicker"],
+    shape:"GLOWCAP HOLLOW \u2014 a forest that glows",
+    feature:"giant glowing mushrooms, glowworms, glowbugs, glowing pools and crystals, all at night",
+    ctrl:[[0,-400],[-120,-412],[-240,-386],[-330,-306],[-356,-196],[-318,-96],[-372,6],[-418,118],[-364,226],[-252,282],[-150,246],[-66,300],
+          [36,362],[156,344],[246,266],[258,152],[196,62],[276,-28],[380,-58],[442,-158],[402,-280],[300,-342],[190,-300],[96,-362]],
+    hills:[[-360,-150,170,24],[60,330,150,20],[390,-160,160,28],[-210,90,190,-10],[200,120,120,14]],
+    jumps:[], fords:[],
+    mud:[[[-318,-96],[-372,6]], [[196,62],[276,-28]]],
+    flats:[[-60,-405,110]],
+    branches:[
+      // the grove: a short cut through the thickest of the giants, under their caps
+      {a:[-150,246], b:[196,62], via:[[-60,200],[30,150],[120,100]],
+       half:5.0, jumps:[[0.5,24,7,2.2,44]], tune:0.1, label:"THE GROVE", mainLabel:"THE RIDGE"}
     ]}
 ];
 
@@ -1654,6 +1675,14 @@ if(GATOR){
    air, late sun through the moss, willows and cypress, boardwalks over black
    water, deep mud, and old log cabins going back to the woods. */
 const SWAMPGP = TRACK.season === "swamp" && !GATOR;
+/* Glowcap Hollow: night. Dark navy air that closes in, a blue moon, and the light
+   of the place coming from what grows in it */
+const GLOW = TRACK.season === "glow";
+if(GLOW){
+  scene.fog.color.set(0x081430); SKY.set(0x0a1838); scene.fog.near = 50; scene.fog.far = 520;
+  hemi.color.set(0x6a8ce0); hemi.groundColor.set(0x101a34); hemi.intensity = 0.85;
+  sun.color.set(0xa8c4ff); sun.intensity = 0.62;
+}
 if(SWAMPGP){
   // (green, close air: the haze on the horizon of the bayou's dark green sky)
   scene.fog.color.set(0x8fa574); SKY.set(0xa9b98a); scene.fog.near = 130; scene.fog.far = 820;
@@ -4971,7 +5000,7 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
           }
           /* on the volcano the snow is thin: drifts of black ash and scree
              show through it in patches, more of them on the steeper ground */
-          if(TRACK.special && !GATOR && !TRACK.alpine && t > 0.35){
+          if(TRACK.special && !GATOR && !TRACK.alpine && !GLOW && t > 0.35){
             const nz = Math.sin(x*0.031 + Math.sin(z*0.023)*2.1) + Math.sin(z*0.027 + Math.sin(x*0.019)*1.7) + 0.5*Math.sin((x + z)*0.071);
             const k = smoothstep(0.7, 1.35, nz + steep*0.8 + (Math.random() - 0.5)*0.45);
             if(k > 0) c.lerp(new THREE.Color().setHSL(0.04 + Math.random()*0.03, 0.09, 0.12 + Math.random()*0.09), k*0.9);
@@ -5126,12 +5155,24 @@ const SKYS = {
                     {kind:"forest", y:14, amp:66, step:64, col:[30,58,40], haze:[118,146,100], hz:0.3, speck:[[210,236,120],[180,210,96]]},
                     {kind:"forest", y:32, amp:46, step:50, col:[20,40,28], haze:[98,124,84], hz:0.18} ] }
 };
+SKYS.glow = { sky:[[0,"#02040e"],[0.2,"#060c24"],[0.36,"#0b1a44"],[0.45,"#123064"],[0.49,"#1b4a86"],[0.5,"#21588f"],[1,"#0a1730"]],
+  halo:[160,200,255], sunR:20, cloud:"streaks", cloudLit:[60,90,150], cloudShade:[10,18,40], stars:true,
+  layers:[ {kind:"round", y:-30, amp:150, step:500, col:[22,34,70], haze:[30,60,120], hz:0.5},
+           {kind:"sharp", y:-10, amp:110, step:260, col:[16,26,56], haze:[26,52,104], hz:0.4},
+           {kind:"forest", y:10, amp:70, step:84, col:[12,22,44], haze:[24,48,96], hz:0.3, speck:[[70,200,255],[120,230,255],[90,120,255]]},
+           {kind:"forest", y:30, amp:46, step:56, col:[8,16,32], haze:[18,38,80], hz:0.2, speck:[[60,190,255],[150,240,255]]} ] };
 function paintSky(g, w, h){
   const B = (SWAMPGP ? SKYS.bayou : SKYS[TRACK.season]) || SKYS.summer, hz = h*0.5;
   const rgb = (c, k, a)=> "rgba(" + c.map(v=> Math.max(0, Math.min(255, Math.round(v*(k || 1))))).join(",") + "," + (a === undefined ? 1 : a) + ")";
   const grd = g.createLinearGradient(0, 0, 0, h);
   B.sky.forEach(s0=> grd.addColorStop(s0[0], s0[1]));
   g.fillStyle = grd; g.fillRect(0, 0, w, h);
+  // a night sky full of stars, thicker in a band across it
+  if(B.stars) for(let i=0;i<2600;i++){
+    const x = Math.random()*w, band = Math.random() < 0.4, y = band ? h*0.12 + (Math.sin(x/w*6.28)*0.06 + (Math.random() - 0.5)*0.08)*h : Math.random()*hz*0.95;
+    const r = Math.random() < 0.04 ? 1.6 + Math.random() : 0.5 + Math.random()*0.8, a = 0.35 + Math.random()*0.65;
+    g.fillStyle = "rgba(" + (200 + Math.random()*55|0) + "," + (215 + Math.random()*40|0) + ",255," + a.toFixed(2) + ")"; g.fillRect(x, y, r, r);
+  }
   // the sun, where the scene light is
   const sunU = 0.0912, sunV = 0.229, sx = sunU*w, sy = sunV*h;
   for(const ox of [0, w]){            // it wraps round the dome
@@ -7097,7 +7138,7 @@ if(RIVER.on){
    past the grid, the course's name on it in the season's colours ---- */
 function courseBillboard(){
   const P = MAIN, pal = { summer:["#2f6a3a", "#8fd06a"], fall:["#6a2c12", "#f08a2a"], winter:["#1f4a6e", "#8fd3f4"], desert:["#6a2a16", "#e56a3a"] };
-  const c0 = GATOR ? ["#3a1a5a", "#ff8a6a"] : TRACK.alpine ? ["#24384e", "#cfe3f2"] : TRACK.special ? ["#3a1208", "#ff7a2a"] : pal[TRACK.season || "summer"] || pal.summer;
+  const c0 = GATOR ? ["#3a1a5a", "#ff8a6a"] : TRACK.alpine ? ["#24384e", "#cfe3f2"] : GLOW ? ["#06102a", "#46c8ff"] : TRACK.special ? ["#3a1208", "#ff7a2a"] : pal[TRACK.season || "summer"] || pal.summer;
   // the spot: past the grid, on whichever side the ground sits nearer the road
   let best = null;
   for(let d=100; d<=220; d+=15){
@@ -10604,7 +10645,7 @@ const grassTuftTex = new THREE.CanvasTexture(noiseCanvas(256, 256, (g)=>{
 }));
 
 
-function billboardField(tex, cell, pos, scale, uv, tint){
+function billboardField(tex, cell, pos, scale, uv, tint, colour){
   const base = new THREE.PlaneGeometry(1, 1);
   base.translate(0, 0.5, 0);
   const geo = new THREE.InstancedBufferGeometry();
@@ -10620,7 +10661,7 @@ function billboardField(tex, cell, pos, scale, uv, tint){
   geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 3000);
   const mat = new THREE.ShaderMaterial({
     uniforms: {
-      map:{value:tex}, uCell:{value:cell},
+      map:{value:tex}, uCell:{value:cell}, uCol:{value: colour || new THREE.Color(1, 1, 1)},
       fogColor:{value:new THREE.Color(scene.fog.color)},
       fogNear:{value:scene.fog.near}, fogFar:{value:scene.fog.far}
     },
@@ -10637,13 +10678,13 @@ function billboardField(tex, cell, pos, scale, uv, tint){
       "}"
     ].join("\n"),
     fragmentShader: [
-      "uniform sampler2D map; uniform vec3 fogColor; uniform float fogNear; uniform float fogFar;",
+      "uniform sampler2D map; uniform vec3 fogColor; uniform float fogNear; uniform float fogFar; uniform vec3 uCol;",
       "varying vec2 vUv; varying float vTint; varying float vDepth;",
       "void main(){",
       "  vec4 t = texture2D(map, vUv);",
       "  if(t.a < 0.22) discard;",
       "  float f = clamp((vDepth - fogNear)/(fogFar - fogNear), 0.0, 1.0);",
-      "  gl_FragColor = vec4(mix(t.rgb*vTint, fogColor, f), 1.0);",
+      "  gl_FragColor = vec4(mix(t.rgb*vTint*uCol, fogColor, f), 1.0);",
       "}"
     ].join("\n")
   });
@@ -10722,6 +10763,188 @@ function bushGeometry(seed){
 }
 
 courseBillboard();
+/* ==== GLOWCAP HOLLOW: a forest that glows in the dark =====================
+   The glowworm grotto's light, out under the open night sky: blue-black ground,
+   giant mushrooms with caps that glow blue and cyan, some leaning right out over
+   the road, the biggest standing far off like lit towers, glowworms hanging in
+   threads under the caps, glowbugs drifting everywhere, pools of glowing water,
+   clusters of blue crystal, glowing moss, and a line of blue studs along both
+   edges of the road to drive by. Built here, before the forest is planted, so
+   the trees keep off everything that stands in it. */
+if(GLOW){
+  const rnd = seeded(7331 + TRACK_ID);
+  const BLUES = [0x1e90ff, 0x00d4ff, 0x2fb8ff, 0x1a5cff, 0x34e6ff, 0x5a5cff, 0x8a4dff];
+  const blue = ()=> BLUES[rnd() < 0.9 ? Math.floor(rnd()*5) : 5 + Math.floor(rnd()*2)];
+  const capGeo = new THREE.SphereGeometry(1, 18, 8, 0, Math.PI*2, 0, Math.PI/2);
+  const underGeo = new THREE.CircleGeometry(1, 18); underGeo.rotateX(Math.PI/2);
+  const stemGeo = new THREE.CylinderGeometry(0.75, 1, 1, 10); stemGeo.translate(0, 0.5, 0);
+  // a soft round glow, for the ground under the caps, the moss and the pools
+  const glowTex = (()=>{ const cv = document.createElement("canvas"); cv.width = cv.height = 128; const g = cv.getContext("2d");
+    const r = g.createRadialGradient(64, 64, 2, 64, 64, 62); r.addColorStop(0, "rgba(255,255,255,1)"); r.addColorStop(0.35, "rgba(255,255,255,.45)"); r.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = r; g.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(cv); })();
+  const glowGeo = new THREE.PlaneGeometry(1, 1); glowGeo.rotateX(-Math.PI/2);
+  const glowMat = new THREE.MeshBasicMaterial({map:glowTex, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, opacity:0.55});
+  const ok = (x, z, m)=>{ if(inWaterway(x, z) || deckAt(x, z) > 0.2) return false; const n = nearest(x, z); return n.dist > n.half + m; };
+
+  /* -- the mushrooms: [x, z, height, cap radius, colour, lean x, lean z] -- */
+  const shrooms = [];
+  const put = (x, z, H, cr, c, lx, lz)=>{ shrooms.push({x, z, y:gradedY(x, z) - 0.2, H, cr, c, lx:lx || 0, lz:lz || 0}); NO_TREES.push([x, z, Math.max(2.5, cr*0.6)]); };
+  paths.forEach(P=>{
+    // (the Grove, the short cut, is the thick of it: twice as many, half of them arching over)
+    const grove = P !== MAIN, seg = P.seg, step = Math.round((grove ? 8 : 13)/seg), RR = P.closed ? radiiOf(P) : radiiOpen(P);
+    for(let k=Math.round(20/seg); k<P.N - (P.closed ? 0 : Math.round(20/seg)); k+=step){
+      const i = P.closed ? wrapIdx(P, k) : k, q = P.pts[i], t = P.tans[i];
+      for(const sd of [-1, 1]){
+        if(rnd() < (grove ? 0.12 : 0.42)) continue;
+        // now and then a tall one right at the verge, its cap spread out over the road
+        const arch = rnd() < (grove ? 0.45 : 0.16) && RR[i] > (grove ? 45 : 70);
+        const off = arch ? P.half[i] + 2.4 + rnd()*1.2 : P.half[i] + 5 + rnd()*16;
+        const x = q.x - t.z*sd*off, z = q.z + t.x*sd*off;
+        if(!ok(x, z, arch ? 1.6 : 3)) continue;
+        if(arch){
+          const H = 9.5 + rnd()*2.5, cr = P.half[i] + 2.6;
+          put(x, z, H, cr, blue(), t.z*sd*0.14, -t.x*sd*0.14);       // leaning in over the road
+        } else {
+          const H = 2.5 + Math.pow(rnd(), 1.4)*12, cr = 1.2 + H*0.32 + rnd()*1.5;
+          put(x, z, H, cr, blue(), (rnd() - 0.5)*0.2, (rnd() - 0.5)*0.2);
+          // little ones round its foot
+          for(let n=0;n<3;n++){ const a = rnd()*6.28, r = cr*0.7 + rnd()*2.4, x2 = x + Math.cos(a)*r, z2 = z + Math.sin(a)*r;
+            if(ok(x2, z2, 1.5)) put(x2, z2, 0.5 + rnd()*1.3, 0.35 + rnd()*0.6, blue(), (rnd() - 0.5)*0.3, (rnd() - 0.5)*0.3); }
+        }
+      }
+    }
+  });
+  // the giants, far off from the road, glowing over the treetops like lit towers
+  for(let n=0, tries=0; n<12 && tries<400; tries++){
+    const P = MAIN, i = Math.floor(rnd()*P.N), q = P.pts[i], t = P.tans[i], sd = rnd() < 0.5 ? -1 : 1, off = 45 + rnd()*110;
+    const x = q.x - t.z*sd*off, z = q.z + t.x*sd*off;
+    if(!ok(x, z, 30) || shrooms.some(s=> s.H > 18 && Math.hypot(s.x - x, s.z - z) < 120)) continue;
+    const H = 24 + rnd()*20; put(x, z, H, H*0.45, blue(), (rnd() - 0.5)*0.12, (rnd() - 0.5)*0.12); NO_TREES.push([x, z, H*0.4]); n++;
+  }
+  /* built instanced: the stems pale and faintly lit, the caps glowing, a darker glowing underside
+     and pale spots on top, and a pool of light on the ground under each */
+  {
+    const N = shrooms.length, m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), e3 = new THREE.Euler(), cc = new THREE.Color();
+    const stemI = new THREE.InstancedMesh(stemGeo, new THREE.MeshLambertMaterial({color:0xcfe4ff, emissive:0x1d3a66}), N);
+    const capI = new THREE.InstancedMesh(capGeo, new THREE.MeshBasicMaterial({}), N);
+    const underI = new THREE.InstancedMesh(underGeo, new THREE.MeshBasicMaterial({side:THREE.DoubleSide}), N);
+    const groundI = new THREE.InstancedMesh(glowGeo, glowMat, N);
+    const spots = [];
+    shrooms.forEach((s, k)=>{
+      e3.set(s.lx, rnd()*6.28, s.lz); q4.setFromEuler(e3);
+      const w = Math.max(0.14, s.cr*0.13);
+      v3.set(s.x, s.y, s.z); s3.set(w, s.H, w); m4.compose(v3, q4, s3); stemI.setMatrixAt(k, m4);
+      // the top of the leaning stem
+      const top = new THREE.Vector3(0, s.H, 0).applyQuaternion(q4).add(v3);
+      v3.copy(top); s3.set(s.cr, s.cr*0.55, s.cr); m4.compose(v3, q4, s3); capI.setMatrixAt(k, m4); underI.setMatrixAt(k, m4);
+      cc.setHex(s.c); capI.setColorAt(k, cc); underI.setColorAt(k, cc.clone().multiplyScalar(0.45));
+      v3.set(top.x, gradedY(top.x, top.z) + 0.06, top.z); s3.set(s.cr*2.6, 1, s.cr*2.6); m4.compose(v3, new THREE.Quaternion(), s3); groundI.setMatrixAt(k, m4);
+      groundI.setColorAt(k, cc.setHex(s.c));
+      const ns = s.cr > 1 ? 5 + Math.floor(rnd()*5) : 2;
+      for(let n=0;n<ns;n++){ const a = rnd()*6.28, r = Math.sqrt(rnd())*0.78, y = Math.sqrt(1 - r*r)*0.55;
+        spots.push(new THREE.Vector3(Math.cos(a)*r, y, Math.sin(a)*r).multiplyScalar(s.cr).applyQuaternion(q4).add(top), s.cr*0.09); }
+    });
+    groundI.material = glowMat.clone(); groundI.material.opacity = 0.85;
+    {
+      const hp = [], hc = [], hs = [], cc2 = new THREE.Color();
+      shrooms.forEach(s=>{ if(s.cr < 0.9) return; const lean = new THREE.Vector3(0, s.H, 0).applyEuler(new THREE.Euler(s.lx, 0, s.lz));
+        hp.push(s.x + lean.x, s.y + lean.y + s.cr*0.2, s.z + lean.z); cc2.setHex(s.c); hc.push(cc2.r, cc2.g, cc2.b); hs.push(s.cr*3.2); });
+      const hg = new THREE.BufferGeometry(); hg.setAttribute("position", new THREE.Float32BufferAttribute(hp, 3)); hg.setAttribute("color", new THREE.Float32BufferAttribute(hc, 3)); hg.setAttribute("aSize", new THREE.Float32BufferAttribute(hs, 1));
+      const hm = new THREE.ShaderMaterial({ uniforms:{map:{value:glowTex}, uScale:{value:window.innerHeight/2}}, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, vertexColors:true,
+        vertexShader:"attribute float aSize; varying vec3 vC; uniform float uScale; void main(){ vC = color; vec4 mv = modelViewMatrix*vec4(position, 1.0); gl_PointSize = min(512.0, uScale*aSize/max(1.0, -mv.z)); gl_Position = projectionMatrix*mv; }",
+        fragmentShader:"uniform sampler2D map; varying vec3 vC; void main(){ float k = texture2D(map, gl_PointCoord).r; gl_FragColor = vec4(vC*k*k*0.16, 1.0); }" });
+      const halo = new THREE.Points(hg, hm); halo.frustumCulled = false; halo.renderOrder = 4; scene.add(halo);
+    }
+    [stemI, capI, underI, groundI].forEach(o=>{ o.instanceMatrix.needsUpdate = true; if(o.instanceColor) o.instanceColor.needsUpdate = true; o.frustumCulled = false; scene.add(o); });
+    stemI.castShadow = true;
+    const spotI = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 6, 4), new THREE.MeshBasicMaterial({color:0xe6fbff}), Math.max(1, spots.length/2));
+    for(let k=0;k<spots.length;k+=2){ v3.copy(spots[k]); s3.setScalar(spots[k+1]); m4.compose(v3, new THREE.Quaternion(), s3); spotI.setMatrixAt(k/2, m4); }
+    spotI.instanceMatrix.needsUpdate = true; spotI.frustumCulled = false; scene.add(spotI);
+    // glowworms on their threads, under the caps of the arches and the giants
+    const gp = [], gc = [], gl = [];
+    shrooms.forEach(s=>{
+      if(s.cr < 4) return;
+      const n = Math.round(s.cr*s.cr*0.75);
+      for(let q=0;q<n;q++){ const a = rnd()*6.28, r = Math.sqrt(rnd())*s.cr*0.92, x = s.x + Math.cos(a)*r, z = s.z + Math.sin(a)*r, y = s.y + s.H - 0.1;
+        const drop = 0.3 + rnd()*Math.min(4, s.H*0.3); gp.push(x, y - drop, z); const b0 = 0.6 + rnd()*0.4; gc.push(0.35*b0, 0.85*b0, b0); gl.push(x, y, z, x, y - drop, z); }
+    });
+    if(gp.length){
+      const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(gp, 3)); g.setAttribute("color", new THREE.Float32BufferAttribute(gc, 3));
+      const pm = new THREE.Points(g, new THREE.PointsMaterial({size:0.3, vertexColors:true, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false}));
+      pm.frustumCulled = false; scene.add(pm);
+      const lg = new THREE.BufferGeometry(); lg.setAttribute("position", new THREE.Float32BufferAttribute(gl, 3));
+      const lm = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({color:0x6fc8ff, transparent:true, opacity:0.16})); lm.frustumCulled = false; scene.add(lm);
+    }
+  }
+
+  /* -- glowing moss on the ground, crystals and pools of glowing water -- */
+  {
+    const moss = [], cry = [], pools = [];
+    paths.forEach(P=>{ for(let k=0;k<P.N;k+=Math.round(6/P.seg)){
+      const q = P.pts[k], t = P.tans[k], sd = rnd() < 0.5 ? -1 : 1, off = P.half[k] + 2 + rnd()*26, x = q.x - t.z*sd*off, z = q.z + t.x*sd*off;
+      if(!ok(x, z, 1)) continue;
+      const r = rnd();
+      if(r < 0.7) moss.push([x, z, 2 + rnd()*6, rnd() < 0.8 ? 0x2fd8ff : 0x3a6bff]);
+      else if(r < 0.86 && off > P.half[k] + 4) cry.push([x, z]);
+      else if(r < 0.9 && off > P.half[k] + 7 && ok(x, z, 7)) pools.push([x, z, 3 + rnd()*5]);
+    } });
+    const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), e3 = new THREE.Euler(), cc = new THREE.Color();
+    const mossI = new THREE.InstancedMesh(glowGeo, glowMat, Math.max(1, moss.length));
+    moss.forEach((m, k)=>{ v3.set(m[0], gradedY(m[0], m[1]) + 0.05, m[1]); s3.set(m[2], 1, m[2]*(0.6 + rnd()*0.8)); e3.set(0, rnd()*6.28, 0); q4.setFromEuler(e3); m4.compose(v3, q4, s3); mossI.setMatrixAt(k, m4); mossI.setColorAt(k, cc.setHex(m[3]).multiplyScalar(0.55)); });
+    mossI.instanceMatrix.needsUpdate = true; if(mossI.instanceColor) mossI.instanceColor.needsUpdate = true; mossI.frustumCulled = false; scene.add(mossI);
+    // crystal clusters: long six-sided points of blue glass, leaning out from a common root
+    const crys = [];
+    cry.forEach(c=>{ const y = gradedY(c[0], c[1]), n = 3 + Math.floor(rnd()*5);
+      for(let q=0;q<n;q++){ const L = 0.8 + rnd()*2.6; crys.push([c[0] + (rnd() - 0.5)*1.2, y, c[1] + (rnd() - 0.5)*1.2, L, (rnd() - 0.5)*1.1, (rnd() - 0.5)*1.1]); }
+      NO_TREES.push([c[0], c[1], 2.5]); });
+    const crystalGeo = new THREE.CylinderGeometry(0, 0.28, 1, 6); crystalGeo.translate(0, 0.5, 0);
+    const cryI = new THREE.InstancedMesh(crystalGeo, new THREE.MeshBasicMaterial({color:0x7fe6ff, transparent:true, opacity:0.88}), Math.max(1, crys.length));
+    crys.forEach((c, k)=>{ v3.set(c[0], c[1] - 0.1, c[2]); e3.set(c[4], rnd()*6.28, c[5]); q4.setFromEuler(e3); s3.set(c[3]*0.9, c[3], c[3]*0.9); m4.compose(v3, q4, s3); cryI.setMatrixAt(k, m4); });
+    cryI.instanceMatrix.needsUpdate = true; cryI.frustumCulled = false; scene.add(cryI);
+    const cGlow = new THREE.InstancedMesh(glowGeo, glowMat, Math.max(1, cry.length));
+    cry.forEach((c, k)=>{ v3.set(c[0], gradedY(c[0], c[1]) + 0.07, c[1]); s3.set(9, 1, 9); m4.compose(v3, new THREE.Quaternion(), s3); cGlow.setMatrixAt(k, m4); cGlow.setColorAt(k, cc.setHex(0x46d4ff)); });
+    cGlow.instanceMatrix.needsUpdate = true; if(cGlow.instanceColor) cGlow.instanceColor.needsUpdate = true; cGlow.frustumCulled = false; scene.add(cGlow);
+    // the pools: glowing water lying in hollows, rippling
+    const poolMat = new THREE.ShaderMaterial({ uniforms:{uTime:{value:0}}, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
+      vertexShader:"varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }",
+      fragmentShader:["uniform float uTime; varying vec2 vUv;",
+        "void main(){ vec2 p = vUv - 0.5; float d = length(p)*2.0; if(d > 1.0) discard;",
+        "  float rip = 0.5 + 0.5*sin(d*22.0 - uTime*2.2) * 0.5 + 0.25*sin(p.x*31.0 + uTime*1.3)*sin(p.y*27.0 - uTime*1.1);",
+        "  float edge = smoothstep(1.0, 0.75, d);",
+        "  gl_FragColor = vec4(vec3(0.12, 0.62, 1.0)*(0.55 + 0.45*rip)*edge, 1.0); }"].join("\n") });
+    waterMats.push(poolMat);
+    pools.forEach(p=>{ const m = new THREE.Mesh(new THREE.CircleGeometry(p[2], 24), poolMat); m.rotation.x = -Math.PI/2; m.position.set(p[0], gradedY(p[0], p[1]) + 0.08, p[1]); scene.add(m);
+      NO_TREES.push([p[0], p[1], p[2] + 1.5]); });
+  }
+
+  /* -- the road's edges, picked out in blue studs -- */
+  {
+    const studs = [];
+    paths.forEach(P=>{ for(let k=0;k<P.N;k+=Math.round(7/P.seg)){ const q = P.pts[k], t = P.tans[k];
+      for(const sd of [-1, 1]){ const o = P.half[k] + 0.7, x = q.x - t.z*sd*o, z = q.z + t.x*sd*o; if(deckAt(x, z) > 0.2) continue; studs.push([x, surfaceY(x, z), z]); } } });
+    const I = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 0.22, 0.16), new THREE.MeshBasicMaterial({color:0x6fdcff}), Math.max(1, studs.length));
+    const m4 = new THREE.Matrix4(); studs.forEach((s, k)=>{ m4.makeTranslation(s[0], s[1] + 0.1, s[2]); I.setMatrixAt(k, m4); });
+    I.instanceMatrix.needsUpdate = true; I.frustumCulled = false; scene.add(I);
+  }
+
+  /* -- glowbugs: thousands of blue-white points, drifting and blinking -- */
+  {
+    const pos = [], ph = [];
+    paths.forEach(P=>{ for(let k=0;k<P.N;k+=2){ const q = P.pts[k], t = P.tans[k];
+      for(let n=0;n<2;n++){ const sd = rnd() < 0.5 ? -1 : 1, off = rnd()*(P.half[k] + 22), x = q.x - t.z*sd*off, z = q.z + t.x*sd*off;
+        pos.push(x, gradedY(x, z) + 0.8 + rnd()*7, z); ph.push(rnd()*6.28); } } });
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("aPh", new THREE.Float32BufferAttribute(ph, 1));
+    const mat = new THREE.ShaderMaterial({ uniforms:{uTime:{value:0}, uScale:{value:window.innerHeight/2}}, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
+      vertexShader:["attribute float aPh; uniform float uTime, uScale; varying float vA; varying vec3 vC;",
+        "void main(){ vec3 p = position + vec3(sin(uTime*0.5 + aPh*3.0)*1.6, sin(uTime*0.8 + aPh)*0.8, cos(uTime*0.45 + aPh*2.0)*1.6);",
+        "  vec4 mv = modelViewMatrix*vec4(p, 1.0);",
+        "  vA = 0.25 + 0.75*pow(max(0.0, sin(uTime*1.4 + aPh*5.0)), 2.0);",
+        "  vC = mix(vec3(0.35, 0.8, 1.0), vec3(0.85, 0.97, 1.0), fract(aPh*0.61));",
+        "  gl_PointSize = clamp(uScale*0.26/max(1.0, -mv.z), 1.5, 10.0); gl_Position = projectionMatrix*mv; }"].join("\n"),
+      fragmentShader:"varying float vA; varying vec3 vC; void main(){ float d = length(gl_PointCoord - 0.5); if(d > 0.5) discard; gl_FragColor = vec4(vC*vA*(1.0 - d*1.7), 1.0); }" });
+    const pm = new THREE.Points(g, mat); pm.frustumCulled = false; scene.add(pm); waterMats.push(mat);
+  }
+}
 /* ---- the event dressing: banner ads along the straights and flags on poles ----
    Vinyl banners strung between two posts down the outside of the straights (the corners have
    their chevron boards), each a sponsor: the rally itself, the website, and the local firms that
@@ -10822,7 +11045,7 @@ courseBillboard();
         g.drawImage(logoImgEl, (cv.width - w)/2, (cv.height - h)/2, w, h); t.needsUpdate = true; };
       if(logoImgEl.complete && logoImgEl.naturalWidth) put(); else logoImgEl.addEventListener("load", put, {once:true});
     }
-    return new THREE.MeshLambertMaterial({map:t, side:THREE.DoubleSide});
+    return new THREE.MeshLambertMaterial({map:t, side:THREE.DoubleSide, emissive: GLOW ? 0xffffff : 0x000000, emissiveMap: GLOW ? t : null, emissiveIntensity: 0.55});
   });
 
   /* -- where the banners go: down the straights, a side at a time, a sponsor at a time -- */
@@ -10886,7 +11109,7 @@ courseBillboard();
         g.drawImage(logoImgEl, 26, (cv.height - h)/2, w, h); t.needsUpdate = true; };
       if(logoImgEl.complete && logoImgEl.naturalWidth) put(); else logoImgEl.addEventListener("load", put, {once:true});
     }
-    const m = new THREE.MeshLambertMaterial({map:t, side:THREE.DoubleSide});
+    const m = new THREE.MeshLambertMaterial({map:t, side:THREE.DoubleSide, emissive: GLOW ? 0xffffff : 0x000000, emissiveMap: GLOW ? t : null, emissiveIntensity: 0.45});
     m.onBeforeCompile = sh=>{
       sh.uniforms.uWind = WIND.time;
       sh.vertexShader = "uniform float uWind;\n" + sh.vertexShader.replace("#include <begin_vertex>", `#include <begin_vertex>
@@ -11263,7 +11486,35 @@ courseBillboard();
       b++;
     }
   });
-  scene.add(billboardField(grassTuftTex, 1.0, pos, scale, uv, tint));
+  scene.add(billboardField(grassTuftTex, 1.0, pos, scale, uv, tint, GLOW ? new THREE.Color(0.22, 0.62, 1.15) : null));
+}
+
+/* Glowcap Hollow, once everything is planted: every leaf, needle, bush and the ground itself
+   turned blue-black (they are all painted in vertex colours, so the material's colour tints them),
+   and headlights: a real lamp ahead of your car, and a soft beam of light ahead of every car */
+if(GLOW){
+  const tint = new THREE.Color(0.4, 0.6, 1.0);
+  scene.traverse(o=>{ if(o.isMesh && o.material && o.material.isMeshLambertMaterial && o.material.vertexColors) o.material.color.multiply(tint); });
+  // the fallen leaves too (the glowing points are added light, and left as they are)
+  scene.traverse(o=>{ if(o.isPoints && o.material && o.material.isPointsMaterial && o.material.map && o.material.blending !== THREE.AdditiveBlending) o.material.color.setRGB(0.22, 0.36, 0.7); });
+  const lamp = new THREE.SpotLight(0xdfeaff, 3.2, 70, 0.62, 0.65, 1.0);
+  scene.add(lamp); scene.add(lamp.target);
+  const beamGeo = new THREE.ConeGeometry(4.2, 22, 18, 1, true); beamGeo.translate(0, -11, 0); beamGeo.rotateX(-Math.PI/2);
+  const beamMat = new THREE.ShaderMaterial({ transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide,
+    vertexShader:"varying float vL; void main(){ vL = clamp(position.z/22.0, 0.0, 1.0); gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }",
+    fragmentShader:"varying float vL; void main(){ gl_FragColor = vec4(vec3(0.55, 0.7, 1.0)*0.09*(1.0 - vL)*(1.0 - vL), 1.0); }" });
+  const beams = [];
+  const beamFor = ()=>{ const b = new THREE.Mesh(beamGeo, beamMat); b.frustumCulled = false; scene.add(b); beams.push(b); return b; };
+  ANIMS_LATE.push(()=>{
+    const fx = Math.sin(pose.h), fz = Math.cos(pose.h), y = car.position.y + 0.85;
+    // (high over the car and aimed down: a lamp at bumper height only skims the road, and lights nothing)
+    lamp.position.set(pose.x + fx*1.0, y + 5.5, pose.z + fz*1.0);
+    lamp.target.position.set(pose.x + fx*20, y - 0.85, pose.z + fz*20); lamp.visible = car.visible;
+    const cars = [{m:car, x:pose.x, z:pose.z, h:pose.h, y:car.position.y, on:car.visible}].concat(FIELD.map(r=> ({m:r.mesh, x:r.mesh.position.x, z:r.mesh.position.z, h:r.mesh.rotation.y, y:r.mesh.position.y, on:r.mesh.visible})));
+    cars.forEach((c, k)=>{ const b = beams[k] || beamFor(); b.visible = c.on;
+      b.position.set(c.x + Math.sin(c.h)*2.0, c.y + 0.75, c.z + Math.cos(c.h)*2.0); b.rotation.set(0.06, c.h, 0); });
+    for(let k=cars.length; k<beams.length; k++) beams[k].visible = false;
+  });
 }
 
 /* ------------------------------------------------------------------ *
@@ -17060,7 +17311,7 @@ const GP_GROUPS = (()=>{
   return g;
 })();
 const SEASON_COL = { summer:"#8fd06a", fall:"#f08a2a", winter:"#8fd3f4", desert:"#e56a3a", swamp:"#3f8a4a" };
-const trackCol = t=> t && t.gator ? "#ff7ac8" : t && t.alpine ? "#a9c8e2" : SEASON_COL[(t && t.season) || "summer"];
+const trackCol = t=> t && t.gator ? "#ff7ac8" : t && t.alpine ? "#a9c8e2" : t && t.season === "glow" ? "#46b4ff" : SEASON_COL[(t && t.season) || "summer"];
 function showTracks(mode, group){
   const exped = mode === "expedition";
   let ids, gi = 0;
