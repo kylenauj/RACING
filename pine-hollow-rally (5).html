@@ -4865,6 +4865,11 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
       "col = mix(col, asph, tar);",
       FROZEN ? "col = mix(col, vec3(0.80, 0.88, 0.95)*(0.9 + 0.12*n3), clamp(wet*1.4, 0.0, 1.0)*max(onRoad, verge)*0.8);"
              : "col = mix(col, col*vec3(0.62, 0.64, 0.66), clamp(wet*1.4, 0.0, 1.0)*max(onRoad, verge));",
+      GLOW ? ["float gEdge = exp(-pow((e + 0.2)/0.6, 2.0));",
+              "float gMoss = smoothstep(0.6, 0.85, vnz(vXZ*0.055) + 0.25*n2)*(1.0 - onRoad);",
+              "float gSpore = step(0.94, h21(floor(vXZ*2.6)))*smoothstep(0.32, 0.12, length(fract(vXZ*2.6) - 0.5))*(1.0 - onRoad);",
+              "totalEmissiveRadiance += vec3(0.03, 0.10, 0.24)*onRoad*(0.7 + 0.6*n3) + vec3(0.05, 0.38, 0.85)*gEdge*0.8",
+              "  + vec3(0.03, 0.22, 0.5)*gMoss*0.55 + vec3(0.35, 0.85, 1.0)*gSpore*0.7;"].join("\n") : "",
       "diffuseColor.rgb *= col;"
     ].join("\n"))
     .replace("#include <color_fragment>", "")
@@ -10458,6 +10463,65 @@ function snowify(g){
    cascade of drooping crowns, each a soft dome that flows down into a skirt of hanging
    leaves with a ragged fringe, layered round a big central one so the whole tree reads
    as curtains falling over curtains almost to the ground */
+/* Glowcap Hollow's trees, in two parts each, both unit height so the instance scale is the
+   tree's height: the body (trunk, boughs and leaf clumps, lit like any tree and painted in vertex
+   colours) and the glow (unlit, so it shines in the dark: the leaves speckled with light, threads
+   and fronds hanging down, a bead of light on the end of each).
+     0 glowshade: a twisted trunk under a cloud of leaf clumps, glowing threads hanging beneath
+     1 lantern willow: a slender trunk under a dark dome, a curtain of fronds glowing at the tips */
+const GLOW_TREE = {};
+function glowTreeGeometry(kind){
+  if(GLOW_TREE[kind]) return GLOW_TREE[kind];
+  const R = Math.random, bp = [], bc = [], gp = [], gc = [];
+  const put = (geo, mtx, col, P, C, jit)=>{
+    const g = geo.index ? geo.toNonIndexed() : geo; g.applyMatrix4(mtx);
+    const a = g.attributes.position;
+    for(let i=0;i<a.count;i++){ P.push(a.getX(i), a.getY(i), a.getZ(i)); const k = 1 + (jit ? (R() - 0.5)*jit : 0); C.push(col[0]*k, col[1]*k, col[2]*k); }
+  };
+  const M = (x, y, z, rx, ry, rz, sx, sy, sz)=> new THREE.Matrix4().compose(new THREE.Vector3(x, y, z),
+    new THREE.Quaternion().setFromEuler(new THREE.Euler(rx || 0, ry || 0, rz || 0)), new THREE.Vector3(sx || 1, sy || 1, sz || 1));
+  const bark = [0.13, 0.12, 0.17], leaf = ()=> [0.08 + R()*0.04, 0.2 + R()*0.08, 0.27 + R()*0.08];
+  // a ribbon hanging from (x, y, z) for len, dark at the top and bright at the foot, with a bead on the end
+  const strand = (x, y, z, len, w, bright)=>{
+    const a = R()*Math.PI, dx = Math.cos(a)*w, dz = Math.sin(a)*w, top = [0.03, 0.08, 0.2], foot = bright;
+    for(const q of [[x - dx, y, z - dz, top], [x + dx, y, z + dz, top], [x + dx, y - len, z + dz, foot],
+                    [x - dx, y, z - dz, top], [x + dx, y - len, z + dz, foot], [x - dx, y - len, z - dz, foot]]){ gp.push(q[0], q[1], q[2]); gc.push(...q[3]); }
+    put(new THREE.OctahedronGeometry(w*2.2, 0), M(x, y - len - w*1.5, z), [bright[0]*1.2, bright[1]*1.15, bright[2]*1.1], gp, gc);
+  };
+  const glowCol = ()=> R() < 0.82 ? [0.25 + R()*0.15, 0.75 + R()*0.2, 1.0] : [0.45, 0.45 + R()*0.15, 1.0];
+  if(kind === 0){
+    // the trunk in three bent lengths
+    let x = 0, z = 0, y = 0;
+    for(let k=0;k<3;k++){ const L = 0.22, ax = (R() - 0.5)*0.35, az = (R() - 0.5)*0.35, r0 = 0.07 - k*0.016;
+      put(new THREE.CylinderGeometry(r0 - 0.016, r0, L, 6), M(x + Math.sin(az)*L/2, y + L/2, z - Math.sin(ax)*L/2, ax, 0, az), bark, bp, bc, 0.15);
+      x += Math.sin(az)*L; z -= Math.sin(ax)*L; y += L*0.97; }
+    // boughs, and the cloud of leaf clumps on them
+    const blobs = [];
+    for(let k=0;k<4;k++){ const a = k/4*Math.PI*2 + R()*0.8, L = 0.16 + R()*0.08;
+      put(new THREE.CylinderGeometry(0.012, 0.024, L, 5), M(x + Math.cos(a)*L*0.45, y - 0.06 + L*0.2, z + Math.sin(a)*L*0.45, 0, -a, Math.PI/2 - 0.5), bark, bp, bc, 0.15);
+      blobs.push([x + Math.cos(a)*L*0.9, y + 0.02 + R()*0.06, z + Math.sin(a)*L*0.9, 0.12 + R()*0.05]); }
+    blobs.push([x, y + 0.12, z, 0.17], [x + (R() - 0.5)*0.1, y + 0.2, z + (R() - 0.5)*0.1, 0.12]);
+    blobs.forEach(b=>{ put(new THREE.IcosahedronGeometry(b[3], 0), M(b[0], b[1], b[2], R(), R(), R(), 1, 0.78, 1), leaf(), bp, bc, 0.25);
+      // the leaves catch the light: glowing specks scattered over each clump
+      for(let n=0;n<10;n++){ const u = new THREE.Vector3(R() - 0.5, (R() - 0.3)*0.8, R() - 0.5).normalize().multiplyScalar(b[3]*0.96);
+        put(new THREE.TetrahedronGeometry(0.014 + R()*0.01, 0), M(b[0] + u.x, b[1] + u.y*0.78, b[2] + u.z, R()*6, R()*6, 0), glowCol(), gp, gc); }
+      // and threads hanging from its underside
+      for(let n=0;n<3;n++){ const a = R()*Math.PI*2, r = R()*b[3]*0.8;
+        strand(b[0] + Math.cos(a)*r, b[1] - b[3]*0.6, b[2] + Math.sin(a)*r, 0.06 + R()*0.18, 0.0035, glowCol()); } });
+  } else {
+    // a slender trunk, a dark dome, and a curtain of fronds round its rim glowing toward their tips
+    put(new THREE.CylinderGeometry(0.026, 0.055, 0.62, 6), M(0, 0.31, 0, (R() - 0.5)*0.08, 0, (R() - 0.5)*0.08), bark, bp, bc, 0.15);
+    put(new THREE.SphereGeometry(0.25, 9, 5, 0, Math.PI*2, 0, Math.PI*0.55), M(0, 0.58, 0, 0, R()*6, 0, 1, 0.62, 1), leaf(), bp, bc, 0.25);
+    put(new THREE.IcosahedronGeometry(0.1, 0), M(0, 0.72, 0, R(), R(), R()), leaf(), bp, bc, 0.25);
+    for(let n=0;n<44;n++){ const a = n/44*Math.PI*2 + R()*0.1, r = 0.17 + R()*0.08, y = 0.6 + (0.25 - r)*0.6;
+      strand(Math.cos(a)*r, y, Math.sin(a)*r, 0.2 + R()*0.26, 0.006, glowCol()); }
+    for(let n=0;n<8;n++){ const u = new THREE.Vector3(R() - 0.5, R()*0.5, R() - 0.5).normalize().multiplyScalar(0.25);
+      put(new THREE.TetrahedronGeometry(0.016, 0), M(u.x, 0.58 + u.y*0.62, u.z, R()*6, R()*6, 0), glowCol(), gp, gc); }
+  }
+  const mk = (P, C)=>{ const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(P, 3)); g.setAttribute("color", new THREE.Float32BufferAttribute(C, 3)); g.computeVertexNormals(); return g; };
+  return (GLOW_TREE[kind] = {body: mk(bp, bc), glow: mk(gp, gc)});
+}
+const GLOW_TREE_MAT = new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.DoubleSide});
 function willowGeometry(){
   const pos = [], col = [], c = new THREE.Color(), R = (a, b)=> a + Math.random()*(b - a);
   const put = (geo, shade)=>{ const g = geo.index ? geo.toNonIndexed() : geo, a = g.attributes.position;
@@ -10852,7 +10916,7 @@ if(GLOW){
       const hg = new THREE.BufferGeometry(); hg.setAttribute("position", new THREE.Float32BufferAttribute(hp, 3)); hg.setAttribute("color", new THREE.Float32BufferAttribute(hc, 3)); hg.setAttribute("aSize", new THREE.Float32BufferAttribute(hs, 1));
       const hm = new THREE.ShaderMaterial({ uniforms:{map:{value:glowTex}, uScale:{value:window.innerHeight/2}}, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, vertexColors:true,
         vertexShader:"attribute float aSize; varying vec3 vC; uniform float uScale; void main(){ vC = color; vec4 mv = modelViewMatrix*vec4(position, 1.0); gl_PointSize = min(512.0, uScale*aSize/max(1.0, -mv.z)); gl_Position = projectionMatrix*mv; }",
-        fragmentShader:"uniform sampler2D map; varying vec3 vC; void main(){ float k = texture2D(map, gl_PointCoord).r; gl_FragColor = vec4(vC*k*k*0.16, 1.0); }" });
+        fragmentShader:"uniform sampler2D map; varying vec3 vC; void main(){ float k = texture2D(map, gl_PointCoord).a; gl_FragColor = vec4(vC*k*k*0.3, 1.0); }" });
       const halo = new THREE.Points(hg, hm); halo.frustumCulled = false; halo.renderOrder = 4; scene.add(halo);
     }
     [stemI, capI, underI, groundI].forEach(o=>{ o.instanceMatrix.needsUpdate = true; if(o.instanceColor) o.instanceColor.needsUpdate = true; o.frustumCulled = false; scene.add(o); });
@@ -11186,7 +11250,8 @@ if(GLOW){
       if(inWaterway(x,z) || barren(x,z)) return false;          // trees do not grow in the river
       if(TRACK.treeline && gradedY(x, z) > TRACK.treeline + (Math.random() - 0.7)*14) return false;   // nor above the treeline
       if(DESERT && Math.random() > 0.2) return false;        // the desert is open country
-      const kind = FALL ? (Math.random() < 0.22 ? 0 : (Math.random() < 0.55 ? 1 : 2))
+      const kind = GLOW ? (Math.random() < 0.46 ? 0 : (Math.random() < 0.72 ? 1 : 2))
+                 : FALL ? (Math.random() < 0.22 ? 0 : (Math.random() < 0.55 ? 1 : 2))
                  : DESERT ? (Math.random() < 0.6 ? 0 : (Math.random() < 0.6 ? 1 : 2))
                         : (Math.random() < 0.5 ? 0 : (Math.random() < 0.6 ? 1 : 2));
       const tall = DESERT ? (kind === 0 ? 5 + Math.random()*5 : 3 + Math.random()*3) : 9 + Math.random()*10;
@@ -11204,7 +11269,8 @@ if(GLOW){
   treeSpots.forEach((list, kind)=>{
     if(!list.length) return;
     const inst = new THREE.InstancedMesh(
-      DESERT ? (kind === 0 ? cactusGeometry() : kind === 1 ? hardwoodGeometry(1) : coniferGeometry(2))
+      GLOW ? (kind < 2 ? glowTreeGeometry(kind).body : coniferGeometry(1))
+      : DESERT ? (kind === 0 ? cactusGeometry() : kind === 1 ? hardwoodGeometry(1) : coniferGeometry(2))
       : SWAMPGP ? (kind === 0 ? willowGeometry() : kind === 1 ? cypressGeometry() : hardwoodGeometry(1))
       : WINTER ? snowify(coniferGeometry(kind))
       : FALL && kind > 0 ? hardwoodGeometry(kind) : coniferGeometry(kind),
@@ -11225,6 +11291,7 @@ if(GLOW){
       else if(DESERT){ if(kind === 0){ const k = 0.9 + Math.random()*0.3; tint.setRGB(k, k, k*0.9); }
                        else tint.setHSL(0.2 + Math.random()*0.05, 0.22, 0.42 + Math.random()*0.1); }
       else if(FALL && kind > 0) fallTint(tint);
+      else if(GLOW){ const k = 0.8 + Math.random()*0.4; tint.setRGB(k*0.92, k, k*1.08); }
       else if(GATOR) tint.setHSL(0.26 + Math.random()*0.14, 0.45 + Math.random()*0.2, 0.52 + Math.random()*0.14);   // lush swamp greens, some teal
       else if(SWAMPGP){ if(kind === 2) tint.setHSL(0.2 + Math.random()*0.08, 0.4 + Math.random()*0.15, 0.36 + Math.random()*0.1);   // gum and oak, green
                         else { const k = 0.85 + Math.random()*0.35; tint.setRGB(k*0.98, k, k*0.86); } }                           // willow and cypress keep their own colours
@@ -11241,6 +11308,12 @@ if(GLOW){
     if(inst.instanceColor) inst.instanceColor.needsUpdate = true;
     inst.userData.lod = "tree";                      // (gets a far version and near-only shadows: see chunkInstances)
     scene.add(inst);
+    // the glowing half of Glowcap Hollow's trees, on the same spots
+    if(GLOW && kind < 2){
+      const gi = new THREE.InstancedMesh(glowTreeGeometry(kind).glow, GLOW_TREE_MAT, list.length);
+      for(let i=0;i<list.length;i++){ inst.getMatrixAt(i, m); gi.setMatrixAt(i, m); }
+      gi.instanceMatrix.needsUpdate = true; gi.castShadow = false; scene.add(gi);
+    }
   });
 
   /* rocks, in three shapes */
@@ -11496,7 +11569,8 @@ if(GLOW){
   const tint = new THREE.Color(0.4, 0.6, 1.0);
   scene.traverse(o=>{ if(o.isMesh && o.material && o.material.isMeshLambertMaterial && o.material.vertexColors) o.material.color.multiply(tint); });
   // the fallen leaves too (the glowing points are added light, and left as they are)
-  scene.traverse(o=>{ if(o.isPoints && o.material && o.material.isPointsMaterial && o.material.map && o.material.blending !== THREE.AdditiveBlending) o.material.color.setRGB(0.22, 0.36, 0.7); });
+  scene.traverse(o=>{ if(o.isPoints && o.material && o.material.isPointsMaterial && o.material.map && o.material.blending !== THREE.AdditiveBlending){
+    const m = o.material; m.color.setRGB(0.15, 0.42, 0.62); m.blending = THREE.AdditiveBlending; m.transparent = true; m.depthWrite = false; m.needsUpdate = true; } });
   const lamp = new THREE.SpotLight(0xdfeaff, 3.2, 70, 0.62, 0.65, 1.0);
   scene.add(lamp); scene.add(lamp.target);
   const beamGeo = new THREE.ConeGeometry(4.2, 22, 18, 1, true); beamGeo.translate(0, -11, 0); beamGeo.rotateX(-Math.PI/2);
