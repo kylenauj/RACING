@@ -1266,32 +1266,40 @@ const TRACKS = [
      some leaning out over the road, glowworms on threads under their caps, glowbugs
      everywhere, pools of glowing water and blue crystal, and the road picked out in studs. */
   { name:"GLOWCAP HOLLOW", special:true, season:"glow", after:"a forest that glows in the dark", relief:1.0, rollers:0.8,
-    blurb:"night in a forest of giant glowing mushrooms: under the arches of their caps, past pools of glowing water and blue crystal, through clouds of glowbugs, and round the grove of giants",
+    blurb:"night in a forest of giant glowing mushrooms, with a river of glowing water running right through it: jump it, cross it on a fallen giant, jump it again, and fly the broken bridge to the flag",
     kit:["crest","kicker"],
     shape:"GLOWCAP HOLLOW \u2014 a forest that glows",
     feature:"giant glowing mushrooms, glowworms, glowbugs, glowing pools and crystals, all at night",
     ctrl:[[0,-400],[-120,-412],[-240,-386],[-322,-320],
           // the long straight down to the ravine, across the fallen giant, and on
           [-342,-200],[-352,-100],[-362,0],[-374,100],[-352,206],[-252,282],[-150,246],[-66,300],
-          [36,362],[156,344],[246,266],[258,152],[196,62],[276,-28],[380,-58],[442,-158],[402,-280],[300,-342],[190,-300],[96,-362]],
+          [36,362],[156,344],[246,266],[258,152],[196,62],[276,-28],[380,-58],[442,-158],[402,-280],
+          // the run home: one long straight down to the broken bridge over the gorge, and the flag
+          [300,-330],[180,-347],[60,-370]],
     hills:[[-310,-330,150,16],[60,330,150,20],[390,-160,160,28],[-210,90,190,-10],[200,120,120,14]],
     jumps:[], fords:[],
     mud:[[[196,62],[276,-28]]],
     /* THE FALLEN GIANT: a tree that came down across a ravine, so long ago its top is worn flat,
        and the road runs along it. 26m down, the ravine floor is a stream of glowing water */
-    spans:[{at:[-352,-100], road:-1, span:60, depth:26, wall:52, reach:120, giant:true},
-           // downstream, a second giant that broke in the middle as it fell: the near half kicks up,
-           // the far half lies waiting; it shares the first one's ravine rather than cutting its own
-           {at:[-289,-108], road:1, span:62, depth:26, wall:56, reach:40, giant:true, broken:9, kick:2.6, shared:0}],
+    /* THE RIVER: one stream of glowing water right through the map, in from the dark beyond the north
+       woods and out past the south, crossing the lap four times: jumped twice, crossed on the fallen
+       giant where it runs through a gorge, and jumped once more off a broken bridge over another gorge
+       just before the flag. Points: [x, z, half width of its bed, depth below the land] */
+    glowRiver:[[-300,600,7,5],[-302,420,7,6],[-300,245,7,7],[-292,150,7,6],[-302,60,7,6],[-292,-30,8,10],[-300,-82,8,20],
+               [-352,-100,8,22],[-420,-122,8,16],[-472,-190,8,8],[-462,-290,7,6],[-405,-385,7,6],[-345,-402,7,7],[-290,-346,7,7],
+               [-230,-300,7,6],[-120,-285,7,6],[-10,-275,8,6],[80,-296,8,10],[135,-330,9,16],[150,-356,9,18],[168,-410,8,10],
+               [182,-480,7,6],[195,-640,7,5]],
+    spans:[{at:[-352,-100], road:-1, span:60, depth:26, wall:52, reach:120, giant:true, shared:0},
+           // the broken bridge: a log trestle over the gorge, its middle gone; flat out off the end
+           {at:[150,-356], road:-1, span:40, depth:18, wall:32, reach:60, broken:12, kick:3.8, shared:0}],
+    // the two jumps straight across the river (their gaps are measured off the river itself)
+    leaps:[{at:[-300,245], height:3.6, river:true, shared:0}, {at:[-290,-346], height:4.2, river:true, shared:0}],
     widths:[[[-347,-160],[-357,-40],3.9]],
     flats:[[-60,-405,110]],
     branches:[
       // the grove: a short cut through the thickest of the giants, under their caps
       {a:[-150,246], b:[196,62], via:[[-60,200],[30,150],[120,100]],
        half:5.0, jumps:[[0.5,24,7,2.2,44]], tune:0.1, label:"THE GROVE", mainLabel:"THE RIDGE"},
-      // the broken giant: out along the bank and across the river downstream, flat out off the snapped end
-      {a:[-342,-235], b:[-365,30], via:[[-318,-232],[-293,-215],[-287,-180],[-289,-108],[-292,-40],[-302,-12],[-332,8]],
-       half:4.4, jumps:[], tune:0, jumpKeep:20, label:"THE BROKEN GIANT", mainLabel:"THE FALLEN GIANT"},
       // the hops: straight across the inside of the hill, over two crests, while the road goes round it
       {a:[276,-28], b:[300,-342], via:[[290,-100],[304,-180],[306,-262]],
        half:4.8, jumps:[[0.3,24,7,2.6,46],[0.68,24,7,2.8,48]], tune:0.2, label:"THE HOPS", mainLabel:"THE HILL"}
@@ -1740,6 +1748,7 @@ if(SWAMPGP){
   TRACK.widths = (TRACK.widths||[]).map(b=> [mv(b[0]), mv(b[1]), b[2]]);
   if(TRACK.summit) TRACK.summit = mv(TRACK.summit);
   if(TRACK.swamps) TRACK.swamps = TRACK.swamps.map(w=> Object.assign({}, w, {at: mv(w.at)}));
+  if(TRACK.glowRiver) TRACK.glowRiver = TRACK.glowRiver.map(q=> mv(q).concat(q.slice(2)));
   TRACK.camps = (TRACK.camps||[]).map(mv);
   TRACK.flats = (TRACK.flats||[]).map(f=> mv([f[0], f[1]]).concat([f[2]]));
   TRACK.branches = TRACK.branches.map(b=> Object.assign({}, b, {a: mv(b.a), b: mv(b.b), via: b.via.map(mv)}));
@@ -1750,6 +1759,9 @@ if(SWAMPGP){
    metres apart, so a lap is always going over a top or down into a dip.
    Tall enough that the biggest crests go light at full speed. */
 const ROLL = TRACK.test || TRACK.expedition ? 0 : (TRACK.rollers !== undefined ? TRACK.rollers : 1);
+/* a river cut through the whole map (Glowcap Hollow's): filled in once the land is known; 'off' while the
+   roads take their heights, so a road meets the river at the height of its banks and has to cross it */
+const GRIV = {on:false, off:false, KB:1.6};
 const ROLL_PH = (TRACK.name.length*1.37) % 6.28;
 function rollers(x, z){
   return 5.6*Math.sin(x*0.029 + z*0.011 + ROLL_PH) + 4.4*Math.sin(z*0.034 - x*0.017 + ROLL_PH*1.7)
@@ -1836,6 +1848,7 @@ function macro(x, z){
   }
   /* the slot canyon: walls standing up either side of the road through it */
   if(CANYON.on) h += canyonWall(x, z);
+  if(GRIV.on && !GRIV.off) h = Math.min(h, rivCarve(x, z, h));
   /* the hilltop the village sits on, levelled to the summit */
   if(TOWN.on){
     const d = Math.hypot(x - TOWN.x, z - TOWN.z);
@@ -2105,7 +2118,63 @@ function iceAt(x, z){
   return 1 - smoothstep(0.93, 1.0, e);
 }
 /* the road follows the land, smoothed so it climbs at a grade a road would */
+/* where a point is against the river: distance from its line, station along it, its bed's half
+   width and level there (looked up through a grid of the segments near each cell) */
+function rivAt(x, z){
+  if(!GRIV.on) return null;
+  const key = Math.floor(x/GRIV.CELL) + "," + Math.floor(z/GRIV.CELL), list = GRIV.hash.get(key);
+  if(!list) return null;
+  let best = Infinity, bk = 0, bt = 0;
+  for(const k of list){
+    const A = GRIV.pts[k], B = GRIV.pts[k + 1], ex = B[0] - A[0], ez = B[1] - A[1], L2 = ex*ex + ez*ez;
+    let t = L2 ? ((x - A[0])*ex + (z - A[1])*ez)/L2 : 0; t = Math.max(0, Math.min(1, t));
+    const d2 = (x - A[0] - ex*t)**2 + (z - A[1] - ez*t)**2;
+    if(d2 < best){ best = d2; bk = k; bt = t; }
+  }
+  const lerp = (a, b)=> a + (b - a)*bt;
+  return {d: Math.sqrt(best), s: bk + bt, hw: lerp(GRIV.hw[bk], GRIV.hw[bk + 1]), bed: lerp(GRIV.bed[bk], GRIV.bed[bk + 1])};
+}
+function rivCarve(x, z, h){
+  const r = rivAt(x, z);
+  if(!r) return h;
+  const wob = Math.sin(x*0.07 + z*0.05)*0.8;
+  return r.bed + 0.4*Math.min(1, (r.d/r.hw)**2) + Math.max(0, r.d - r.hw - wob)*GRIV.KB;
+}
+/* the land as it lies, uncarved by the river (the river's own banks are measured off it) */
+function gridH0(x, z){ GRIV.off = true; try { return macro(x, z); } finally { GRIV.off = false; } }
+/* how far a point is into the river's water: the water's level, or null */
+function rivWater(x, z){
+  const r = rivAt(x, z);
+  return r && r.d < r.hw + 1.5 ? r.bed + 1.1 : null;
+}
+function buildRiver(def){
+  // a smooth line through the points, sampled every 3m, the width and depth carried along it
+  const ctrl = def.map(q=> new THREE.Vector3(q[0], 0, q[1])), curve = new THREE.CatmullRomCurve3(ctrl, false, "centripetal");
+  const L = curve.getLength(), n = Math.max(8, Math.round(L/3)), sp = curve.getSpacedPoints(n);
+  const cum = [0]; for(let k=1;k<def.length;k++) cum.push(cum[k - 1] + Math.hypot(def[k][0] - def[k - 1][0], def[k][1] - def[k - 1][1]));
+  const at = (frac, idx)=>{ const s0 = frac*cum[cum.length - 1]; let k = 0; while(k < cum.length - 2 && cum[k + 1] < s0) k++;
+    const f = (s0 - cum[k])/Math.max(1e-6, cum[k + 1] - cum[k]); return def[k][idx] + (def[k + 1][idx] - def[k][idx])*Math.max(0, Math.min(1, f)); };
+  GRIV.pts = sp.map(v=> [v.x, v.z]);
+  GRIV.hw = sp.map((v, k)=> at(k/n, 2));
+  const depth = sp.map((v, k)=> at(k/n, 3));
+  GRIV.bed = sp.map((v, k)=> macro(v.x, v.z) - depth[k]);
+  for(let pass=0; pass<6; pass++){ const b = GRIV.bed.slice(); for(let k=1;k<n;k++) GRIV.bed[k] = (b[k - 1] + 2*b[k] + b[k + 1])/4; }
+  // the grid of segments, each in every cell its banks can reach
+  GRIV.CELL = 40; GRIV.hash = new Map();
+  for(let k=0;k<n;k++){
+    const A = GRIV.pts[k], B = GRIV.pts[k + 1], reach = GRIV.hw[k] + 40/GRIV.KB + 6;
+    const x0 = Math.floor((Math.min(A[0], B[0]) - reach)/GRIV.CELL), x1 = Math.floor((Math.max(A[0], B[0]) + reach)/GRIV.CELL);
+    const z0 = Math.floor((Math.min(A[1], B[1]) - reach)/GRIV.CELL), z1 = Math.floor((Math.max(A[1], B[1]) + reach)/GRIV.CELL);
+    for(let cx=x0; cx<=x1; cx++) for(let cz=z0; cz<=z1; cz++){ const key = cx + "," + cz; if(!GRIV.hash.has(key)) GRIV.hash.set(key, []); GRIV.hash.get(key).push(k); }
+  }
+  GRIV.on = true;
+}
+if(TRACK.glowRiver) buildRiver(TRACK.glowRiver);
 function profileFromLand(P){
+  GRIV.off = true;
+  try { profileFromLandRaw(P); } finally { GRIV.off = false; }
+}
+function profileFromLandRaw(P){
   const y = P.pts.map(p=> macro(p.x, p.z));
   smoothAlong(y, P.closed, Math.round(24/P.seg));
   if(!TRACK.expedition && !TRACK.test) limitBend(y, P.closed, P.seg);
@@ -3560,8 +3629,16 @@ function passIdx(P, at, pass, skip){
   CAVES.push({a, b, grow:4});
   TUNNELS.push({a, b, cave:true});
 });
-(TRACK.leaps || []).forEach(d=>{
-  const P = MAIN, seg = P.seg, i = snapTo(P, d.at), p = P.pts[i], t = P.tans[i];
+(TRACK.leaps || []).forEach(d0=>{
+  const d = Object.assign({}, d0), P = MAIN, seg = P.seg;
+  let i = snapTo(P, d.at);
+  /* across the river: the gap is where the river's channel is cut below the road, measured along the road */
+  if(d.river && GRIV.on){
+    const inCh = k=>{ const q = P.pts[wrapIdx(P, k)], r = rivAt(q.x, q.z); return r && r.d < r.hw + Math.max(0, q.y - r.bed)/GRIV.KB + 0.5; };
+    let a = i, b = i; while(inCh(a - 1) && i - a < 80/seg) a--; while(inCh(b + 1) && b - i < 80/seg) b++;
+    i = wrapIdx(P, Math.round((a + b)/2)); d.gap = Math.max(10, (b - a)*seg + 2);
+  }
+  const p = P.pts[i], t = P.tans[i];
   const lip = i - Math.round((d.gap/2 + 3)/seg);
   // the road across the gap runs on as a line, so the far bank meets the car where it expects
   const E = Math.round((d.gap/2 + 6)/seg);
@@ -3570,7 +3647,7 @@ function passIdx(P, at, pass, skip){
   ramp(P, lip, Math.round(34/seg), Math.round(40/seg), d.height, 0, true, 4);
   const y = P.pts[i].y;
   const sp = {P, i, S:0, x:p.x, z:p.z, y, tx:t.x, tz:t.z, grade:0, span:0, depth:7, wall:d.gap/2 + 1, reach:d.reach || 70, cave:!!d.cave,
-              low:true, ph: SPANS.length*1.7 + 0.5, over:false, leap:true, Q:null, j:-1};
+              low:true, ph: SPANS.length*1.7 + 0.5, over:false, leap:true, Q:null, j:-1, shared: d.shared !== undefined, gap:d.gap};
   sp.floor = Math.min(ya, yb) + BED - 7; sp.lava = sp.floor + 1.2;
   const W = Math.round((d.gap/2)/seg);
   for(let k=-W;k<=W;k++) P.noStamp[wrapIdx(P, i + k)] = 1;
@@ -3648,6 +3725,7 @@ function spanFind(x, z, tol){
 }
 /* how deep in lava a point is: the level there, or null if there is none */
 function lavaLevelAt(x, z){
+  if(GRIV.on){ const w = rivWater(x, z); if(w !== null) return w; }
   for(let n=0;n<SPANS.length;n++){
     const sp = SPANS[n];
     if(sp.over || sp.shared) continue;
@@ -3748,6 +3826,7 @@ function barren(x, z){
   return false;
 }
 function inWaterway(x, z){
+  if(GRIV.on){ const r = rivAt(x, z); if(r && r.d < r.hw + Math.max(0, gridH0(x, z) - r.bed)/GRIV.KB + 2.5) return true; }
   if(RIVER.on){ const r = riverAt(x, z); if(r && r[0] < RIVER_BANK + 1) return true; }
   if(TOWN.on && Math.hypot(x - TOWN.x, z - TOWN.z) < TOWN.r*0.85) return true;   // the village keeps its own ground
   if(LAKE.on && Math.hypot((x - LAKE.x)/LAKE.rx, (z - LAKE.z)/LAKE.rz) < 1.05) return true;
@@ -3984,7 +4063,7 @@ const NOTES = (()=>{
   }
   return out;
 })();
-const NOTE_WORDS = { bridgeout: GLOW ? "broken giant, flat out, jump" : "bridge out, jump, flat out", lavaleap:"lava jump, flat out, don't lift", tunnel:"into the ice tunnel", overpass:"over the bridge", bridge: GLOW ? "the fallen giant, keep it straight" : "log bridge, lava below", jump:"jump", bigjump:"big jump, keep straight", ridge:"ice ridge, jump", water:"water", creek:"into the creek",
+const NOTE_WORDS = { bridgeout: GLOW ? "bridge out over the gorge, flat out, jump" : "bridge out, jump, flat out", lavaleap: GLOW ? "river jump, flat out, don't lift" : "lava jump, flat out, don't lift", tunnel:"into the ice tunnel", overpass:"over the bridge", bridge: GLOW ? "the fallen giant, keep it straight" : "log bridge, lava below", jump:"jump", bigjump:"big jump, keep straight", ridge:"ice ridge, jump", water:"water", creek:"into the creek",
                      mud:"mud", crossing:"crossing", ice:"onto ice", crest:"over crest", bumps:"bumps" };
 function noteSay(n){
   if(n.kind === "fork") return (n.label ? n.label.toLowerCase() : "shortcut") + " " + (n.dir > 0 ? "left" : "right");
@@ -6052,6 +6131,31 @@ if(SPANS.length){
   // a sign before each crevasse on the high route
   SPANS.forEach(sp=>{ if(sp.gapS) roadSign(sp.i - sp.S - Math.round(70/MAIN.seg), 1, ["BRIDGE OUT", "flat out \u2014 jump it"], "#d8302a", "#f2efe6"); });
   SPANS.forEach(sp=>{ if(sp.P === MAIN && !sp.over && !sp.leap) roadSign(sp.i - sp.S - Math.round(60/MAIN.seg), 1, ["LOG BRIDGE", "lava below \u2014 keep it straight"], "#e2b21e", "#1f1f1f"); });
+}
+/* ---- the river's water: one ribbon of it from end to end, flowing downstream, drawn only where it
+   lies over its bed (where a road was built across it on earth, there is none) ---- */
+if(GRIV.on){
+  const pos = [], dep = [], run = [], idx = [], NC = 10;
+  let arc = 0, rows = 0;
+  for(let k=0;k<GRIV.pts.length;k++){
+    const A = GRIV.pts[Math.max(0, k - 1)], B = GRIV.pts[Math.min(GRIV.pts.length - 1, k + 1)], q = GRIV.pts[k];
+    if(k) arc += Math.hypot(q[0] - GRIV.pts[k - 1][0], q[1] - GRIV.pts[k - 1][1]);
+    let tx = B[0] - A[0], tz = B[1] - A[1]; const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl;
+    const w = GRIV.hw[k] + 2.2, lev = GRIV.bed[k] + 1.1;
+    for(let c=0;c<=NC;c++){
+      const v = (c/NC - 0.5)*2*w, x = q[0] - tz*v, z = q[1] + tx*v;
+      pos.push(x, lev, z); run.push(v, arc);
+      dep.push(Math.max(-1, Math.min(3, lev - gridH(x, z))));
+    }
+    if(k) for(let c=0;c<NC;c++){ const a0 = (rows - 1)*(NC + 1) + c, b0 = rows*(NC + 1) + c;
+      if(dep[a0] <= 0 && dep[a0 + 1] <= 0 && dep[b0] <= 0 && dep[b0 + 1] <= 0) continue;
+      idx.push(a0, b0, a0 + 1, a0 + 1, b0, b0 + 1); }
+    rows++;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("aDepth", new THREE.Float32BufferAttribute(dep, 1));
+  g.setAttribute("aRun", new THREE.Float32BufferAttribute(run, 2)); g.setIndex(idx);
+  const m = new THREE.Mesh(g, lavaMaterial(true)); m.material.side = THREE.DoubleSide; m.frustumCulled = false; m.renderOrder = 2; scene.add(m);
 }
 /* ---- the ice tunnel: a tube of clear blue ice over the road, ribbed,
    hung with icicles, a snow-capped portal at each end ---- */
@@ -16903,12 +17007,17 @@ function lavaReset(){
   const x = pose.x, y = pose.y, z = pose.z;
   for(let k=0;k<40;k++) spawnDust(x + (Math.random() - 0.5)*3, y + 0.5, z + (Math.random() - 0.5)*3, 4, 1.2,
                                   (Math.random() - 0.5)*3, (Math.random() - 0.5)*3, 4 + Math.random()*5);
-  for(let k=0;k<24;k++) spawnDust(x, y + 0.3, z, GATOR ? [0.4, 0.9, 1.0] : [1.0, 0.5, 0.12], 0.6, (Math.random() - 0.5)*8, (Math.random() - 0.5)*8, 5 + Math.random()*6);
+  for(let k=0;k<24;k++) spawnDust(x, y + 0.3, z, GATOR || GLOW ? [0.4, 0.9, 1.0] : [1.0, 0.5, 0.12], 0.6, (Math.random() - 0.5)*8, (Math.random() - 0.5)*8, 5 + Math.random()*6);
   if(actx){ burst(1.4, "highpass", 1800, 0.3, 0.6, 0, 5000); burst(0.6, "lowpass", 300, 0.3, 1, 0); }
-  banner(GATOR ? "SPLASH!" : "INTO THE LAVA", GATOR ? "#3ccfff" : "#ff6a2a", 1.6);
+  banner(GATOR || GLOW ? "SPLASH!" : "INTO THE LAVA", GATOR || GLOW ? "#3ccfff" : "#ff6a2a", 1.6);
   if(GATOR) GG.hit(3);
   const n = nearest(x, z), P = n.path;
-  if(P === MAIN){ resetCar(); return; }
+  if(P === MAIN){
+    // short of a jump: back up the road before it, never onto the road over the gap
+    const sp = SPANS.find(q=> q.P === MAIN && (q.leap || q.gapS) && Math.abs(((n.i - q.i) % MAIN.N + MAIN.N*1.5) % MAIN.N - MAIN.N/2) < ((q.gap || 0)/2 + (q.gapS || 0)*MAIN.seg + 40)/MAIN.seg);
+    if(sp){ resetCar(wrapIdx(MAIN, sp.i - Math.round(((sp.gap || 0)/2 + (sp.gapS || 0)*MAIN.seg + 70)/MAIN.seg))); return; }
+    resetCar(); return;
+  }
   // back on the branch, eight metres before where it left the deck
   resetCar();
   const j = Math.max(0, n.pi - Math.round(14/P.seg)), p = P.pts[j], t = P.tans[j];
@@ -16925,7 +17034,8 @@ function checkBrokenBridge(){
     if(near > sp.gapS + 40/MAIN.seg) continue;                                  // on the road below: that's fine
     const dx = pose.x - sp.x, dz = pose.z - sp.z, u = dx*sp.tx + dz*sp.tz, v = -dx*sp.tz + dz*sp.tx;
     if(Math.abs(u) > sp.gapS*MAIN.seg + 8 || Math.abs(v) > 16) continue;
-    if(pose.y < pathY(MAIN, sp.i) + BED - 3.2){
+    // measured against the deck under the car, not the middle: a far half that falls away is still a landing
+    if(pose.y < pathY(MAIN, wrapIdx(MAIN, sp.i + Math.round(u/MAIN.seg))) + BED - 3.2){
       banner("TOO SHORT", "#ff6a4a", 1.5, "flat out at the gap");
       resetCar(wrapIdx(MAIN, sp.i - sp.S - Math.round(45/MAIN.seg)));
       return;
