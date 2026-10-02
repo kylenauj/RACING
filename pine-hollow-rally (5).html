@@ -1078,44 +1078,43 @@ const TRACKS = [
     ]},
 
   /* ---- SPECIAL: Blossom Run, a cherry blossom valley in spring ----
-     A jump course through the orchards: off the start straight, a table and a ramp up the ridge,
-     two big ramps down the plunge into the hairpin, rhythm humps and a ramp along the valley, the
-     lone hill, and a table and two ramps down the long west straight home. Pink trees,
+     A figure of eight through the orchards: up the long diagonal under the old bridge, esses and a banked
+     carousel high on the hill, down the other diagonal and off the broken bridge over the road below,
+     the lone hill, a giant banked wall in the valley, and the esses home. Pink trees,
      petals on the wind and on the road, and butterflies everywhere. The hills work like the
      Sawtooth's: fast up, and down past top speed; the boost pads throw you further still. */
   { name:"BLOSSOM RUN", special:true, spring:true, hillfast:true, season:"summer", after:"a cherry blossom valley in spring", relief:0.9, rollers:0.35,
-    blurb:"a jump course through the cherry orchards with banked walls: up the big ridge over a table and a ramp, round the banked top and down the plunge over two big ramps, flat out round the giant wall at the bottom, rhythm humps and a ramp in the valley, the lone hill, round the banked west turn, a table and two ramps down the west straight, and the banked last turn. Boost pads throw you further",
+    blurb:"a figure of eight through the cherry orchards: up the long diagonal under the old bridge, through the esses and round the banked carousel high on the hill, then flat out down the other diagonal and off the broken bridge over the road you came up, the lone hill, the giant banked wall in the valley and the esses home. Eight big jumps a lap, and boost pads to throw you further",
     kit:[],
-    shape:"BLOSSOM RUN \u2014 a spring speedway",
-    feature:"cherry blossoms, butterflies, boost pads, a jump every few hundred metres and giant banked walls",
-    ctrl:[[-330,-300],[-298,-300],[-266,-300],[-234,-300],[-202,-300],[-170,-300],[-138,-300],[-106,-300],[-74,-300],[-42,-300],[-10,-300],[22,-300],
-          [54,-300],[86,-300],[118,-300],[150,-300],[183,-296],[214,-286],[243,-269],[268,-248],[292,-228],[317,-207],[341,-187],[366,-166],
-          [390,-146],[415,-125],[439,-104],[464,-84],[488,-63],[513,-43],[537,-22],[559,-4],[582,23],[595,53],[600,84],[600,117],
-          [600,149],[600,181],[600,213],[600,245],[600,277],[600,310],[600,342],[600,374],[600,406],[600,438],[600,470],[600,502],
-          [600,519],[600,535],[600,568],[600,600],[595,632],[577,659],[548,674],[516,675],[493,666],[456,652],[428,650],[392,650],
-          [360,650],[328,650],[296,650],[264,650],[232,650],[200,650],[168,650],[136,646],[105,637],[75,625],[44,613],[14,601],
-          [-16,589],[-38,580],[-77,569],[-106,567],[-142,567],[-175,567],[-207,567],[-240,567],[-272,567],[-305,567],[-329,567],[-368,557],
-          [-393,536],[-408,508],[-412,480],[-412,444],[-412,412],[-412,380],[-412,348],[-412,316],[-412,284],[-412,251],[-412,219],[-412,187],
-          [-412,155],[-412,123],[-412,91],[-412,59],[-412,27],[-412,-5],[-412,-37],[-412,-70],[-412,-102],[-412,-134],[-412,-166],[-412,-198],
-          [-412,-222],[-401,-261],[-379,-285],[-350,-298]],
-    /* (laid out from straights and arcs: every straight built round its jumps with a straight landing,
-       and the big turns banked into walls you take flat out) */
-    hills:[[590,38,360,72],[248,650,120,-16],[-219,567,100,36],[-412,127,85,14]],
-    jumps:[[[-42,-300],1.8],[[-412,-82],2.2]],
-    // hand-placed jumps (see shapeJump): a table on the ridge, rhythm humps in the valley, a table down the west straight
-    set:[[[312,650],"rhythm"],[[-412,340],"tabletop"]],
+    shape:"BLOSSOM RUN \u2014 a figure of eight",
+    feature:"a figure of eight with a broken bridge to jump over the road below, giant banked walls, cherry blossoms and butterflies",
+    ctrl:[[-330,-300],[-298,-300],[-266,-300],[-234,-300],[-201,-300],[-169,-300],[-137,-300],[-105,-300],[-73,-300],[-41,-300],[-9,-300],[23,-300],
+          [56,-300],[88,-300],[120,-297],[152,-288],[181,-274],[206,-254],[228,-229],[247,-202],[265,-176],[282,-152],[306,-125],[332,-106],
+          [350,-96],[390,-78],[404,-71],[418,-63],[444,-44],[466,-20],[485,6],[494,19],[502,33],[509,65],[505,97],[489,125],
+          [465,147],[435,158],[402,157],[379,150],[343,133],[314,119],[285,106],[256,92],[227,79],[198,65],[169,52],[141,37],
+          [115,17],[93,-6],[74,-33],[61,-62],[50,-92],[39,-122],[28,-152],[17,-182],[6,-213],[-5,-243],[-16,-273],[-27,-303],
+          [-38,-333],[-49,-363],[-60,-394],[-71,-424],[-82,-454],[-93,-484],[-104,-514],[-115,-544],[-126,-574],[-137,-605],[-148,-635],[-159,-665],
+          [-171,-695],[-189,-722],[-210,-746],[-235,-767],[-264,-783],[-282,-791],[-324,-806],[-354,-817],[-384,-828],[-415,-836],[-447,-831],[-475,-815],
+          [-494,-788],[-500,-756],[-499,-740],[-496,-724],[-491,-693],[-485,-661],[-484,-628],[-491,-596],[-502,-574],[-516,-535],[-518,-502],[-516,-486],
+          [-513,-470],[-509,-447],[-497,-408],[-481,-380],[-461,-355],[-437,-333],[-409,-317],[-378,-306],[-346,-301]],
+    /* (laid out from straights and arcs: a figure of eight, the east loop high on the hill and the west
+       loop down in the valley, the two long diagonals crossing in the middle on a broken bridge) */
+    hills:[[364,17,320,70],[-457,-697,260,-12],[-140,-612,95,30]],
+    jumps:[[[-161,-300],1.8]],
+    set:[[[281,104],"tabletop"]],
     fords:[],
-    // the big ramps, built whole whatever the hill under them: off the ridge, twice down the plunge, the valley,
-    // the lone hill, and off the crest in the middle of the west straight
-    bigJumps:[[[344,-184],2.0],[[482,-68],2.2],[[600,261],2.3],[[600,410],2.0],[[29,607],1.9],[[-219,567],2.6],[[-412,127],2.1]],
-    /* the banked turns: the road leans right over into a wall round the outside, so a turn you'd brake for
-       on the flat is flat out (the bank is the rise per metre across the road; see BANKS) */
-    banks:[[[562,-1],[600,89],0.42],[[600,613],[456,652],0.75],[[-333,567],[-412,480],0.62],[[-412,-226],[-330,-300],0.55]],
-    widths:[[[600,613],[456,652],9.5],[[-333,567],[-412,480],8.5],[[-412,-226],[-330,-300],8]],
-    flats:[[-200,-300,120]],
-    // the boost pads: off the grid, up the ridge, over the top of the plunge, out of the wall, into
-    // the lone hill and twice down the west straight (each only where there's room to use it: padSpots)
-    pads:[[-234,-300],[268,-248],[600,113],[400,650],[-130,567],[-412,444],[-412,59]],
+    // the big ramps, built whole whatever the hill under them: past the bridge on the way out, twice down
+    // the long diagonal, the second one off the lone hill
+    bigJumps:[[[27,-300],1.8],[[183,58],1.8],[[-74,-431],2.2],[[-140,-612],2.6]],
+    /* the crossing: the second time through the middle the road climbs onto an old timber bridge over the
+       first diagonal, and the middle of it is gone: a kicker at the broken end, and you jump the road below */
+    spans:[{at:[-25,-300], road:-1, pass:2, under:-1, over:true, span:36, wall:36, broken:8.5, kick:2.6, lift:true}],
+    /* the banked turns (the bank is the rise per metre across the road; see BANKS) */
+    banks:[[[96,-300],[230,-226],0.35],[[496,23],[379,150],0.75],[[158,47],[59,-66],0.4],[[-163,-676],[-282,-791],0.4],[[-399,-833],[-499,-740],0.75],[[-508,-443],[-330,-300],0.5]],
+    widths:[[[496,23],[379,150],9],[[-399,-833],[-499,-740],9]],
+    flats:[[-300,-300,110]],
+    // the boost pads: off the grid, along the top, into the bridge, down the diagonal, out of the valley S
+    pads:[[-266,-300],[357,140],[36,-130],[-52,-371],[-512,-466]],
     branches:[]},
 
   /* ---- THE SWAMP CUP: the bayou, boardwalks, mud and willows ---- */
@@ -4920,7 +4919,7 @@ function paintCanvas(base, rustAmt){
 /* ---- where the lava fissures run on the volcano: jagged cracks a few
    metres off the verge, on the flat, clear of the set pieces ---- */
 const FISS_ROWS = [];
-if(TRACK.special && !GATOR && !GLOW && (SPANS.length || CRATER.on)){
+if(TRACK.special && !GATOR && !GLOW && !SPRING && (SPANS.length || CRATER.on)){
   const P = MAIN, seg = P.seg, clear = (i, x, z)=>{
     if(i*seg < 160 || (P.N - i)*seg < 60) return false;
     if(SPANS.some(sp=> Math.hypot(x - sp.x, z - sp.z) < 55)) return false;
@@ -6577,7 +6576,7 @@ function caveRoom(x, z){
    fissures steaming in the snow beside the road, the charred skeletons of
    trees the lava has reached, and black basalt tumbled over the snowfields
    round the cone ---- */
-if(TRACK.special && !GATOR && !GLOW && (SPANS.length || CRATER.on)){
+if(TRACK.special && !GATOR && !GLOW && !SPRING && (SPANS.length || CRATER.on)){
   const P = MAIN, seg = P.seg, clear = (i, x, z)=>{
     if(i*seg < 160 || (P.N - i)*seg < 60) return false;                                   // the start
     if(SPANS.some(sp=> Math.hypot(x - sp.x, z - sp.z) < 55)) return false;
