@@ -1084,36 +1084,38 @@ const TRACKS = [
      petals on the wind and on the road, and butterflies everywhere. The hills work like the
      Sawtooth's: fast up, and down past top speed; the boost pads throw you further still. */
   { name:"BLOSSOM RUN", special:true, spring:true, hillfast:true, season:"summer", after:"a cherry blossom valley in spring", relief:0.9, rollers:0.35,
-    blurb:"a jump course through the cherry orchards: twelve jumps a lap, off the start straight, a table and a ramp up the ridge, two big ramps down the plunge, rhythm humps and a ramp in the valley, the lone hill, and a table and two ramps down the west straight. Boost pads throw you further",
+    blurb:"a jump course through the cherry orchards with banked walls: up the big ridge over a table and a ramp, round the banked top and down the plunge over two big ramps, flat out round the giant wall at the bottom, rhythm humps and a ramp in the valley, the lone hill, round the banked west turn, a table and two ramps down the west straight, and the banked last turn. Boost pads throw you further",
     kit:[],
     shape:"BLOSSOM RUN \u2014 a spring speedway",
-    feature:"cherry blossoms, butterflies, boost pads and a jump every few hundred metres",
+    feature:"cherry blossoms, butterflies, boost pads, a jump every few hundred metres and giant banked walls",
     ctrl:[[-330,-300],[-298,-300],[-266,-300],[-234,-300],[-202,-300],[-170,-300],[-138,-300],[-106,-300],[-74,-300],[-42,-300],[-10,-300],[22,-300],
-          [54,-300],[86,-300],[118,-300],[150,-300],[182,-296],[212,-286],[240,-269],[264,-248],[289,-228],[313,-207],[338,-186],[362,-166],
-          [387,-145],[411,-125],[436,-104],[460,-84],[485,-63],[509,-42],[534,-22],[552,-6],[578,24],[592,54],[597,86],[597,118],
-          [597,150],[597,182],[597,214],[597,247],[597,279],[597,311],[597,343],[597,375],[597,407],[597,439],[597,472],[597,504],
-          [597,524],[597,568],[597,600],[597,632],[591,664],[565,683],[532,677],[500,667],[467,666],[435,666],[403,666],[371,666],
-          [339,666],[307,666],[275,666],[243,666],[227,666],[211,665],[179,659],[160,652],[119,635],[89,623],[58,611],[28,599],
-          [-2,589],[-35,584],[-67,584],[-99,584],[-131,584],[-164,584],[-196,584],[-228,584],[-260,584],[-293,584],[-325,584],[-357,578],
-          [-384,560],[-401,533],[-407,502],[-407,470],[-407,438],[-407,406],[-407,373],[-407,341],[-407,309],[-407,277],[-407,245],[-407,213],
-          [-407,181],[-407,149],[-407,117],[-407,85],[-407,53],[-407,21],[-407,-11],[-407,-43],[-407,-75],[-407,-107],[-407,-139],[-407,-171],
-          [-407,-203],[-407,-227],[-395,-265],[-372,-288]],
-    /* (laid out from straights and arcs: every straight built round its jumps, with a straight landing,
-       and the bends between them sized for the speed you come out of the jumps at) */
-    hills:[[300,-250,330,50],[600,-150,260,45],[100,620,300,-15],
-           // the lone hill on the valley floor, to fly off
-           [-188,584,100,34]],
-    jumps:[[[-42,-300],1.8],[[-407,-79],2.2]],
+          [54,-300],[86,-300],[118,-300],[150,-300],[183,-296],[214,-286],[243,-269],[268,-248],[292,-228],[317,-207],[341,-187],[366,-166],
+          [390,-146],[415,-125],[439,-104],[464,-84],[488,-63],[513,-43],[537,-22],[559,-4],[582,23],[595,53],[600,84],[600,117],
+          [600,149],[600,181],[600,213],[600,245],[600,277],[600,310],[600,342],[600,374],[600,406],[600,438],[600,470],[600,502],
+          [600,519],[600,535],[600,568],[600,600],[595,632],[577,659],[548,674],[516,675],[493,666],[456,652],[428,650],[392,650],
+          [360,650],[328,650],[296,650],[264,650],[232,650],[200,650],[168,650],[136,646],[105,637],[75,625],[44,613],[14,601],
+          [-16,589],[-38,580],[-77,569],[-106,567],[-142,567],[-175,567],[-207,567],[-240,567],[-272,567],[-305,567],[-329,567],[-368,557],
+          [-393,536],[-408,508],[-412,480],[-412,444],[-412,412],[-412,380],[-412,348],[-412,316],[-412,284],[-412,251],[-412,219],[-412,187],
+          [-412,155],[-412,123],[-412,91],[-412,59],[-412,27],[-412,-5],[-412,-37],[-412,-70],[-412,-102],[-412,-134],[-412,-166],[-412,-198],
+          [-412,-222],[-401,-261],[-379,-285],[-350,-298]],
+    /* (laid out from straights and arcs: every straight built round its jumps with a straight landing,
+       and the big turns banked into walls you take flat out) */
+    hills:[[590,38,360,72],[248,650,120,-16],[-219,567,100,36],[-412,127,85,14]],
+    jumps:[[[-42,-300],1.8],[[-412,-82],2.2]],
     // hand-placed jumps (see shapeJump): a table on the ridge, rhythm humps in the valley, a table down the west straight
-    set:[[[338,-186],"tabletop"],[[355,666],"rhythm"],[[-407,353],"tabletop"]],
+    set:[[[312,650],"rhythm"],[[-412,340],"tabletop"]],
     fords:[],
     // the big ramps, built whole whatever the hill under them: off the ridge, twice down the plunge, the valley,
-    // the lone hill, and the middle of the west straight
-    bigJumps:[[[476,-71],2.2],[[597,287],2.3],[[597,435],2.0],[[89,623],1.9],[[-188,584],2.6],[[-407,137],2.1]],
+    // the lone hill, and off the crest in the middle of the west straight
+    bigJumps:[[[344,-184],2.0],[[482,-68],2.2],[[600,261],2.3],[[600,410],2.0],[[29,607],1.9],[[-219,567],2.6],[[-412,127],2.1]],
+    /* the banked turns: the road leans right over into a wall round the outside, so a turn you'd brake for
+       on the flat is flat out (the bank is the rise per metre across the road; see BANKS) */
+    banks:[[[562,-1],[600,89],0.42],[[600,613],[456,652],0.75],[[-333,567],[-412,480],0.62],[[-412,-226],[-330,-300],0.55]],
+    widths:[[[600,613],[456,652],9.5],[[-333,567],[-412,480],8.5],[[-412,-226],[-330,-300],8]],
     flats:[[-200,-300,120]],
-    // the boost pads: off the grid, up the ridge, over the top of the plunge, out of the hairpin, into
+    // the boost pads: off the grid, up the ridge, over the top of the plunge, out of the wall, into
     // the lone hill and twice down the west straight (each only where there's room to use it: padSpots)
-    pads:[[-234,-300],[261,-251],[597,118],[459,666],[-75,584],[-407,462],[-407,65]],
+    pads:[[-234,-300],[268,-248],[600,113],[400,650],[-130,567],[-412,444],[-412,59]],
     branches:[]},
 
   /* ---- THE SWAMP CUP: the bayou, boardwalks, mud and willows ---- */
@@ -1484,6 +1486,8 @@ const ALP = {fall:1.5, over:18, overPer:45, settle:3, climb:4};   // (climb: a s
 /* a boost pad: how far past top speed it lifts the limit (m/s, stacking up to max), how long that
    holds before it fades (s) and how fast it fades (m/s a second), and the shove it gives (m/s^2, for push s) */
 const PAD_SURGE = {add:16, max:30, hold:2.0, fade:3.0, kick:18, push:1.5};
+/* how much more the car can corner on a banked road, per unit of bank (rise per metre) */
+const BANK_GRIP = 2.4;
 /* where the boost pads go: each one only where the next 160m has no bend the boosted car can't hold
    (it moves up to 60m to find such a spot, or is left out). Shared by the pads and the rivals' pace. */
 let PAD_SPOTS = null;
@@ -1498,6 +1502,19 @@ function padSpots(){
     PAD_SPOTS.push(i);
   });
   return PAD_SPOTS;
+}
+/* how far the road under a point leans (rise per metre across it), 0 off it */
+function bankAt(x, z){
+  const n = nearest(x, z), P = n.path;
+  if(!P || !P.bank || n.dist > n.half + 1) return 0;
+  // (only a real wall counts: the gentle camber every corner has doesn't change how the car turns)
+  const b = Math.abs(P.bank[n.pi] || 0);
+  return b > 0.3 ? b : 0;
+}
+function bankSigned(x, z){
+  const n = nearest(x, z), P = n.path;
+  if(!P || !P.bank || n.dist > n.half + 3) return 0;
+  return P.bank[n.pi] || 0;
 }
 function routingTest(P){
   const N = P.N, seg = P.seg, R = radiiOf(P);
@@ -1533,7 +1550,8 @@ function routingTest(P){
     for(let m=0; m<400; m+=seg){ const i = (p0 + Math.round(m/seg)) % N, sg = PAD_SURGE.max - Math.max(0, m - PAD_SURGE.hold*44)*PAD_SURGE.fade/44;
       if(sg <= 0) break; over[i] = Math.max(over[i], Math.min(PAD_SURGE.max, sg)); if(m < PAD_SURGE.push*44) push[i] = PAD_SURGE.kick; } });
   // (past top speed a bend holds what keeps the pull at top speed's: v^2/R = 44 x the turn rate there)
-  if(HILL) for(let i=0;i<N;i++){ const c = cornerHoldSpeed(R[i]); v[i] = c > 43.5 ? Math.min(44 + over[i], Math.sqrt(R[i]*44*2.05*0.45)) : c; }
+  if(HILL) for(let i=0;i<N;i++){ const c = cornerHoldSpeed(R[i]), b0 = P.bank ? Math.abs(P.bank[i]) : 0, bk = b0 > 0.3 ? b0 : 0;
+    v[i] = c > 43.5 || bk > 0 ? Math.min(44 + over[i], Math.sqrt(R[i]*44*2.05*0.45*(1 + BANK_GRIP*bk))) : c; }
   for(let pass=0; pass<3; pass++){
     for(let i=N-1;i>=0;i--){
       const nx2 = (i+1)%N;
@@ -1770,6 +1788,7 @@ if(SWAMPGP){
   TRACK.boardwalks = (TRACK.boardwalks||[]).map(b=> [mv(b[0]), mv(b[1])]);
   TRACK.wades = (TRACK.wades||[]).map(b=> [mv(b[0]), mv(b[1])]);
   TRACK.widths = (TRACK.widths||[]).map(b=> [mv(b[0]), mv(b[1]), b[2]]);
+  TRACK.banks = (TRACK.banks||[]).map(b=> [mv(b[0]), mv(b[1]), b[2]]);
   if(TRACK.summit) TRACK.summit = mv(TRACK.summit);
   if(TRACK.swamps) TRACK.swamps = TRACK.swamps.map(w=> Object.assign({}, w, {at: mv(w.at)}));
   if(TRACK.glowRiver) TRACK.glowRiver = TRACK.glowRiver.map(q=> mv(q).concat(q.slice(2)));
@@ -4006,6 +4025,25 @@ paths.forEach(P=>{
   const sm = Array.from(b); smoothAlong(sm, P.closed, Math.round(12/P.seg));
   if(P.bank){ for(let i=0;i<N;i++) if(Math.abs(P.bank[i]) < Math.abs(sm[i])) P.bank[i] = sm[i]; }
   else P.bank = Float32Array.from(sm);
+});
+/* The banked walls: through each, the road leans right over, its outside edge lifted (bank is the
+   rise per metre across the road, signed to lift the outside of the bend), coming on and going off
+   over 45m either end. The car can corner far harder on it (bankAt, in stepCar), so a turn you'd
+   brake for on the flat is flat out up on the wall. */
+(TRACK.banks || []).forEach(b=>{
+  const P = MAIN, N = P.N, seg = P.seg, a = snapTo(P, b[0]); let n = snapTo(P, b[1]) - a; if(n < 0) n += N;
+  const E = Math.round(45/seg), W = Math.max(3, Math.round(8/seg));
+  if(!P.bank) P.bank = new Float32Array(N);
+  // which way the turn goes, over the whole of it
+  let turn = 0;
+  for(let k=0;k<=n;k++){ const i = wrapIdx(P, a + k), ta = P.tans[wrapIdx(P, i - W)], tb = P.tans[wrapIdx(P, i + W)], t = P.tans[i];
+    turn += (tb.x - ta.x)*(-t.z) + (tb.z - ta.z)*t.x; }
+  const sg = -Math.sign(turn || 1);
+  for(let k=-E; k<=n + E; k++){
+    const i = wrapIdx(P, a + k), w = k < 0 ? smoothstep(-E, 0, k) : k > n ? 1 - smoothstep(n, n + E, k) : 1;
+    const v = sg*b[2]*w;
+    if(Math.abs(v) > Math.abs(P.bank[i])) P.bank[i] = v;
+  }
 });
 const ROUTE = routingTest(MAIN);
 let LAP_TEST = ROUTE;
@@ -13979,6 +14017,7 @@ const postMat = new THREE.ShaderMaterial({
     uRes:     {value: new THREE.Vector2(1,1)},
     uAspect:  {value: 1},
     uSpeed:   {value: 0},
+    uOver:    {value: 0},
     uSunPos:  {value: new THREE.Vector2(-1,-1)},
     uSunVis:  {value: 0},
     uRayCol:  {value: new THREE.Vector3(1.0, 0.86, 0.62)},
@@ -13999,7 +14038,7 @@ const postMat = new THREE.ShaderMaterial({
   fragmentShader: [
     "uniform sampler2D tDiffuse, tBloom;",
     "uniform vec2 uRes, uSunPos;",
-    "uniform float uAspect, uSpeed, uSunVis, uFlash, uTime, uFxaa; uniform vec3 uRayCol;",
+    "uniform float uAspect, uSpeed, uOver, uSunVis, uFlash, uTime, uFxaa; uniform vec3 uRayCol;",
     "uniform sampler2D tDepth, tFxMask; uniform float uPrint, uPixel, uNear, uFar, uInk, uFxMask; uniform vec3 uStock, uWarm;",
     "float linZ(float d){ float z = d*2.0 - 1.0; return 2.0*uNear*uFar/(uFar + uNear - z*(uFar - uNear)); }",
     "varying vec2 vUv;",
@@ -14045,17 +14084,25 @@ const postMat = new THREE.ShaderMaterial({
     "  vec2 dir = uv - 0.5;",
     "  float r = length(dir*vec2(uAspect, 1.0));",
     "  vec3 col = base(uv);",
-    // speed: a radial smear that only reaches the outer frame
-    "  float edge = smoothstep(0.30, 0.95, r);",
+    // speed: a radial smear that only reaches the outer frame; past top speed (uOver) it reaches in
+    // much further and pulls harder, everything streaming out past you but the road ahead
+    "  float edge = smoothstep(0.30 - 0.2*uOver, 0.95 - 0.25*uOver, r);",
     "  float sm = uSpeed*edge;",
     "  if(sm > 0.002){",
-    "    vec2 stp = dir*sm*0.045;",
+    "    vec2 stp = dir*sm*(0.045 + 0.06*uOver);",
     "    vec3 acc = col;",
-    "    acc += texture2D(tDiffuse, uv - stp*0.25).rgb;",
-    "    acc += texture2D(tDiffuse, uv - stp*0.50).rgb;",
-    "    acc += texture2D(tDiffuse, uv - stp*0.75).rgb;",
-    "    acc += texture2D(tDiffuse, uv - stp).rgb;",
-    "    col = acc*0.2;",
+    "    for(int k=1;k<=8;k++){ float f = float(k)/8.0; acc += texture2D(tDiffuse, uv - stp*f).rgb; }",
+    "    col = acc/9.0;",
+    "  }",
+    // and streaks of wind, flying out from the middle of the view toward the edges
+    "  if(uOver > 0.01){",
+    "    float ang = atan(dir.y, dir.x*uAspect);",
+    "    float lane = floor(ang*38.0/6.2832);",
+    "    float h = fract(sin(lane*91.7 + 3.1)*43758.5453);",
+    "    float run = fract(r*2.2 - uTime*(3.5 + h*3.0) + h*7.0);",
+    "    float thin = 1.0 - smoothstep(0.0, 0.18, abs(fract(ang*38.0/6.2832) - 0.5)*2.0 - 0.78);",
+    "    float streak = step(0.55, h)*smoothstep(0.0, 0.25, run)*(1.0 - smoothstep(0.25, 0.5, run))*thin*smoothstep(0.32, 0.75, r);",
+    "    col = mix(col, vec3(1.0, 0.97, 0.94), streak*0.45*uOver);",
     "  }",
     // a whisper of lateral colour at the edges when you're really moving
     "  float ca = 0.0012*uSpeed*edge;",
@@ -15210,8 +15257,10 @@ function stepCarInner(dt){
      harder and harder: past it, how fast it turns falls away with speed, so the pull through a bend
      stays what it is at top speed and a tap of the key is a small correction, not a lurch. The wheel
      also winds on more gently up there. */
-  const fast = sp > MAXV ? MAXV/sp : 1;
-  const rate = 2.05 * auth * (hand?1.25:1) * fast;
+  // (on a banked wall the road holds the car into the turn: it can turn as hard as BANK_GRIP lets it)
+  const bankNow = bankAt(pose.x, pose.z);
+  const fast = sp > MAXV ? Math.min(1, MAXV*(1 + BANK_GRIP*bankNow)/sp) : 1;
+  const rate = 2.05 * auth * (hand?1.25:1) * fast * (sp > MAXV ? 1 : 1 + bankNow*0.6);
   pose.steerIn += (steer - pose.steerIn) * Math.min(1, dt*8*Math.sqrt(fast));
   pose.h += pose.steerIn * rate * dt * Math.sign(newAlong || 1);
 
@@ -16018,7 +16067,9 @@ function stepCamera(dt, sp){
   if(camMode !== 1){
     const far = camMode === 2;
     const back = (far ? 13.5 : 9.2) + Math.min(3.4, sp*0.09);
-    camPos.set(pose.x - fx*back, pose.y + (far ? 5.6 : 3.55), pose.z - fz*back);
+    // (past top speed the view drops lower and closer to the road, which sells the speed)
+    const ov = GAME.over || 0;
+    camPos.set(pose.x - fx*(back - ov*1.2), pose.y + (far ? 5.6 : 3.55) - ov*1.0, pose.z - fz*(back - ov*1.2));
     camAim.set(pose.x + fx*7, pose.y + 1.25, pose.z + fz*7);
     // vertical follows slower than lateral so crests and dips don't pump the view
     camera.position.x += (camPos.x - camera.position.x) * Math.min(1, dt*7);
@@ -16057,6 +16108,18 @@ function stepCamera(dt, sp){
     camera.position.y += Math.sin(state.t*29)*r + Math.sin(state.t*53)*r*0.45;
   }
   camera.lookAt(camAim);
+  /* Past top speed: GAME.over runs 0 to 1 between top speed and about 260 km/h. The view buzzes with it.
+     On a banked wall the view leans with the road, so the wall stands up beside you and the horizon tips. */
+  {
+    const ovT = Math.max(0, Math.min(1, (sp - MAXV)/28));
+    GAME.over = (GAME.over || 0) + (ovT - (GAME.over || 0))*Math.min(1, dt*3);
+    const ov = GAME.over;
+    if(ov > 0.01 && !pose.air){ const a = 0.035*ov;
+      camera.position.y += (Math.sin(state.t*71) + Math.sin(state.t*113)*0.6)*a; camera.position.x += Math.sin(state.t*89)*a*0.6; }
+    const rollT = state.phase === "menu" ? 0 : Math.atan(bankSigned(pose.x, pose.z))*0.7;
+    GAME.camRoll = (GAME.camRoll || 0) + (rollT - (GAME.camRoll || 0))*Math.min(1, dt*4);
+    if(Math.abs(GAME.camRoll) > 0.002) camera.rotateZ(GAME.camRoll);
+  }
   /* the body's motion in the seat: the chase view rides a share of the
      heave and the jolts, the bonnet view all of it, pitch and roll too */
   {
@@ -16068,7 +16131,7 @@ function stepCamera(dt, sp){
     if(!chase){ camera.rotateX(-pose.bP*0.8); camera.rotateZ(pose.bR*0.8); }
     else camera.rotateZ(pose.bR*0.25);
   }
-  const fovT = 62 + Math.min(HILLFAST ? 1.5 : 1, sp/MAXV)*11;      // the frame opens up with speed (and past top speed down the Sawtooth)
+  const fovT = 62 + Math.min(1, sp/MAXV)*11 + (GAME.over || 0)*14;      // the frame opens up with speed (and past top speed down the Sawtooth)
   if(Math.abs(camera.fov - fovT) > 0.01){
     camera.fov += (fovT - camera.fov)*Math.min(1, dt*2.5);
     camera.updateProjectionMatrix();
@@ -19570,6 +19633,7 @@ function frame(now){
   postMat.uniforms.uSpeed.value = GAME.paused ? 0 : Math.max(0, (sp/MAXV - 0.42))*1.7
                                  + (drift.on ? Math.min(0.5, 0.12 + drift.t*0.16) : 0)
                                  + (drift.boostT > 0 ? 0.55*Math.min(1, drift.boostT) : 0);
+  postMat.uniforms.uOver.value = GAME.paused || state.phase === "menu" ? 0 : (GAME.over || 0);
   postMat.uniforms.uFlash.value = Math.max(0, postMat.uniforms.uFlash.value - dt*2.2);
   updateSunGlow();
 
