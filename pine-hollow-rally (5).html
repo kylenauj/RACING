@@ -1083,38 +1083,42 @@ const TRACKS = [
      the lone hill, a giant banked wall in the valley, and the esses home. Pink trees,
      petals on the wind and on the road, and butterflies everywhere. The hills work like the
      Sawtooth's: fast up, and down past top speed; the boost pads throw you further still. */
-  { name:"BLOSSOM RUN", special:true, spring:true, hillfast:true, season:"summer", after:"a cherry blossom valley in spring", relief:0.9, rollers:0.35,
-    blurb:"a figure of eight through the cherry orchards: up the long diagonal under the old bridge, through the esses and round the banked carousel high on the hill, then flat out down the other diagonal and off the broken bridge over the road you came up, the lone hill, the giant banked wall in the valley and the esses home. Eight big jumps a lap, and boost pads to throw you further",
+  { name:"BLOSSOM RUN", special:true, spring:true, hillfast:true, planned:true, season:"summer", after:"a cherry blossom valley in spring", relief:0.9, rollers:0.35,
+    blurb:"a figure of eight through the cherry orchards: up the long diagonal under the old bridge, flat-out esses and a banked carousel high on the hill, a table jump, sweepers down onto the broken bridge and off it over the road below, the lone hill, the giant banked wall in the valley and the esses home. Every jump is built for the speed you hit it at, so you land on the slope",
     kit:[],
     shape:"BLOSSOM RUN \u2014 a figure of eight",
     feature:"a figure of eight with a broken bridge to jump over the road below, giant banked walls, cherry blossoms and butterflies",
-    ctrl:[[-201,-300],[-169,-300],[-137,-300],[-105,-300],[-73,-300],[-41,-300],[-9,-300],[23,-300],[56,-300],[88,-300],[120,-297],[152,-288],
-          [181,-274],[206,-254],[228,-229],[247,-202],[265,-176],[282,-152],[306,-125],[332,-106],[350,-96],[390,-78],[404,-71],[418,-63],
-          [444,-44],[466,-20],[485,6],[494,19],[502,33],[509,65],[505,97],[489,125],[465,147],[435,158],[402,157],[379,150],
-          [343,133],[314,119],[285,106],[256,92],[227,79],[198,65],[169,52],[141,37],[115,17],[93,-6],[74,-33],[61,-62],
-          [50,-92],[39,-122],[28,-152],[17,-182],[6,-213],[-5,-243],[-16,-273],[-27,-303],[-38,-333],[-49,-363],[-60,-394],[-71,-424],
-          [-82,-454],[-93,-484],[-104,-514],[-115,-544],[-126,-574],[-137,-605],[-148,-635],[-159,-665],[-171,-695],[-189,-722],[-210,-746],[-235,-767],
-          [-264,-783],[-282,-791],[-324,-806],[-354,-817],[-384,-828],[-415,-836],[-447,-831],[-475,-815],[-494,-788],[-500,-756],[-499,-740],[-496,-724],
-          [-491,-693],[-485,-661],[-484,-628],[-491,-596],[-502,-574],[-516,-535],[-518,-502],[-516,-486],[-513,-470],[-509,-447],[-497,-408],[-481,-380],
-          [-461,-355],[-437,-333],[-409,-317],[-378,-306],[-346,-301],[-330,-300],[-298,-300],[-266,-300],[-234,-300]],
+    ctrl:[[-201,-300],[-168,-300],[-136,-300],[-104,-300],[-71,-300],[-39,-300],[-7,-300],[26,-300],[54,-300],[90,-296],[121,-285],[149,-269],
+          [174,-248],[194,-223],[209,-194],[221,-163],[229,-139],[238,-100],[239,-68],[235,-40],[229,-11],[226,29],[229,61],[239,92],
+          [253,120],[273,146],[296,168],[320,186],[346,211],[364,238],[377,267],[388,297],[396,329],[392,361],[377,389],[352,411],
+          [322,422],[290,422],[259,411],[246,401],[234,391],[210,370],[185,350],[161,329],[136,309],[112,288],[93,273],[65,244],
+          [48,217],[35,187],[24,157],[14,131],[5,96],[1,64],[2,36],[4,0],[6,-32],[9,-64],[10,-84],[8,-128],
+          [2,-159],[-4,-178],[-19,-220],[-30,-250],[-41,-280],[-52,-310],[-63,-340],[-74,-370],[-85,-400],[-96,-430],[-107,-460],[-118,-490],
+          [-129,-521],[-140,-551],[-151,-581],[-162,-611],[-173,-641],[-183,-671],[-194,-701],[-205,-731],[-216,-761],[-227,-791],[-238,-821],[-249,-852],
+          [-260,-882],[-274,-911],[-292,-938],[-315,-961],[-341,-981],[-370,-996],[-400,-1007],[-430,-1018],[-460,-1029],[-490,-1040],[-522,-1045],[-553,-1037],
+          [-579,-1018],[-595,-990],[-599,-957],[-593,-925],[-589,-900],[-587,-859],[-594,-826],[-604,-799],[-613,-781],[-619,-766],[-627,-735],[-629,-702],
+          [-624,-670],[-613,-640],[-596,-612],[-577,-591],[-563,-577],[-551,-565],[-533,-537],[-520,-506],[-516,-486],[-509,-447],[-499,-412],[-484,-383],
+          [-464,-357],[-440,-336],[-412,-319],[-382,-307],[-350,-301],[-330,-300],[-298,-300],[-265,-300],[-233,-300]],
     /* (laid out from straights and arcs: a figure of eight, the east loop high on the hill and the west
        loop down in the valley, the two long diagonals crossing in the middle on a broken bridge) */
-    hills:[[364,17,380,108],[-457,-697,300,-22],[-140,-612,105,40]],
+    hills:[[269,202,380,108],[-558,-804,300,-22],[-234,-810,170,28]],
     jumps:[],
-    set:[[[281,104],"tabletop"]],
+    set:[[[176,342],"tabletop"]],
     fords:[],
     // the big ramps, built whole whatever the hill under them: past the bridge on the way out, twice down
     // the long diagonal, the second one off the lone hill
-    bigJumps:[[[27,-300],1.8],[[183,58],1.8],[[-74,-431],2.2],[[-140,-612],2.6]],
+    bigJumps:[[[-234,-810],2.6]],
+    // the speed the ghost car really takes off at, at each (measured: the landings are built for it)
+    jumpV:[[[176,342],265],[[-234,-810],270],[[-48,-299],255]],
     /* the crossing: the second time through the middle the road climbs onto an old timber bridge over the
        first diagonal, and the middle of it is gone: a kicker at the broken end, and you jump the road below */
-    spans:[{at:[-25,-300], road:-1, pass:2, under:-1, over:true, span:36, wall:36, broken:8.5, kick:2.6, lift:true}],
+    spans:[{at:[-48,-299], road:-1, pass:2, under:-1, over:true, span:36, wall:24, broken:8.5, kick:2.6, lift:true}],
     /* the banked turns (the bank is the rise per metre across the road; see BANKS) */
-    banks:[[[96,-300],[230,-226],0.35],[[496,23],[379,150],0.75],[[158,47],[59,-66],0.4],[[-163,-676],[-282,-791],0.4],[[-399,-833],[-499,-740],0.75],[[-508,-443],[-330,-300],0.5]],
-    widths:[[[496,23],[379,150],9],[[-399,-833],[-499,-740],9]],
-    flats:[[-201,-300,120]],
+    banks:[[[58,-300],[212,-186],0.35],[[392,309],[246,401],0.75],[[90,270],[35,187],0.4],[[-262,-885],[-381,-1000],0.4],[[-498,-1042],[-597,-949],0.75],[[-508,-443],[-330,-300],0.5]],
+    widths:[[[392,309],[246,401],9],[[-498,-1042],[-597,-949],9]],
+    flats:[[-213,-300,120]],
     // the boost pads: on the way to the line, up the climb, into the esses, along the top, into the bridge, down the diagonal, out of the valley S
-    pads:[[-266,-300],[-141,-300],[247,-202],[357,140],[36,-130],[-52,-371],[-512,-466]],
+    pads:[[-269,-300],[-156,-300],[218,-171],[231,388],[-30,-250],[-133,-532],[-512,-466]],
     branches:[]},
 
   /* ---- THE SWAMP CUP: the bayou, boardwalks, mud and willows ---- */
@@ -1492,7 +1496,8 @@ const BANK_GRIP = 2.4;
 let PAD_SPOTS = null;
 function padSpots(){
   if(PAD_SPOTS) return PAD_SPOTS;
-  const PR = radiiOf(MAIN), roomAt = i=>{ for(let m=0; m<=160; m+=2){ if(PR[wrapIdx(MAIN, i + Math.round(m/MAIN.seg))] < 150) return false; } return true; };
+  const PR = radiiOf(MAIN), roomAt = i=>{ for(let m=0; m<=160; m+=2){ const j = wrapIdx(MAIN, i + Math.round(m/MAIN.seg)), b = MAIN.bank ? Math.abs(MAIN.bank[j]) : 0;
+    if(PR[j]*(1 + (b > 0.3 ? BANK_GRIP*b : 0)) < 140) return false; } return true; };
   PAD_SPOTS = [];
   (TRACK.pads || []).forEach(xz=>{
     let i = snapTo(MAIN, xz);
@@ -1501,6 +1506,13 @@ function padSpots(){
     PAD_SPOTS.push(i);
   });
   return PAD_SPOTS;
+}
+/* on or beside a banked wall: the road leans right over there and the ground rises with it up the
+   outside, so nothing is planted or stood there (trees, bushes, grass, stones, banners, flags, signs) */
+function onBankWall(x, z){
+  const n = nearest(x, z), P = n.path;
+  if(!P || !P.bank) return false;
+  return Math.abs(P.bank[n.pi] || 0) > 0.2 && n.dist < n.half + 16;
 }
 /* how far the road under a point leans (rise per metre across it), 0 off it */
 function bankAt(x, z){
@@ -1776,6 +1788,7 @@ if(SWAMPGP){
   TRACK.bigJumps = (TRACK.bigJumps||[]).map(j=> [mv(j[0]), j[1]]);
   TRACK.pads = (TRACK.pads||[]).map(mv);
   TRACK.set = (TRACK.set||[]).map(j=> [mv(j[0]), j[1]]);
+  TRACK.jumpV = (TRACK.jumpV||[]).map(j=> [mv(j[0]), j[1]]);
   TRACK.ridges = (TRACK.ridges||[]).map(r=> mv(r).concat(r.slice(2)));
   TRACK.spans = (TRACK.spans||[]).map(sp=> Object.assign({}, sp, {at: mv(sp.at)}));
   TRACK.leaps = (TRACK.leaps||[]).map(sp=> Object.assign({}, sp, {at: mv(sp.at)}));
@@ -3618,7 +3631,8 @@ function passIdx(P, at, pass, skip){
     if(need > 0){
       const up = d.lift ? need : need*0.6, down = need - up;      // (lift: all of it on this road, the other stays put)
       const bump = (R0, c, amt, halfLen)=>{
-        const E0 = Math.round(halfLen/R0.seg), Rr = Math.round(Math.max(45, amt/0.065)/R0.seg);
+        // (on Blossom Run the cars arrive at 250km/h: a ramp any steeper launches them off its top, over the bridge)
+        const E0 = Math.round(halfLen/R0.seg), Rr = Math.round(Math.max(45, amt/(SPRING ? 0.026 : 0.065))/R0.seg);
         for(let k=-(E0 + Rr); k<=E0 + Rr; k++){
           const w = Math.abs(k) <= E0 ? 1 : smoothstep(0, 1, 1 - (Math.abs(k) - E0)/Rr);
           R0.pts[wrapIdx(R0, c + k)].y += amt*w;
@@ -3630,7 +3644,11 @@ function passIdx(P, at, pass, skip){
   }
   const S = Math.round(d.span/seg), E = S + Math.round(8/seg), R = Math.round(30/seg);
   const ia = wrapIdx(P, i - E), ib = wrapIdx(P, i + E);
-  const ya = P.pts[ia].y, yb = P.pts[ib].y;
+  let ya = P.pts[ia].y, yb = P.pts[ib].y;
+  /* (on Blossom Run a broken bridge is built level, at the height of its upper end: on a steep hill a kicker
+     on a deck that falls with it hardly lifts the car, and the road beyond the far end, coming down off
+     the bridge, is the landing) */
+  if(SPRING && d.broken) ya = yb = Math.max(ya, yb);
   for(let k=-E;k<=E;k++) P.pts[wrapIdx(P, i + k)].y = ya + (yb - ya)*(k + E)/(2*E);
   // the road eases onto the deck's grade either side instead of kinking at the abutment
   const g = (yb - ya)/(2*E*seg);
@@ -3652,7 +3670,8 @@ function passIdx(P, at, pass, skip){
   if(d.broken){
     // the middle is gone: a kicker up to the broken end, the gap, and the far half falling away to land on
     sp.gapS = Math.round(d.broken/seg);
-    ramp(P, wrapIdx(P, i - sp.gapS), Math.round(30/seg), Math.round(30/seg), d.kick || 2.2, 0, true, 3);
+    // (a long face where cars arrive flat out: a short one is over before the springs have loaded up, and barely lifts them)
+    ramp(P, wrapIdx(P, i - sp.gapS), Math.round(30/seg), Math.round(30/seg), d.kick || 2.2, 0, true, SPRING ? 6.5 : 3);
     for(let k=-sp.gapS + 1;k<=sp.gapS - 1;k++) P.deck[wrapIdx(P, i + k)] = 0;
   }
   SPANS.push(sp);
@@ -3856,6 +3875,7 @@ function carveWater(y, x, z){
 }
 /* ground nothing grows on: the open dunes, the canyon's walls */
 function barren(x, z){
+  if(TRACK.banks && TRACK.banks.length && onBankWall(x, z)) return true;     // (up a banked wall)
   if(GIANT.on && Math.hypot(x - GIANT.x, z - GIANT.z) < GIANT.ring - 7) return true;   // the oak's own ground
   if(SPANS.length && lavaNear(x, z) > 0.2) return true;                                   // nothing grows by the lava
   if(CRATER.on && Math.hypot(x - CRATER.x, z - CRATER.z) < CRATER.r*3.2) return true;      // nor on the volcano's cone
@@ -4033,7 +4053,7 @@ paths.forEach(P=>{
    brake for on the flat is flat out up on the wall. */
 (TRACK.banks || []).forEach(b=>{
   const P = MAIN, N = P.N, seg = P.seg, a = snapTo(P, b[0]); let n = snapTo(P, b[1]) - a; if(n < 0) n += N;
-  const E = Math.round(45/seg), W = Math.max(3, Math.round(8/seg));
+  const E = Math.round(80/seg), W = Math.max(3, Math.round(8/seg));
   if(!P.bank) P.bank = new Float32Array(N);
   // which way the turn goes, over the whole of it
   let turn = 0;
@@ -4041,11 +4061,114 @@ paths.forEach(P=>{
     turn += (tb.x - ta.x)*(-t.z) + (tb.z - ta.z)*t.x; }
   const sg = -Math.sign(turn || 1);
   for(let k=-E; k<=n + E; k++){
-    const i = wrapIdx(P, a + k), w = k < 0 ? smoothstep(-E, 0, k) : k > n ? 1 - smoothstep(n, n + E, k) : 1;
+    // (smootherstep: the lean comes on and goes off with no kink at either end)
+    const i = wrapIdx(P, a + k);
+    const u = k < 0 ? (k + E)/E : k > n ? 1 - (k - n)/E : 1, w = u*u*u*(u*(u*6 - 15) + 10);
     const v = sg*b[2]*w;
-    if(Math.abs(v) > Math.abs(P.bank[i])) P.bank[i] = v;
+    // through the ramps the lean takes over from the road's own camber rather than jumping from one to the other
+    P.bank[i] = P.bank[i]*(1 - w) + v*w;
   }
+  // and eased along once more over the whole stretch
+  const L0 = a - E - 10, L1 = a + n + E + 10, raw = [];
+  for(let k=L0; k<=L1; k++) raw.push(P.bank[wrapIdx(P, k)]);
+  const sm = raw.slice(); smoothAlong(sm, false, Math.round(10/seg));
+  for(let k=L0; k<=L1; k++) P.bank[wrapIdx(P, k)] = sm[k - L0];
 });
+/* Planned jumps (Blossom Run). At 250km/h any crest the road goes over is a jump: the car leaves the
+   ground wherever the road curves away faster than gravity (26) can pull it down, v^2 x curvature > g.
+   So first every crest on the lap is rounded off until the car, at the speed it will really be doing
+   there (the rivals' pace: flat out, with the pads and the hills), stays on the road over it. Only
+   the jumps' own lips are left sharp. Then each jump's flight is worked out at that speed, and the
+   ground where it comes down is reshaped into a landing that follows the car's path down and eases
+   back into the road, so the car touches down along the slope instead of slamming into it. */
+const JUMP_PLAN = [];
+if(TRACK.planned){
+  const P = MAIN, N = P.N, seg = P.seg, G = 26;
+  const V = routingTest(P).v, y = P.pts.map(p=> p.y), lock = new Uint8Array(N);
+  const lockRange = (a, b)=>{ for(let k=a; k<=b; k++) lock[wrapIdx(P, k)] = 1; };
+  const M = m=> Math.round(m/seg);
+  const lips = [];
+  (TRACK.jumps || []).forEach(j=> lips.push(snapTo(P, j[0])));
+  (TRACK.bigJumps || []).forEach(j=> lips.push(snapTo(P, j[0])));
+  AUTO_JUMPS.forEach(a=>{ if(a.type === "tabletop" || a.type === "kicker") lips.push(a.at);
+    else lockRange(a.at - M(40), a.at + M((JUMP_LEN[a.type] || 120) + 10)); });          // (rhythm humps: as built)
+  const deck = new Uint8Array(N), deckEnd = {};
+  SPANS.forEach(sp=>{ if(sp.P !== P) return;
+    lockRange(sp.i - sp.S, sp.i + sp.S);                                                   // the deck
+    for(let k=-sp.S; k<=sp.S; k++) deck[wrapIdx(P, sp.i + k)] = 1;
+    if(sp.gapS){ const L = wrapIdx(P, sp.i - sp.gapS); lips.push(L); deckEnd[L] = (sp.S + sp.gapS)*seg; } });
+  lips.forEach(i=> lockRange(i - M(12), i + M(6)));                                        // each lip (its run-up is smoothed like the rest)
+  const limit = ()=>{
+    for(let pass=0; pass<600; pass++){
+      let moved = 0;
+      for(let i=0;i<N;i++){
+        if(lock[i]) continue;
+        // (the pace estimate runs a good deal under what a car flat out over the pads really does: allow for it)
+        const a = y[(i - 1 + N)%N], b = y[(i + 1)%N], v = Math.max(40, Math.min(85, V[i]*1.35));
+        const lim = 0.85*G/(v*v)*seg*seg;
+        if(a + b - 2*y[i] < -lim){ y[i] = (a + b + lim)/2; moved++; }
+      }
+      if(!moved) break;
+    }
+  };
+  limit();
+  // each flight, at the speed the car gets there, and its landing
+  const along = (i, m)=> wrapIdx(P, i + M(m));
+  lips.forEach(i0=>{
+    // (a track can give the speed its ghost car really took off at, measured: TRACK.jumpV [[x, z], km/h])
+    const meas = (TRACK.jumpV || []).find(j=> Math.abs(((snapTo(P, j[0]) - i0) % N + N*1.5) % N - N/2)*seg < 20);
+    // (the springs load up on the face and fire the car off the lip, up to the 11m/s the car allows)
+    let m0 = 0; for(let k=0;k<=M(4);k++) m0 = Math.max(m0, (y[wrapIdx(P, i0 - k)] - y[wrapIdx(P, i0 - k - 2)])/(2*seg));
+    const v = meas ? meas[1]/3.6 : Math.max(20, V[i0]);
+    const c = 1/Math.sqrt(1 + m0*m0); let vx = v*c, vy = Math.min(11, v*m0*c*1.4), s = 0, h = y[i0]; const vx0 = vx;
+    const traj = [];
+    for(let t=0; t<6; t+=1/120){
+      s += vx/120; vy -= G/120; h += vy/120; traj.push([s, h, vy/vx]);
+      if(s > 4 && h <= y[along(i0, s)]) break;
+    }
+    const [sL, hL, mt] = traj[traj.length - 1];
+    if(sL > 400 || sL < 8) return;
+    if(deckEnd[i0] !== undefined && sL < deckEnd[i0] + 5) return;                         // (comes down on the far half of the bridge)
+    const trajAt = q=>{ for(const t of traj) if(t[0] >= q) return t[1]; return hL; };
+    /* The landing is the car's own arc, scaled: ground at hL + 0.85 x (path - hL), so it lies under the
+       path everywhere before touchdown (by 15% of the path's height above it) and meets it at touchdown,
+       running down along it. A car a touch high or fast meets it a few metres on, at an easy angle; a
+       touch low or slow comes down on the run-in before it. Past touchdown the ground keeps curving down
+       at 85% of gravity, so the car stays on it, then eases back into the road. Anything the original
+       ground had standing up under the flight is cut away; the last 20m before touchdown are filled to
+       the shape, with a sloped run-in (not a step) in front of it. */
+    const F = 0.85, arc = q=> hL + F*(trajAt(q) - hL);
+    const qT = Math.min(traj[traj.length - 1][0] + 30, sL + 30);
+    const pathPast = q=>{ const tt = (q - sL)/vx0; return hL + mt*(q - sL) - 0.5*G*tt*tt; };      // the path carried on past touchdown
+    const arcPast = q=> hL + F*(pathPast(q) - hL);
+    for(let q=6; q<=qT; q+=seg){ const k = along(i0, q);
+      if(deck[k]) continue;
+      const want = q <= sL ? arc(q) : arcPast(q);
+      if(q >= sL - 20) y[k] = want;
+      else if(q >= sL - 40){ const w = smoothstep(sL - 40, sL - 20, q); y[k] = Math.min(y[k], want)*(1 - w) + want*w; }
+      else y[k] = Math.min(y[k], want);
+    }
+    const sE = qT, mE = F*(mt - G*(sE - sL)/(vx0*vx0)), y0 = arcPast(sE);
+    /* then as long an ease as it needs: the shortest whose dips and crests the car takes at no more than
+       16m/s^2 of compression, and less than gravity over a crest */
+    let D = 0, m1 = 0, y1 = 0, kE = 0;
+    for(let D0 = Math.max(60, v*1.0); D0 <= 300; D0 += 10){
+      kE = along(i0, sE + D0); m1 = (y[wrapIdx(P, kE + 2)] - y[wrapIdx(P, kE - 2)])/(4*seg); y1 = y[kE]; D = D0;
+      let ok = true;
+      for(let u=0; u<=1; u+=0.05){ const acc = ((12*u - 6)*y0 + (6*u - 4)*D0*mE + (6 - 12*u)*y1 + (6*u - 2)*D0*m1)/(D0*D0)*v*v;
+        if(acc > 16 || acc < -0.8*G) ok = false; }
+      if(ok) break;
+    }
+    for(let q=0; q<=D; q+=seg){ const u = q/D, h00 = 2*u*u*u - 3*u*u + 1, h10 = u*u*u - 2*u*u + u, h01 = -2*u*u*u + 3*u*u, h11 = u*u*u - u*u;
+      const k = along(i0, sE + q); if(!deck[k]) y[k] = h00*y0 + h10*D*mE + h01*y1 + h11*D*m1; }
+    const sLD = sE - sL;
+    lockRange(i0 - M(12), i0 + M(sE + D));
+    (P.rampSpans = P.rampSpans || []).push([i0 - M(40), i0 + M(sE + D)]);
+    JUMP_PLAN.push({lip:i0, land:along(i0, sL), v, flight:Math.round(sL)});
+  });
+  limit();
+  for(let i=0;i<N;i++) P.pts[i].y = y[i];
+}
 const ROUTE = routingTest(MAIN);
 let LAP_TEST = ROUTE;
 
@@ -4224,7 +4347,7 @@ function caveOf(s){ for(const C of CAVES){ if(s >= C.a && s <= C.b) return C; } 
   let a = snapTo(MAIN, d[0]), b = snapTo(MAIN, d[1]);
   let n = b - a; if(n < 0) n += MAIN.N;
   if(n > MAIN.N/2){ const q = a; a = b; b = q; n = MAIN.N - n; }
-  const L = n*seg, E = 30;
+  const L = n*seg, E = TRACK.banks && TRACK.banks.length ? 80 : 30;     // (where it widens for a banked wall, as gently as the lean comes on)
   for(let k=-Math.round(E/seg); k<=n + Math.round(E/seg); k++){
     const u = k*seg, w = smoothstep(-E, 0, u)*(1 - smoothstep(L, L + E, u)), i = wrapIdx(MAIN, a + k);
     const want = d[2] + Math.sin(i*0.11)*0.25*d[2]/5;
@@ -10203,8 +10326,18 @@ if(SPRING){
   const red = new THREE.MeshLambertMaterial({color:0xd8341f, emissive:0x3a0802}), ink = new THREE.MeshLambertMaterial({color:0x1c1414});
   const gold = new THREE.MeshLambertMaterial({color:0xf2c14e, emissive:0x2a1a00});
   const box = (g, mat, w, h, d, x, y, z, rz)=>{ const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); if(rz) m.rotation.z = rz; m.castShadow = true; g.add(m); return m; };
-  [[-160,-305],[470,-255],[240,478],[-578,60]].forEach(xz=>{
-    const i = snapTo(MAIN, [xz[0] - TRACK._ox, xz[1] - TRACK._oz]), p = MAIN.pts[i], t = MAIN.tans[i], half = MAIN.half[i] + 2.6;
+  /* four of them round the lap, each on a straight (not up a banked wall, not on a jump or the bridge),
+     as near as there is one to a quarter of the way round */
+  const TR = radiiOf(MAIN), N0 = MAIN.N, seg0 = MAIN.seg, busy = [];
+  AUTO_JUMPS.forEach(a=> busy.push(a.at)); (TRACK.bigJumps || []).forEach(j=> busy.push(snapTo(MAIN, j[0])));
+  SPANS.forEach(sp=>{ if(sp.P === MAIN) busy.push(sp.i); if(sp.Q === MAIN) busy.push(sp.j); }); BOOSTPADS.forEach(b=> busy.push(b.i));
+  const okAt = i=>{ for(let m=-30; m<=30; m+=3){ const j = wrapIdx(MAIN, i + Math.round(m/seg0)); if(TR[j] < 300 || (MAIN.bank && Math.abs(MAIN.bank[j]) > 0.08)) return false; }
+    return busy.every(b=> Math.abs(((i - b) % N0 + N0*1.5) % N0 - N0/2)*seg0 > 90); };
+  const spots = [];
+  [0.06, 0.31, 0.56, 0.81].forEach(f=>{ const c = Math.round(N0*f);
+    for(let d=0; d<N0*0.12; d+=3){ const i = wrapIdx(MAIN, c + d), j = wrapIdx(MAIN, c - d); if(okAt(i)){ spots.push(i); break; } if(okAt(j)){ spots.push(j); break; } } });
+  spots.forEach(i=>{
+    const p = MAIN.pts[i], t = MAIN.tans[i], half = MAIN.half[i] + 2.6;
     const nx = -t.z, nz = t.x, yl = gradedY(p.x - nx*half, p.z - nz*half), yr = gradedY(p.x + nx*half, p.z + nz*half);
     const base = Math.min(yl, yr), H = Math.max(8.5, p.y + 7.2 - base);
     const g = new THREE.Group(); g.position.set(p.x, base, p.z); g.rotation.y = Math.atan2(nx, nz) - Math.PI/2;
@@ -11606,6 +11739,7 @@ if(GLOW){
   // is a spot a fair place to stand something? ground, not road, not water, near the road's height
   const fair = (x, z, roadY, keep)=>{
     if(inWaterway(x, z) || deckAt(x, z) > 0.2) return false;
+    if(TRACK.banks && TRACK.banks.length && onBankWall(x, z)) return false;
     if((SPANS.length || (LAKE.on && LAKE.lava)) && lavaNear(x, z) > 0.02) return false;
     if(CAVES.length && caveRoom(x, z)) return false;
     if(CANYON.on && canyonAt(x, z) > 0.2) return false;
@@ -11831,7 +11965,7 @@ if(GLOW){
       const x = P.pts[i].x + nx*side*off + t.x*jit;
       const z = P.pts[i].z + nz*side*off + t.z*jit;
       { const nn = nearest(x,z); if(nn.dist < Math.max(9.4, nn.half + 3.7)) return false; }   // (a wide road keeps its trees further back)
-      if(Math.hypot(x,z) > 620) return false;
+      if(Math.hypot(x,z) > Math.max(620, FAR + 70)) return false;
       if(inWaterway(x,z) || barren(x,z)) return false;          // trees do not grow in the river
       if(TRACK.treeline && gradedY(x, z) > TRACK.treeline + (Math.random() - 0.7)*14) return false;   // nor above the treeline
       if(DESERT && Math.random() > 0.2) return false;        // the desert is open country
@@ -15448,7 +15582,9 @@ function stepCarInner(dt){
      car 10.7m straight down in a single frame instead of falling off it,
      which measured as 38,807 m/s^2. A cliff needs no special case at all:
      leave the car where it is and the airborne test below does the rest. */
-  if(rawStep > 1.1){
+  /* (only if the car is actually down at the new ground: flying over the far edge of a gap the ground
+     jumps up under it too, and treating that as a wall stood the car on thin air and fired it off again) */
+  if(rawStep > 1.1 && pose.y < gy + 0.3){
     pose.lastGy = gy;
     pose.y = Math.max(pose.y, gy);
     pose.vy = 0;
