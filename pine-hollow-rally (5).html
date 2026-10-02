@@ -1078,36 +1078,42 @@ const TRACKS = [
     ]},
 
   /* ---- SPECIAL: Blossom Run, a cherry blossom valley in spring ----
-     A speedway through the orchards: fast sweepers along the top of the ridge, a plunge off its
-     east end that throws you well past top speed, a long braking zone into the hairpin at the foot
-     of it, boost out along the valley, fly the lone hill, and sweep up the long climb to the ridge. Pink trees,
+     A jump course through the orchards: off the start straight, a table and a ramp up the ridge,
+     two big ramps down the plunge into the hairpin, rhythm humps and a ramp along the valley, the
+     lone hill, and a table and two ramps down the long west straight home. Pink trees,
      petals on the wind and on the road, and butterflies everywhere. The hills work like the
      Sawtooth's: fast up, and down past top speed; the boost pads throw you further still. */
   { name:"BLOSSOM RUN", special:true, spring:true, hillfast:true, season:"summer", after:"a cherry blossom valley in spring", relief:0.9, rollers:0.35,
-    blurb:"flat out through the cherry orchards: sweepers along the ridge, a plunge off its end past top speed and hard on the brakes for the hairpin at the bottom, boost out along the valley, fly the lone hill and sweep up the climb home. Hit the boost pads to go faster than the car can on its own",
+    blurb:"a jump course through the cherry orchards: twelve jumps a lap, off the start straight, a table and a ramp up the ridge, two big ramps down the plunge, rhythm humps and a ramp in the valley, the lone hill, and a table and two ramps down the west straight. Boost pads throw you further",
     kit:[],
     shape:"BLOSSOM RUN \u2014 a spring speedway",
-    feature:"cherry blossoms, butterflies, boost pads, a plunge past top speed into a hairpin, and esses taken flat out",
-    ctrl:[[-330,-300],[-298,-300],[-265,-300],[-233,-300],[-201,-300],[-169,-300],[-136,-300],[-104,-300],[-71,-296],[-40,-284],[-26,-275],[-13,-266],
-          [13,-248],[41,-231],[72,-221],[104,-219],[136,-225],[166,-239],[192,-257],[218,-275],[247,-291],[280,-299],[297,-300],[314,-300],
-          [347,-298],[378,-292],[408,-282],[437,-267],[463,-248],[477,-234],[501,-196],[508,-164],[508,-132],[508,-100],[508,-68],[508,-36],
-          [508,-4],[508,28],[508,60],[508,92],[508,124],[508,156],[508,188],[508,220],[508,244],[508,285],[508,318],[508,350],
-          [496,379],[465,388],[440,368],[417,344],[386,332],[370,330],[354,330],[322,330],[290,330],[258,330],[226,330],[194,330],
-          [170,330],[130,339],[112,348],[74,372],[46,389],[17,405],[-15,411],[-47,411],[-79,411],[-111,411],[-143,411],[-175,411],
-          [-207,411],[-239,411],[-271,411],[-303,411],[-335,411],[-367,411],[-399,411],[-431,405],[-457,386],[-473,358],[-476,334],[-476,294],
-          [-476,261],[-476,228],[-474,196],[-468,165],[-458,134],[-445,105],[-432,76],[-422,54],[-409,16],[-403,-16],[-402,-44],[-402,-80],
-          [-402,-112],[-402,-144],[-402,-176],[-402,-208],[-402,-232],[-389,-270],[-365,-292]],
-    /* (laid out from straights and arcs: every bend's radius picked for the speed you arrive at it,
-       so a boost is room to use, and the two slow corners come at the end of a long braking zone) */
-    hills:[[-250,-440,330,62],[150,-450,330,68],[440,-340,230,56],[565,-160,150,36],[60,330,330,-22],
-           // the lone hill on the valley floor, to fly off; and a roller in the valley S-bends
-           [-215,411,105,38],[70,374,34,5]],
-    jumps:[[[266,330],1.8]], fords:[],
-    bigJumps:[[[-215,411],2.6]],
-    flats:[[-250,-300,110]],
-    // the boost pads: off the grid, over the top of the plunge, out of the hairpin, on into the lone
-    // hill, and up the climb (each only where the road ahead has room to use it: see BOOSTPADS)
-    pads:[[-213,-300],[508,-110],[380,330],[-27,411],[-476,290],[-402,-90]],
+    feature:"cherry blossoms, butterflies, boost pads and a jump every few hundred metres",
+    ctrl:[[-330,-300],[-298,-300],[-266,-300],[-234,-300],[-202,-300],[-170,-300],[-138,-300],[-106,-300],[-74,-300],[-42,-300],[-10,-300],[22,-300],
+          [54,-300],[86,-300],[118,-300],[150,-300],[182,-296],[212,-286],[240,-269],[264,-248],[289,-228],[313,-207],[338,-186],[362,-166],
+          [387,-145],[411,-125],[436,-104],[460,-84],[485,-63],[509,-42],[534,-22],[552,-6],[578,24],[592,54],[597,86],[597,118],
+          [597,150],[597,182],[597,214],[597,247],[597,279],[597,311],[597,343],[597,375],[597,407],[597,439],[597,472],[597,504],
+          [597,524],[597,568],[597,600],[597,632],[591,664],[565,683],[532,677],[500,667],[467,666],[435,666],[403,666],[371,666],
+          [339,666],[307,666],[275,666],[243,666],[227,666],[211,665],[179,659],[160,652],[119,635],[89,623],[58,611],[28,599],
+          [-2,589],[-35,584],[-67,584],[-99,584],[-131,584],[-164,584],[-196,584],[-228,584],[-260,584],[-293,584],[-325,584],[-357,578],
+          [-384,560],[-401,533],[-407,502],[-407,470],[-407,438],[-407,406],[-407,373],[-407,341],[-407,309],[-407,277],[-407,245],[-407,213],
+          [-407,181],[-407,149],[-407,117],[-407,85],[-407,53],[-407,21],[-407,-11],[-407,-43],[-407,-75],[-407,-107],[-407,-139],[-407,-171],
+          [-407,-203],[-407,-227],[-395,-265],[-372,-288]],
+    /* (laid out from straights and arcs: every straight built round its jumps, with a straight landing,
+       and the bends between them sized for the speed you come out of the jumps at) */
+    hills:[[300,-250,330,50],[600,-150,260,45],[100,620,300,-15],
+           // the lone hill on the valley floor, to fly off
+           [-188,584,100,34]],
+    jumps:[[[-42,-300],1.8],[[-407,-79],2.2]],
+    // hand-placed jumps (see shapeJump): a table on the ridge, rhythm humps in the valley, a table down the west straight
+    set:[[[338,-186],"tabletop"],[[355,666],"rhythm"],[[-407,353],"tabletop"]],
+    fords:[],
+    // the big ramps, built whole whatever the hill under them: off the ridge, twice down the plunge, the valley,
+    // the lone hill, and the middle of the west straight
+    bigJumps:[[[476,-71],2.2],[[597,287],2.3],[[597,435],2.0],[[89,623],1.9],[[-188,584],2.6],[[-407,137],2.1]],
+    flats:[[-200,-300,120]],
+    // the boost pads: off the grid, up the ridge, over the top of the plunge, out of the hairpin, into
+    // the lone hill and twice down the west straight (each only where there's room to use it: padSpots)
+    pads:[[-234,-300],[261,-251],[597,118],[459,666],[-75,584],[-407,462],[-407,65]],
     branches:[]},
 
   /* ---- THE SWAMP CUP: the bayou, boardwalks, mud and willows ---- */
@@ -1750,6 +1756,7 @@ if(SWAMPGP){
     downPts: TRACK.river.downPts && TRACK.river.downPts.map(mv), upPts: TRACK.river.upPts && TRACK.river.upPts.map(mv)});
   TRACK.bigJumps = (TRACK.bigJumps||[]).map(j=> [mv(j[0]), j[1]]);
   TRACK.pads = (TRACK.pads||[]).map(mv);
+  TRACK.set = (TRACK.set||[]).map(j=> [mv(j[0]), j[1]]);
   TRACK.ridges = (TRACK.ridges||[]).map(r=> mv(r).concat(r.slice(2)));
   TRACK.spans = (TRACK.spans||[]).map(sp=> Object.assign({}, sp, {at: mv(sp.at)}));
   TRACK.leaps = (TRACK.leaps||[]).map(sp=> Object.assign({}, sp, {at: mv(sp.at)}));
@@ -2683,6 +2690,8 @@ const AUTO_JUMPS = [];
     AUTO_JUMPS.push({type, at:best});
     busy.push([best, L*0.5 + 22]);
   });
+  // and the ones put exactly where a track wants them
+  (TRACK.set || []).forEach(j=> AUTO_JUMPS.push({type:j[1], at:snapTo(MAIN, j[0])}));
 }
 
 /* ---- stages ----------------------------------------------------------
