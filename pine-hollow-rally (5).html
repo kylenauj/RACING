@@ -1084,7 +1084,7 @@ const TRACKS = [
      petals on the wind and on the road, and butterflies everywhere. The hills work like the
      Sawtooth's: fast up, and down past top speed; the boost pads throw you further still. */
   { name:"BLOSSOM RUN", special:true, spring:true, hillfast:true, planned:true, season:"summer", after:"a cherry blossom valley in spring", relief:0.9, rollers:0.35,
-    blurb:"a figure of eight through the cherry orchards: up the long diagonal under the old bridge, flat-out esses and a banked carousel high on the hill, a table jump, sweepers down onto the broken bridge and off it over the road below, the lone hill, the giant banked wall in the valley and the esses home. Every jump is built for the speed you hit it at, so you land on the slope",
+    blurb:"a figure of eight through the cherry orchards: up the long diagonal under the old bridge, flat-out esses and a banked carousel high on the hill, a table jump, sweepers down onto the broken bridge and off it over the road below, the lone hill, the giant banked wall in the valley and the esses home. Little striped kickers pop you down the long straights, and every jump is built for the speed you hit it at, so you land on the slope",
     kit:[],
     shape:"BLOSSOM RUN \u2014 a figure of eight",
     feature:"a figure of eight with a broken bridge to jump over the road below, giant banked walls, cherry blossoms and butterflies",
@@ -1103,13 +1103,15 @@ const TRACKS = [
        loop down in the valley, the two long diagonals crossing in the middle on a broken bridge) */
     hills:[[269,202,380,108],[-558,-804,300,-22],[-234,-810,170,28]],
     jumps:[],
-    set:[[[176,342],"tabletop"]],
+    // (and the little kickers, pops, down the long straights: out from under the bridge, down to it, and
+    // two up the long diagonal out of the valley, after the pads)
+    set:[[[176,342],"tabletop"],[[-15,-300],"pop"],[[4,-5],"pop"],[[-160,-605],"pop"],[[-182,-669],"pop"]],
     fords:[],
     // the big ramps, built whole whatever the hill under them: past the bridge on the way out, twice down
     // the long diagonal, the second one off the lone hill
     bigJumps:[[[-234,-810],2.6]],
     // the speed the ghost car really takes off at, at each (measured: the landings are built for it)
-    jumpV:[[[176,342],265],[[-234,-810],270],[[-48,-299],255]],
+    jumpV:[[[176,342],265],[[-234,-810],286],[[-48,-299],255]],
     /* the crossing: the second time through the middle the road climbs onto an old timber bridge over the
        first diagonal, and the middle of it is gone: a kicker at the broken end, and you jump the road below */
     spans:[{at:[-48,-299], road:-1, pass:2, under:-1, over:true, span:36, wall:24, broken:8.5, kick:2.6, lift:true}],
@@ -2567,7 +2569,12 @@ TRACK.branches.forEach((def, bi)=>{
      staircase  three ledges, one after another, down the hill
      ledge      one big ledge, the tall version of a drop           */
 const JUMP_LEN = { kicker:100, crest:80, double:190, tabletop:115, drop:95,
-                   rhythm:150, staircase:170, ledge:120 };
+                   rhythm:150, staircase:170, ledge:120, pop:40 };
+/* a pop: a little kicker, 16m of curved face up to a lip 0.7m proud of the road, and straight back down
+   behind it. At speed it throws the car 20 or 30 metres down the road. (Off a pop the car may leave at up
+   to POP_KICK faster than the road there climbs, so one still pops up a steep hill taken flat out.) */
+const POP_H = 0.7, POP_RUN = 16, POP_KICK = 5.5;
+const popShape = s=> s < -POP_RUN || s > 4 ? 0 : s <= 0 ? POP_H*((s + POP_RUN)/POP_RUN)**2 : POP_H*(1 - s/4);
 function shapeJump(P, at, type){
   const seg = P.seg, add = (m0, m1, fn)=>{
     for(let k=Math.round(m0/seg); k<=Math.round(m1/seg); k++){
@@ -2589,6 +2596,7 @@ function shapeJump(P, at, type){
   };
   switch(type){
     case "kicker":   ramp(P, at, 30, 8, 2.0, 50); break;
+    case "pop":      if(!TRACK.planned) add(-POP_RUN, 4, popShape); break;     // (a planned track lays its pops on the finished road)
     case "crest":    add(-16, 38, crest(1.6, 15, 36)); break;
     case "double":   ramp(P, at, 26, 7, 1.7, 0); ramp(P, at + Math.round(95/seg), 26, 7, 1.9, 0); break;
     /* a proper take-off and landing: a curved kicker onto a lip, a step
@@ -4090,7 +4098,8 @@ if(TRACK.planned){
   const lips = [];
   (TRACK.jumps || []).forEach(j=> lips.push(snapTo(P, j[0])));
   (TRACK.bigJumps || []).forEach(j=> lips.push(snapTo(P, j[0])));
-  AUTO_JUMPS.forEach(a=>{ if(a.type === "tabletop" || a.type === "kicker") lips.push(a.at);
+  AUTO_JUMPS.forEach(a=>{ if(a.type === "pop") return;                                   // (laid on afterwards, below)
+    if(a.type === "tabletop" || a.type === "kicker") lips.push(a.at);
     else lockRange(a.at - M(40), a.at + M((JUMP_LEN[a.type] || 120) + 10)); });          // (rhythm humps: as built)
   const deck = new Uint8Array(N), deckEnd = {};
   SPANS.forEach(sp=>{ if(sp.P !== P) return;
@@ -4167,6 +4176,16 @@ if(TRACK.planned){
     JUMP_PLAN.push({lip:i0, land:along(i0, sL), v, flight:Math.round(sL)});
   });
   limit();
+  /* and the pops, laid on the finished road: each one small enough that the car comes back down onto the
+     road as it is, smoothed for speed, at about the few m/s a planned landing gives, so they can sit
+     anywhere along a straight, even down a big jump's landing */
+  AUTO_JUMPS.forEach(a=>{ if(a.type !== "pop") return;
+    if(!P.popG){ P.popG = new Float32Array(N); P.popG.fill(NaN); }
+    const grade = (y[along(a.at, 12)] - y[a.at])/12;
+    for(let k=-M(4); k<=M(3); k++) P.popG[wrapIdx(P, a.at + k)] = grade;
+    for(let q=-POP_RUN; q<=4; q+=seg) y[along(a.at, q)] += popShape(Math.round(q/seg)*seg);
+    (P.rampSpans = P.rampSpans || []).push([a.at - M(POP_RUN + 4), a.at + M(40)]);
+  });
   for(let i=0;i<N;i++) P.pts[i].y = y[i];
 }
 const ROUTE = routingTest(MAIN);
@@ -10287,21 +10306,50 @@ if(TRACK.pads && TRACK.pads.length){
   const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(1, 2);
   const mat = new THREE.MeshBasicMaterial({map:tex, transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
   const rim = new THREE.MeshBasicMaterial({color:0xffffff});
-  const geo = new THREE.PlaneGeometry(1, 1);
+  /* each pad is laid onto the road itself, its corners and middle set down on the ground under them,
+     so it lies along the slope and across the lean of a banked turn rather than flat on the level */
   padSpots().forEach(i=>{
-    const p = MAIN.pts[i], t = MAIN.tans[i];
+    const p = MAIN.pts[i], t = MAIN.tans[i], rx = -t.z, rz = t.x;
     const W = Math.min(6.4, MAIN.half[i]*2 - 1.4), L = 8, y = surfaceY(p.x, p.z);
-    const m = new THREE.Mesh(geo, mat);
-    m.scale.set(W, L, 1); m.rotation.order = "YXZ";
-    const y2 = surfaceY(p.x + t.x*3, p.z + t.z*3), y1 = surfaceY(p.x - t.x*3, p.z - t.z*3);
-    m.rotation.set(-Math.PI/2 + Math.atan2(y2 - y1, 6), Math.atan2(t.x, t.z) + Math.PI, 0);
-    m.position.set(p.x, y + 0.07, p.z); m.renderOrder = 2; scene.add(m);
-    // white kerbs down either side of it
-    for(const sd of [-1, 1]){ const k = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.12, L), rim);
-      k.position.set(p.x - t.z*sd*(W/2 + 0.2), y + 0.06, p.z + t.x*sd*(W/2 + 0.2)); k.rotation.y = Math.atan2(t.x, t.z); scene.add(k); }
+    const geo = new THREE.PlaneGeometry(1, 1, 4, 8), pos = geo.attributes.position;
+    for(let k=0; k<pos.count; k++){
+      const u = pos.getX(k)*W, v = pos.getY(k)*L, x = p.x + rx*u + t.x*v, z = p.z + rz*u + t.z*v;
+      pos.setXYZ(k, x, surfaceY(x, z) + 0.07, z);
+    }
+    geo.computeVertexNormals(); geo.computeBoundingSphere();
+    const m = new THREE.Mesh(geo, mat); m.renderOrder = 2; scene.add(m);
+    // white kerbs down either side of it, set on the ground's lean there
+    for(const sd of [-1, 1]){
+      const kx = p.x + rx*sd*(W/2 + 0.2), kz = p.z + rz*sd*(W/2 + 0.2);
+      const fw = new THREE.Vector3(t.x, (surfaceY(kx + t.x*3, kz + t.z*3) - surfaceY(kx - t.x*3, kz - t.z*3))/6, t.z).normalize();
+      const sv = new THREE.Vector3(rx, (surfaceY(kx + rx*0.6, kz + rz*0.6) - surfaceY(kx - rx*0.6, kz - rz*0.6))/1.2, rz).normalize();
+      const up = new THREE.Vector3().crossVectors(fw, sv).normalize(); if(up.y < 0) up.negate();
+      sv.crossVectors(up, fw).normalize();
+      const k = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.12, L), rim);
+      k.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(sv, up, fw));
+      k.position.set(kx, surfaceY(kx, kz) + 0.06, kz); scene.add(k); }
     BOOSTPADS.push({i, x:p.x, z:p.z, y, tx:t.x, tz:t.z, hw:W/2, hl:L/2, cool:0});
   });
   ANIMS.push(t=>{ tex.offset.y = (t*1.8) % 1; });
+}
+/* the pops' faces painted in pink and white stripes across the road, so a little kicker shows up
+   from a long way back down a straight (draped over the face like the pads) */
+if(AUTO_JUMPS.some(a=> a.type === "pop")){
+  const c = document.createElement("canvas"); c.width = 64; c.height = 64; const g = c.getContext("2d");
+  g.fillStyle = "#ffffff"; g.fillRect(0, 0, 64, 64); g.fillStyle = "#e23a86";
+  for(let k=-2;k<3;k++){ g.beginPath(); g.moveTo(k*32, 64); g.lineTo(k*32 + 16, 64); g.lineTo(k*32 + 48, 0); g.lineTo(k*32 + 32, 0); g.closePath(); g.fill(); }
+  const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  const mat = new THREE.MeshBasicMaterial({map:tex, transparent:true, opacity:0.9, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
+  AUTO_JUMPS.forEach(a=>{ if(a.type !== "pop") return;
+    const p = MAIN.pts[a.at], t = MAIN.tans[a.at], rx = -t.z, rz = t.x, W = MAIN.half[a.at]*2 - 1.2, L = 7;
+    const geo = new THREE.PlaneGeometry(1, 1, 6, 6), pos = geo.attributes.position, uv = geo.attributes.uv;
+    for(let k=0; k<pos.count; k++){
+      const u = pos.getX(k)*W, v = (pos.getY(k) - 0.5)*L, x = p.x + rx*u + t.x*v, z = p.z + rz*u + t.z*v;
+      pos.setXYZ(k, x, surfaceY(x, z) + 0.06, z); uv.setXY(k, uv.getX(k)*W/3, uv.getY(k)*L/3);
+    }
+    geo.computeVertexNormals(); geo.computeBoundingSphere();
+    const m = new THREE.Mesh(geo, mat); m.renderOrder = 2; scene.add(m);
+  });
 }
 function stepPads(dt, nfx, nfz){
   for(const p of BOOSTPADS){
@@ -15640,7 +15688,9 @@ function stepCarInner(dt){
     }
     if(sq2 < -DROOP){                                // wheels hanging, ground gone: flying
       pose.air = true; pose.airT = 0;
-      pose.vy = Math.min(11, pose.vy);
+      let cap = 11;
+      if(MAIN.popG){ const n = nearest(pose.x, pose.z); if(n.path === MAIN && !isNaN(MAIN.popG[n.pi])) cap = Math.max(11, MAIN.popG[n.pi]*spV + POP_KICK); }
+      pose.vy = Math.min(cap, pose.vy);
     } else pose.airT = 0;
   } else {
     pose.vy -= G*dt;                                 // mass, not a balloon
