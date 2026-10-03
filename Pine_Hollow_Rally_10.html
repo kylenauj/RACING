@@ -1338,20 +1338,23 @@ const TRACKS = [
     stages:["gravel","muddy","washboard","rutted","gravel","muddy","paved"],
     branches:[]},
 
-  { name:"KOI GARDEN", after:"a Japanese stroll garden", relief:0.6, rollers:0.3, season:"spring", cup:5, kitOnly:true, torii:true, lanterns:true,
-    blurb:"a stroll garden in cherry time: zigzag across the koi pond on the eight-plank bridge, hop the red drum bridges over the streams, down the bamboo grove's tunnel of leaves and under the torii, past the pagoda and its raked gravel",
+  { name:"KOI GARDEN", after:"a Japanese stroll garden round a great koi lake", relief:0.6, rollers:0.3, season:"spring", cup:5, kitOnly:true, torii:true, lanterns:true,
+    blurb:"a stroll garden in cherry time round a great lake full of koi: across the water on a road of giant lily pads, round the south shore, over the moon bridge (fly off the top of it) and straight down into the Koi Skim, a hundred metres of open water you skip across like a stone if you are doing a hundred, down the bamboo tunnel, zigzag over the little koi pond on the eight-plank bridge, past the pagoda and its raked gravel, and over the stream on the drum bridge",
     kit:["crest"],
-    shape:"THE KOI POND — the zigzag bridge",
-    feature:"a zigzag plank bridge across the koi pond, red drum bridges that hop you over the streams, a bamboo tunnel and a five storey pagoda",
-    ctrl:[[0,-300],[0,-200],[-15,-120],[10,-70],[60,-52],[115,-64],[170,-50],[215,-46],[255,-28],[290,10],[300,80],[300,160],[292,220],
-          [255,265],[190,272],[120,250],[60,275],[0,280],[-70,255],[-130,215],[-158,145],[-150,70],[-162,0],[-140,-80],[-112,-150],[-130,-220],
-          [-108,-290],[-92,-372],[-58,-421],[-12,-430],[9,-388]],
-    hills:[[150,300,170,9],[-160,0,150,6],[300,120,120,5]], jumps:[], fords:[], mud:[[[-140,-80],[-112,-150]]], autoFords:0, pits:1,
-    boardwalks:[[[30,-56],[224,-44]]],
+    shape:"THE KOI LAKE — lily pads, the moon bridge and the skim",
+    feature:"a great koi lake, crossed on giant lily pads and over a moon bridge you fly off into the Koi Skim (above 100 km/h you skip across the water), a zigzag plank bridge over the koi pond, a drum bridge, a bamboo tunnel and a five storey pagoda",
+    ctrl:[[-108,-290],[-130,-220],[-112,-150],[-140,-80],[-162,0],[-150,70],[-158,145],[-130,215],[-70,255],[-30,258],[-5,225],[12,175],[-12,120],
+          [6,60],[10,18],[40,-8],[95,-14],[135,0],[150,35],[150,100],[150,170],[155,215],[185,255],[235,270],[280,248],[297,205],[300,140],[300,60],
+          [290,10],[255,-28],[215,-46],[170,-50],[115,-64],[60,-52],[10,-70],[-15,-120],[0,-200],[0,-300],[9,-388],[-12,-430],[-58,-421],[-92,-372]],
+    hills:[[150,330,170,9],[-160,0,150,6],[330,120,120,5]], jumps:[], fords:[], mud:[[[-140,-80],[-112,-150]]], autoFords:0, pits:1,
+    lake:{at:[75,125], rx:160, rz:115},
+    lakeRoad:[{from:[-5,225], to:[10,30], y:0.25, kind:"lily"}, {from:[150,108], to:[152,198], y:-1.0, kind:"skim"}],
+    set:[[[150,56],"moon"]],
+    boardwalks:[[[215,-46],[10,-70]], [[150,24],[150,90]]],
     banks:[[[-78,-400],[6,-400],0.5]],
-    canals:[{pts:[[150,430],[130,300],[120,200],[160,120],[140,40],[132,-24]], w:3.6, depth:1.6, bridge:"drum", flow:true},
-            {pts:[[-280,340],[-180,300],[-100,262],[-40,236],[20,200],[60,120],[128,48]], w:3.2, depth:1.5, bridge:"drum", flow:true}],
-    spots:{pagoda:[[-58,-232]], gravel:[[-55,-168]], stones:[[-64,-158],[-44,-176],[-70,-182]], bamboo:[[300,40],[297,205]]},
+    canals:[{pts:[[-280,300],[-190,245],[-125,180],[-92,122]], w:3.4, depth:1.5, bridge:"drum", flow:true},
+            {pts:[[60,430],[45,330],[60,262],[72,212]], w:3.2, depth:1.4, bridge:"drum", flow:true}],
+    spots:{pagoda:[[-58,-232]], gravel:[[-55,-168]], stones:[[-64,-158],[-44,-176],[-70,-182]], bamboo:[[297,205],[300,40]]},
     ground:"moss", murk:0.12,
     trees:{kinds:["cherry","maple","pine"], mix:[0.55, 0.62], tall:[[9,5],[9,4],[9,6]], density:0.7}, rockK:0.6, coverPink:0.35,
     stages:["gravel","rutted","muddy","gravel","rocky","rutted"],
@@ -1911,6 +1914,7 @@ if(SWAMPGP){
   TRACK.washes = (TRACK.washes||[]).map(mv);
   TRACK.boardwalks = (TRACK.boardwalks||[]).map(b=> [mv(b[0]), mv(b[1])]);
   TRACK.wades = (TRACK.wades||[]).map(b=> [mv(b[0]), mv(b[1])]);
+  TRACK.lakeRoad = (TRACK.lakeRoad||[]).map(r=> Object.assign({}, r, {from:mv(r.from), to:mv(r.to)}));
   TRACK.widths = (TRACK.widths||[]).map(b=> [mv(b[0]), mv(b[1]), b[2]]);
   TRACK.banks = (TRACK.banks||[]).map(b=> [mv(b[0]), mv(b[1]), b[2]]);
   if(TRACK.summit) TRACK.summit = mv(TRACK.summit);
@@ -2521,9 +2525,13 @@ function causeway(P){
     if(LILY.b > LILY.a) paint(P, LILY.a, LILY.b, SURF.WATER);
   }
   const lift = new Float64Array(P.N);
+  /* Koi Garden's lake roads: a stretch held just over the water (the lily pads) or sunk under it (the skim) */
+  const LR = P === MAIN ? (TRACK.lakeRoad || []).map(r=>{ let a = snapTo(P, r.from), b = snapTo(P, r.to), n = b - a; if(n < 0) n += P.N;
+    if(n > P.N/2){ a = b; n = P.N - n; } return {a, n, y:r.y}; }) : [];
+  const lrAt = i=>{ for(const r of LR){ let k = i - r.a; if(k < 0) k += P.N; if(k <= r.n) return r; } return null; };
   for(let i=0;i<P.N;i++){
-    const p = P.pts[i], e = Math.hypot((p.x - LAKE.x)/LAKE.rx, (p.z - LAKE.z)/LAKE.rz);
-    const want = P === MAIN && i >= LILY.a && i <= LILY.b ? LAKE.level - 0.35 : LAKE.level + 1.1;
+    const p = P.pts[i], e = Math.hypot((p.x - LAKE.x)/LAKE.rx, (p.z - LAKE.z)/LAKE.rz), lr = LR.length ? lrAt(i) : null;
+    const want = lr ? LAKE.level + lr.y : P === MAIN && i >= LILY.a && i <= LILY.b ? LAKE.level - 0.35 : LAKE.level + 1.1;
     lift[i] = Math.max(0, want - p.y)*(1 - smoothstep(1.02, 1.3, e));
   }
   const sm = Array.from(lift); smoothAlong(sm, P.closed, Math.round(10/P.seg));
@@ -2815,7 +2823,7 @@ TRACK.branches.forEach((def, bi)=>{
      staircase  three ledges, one after another, down the hill
      ledge      one big ledge, the tall version of a drop           */
 const JUMP_LEN = { kicker:100, crest:80, double:190, tabletop:115, drop:95,
-                   rhythm:150, staircase:170, ledge:120, pop:40, drum:44, swells:310, terrace:110 };
+                   rhythm:150, staircase:170, ledge:120, pop:40, drum:44, swells:310, terrace:110, moon:70 };
 /* a pop: a little kicker, 16m of curved face up to a lip 0.7m proud of the road, and straight back down
    behind it. At speed it throws the car 20 or 30 metres down the road. (Off a pop the car may leave at up
    to POP_KICK faster than the road there climbs, so one still pops up a steep hill taken flat out.) */
@@ -2868,6 +2876,8 @@ function shapeJump(P, at, type){
     /* the koi garden's drum bridge: a steep round arch over a stream, the road up one side and down the
        other. Taken slowly it is a hump; taken quick it throws you off the top */
     case "drum":     add(-17, 17, s=> 2.3*Math.pow(Math.cos(Math.PI*s/34), 1.5)); break;
+    /* Koi Garden's moon bridge over the lake: a tall round arch, steep enough to throw you a long way off its top */
+    case "moon":     add(-27, 27, s=> 4.4*Math.pow(Math.cos(Math.PI*s/54), 1.4)); break;
     /* the Rollercoaster: four great rounded swells one after another down the hill, long enough that the
        car rides them flat out, going light over every top (flying off one only at the very top speed) */
     case "swells":   for(let n=0;n<4;n++) add(n*76 - 37, n*76 + 37, hump(n*76, 2.3, 74)); break;
@@ -2953,7 +2963,7 @@ const AUTO_JUMPS = [];
   SPOTS.forEach(c=> busy.push(c));
   // (on the Spring Cup the jumps a track puts where it wants them are kept clear of too, run-up to landing and on)
   // (and the walled stretches: no jump in a tunnel, a hallway or the maze)
-  if(TRACK.season === "spring") (TRACK.rails || []).forEach(r=>{ const a = snapTo(MAIN, r[0]); let n = snapTo(MAIN, r[1]) - a; if(n < 0) n += N;
+  if(TRACK.season === "spring") (TRACK.rails || []).concat((TRACK.lakeRoad || []).map(r=> [r.from, r.to])).forEach(r=>{ const a = snapTo(MAIN, r[0]); let n = snapTo(MAIN, r[1]) - a; if(n < 0) n += N;
     if(n > N/2){ n = N - n; busy.push([wrapIdx(MAIN, a - Math.round(n/2)), n*seg/2 + 40]); } else busy.push([wrapIdx(MAIN, a + Math.round(n/2)), n*seg/2 + 40]); });
   if(TRACK.season === "spring") (TRACK.banks || []).forEach(b=>{ const a = snapTo(MAIN, b[0]); let n = snapTo(MAIN, b[1]) - a; if(n < 0) n += N;
     if(n > N/2){ n = N - n; busy.push([wrapIdx(MAIN, a - Math.round(n/2)), n*seg/2 + 85]); } else busy.push([wrapIdx(MAIN, a + Math.round(n/2)), n*seg/2 + 85]); });
@@ -3126,7 +3136,7 @@ function addCrests(P, rnd){
   add(calmMask(MAIN, Gg, (TRACK.gorge ? TRACK.gorge.span : 0) + 25));
   CALM.forEach(c=>{ if(c[2] !== "soft") add(calmMask(MAIN, [c[0]], c[1])); });
   // the Spring Cup's walled stretches (tunnels, hallways, the maze) are plain road: no banks, no ruts, no crests
-  if(TRACK.season === "spring") (TRACK.rails || []).forEach(r=>{ let a = snapTo(MAIN, r[0]), b = snapTo(MAIN, r[1]), n = b - a; if(n < 0) n += MAIN.N;
+  if(TRACK.season === "spring") (TRACK.rails || []).concat((TRACK.lakeRoad || []).map(r=> [r.from, r.to])).forEach(r=>{ let a = snapTo(MAIN, r[0]), b = snapTo(MAIN, r[1]), n = b - a; if(n < 0) n += MAIN.N;
     if(n > MAIN.N/2){ n = MAIN.N - n; a = b; }
     const st = []; for(let k=0; k<=n; k+=Math.round(10/MAIN.seg)) st.push(wrapIdx(MAIN, a + k));
     add(calmMask(MAIN, st, 12)); });
@@ -4332,7 +4342,8 @@ paths.forEach(P=>{
    over 45m either end. The car can corner far harder on it (bankAt, in stepCar), so a turn you'd
    brake for on the flat is flat out up on the wall. */
 (TRACK.banks || []).forEach(b=>{
-  const P = MAIN, N = P.N, seg = P.seg, a = snapTo(P, b[0]); let n = snapTo(P, b[1]) - a; if(n < 0) n += N;
+  const P = MAIN, N = P.N, seg = P.seg; let a = snapTo(P, b[0]), n = snapTo(P, b[1]) - a; if(n < 0) n += N;
+  if(n > N/2){ a = snapTo(P, b[1]); n = N - n; }                         // (the short way round, whichever end the track gives first)
   const E = Math.round(80/seg), W = Math.max(3, Math.round(8/seg));
   if(!P.bank) P.bank = new Float32Array(N);
   // which way the turn goes, over the whole of it
@@ -10746,7 +10757,7 @@ if(LAKE.on){
   g.setAttribute("aDepth", new THREE.Float32BufferAttribute(dep,1));
   g.setIndex(idx);
   const wm = new THREE.Mesh(g, LAKE.lava ? lavaMaterial() : waterMaterial()); wm.renderOrder = 3; wm.frustumCulled = false; scene.add(wm);
-  if(!LAKE.frozen && !LAKE.lava && !GATOR){
+  if(!LAKE.frozen && !LAKE.lava && !GATOR && !SPRINGCUP){
   // riprap along the waterline of the causeway
   const rockMat = new THREE.MeshLambertMaterial({map:rockTex});
   const P = MAIN;
@@ -11270,7 +11281,7 @@ if(BLOOM){
      RAINBOW DOWNS   straight through a waterfall, the Rollercoaster's four swells
                      down the hill, balloons, sheep and a white horse in the chalk
    (The ground they lie on is painted by springGround as the land is built.) */
-const SPRINGFX = { step:null, falls:null, wind:0, windSoon:0, windT:0, maze:null };
+const SPRINGFX = { step:null, falls:null, wind:0, windSoon:0, windT:0, maze:null, lake:null, skim:null };
 /* a leaf clipped off the maze's hedges: the hedges' own greens, from deep shade to fresh growth, a few
    gone yellow or brown where they have lain a while */
 function hedgeLeafColour(c){
@@ -12192,6 +12203,156 @@ if(SPRINGCUP){
     for(let k=0;k<=S.n;k+=Math.round(5/seg)){ const f = frm(S.a + k); NO_TREES.push([f.p.x, f.p.z, f.half + 4]); }
     roadSign(byM(S.a, -80), 1, ["THE WISTERIA WALK", "headroom 5.5m"], "#6a4a8a", "#f4ecfa");
   }
+  /* ==== KOI GARDEN's lake ==================================================================
+     The road of lily pads across it, the moon bridge, the Koi Skim with its floating torii, lotus and
+     pads all over the water, and the koi themselves, swimming under the surface and scattering from
+     the car. */
+  if(TRACK.lakeRoad && TRACK.lakeRoad.length && LAKE.on){
+    const lilyG = new THREE.CircleGeometry(1, 22, 0.25, Math.PI*2 - 0.5); lilyG.rotateX(-Math.PI/2);
+    const padM = new THREE.MeshLambertMaterial({side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:-3, polygonOffsetUnits:-3});
+    const roadPads = [], lakePads = [], lotus = [];
+    TRACK.lakeRoad.forEach(R=>{
+      const S = stretch(R.from, R.to);
+      SPRINGFX.lake = SPRINGFX.lake || [];
+      SPRINGFX.lake.push({a:S.a, n:S.n, kind:R.kind});
+      if(R.kind === "lily"){
+        // the road itself, giant pads overlapping kerb to kerb and over the edges, layer on layer
+        let layer = 0;
+        for(let k=0; k<=S.n; k+=Math.max(1, Math.round(3.0/seg))){
+          const f = frm(S.a + k);
+          for(const l of [-(f.half - 1.2), 0.4*(rnd() - 0.5), f.half - 1.2]){
+            const r = 3.4 + rnd()*1.6, x = f.p.x + f.nx*(l + (rnd() - 0.5)*1.4), z = f.p.z + f.nz*(l + (rnd() - 0.5)*1.4);
+            roadPads.push([x, Math.max(f.y, LAKE.level) + 0.04 + (layer++ % 7)*0.012, z, rnd()*6.28, 0, 0, r, 1, r]);
+          }
+        }
+        roadSign(byM(S.a, -90), 1, ["THE LILY PADS", "a road across the lake"], "#2a5a3a", "#f2fbf2");
+      } else if(R.kind === "skim"){
+        // a floating torii at either end of the skim, standing in the water, and paper lanterns down both sides
+        const red = lam(0xd23a22, 0x2a0602), ink = PM(0x1c1414), lantM = new THREE.MeshBasicMaterial({color:0xffe2a0});
+        const toriiAt = (k)=>{ const f = frm(S.a + k), g = new THREE.Group(), w = f.half + 3.4, y0 = LAKE.level - 1.6;
+          for(const sd of [-1, 1]){ const x = f.p.x + f.nx*sd*w, z = f.p.z + f.nz*sd*w;
+            const c = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, 11.6, 12), red); c.position.set(x, y0 + 5.8, z); g.add(c);
+            const b = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 1.2, 12), ink); b.position.set(x, LAKE.level + 0.2, z); g.add(b); }
+          const yaw = Math.atan2(f.t.x, f.t.z) + Math.PI/2;
+          const kas = new THREE.Mesh(new THREE.BoxGeometry(w*2 + 5, 0.9, 1.1), ink); kas.position.set(f.p.x, y0 + 11.9, f.p.z); kas.rotation.y = yaw; g.add(kas);
+          const kas2 = new THREE.Mesh(new THREE.BoxGeometry(w*2 + 4.4, 0.7, 0.9), red); kas2.position.set(f.p.x, y0 + 11.2, f.p.z); kas2.rotation.y = yaw; g.add(kas2);
+          const nuki = new THREE.Mesh(new THREE.BoxGeometry(w*2 + 2, 0.6, 0.6), red); nuki.position.set(f.p.x, y0 + 9.2, f.p.z); nuki.rotation.y = yaw; g.add(nuki);
+          const tab = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.8, 0.3), ink); tab.position.set(f.p.x, y0 + 10.3, f.p.z); tab.rotation.y = yaw; g.add(tab);
+          shade(g); mergeStatic(g); scene.add(g); };
+        toriiAt(Math.round(4/seg)); toriiAt(S.n - Math.round(4/seg));
+        const lg = new THREE.Group();
+        for(let k=Math.round(10/seg); k<S.n - Math.round(8/seg); k+=Math.round(12/seg)) for(const sd of [-1, 1]){
+          const f = frm(S.a + k), o = f.half + 2.6, x = f.p.x + f.nx*sd*o, z = f.p.z + f.nz*sd*o;
+          pbox(lg, 0.9, 0.12, 0.9, ink, x, LAKE.level + 0.06, z);
+          const l = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.9, 8), lantM); l.position.set(x, LAKE.level + 0.6, z); lg.add(l);
+          pcyl(lg, 0.5, 0.5, 0.1, 8, ink, x, LAKE.level + 1.08, z);
+        }
+        mergeStatic(lg); scene.add(lg);
+        // the road under the skim is under water: wading slow, skipping fast
+        for(let k=0; k<=S.n; k++){ const i = wrapIdx(MAIN, S.a + k); if(MAIN.pts[i].y + BED < LAKE.level - 0.2){ MAIN.surf[i] = SURF.WATER; if(MAIN.wet) MAIN.wet[i] = 1; } }
+        roadSign(byM(S.a, -150), -1, ["THE KOI SKIM", "100 km/h and you skip the water"], "#1a4a6a", "#eaf6ff");
+      }
+    });
+    // pads and lotus all over the lake, thick round the lily road
+    for(let q=0, made=0; q<6000 && made<420; q++){
+      const a = rnd()*Math.PI*2, e = Math.sqrt(rnd())*0.97, x = LAKE.x + Math.cos(a)*LAKE.rx*e, z = LAKE.z + Math.sin(a)*LAKE.rz*e;
+      if(LAKE.level - gradedY(x, z) < 0.25) continue;
+      const n = nearest(x, z); if(n.dist < n.half + 2.2) continue;
+      const big = rnd() < 0.3, r = big ? 2.4 + rnd()*2.2 : 0.8 + rnd()*1.4;
+      lakePads.push([x, LAKE.level + 0.03 + rnd()*0.01, z, rnd()*6.28, 0, 0, r, 1, r]); made++;
+      if(rnd() < 0.22) lotus.push([x + (rnd() - 0.5)*r, LAKE.level + 0.05, z + (rnd() - 0.5)*r]);
+    }
+    const padCol = (c)=> c.setHSL(0.25 + rnd()*0.09, 0.5 + rnd()*0.2, 0.28 + rnd()*0.14);
+    instances(lilyG, padM, roadPads, padCol);
+    instances(lilyG, padM, lakePads, padCol);
+    { const pet = new THREE.ConeGeometry(0.28, 0.9, 4); pet.translate(0, 0.45, 0);
+      const list = [], ctr = [];
+      lotus.forEach(L=>{ const pink = rnd() < 0.7;
+        for(let k=0;k<7;k++){ const a = k/7*Math.PI*2; list.push([L[0] + Math.cos(a)*0.22, L[1], L[2] + Math.sin(a)*0.22, a, 0.75, 0, 1, 1, 1, pink]); }
+        ctr.push([L[0], L[1] + 0.3, L[2], 0, 0, 0, 0.28]); });
+      instances(pet, new THREE.MeshLambertMaterial({emissive:0x401828}), list, (c, P)=> P[9] ? c.setHSL(0.93 + rnd()*0.03, 0.75, 0.75) : c.setHSL(0.12, 0.2, 0.95));
+      instances(new THREE.SphereGeometry(1, 8, 6), lam(0xf2c83a, 0x302000), ctr); }
+
+    /* the koi: big ones, gold, white with red, black and orange, cream, swimming just under the surface in
+       slow loops round the lake and the zigzag pond, tails beating, and darting off when the car comes */
+    { const body = new THREE.SphereGeometry(1, 12, 8); body.scale(0.3, 0.17, 1);
+      const tail = new THREE.BufferGeometry(); tail.setAttribute("position", new THREE.Float32BufferAttribute([0,0,-0.8, 0.42,0,-1.55, -0.42,0,-1.55, 0,0.02,-0.8, -0.42,0,-1.55, 0.42,0,-1.55], 3));
+      const fin = new THREE.BufferGeometry(); fin.setAttribute("position", new THREE.Float32BufferAttribute([0.22,0,0.3, 0.62,0,-0.05, 0.25,0,-0.1, -0.22,0,0.3, -0.25,0,-0.1, -0.62,0,-0.05,
+                                                                                                             0.22,-0.01,0.3, 0.25,-0.01,-0.1, 0.62,-0.01,-0.05, -0.22,-0.01,0.3, -0.62,-0.01,-0.05, -0.25,-0.01,-0.1], 3));
+      [tail, fin].forEach(gg=> gg.computeVertexNormals());
+      const patch = new THREE.SphereGeometry(1, 8, 6); patch.scale(0.2, 0.08, 0.32);
+      const KOI = [];
+      const homes = [];
+      for(let q=0, made=0; q<3000 && made<60; q++){
+        const a = rnd()*Math.PI*2, e = Math.sqrt(rnd())*0.85, x = LAKE.x + Math.cos(a)*LAKE.rx*e, z = LAKE.z + Math.sin(a)*LAKE.rz*e;
+        if(LAKE.level - gradedY(x, z) < 0.8) continue;
+        homes.push([x, z, LAKE.level - 0.1, 6 + rnd()*14]); made++;
+      }
+      // and schools of them close beside the roads across the lake, where you see them as you go
+      SPRINGFX.lake.forEach(L=>{ for(let q=0, made=0; q<1500 && made<45; q++){
+        const f = frm(L.a + Math.floor(rnd()*L.n)), sd = rnd() < 0.5 ? -1 : 1, o = f.half + 5 + rnd()*22, x = f.p.x + f.nx*sd*o, z = f.p.z + f.nz*sd*o;
+        if(LAKE.level - gradedY(x, z) < 0.6) continue;
+        homes.push([x, z, LAKE.level - 0.1, 3 + rnd()*6]); made++; } });
+      BOARDWALKS.forEach(W=>{ for(let q=0, made=0; q<400 && made<14; q++){ const p = W.pts[Math.floor(rnd()*W.pts.length)], a = rnd()*6.28, d = p.h + 4 + rnd()*10, x = p.x + Math.cos(a)*d, z = p.z + Math.sin(a)*d;
+        if(bwPool(x, z) < 0.6) continue; homes.push([x, z, W.level - 0.08, 3 + rnd()*4]); made++; } });
+      const kinds = [[0xf2f2ea, 0xe0401a], [0xff8a1e, 0xff8a1e], [0xf8c838, 0xf8c838], [0xf2f2ea, 0x1a1a1a], [0xff6a14, 0x1a1a1a], [0xf4ead2, 0xe0401a]];
+      homes.forEach((h, k)=>{ const K = kinds[k % kinds.length];
+        KOI.push({hx:h[0], hz:h[1], y:h[2], R:h[3], a:rnd()*6.28, sp:(0.35 + rnd()*0.4)*(rnd() < 0.5 ? -1 : 1), s:1.0 + rnd()*0.7, ph:rnd()*6, flee:0, fx:0, fz:0, c1:K[0], c2:K[1]}); });
+      if(KOI.length){
+        /* (the water over them is nearly opaque, so they are drawn after it, a little see-through: bright fish just
+           under the surface; the lily pads, above them, still hide them) */
+        const mk = (g, m)=>{ const im = new THREE.InstancedMesh(g, m, KOI.length); im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.frustumCulled = false; im.renderOrder = 4; scene.add(im); return im; };
+        const kM = o=> new THREE.MeshLambertMaterial(Object.assign({transparent:true, opacity:0.88, depthWrite:false}, o));
+        const bm = mk(body, kM({emissive:0x2a160c})), tm = mk(tail, kM({side:THREE.DoubleSide, opacity:0.7}));
+        const fm = mk(fin, kM({side:THREE.DoubleSide, opacity:0.65})), pm = mk(patch, kM({opacity:0.92}));
+        const c = new THREE.Color();
+        KOI.forEach((K, k)=>{ bm.setColorAt(k, c.setHex(K.c1)); tm.setColorAt(k, c.setHex(K.c1)); fm.setColorAt(k, c.setHex(K.c1)); pm.setColorAt(k, c.setHex(K.c2)); });
+        [bm, tm, fm, pm].forEach(m=> m.instanceColor.needsUpdate = true);
+        const m4 = new THREE.Matrix4(), m5 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e3 = new THREE.Euler(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3();
+        let lastT = null;
+        const swim = (t, always)=>{
+          const dt = lastT === null ? 0 : Math.max(0, Math.min(0.1, t - lastT)); lastT = t;
+          if(!always && Math.hypot(camera.position.x - LAKE.x, camera.position.z - LAKE.z) > Math.max(LAKE.rx, LAKE.rz) + 420) return;
+          const live = !always, cx = live ? pose.x : 1e9, cz = live ? pose.z : 1e9, csp = live ? Math.hypot(pose.vx, pose.vz) : 0;   // (at build time there is no car yet)
+          KOI.forEach((K, k)=>{
+            const px = K.hx + Math.cos(K.a)*K.R*(1 + 0.15*Math.sin(t*0.3 + K.ph)) + K.fx, pz = K.hz + Math.sin(K.a)*K.R + K.fz;
+            // a car close by, and going, sends them darting off, out from under it
+            const dx = px - cx, dz = pz - cz, d = Math.hypot(dx, dz);
+            if(d < 14 && csp > 4) K.flee = 1;
+            K.flee = Math.max(0, K.flee - dt*0.5);
+            if(K.flee > 0 && d > 0.1){ K.fx += dx/d*K.flee*dt*9; K.fz += dz/d*K.flee*dt*9; }
+            K.fx *= 1 - dt*0.25; K.fz *= 1 - dt*0.25;
+            K.a += K.sp*dt*(1 + K.flee*4)/Math.max(2, K.R)*3;
+            const head = Math.atan2(-Math.sin(K.a)*K.sp, Math.cos(K.a)*K.sp) + Math.PI/2*Math.sign(K.sp), wag = Math.sin(t*(5 + K.flee*10) + K.ph)*0.22;
+            v3.set(px, K.y + Math.sin(t*0.8 + K.ph)*0.04, pz); e3.set(0, head + wag*0.3, 0); q4.setFromEuler(e3); s3.set(K.s, K.s, K.s);
+            m4.compose(v3, q4, s3);
+            bm.setMatrixAt(k, m4); fm.setMatrixAt(k, m4);
+            m5.makeRotationY(wag*1.6); m5.premultiply(m4); tm.setMatrixAt(k, m5);
+            v3.set(0, 0.12, 0.15); v3.applyMatrix4(m4); m5.copy(m4); m5.setPosition(v3); pm.setMatrixAt(k, m5);
+          });
+          [bm, tm, fm, pm].forEach(m=> m.instanceMatrix.needsUpdate = true);
+        };
+        swim(0, true); lastT = null; ANIMS.push(t=> swim(t));
+      }
+    }
+  }
+  /* the moon bridge: lacquered red sides from the deck down into the water and lanterns at its feet (the
+     deck and the rails are the boardwalk's) */
+  (TRACK.set || []).filter(j=> j[1] === "moon").forEach(J=>{
+    const i = snapTo(MAIN, J[0]), red = lam(0xc8321e, 0x2a0602), ink = PM(0x1c1414), g = new THREE.Group();
+    for(const sd of [-1, 1]) for(let u=-28; u<=28; u+=1.2){
+      const f = frm(byM(i, u)), f2 = frm(byM(i, u + 1.2)), o = f.half + 0.55, x = f.p.x + f.nx*sd*o, z = f.p.z + f.nz*sd*o;
+      const top = Math.min(f.y, f2.y) - 0.15, bot = LAKE.on ? LAKE.level - 0.5 : top - 2;
+      if(top - bot < 0.3) continue;
+      const b = pbox(g, 0.35, top - bot, 1.3, red, x, (top + bot)/2, z); b.rotation.y = Math.atan2(f.t.x, f.t.z);
+      if(Math.round((u + 28)/1.2) % 6 === 0){ const k2 = pbox(g, 0.45, 0.3, 1.35, ink, x + f.nx*sd*0.05, top - 0.1, z + f.nz*sd*0.05); k2.rotation.y = b.rotation.y; }
+    }
+    for(const u of [-31, 31]) for(const sd of [-1, 1]){ const f = frm(byM(i, u)), o = f.half + 2.2, x = f.p.x + f.nx*sd*o, z = f.p.z + f.nz*sd*o, y = Math.max(gradedY(x, z), LAKE.on ? LAKE.level : -99);
+      pcyl(g, 0.6, 0.8, 0.5, 8, 0x8a8a84, x, y + 0.25, z); pcyl(g, 0.22, 0.25, 1.4, 6, 0x8a8a84, x, y + 1.2, z);
+      pbox(g, 1.3, 1.0, 1.3, 0xf2e6c8, x, y + 2.4, z); const rf = new THREE.Mesh(new THREE.ConeGeometry(1.2, 0.8, 4), PM(0x6a6a64)); rf.rotation.y = Math.PI/4; rf.position.set(x, y + 3.3, z); g.add(rf); }
+    shade(g); mergeStatic(g); scene.add(g);
+    roadSign(byM(i, -110), 1, ["THE MOON BRIDGE", "fly it, then skim it"], "#8a1a12", "#fff2e8");
+  });
   /* Rainbow Downs' stone circle: a ring of grey sarsens out on the open down, the road running straight
      through the middle of it as the old road does at Avebury. The stones are solid. */
   if(SP("henge")){
@@ -12530,6 +12691,40 @@ if(SPRINGCUP){
     instances(fg, lam(0xffffff, 0x2a2000), list, c=> rnd() < 0.8 ? c.setHSL(0.14, 0.95, 0.56) : c.setHSL(0.12, 0.3, 0.95));
   }
 
+  /* the Koi Skim: over the sunken road through the lake, fast enough (100 km/h) and the car skips across the
+     top of the water like a flat stone, a burst of spray at every touch and a little speed lost each time;
+     too slow, or slowed below it, and it drops in and wades the rest */
+  const SKIM = {on:false, n:0, said:false, sunk:false, spray:0};
+  SPRINGFX.skim = SKIM;
+  const skimStep = dt=>{
+    const near = nearest(pose.x, pose.z);
+    let inZone = false;
+    if(near.path === MAIN) for(const L of SPRINGFX.lake){ if(L.kind !== "skim") continue; let k = near.pi - L.a; if(k < 0) k += N; if(k <= L.n) inZone = true; }
+    const lvl = LAKE.level, sp = Math.hypot(pose.vx, pose.vz);
+    if(!inZone || state.phase === "menu"){ SKIM.on = false; SKIM.sunk = false; return; }
+    if(sp > 27.8 && !SKIM.sunk && pose.y < lvl + 0.08){
+      // a touch: bounce off the surface
+      pose.y = lvl + 0.08;
+      if(pose.vy < 1.5){ pose.vy = Math.min(4.6, Math.max(2.4, -pose.vy*0.45 + sp*0.06)); pose.air = true; pose.lastGy = pose.y;
+        pose.vx *= 0.975; pose.vz *= 0.975; SKIM.n++;
+        for(let k=0;k<26;k++) spawnDust(pose.x + (Math.random() - 0.5)*3, lvl + 0.2, pose.z + (Math.random() - 0.5)*3, [0.82, 0.93, 1.0], 0.6,
+          (Math.random() - 0.5)*9 + pose.vx*0.25, (Math.random() - 0.5)*9 + pose.vz*0.25, 3 + Math.random()*4);
+        splash.water = Math.min(1, (splash.water || 0) + 0.35);
+        if(actx && (SKIM.n % 2 === 1)) SFX.splash();
+        GAME.shake = Math.max(GAME.shake || 0, 0.08);
+        if(!SKIM.said){ SKIM.said = true; banner("SKIMMING!", "#bfe6ff", 1.4, "keep it over 100"); }
+      }
+      SKIM.on = true;
+    } else if(SKIM.on && sp <= 27.8){
+      SKIM.on = false; SKIM.sunk = true;
+      for(let k=0;k<40;k++) spawnDust(pose.x + (Math.random() - 0.5)*3, lvl + 0.3, pose.z + (Math.random() - 0.5)*3, [0.82, 0.93, 1.0], 0.9, (Math.random() - 0.5)*6, (Math.random() - 0.5)*6, 4 + Math.random()*5);
+      if(actx) SFX.splash(); splash.water = 1;
+      banner("SPLOOSH", "#bfe6ff", 1.2, "too slow to skim");
+    }
+    // a feather of spray off the back while it skims
+    if(SKIM.on && pose.y < lvl + 0.9){ SKIM.spray += dt*40;
+      while(SKIM.spray > 1){ SKIM.spray--; spawnDust(pose.x - pose.vx/sp*2, lvl + 0.15, pose.z - pose.vz/sp*2, [0.86, 0.95, 1.0], 0.3, -pose.vx*0.15 + (Math.random() - 0.5)*4, -pose.vz*0.15 + (Math.random() - 0.5)*4, 2 + Math.random()*2); } }
+  };
   /* what happens to the car: the polder's gusts push it across the road, the falls soak it */
   SPRINGFX.step = dt=>{
     if(TRACK.wind){
@@ -12567,6 +12762,7 @@ if(SPRINGCUP){
                     Math.random() < 0.6 ? [1.0, 0.82, 0.9] : [0.92, 1.0, 0.86], 0.3, TRACK.wind*2.6, (Math.random() - 0.5)*2, 0.2); }
       }
     }
+    if(SPRINGFX.lake) skimStep(dt);
     const F = SPRINGFX.falls;
     if(!F) return;
     F.cool = Math.max(0, F.cool - dt);
