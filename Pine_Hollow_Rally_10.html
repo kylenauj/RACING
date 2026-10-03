@@ -1339,17 +1339,19 @@ const TRACKS = [
     branches:[]},
 
   { name:"KOI GARDEN", after:"a Japanese stroll garden round a great koi lake", relief:0.6, rollers:0.3, season:"spring", cup:5, kitOnly:true, torii:true, lanterns:true,
-    blurb:"a stroll garden in cherry time round a great lake full of koi: across the water on a road of giant lily pads, round the south shore, over the moon bridge (fly off the top of it) and straight down into the Koi Skim, a hundred metres of open water you skip across like a stone if you are doing a hundred, down the bamboo tunnel, zigzag over the little koi pond on the eight-plank bridge, past the pagoda and its raked gravel, and over the stream on the drum bridge",
+    blurb:"a stroll garden in cherry time round a great lake full of koi: across the water on a road of giant lily pads, round the south shore, over the moon bridge (fly off the top of it), then down off the causeway into the Koi Skim, open water you hydroplane across if you are doing a hundred, down the bamboo tunnel, zigzag over the little koi pond on the eight-plank bridge, past the pagoda and its raked gravel, and over the stream on the drum bridge",
     kit:["crest"],
     shape:"THE KOI LAKE — lily pads, the moon bridge and the skim",
-    feature:"a great koi lake, crossed on giant lily pads and over a moon bridge you fly off into the Koi Skim (above 100 km/h you skip across the water), a zigzag plank bridge over the koi pond, a drum bridge, a bamboo tunnel and a five storey pagoda",
+    feature:"a great koi lake, crossed on giant lily pads and over a moon bridge you fly off, then the Koi Skim (above 100 km/h you hydroplane across the water), a zigzag plank bridge over the koi pond, a drum bridge, a bamboo tunnel and a five storey pagoda",
     ctrl:[[-108,-290],[-130,-220],[-112,-150],[-140,-80],[-162,0],[-150,70],[-158,145],[-130,215],[-70,255],[-30,258],[-5,225],[12,175],[-12,120],
           [6,60],[10,18],[40,-8],[95,-14],[135,0],[150,35],[150,100],[150,170],[155,215],[185,255],[235,270],[280,248],[297,205],[300,140],[300,60],
           [290,10],[255,-28],[215,-46],[170,-50],[115,-64],[60,-52],[10,-70],[-15,-120],[0,-200],[0,-300],[9,-388],[-12,-430],[-58,-421],[-92,-372]],
     hills:[[150,330,170,9],[-160,0,150,6],[330,120,120,5]], jumps:[], fords:[], mud:[[[-140,-80],[-112,-150]]], autoFords:0, pits:1,
     lake:{at:[75,125], rx:160, rz:115},
-    lakeRoad:[{from:[-5,225], to:[10,30], y:0.25, kind:"lily"}, {from:[150,108], to:[152,198], y:-1.0, kind:"skim"}],
-    set:[[[150,56],"moon"]],
+    /* (the moon bridge first, a flat run-out off it along the boardwalk, an even slope down off the causeway,
+       and only then the water: you go onto the skim on all four wheels, never landing in it out of the air) */
+    lakeRoad:[{from:[-5,225], to:[10,30], y:0.25, kind:"lily"}, {from:[150,134], to:[153,220], y:-1.0, kind:"skim"}],
+    set:[[[150,46],"moon"]],
     boardwalks:[[[215,-46],[10,-70]], [[150,24],[150,90]]],
     banks:[[[-78,-400],[6,-400],0.5]],
     canals:[{pts:[[-280,300],[-190,245],[-125,180],[-92,122]], w:3.4, depth:1.5, bridge:"drum", flow:true},
@@ -1392,7 +1394,7 @@ const TRACKS = [
           [40,-260],[20,-330],[40,-400],[10,-470],[-30,-540],[-95,-560],[-160,-545],[-225,-510]],
     hills:[[420,-150,400,52],[160,80,280,14],[-260,-300,180,6],[110,-430,150,-8],[302,-52,75,30]], jumps:[], mud:[[[-30,-540],[-95,-560]],[[290,-500],[200,-420]]], pits:3, autoFords:0,
     /* up the river: off the north road into the creek, up its rushing water toward the cascade (one long climb, no steps to throw you) */
-    river:{from:[190,88], to:[395,-25], pools:7, rush:true, down:70, up:55, downDir:[-0.5,1], upDir:[-1,-0.25]},
+    river:{from:[190,88], to:[395,-25], toFalls:7, pools:7, rush:true, down:70, up:1, downDir:[-0.5,1]},
     /* the chasm on the west side, the beck far below, and the bridge over it */
     gorge:{at:[-240,-185], depth:24, reach:150, wall:30, span:38},
     fords:[[12,-470]],
@@ -2070,6 +2072,7 @@ if(TRACK.ridgeCut && TRACK.spots && TRACK.spots.falls){
   const at = l=> [p0.x - t0.z*l, p0.z + t0.x*l];
   const BL = c.beck || 130;               // (how far back along the ridge the beck comes from)
   TRACK.canals = (TRACK.canals || []).concat([{pts:[at(feed*BL), at(feed*BL*0.62), at(feed*BL*0.31), at(feed*(CUT.w + 3.5))], w:2.6, depth:1.1, bridge:"none", flow:true}]);
+  CUT.head = at(feed*BL); CUT.out = [-t0.z*feed, t0.x*feed];     // (where the beck rises, and the way out from the road to it)
 }
 /* how far into the cutting a point is, 0 to 1: there the road's verge meets the wall straight off, as in the
    slot canyon, instead of being smoothed into a long bank that buried the walls */
@@ -3576,7 +3579,9 @@ const RIVER_FREE = 0.55;     // bank over the water
 function addRiver(P, def){
   const seg = P.seg;
   const a = snapTo(P, def.from);
-  let b = snapTo(P, def.to); if(b < a) b += P.N;
+  /* (or right up to the waterfall over the road, so the falls are the head of the creek: it rises in
+     their plunge pool and runs off downhill, with the road up its bed) */
+  let b = def.toFalls && CUT ? wrapIdx(P, CUT.i - Math.round(def.toFalls/seg)) : snapTo(P, def.to); if(b < a) b += P.N;
   const n = b - a, K = Math.max(1, def.pools || 3);
   const cut = j => Math.round(n*j/K);
   const levels = [];
@@ -3678,7 +3683,7 @@ function addRiver(P, def){
   S.forEach(q=>{ x0=Math.min(x0,q[0]); x1=Math.max(x1,q[0]); z0=Math.min(z0,q[1]); z1=Math.max(z1,q[1]); });
   const pad = RIVER_BANK + 16;
   Object.assign(RIVER, {on:true, S, a, n, levels, box:[x0-pad, x1+pad, z0-pad, z1+pad],
-                        ends:[S.length ? 0 : 0, S.length-1]});
+                        ends:[S.length ? 0 : 0, S.length-1], headFall:!!(def.toFalls && CUT), rush:!!def.rush});
   /* the head of the creek: a rock step it falls over, frozen in the winter */
   if(def.icefall){
     const E = S[S.length - 1], D = S[Math.max(0, S.length - 10)];
@@ -3702,7 +3707,7 @@ function riverAt(x, z){
     const d = (S[j][0]-x)*(S[j][0]-x) + (S[j][1]-z)*(S[j][1]-z);
     if(d < best){ best = d; bj = j; }
   }
-  const endM = (RIVER.fall ? bj : Math.min(bj, S.length - 1 - bj))*MAIN.seg;   // no fading out under the falls
+  const endM = (RIVER.fall || RIVER.headFall ? bj : Math.min(bj, S.length - 1 - bj))*MAIN.seg;   // no fading out under the falls
   return [Math.sqrt(best), S[bj][2], endM];
 }
 if(TRACK.river) addRiver(MAIN, TRACK.river);
@@ -4155,7 +4160,8 @@ function carveWater(y, x, z){
     const r = riverAt(x, z);
     if(r){
       const d = r[0], lev = r[1];
-      const w = (1 - smoothstep(RIVER_BANK, RIVER_BANK + 14, d))*smoothstep(0, 18, r[2] + 6);
+      let w = (1 - smoothstep(RIVER_BANK, RIVER_BANK + 14, d))*smoothstep(0, 18, r[2] + 6);
+      if(w > 0 && CUT) w *= 1 - Math.min(1, cutAt(x, z)/(CUT.h*0.4));      // (the creek's head is in the cutting: its walls stand)
       if(w > 0){
         const wander = Math.sin(x*0.07 + z*0.05)*1.2;
         const shape = lev - 1.1 + (1.1 + RIVER_FREE)*smoothstep(RIVER_BED*0.7, RIVER_BANK, d + wander);
@@ -4704,6 +4710,8 @@ if(TRACK.season === "spring" && MAIN.bank){
    water, a wheel deep through the middle, and back up out the far side. */
 MAIN.bwk = new Float32Array(MAIN.N);
 MAIN.bwDeck = new Uint8Array(MAIN.N);          // stations that are on a boardwalk's planks (not a wade)
+MAIN.bwSink = new Uint8Array(MAIN.N);          // ... and those far enough in that the ground's road is sunk under them
+MAIN.bwU = new Float32Array(MAIN.N);           // ... and how far each is from the nearer end of its deck (m)
 const DECK_SINK = 0.5, DECK_TOP = 0.105;       // the ground's road sunk under the deck; the planks' top over the road line
 (TRACK.boardwalks || []).map(d=> [d, false]).concat((TRACK.wades || []).map(d=> [d, true])).forEach(([d, wade])=>{
   const seg = MAIN.seg;
@@ -4743,7 +4751,10 @@ const DECK_SINK = 0.5, DECK_TOP = 0.105;       // the ground's road sunk under t
     const u = k*seg, w = smoothstep(-12, 4, u)*(1 - smoothstep(L - 4, L + 12, u));
     const i = wrapIdx(MAIN, a + k); if(!wade) MAIN.bwk[i] = Math.max(MAIN.bwk[i], w);      // (a wade has no deck, and no rails)
   }
-  if(!wade) for(let k=0;k<=n;k++) MAIN.bwDeck[wrapIdx(MAIN, a + k)] = 1;
+  /* (the ground's road is sunk under the deck only from 4m in: sunk right to the end, the dip ran on out past
+     it and the car met the deck's end as a step; and the planks come down flush with the road at each end) */
+  if(!wade) for(let k=0;k<=n;k++){ const i = wrapIdx(MAIN, a + k), u = Math.min(k, n - k)*seg;
+    MAIN.bwDeck[i] = 1; MAIN.bwU[i] = u; if(u > 4) MAIN.bwSink[i] = 1; }
   if(wade){
     /* the wade's water reaches on past either end of the dip, over the road's banks, so it
        always stops at a shore (the road climbing out of it, the ground beside) and never
@@ -4760,6 +4771,8 @@ const DECK_SINK = 0.5, DECK_TOP = 0.105;       // the ground's road sunk under t
   else BOARDWALKS.push({a, b, n, pts, L, E, half:MAIN.baseHalf, level:lo - 1.35, floor:lo - 2.9,
                    x0:x0 - 42, x1:x1 + 42, z0:z0 - 42, z1:z1 + 42});
 });
+/* (the planks lie flat, so the road's lean eases out on the way onto a deck instead of stopping at its end) */
+if(MAIN.bank && BOARDWALKS.length) for(let i=0;i<MAIN.N;i++) MAIN.bank[i] *= 1 - MAIN.bwk[i];
 /* the ground round a boardwalk: dug down to the pool's bed from just past the deck's edge
    out to about thirty metres, shallowing back to the bank at either end */
 function carveBoardwalks(y, x, z){
@@ -4960,7 +4973,7 @@ function bwPool(x, z){
           let y = P.pts[ia].y*(1-f) + P.pts[ib].y*f + BED;
           // under a boardwalk the ground's own road lies well below the planks, so it never shows through them
           const onDeck = P.bwDeck && (P.bwDeck[ia] || P.bwDeck[ib]);
-          if(onDeck) y -= DECK_SINK;
+          if(P.bwSink && (P.bwSink[ia] || P.bwSink[ib])) y -= DECK_SINK;
           if(P.bank && !onDeck){                   // (the planks lie flat: no banking under a boardwalk)
             const bk = P.bank[ia]*(1-f) + P.bank[ib]*f;
             if(bk) y += bk*Math.max(-(half + 3), Math.min(half + 3, tL[k]));
@@ -5166,7 +5179,7 @@ function surfaceY(x, z){
         const t = L2 ? Math.max(0, Math.min(1, ((x - A.x)*ex + (z - A.z)*ez)/L2)) : 0, d2 = (x - A.x - ex*t)**2 + (z - A.z - ez*t)**2;
         if(d2 < best){ best = d2; st = k + t; }
       }
-      const top = pathY(MAIN, st) + BED + DECK_TOP;
+      const top = pathY(MAIN, st) + BED + DECK_TOP*smoothstep(0, 3, MAIN.bwU[wrapIdx(MAIN, Math.round(st))]);
       if(!(SURF_HINT !== null && SURF_HINT < top - 2.5)) return top;
     }
   }
@@ -7320,7 +7333,7 @@ function makeFX(n, glow){
   return FX;
 }
 const FX_WIND = [2.4, 1.1];
-const FX_ON = !!(TRACK.geysers || CRATER.on || CAVES.length);
+const FX_ON = !!(TRACK.geysers || CRATER.on || CAVES.length || (TRACK.lakeRoad || []).some(r=> r.kind === "skim"));   // (and the Koi Skim's rooster tails)
 const STEAM = FX_ON ? makeFX(1400, false) : null, SPRAY = FX_ON ? makeFX(900, true) : null;
 /* ---- the crater at the top of the cone: a lake of lava, a column of smoke
    and bombs of it thrown up out over the rim ---- */
@@ -11788,8 +11801,8 @@ if(SPRINGCUP){
     const atS = s=>{ const i0 = Math.floor(s), f = s - i0, A = MAIN.pts[wrapIdx(MAIN, i0)], B = MAIN.pts[wrapIdx(MAIN, i0 + 1)], T = MAIN.tans[wrapIdx(MAIN, Math.round(s))];
       return {x:A.x + (B.x - A.x)*f, z:A.z + (B.z - A.z)*f, y:pathY(MAIN, s) + BED, tx:T.x, tz:T.z, half:MAIN.half[wrapIdx(MAIN, Math.round(s))]}; };
     const plankM = [PM(0xb08a5a), PM(0xa07c4e), PM(0xbc9866)], red = lam(0xc8321e, 0x2a0602), ink = PM(0x1c1414), g = new THREE.Group();
-    for(let u=0; u<=W.L; u+=0.62){ const q = atS(W.a + u/seg), w = (q.half + 0.5)*2;
-      const pl = pbox(g, w, 0.09, 0.54, plankM[Math.floor(rnd()*3)], q.x, q.y + 0.06, q.z); pl.rotation.y = Math.atan2(q.tx, q.tz); }
+    for(let u=0; u<=W.L; u+=0.62){ const q = atS(W.a + u/seg), w = (q.half + 0.5)*2, flush = DECK_TOP*(1 - smoothstep(0, 3, Math.min(u, W.L - u)));
+      const pl = pbox(g, w, 0.09, 0.54, plankM[Math.floor(rnd()*3)], q.x, q.y + 0.06 - flush, q.z); pl.rotation.y = Math.atan2(q.tx, q.tz); }
     let prev = null;
     for(let u=0; u<=W.L + 0.01; u+=2.6){
       const q = atS(W.a + Math.min(W.L, u)/seg), nx2 = -q.tz, nz2 = q.tx;
@@ -12408,12 +12421,24 @@ if(SPRINGCUP){
         // notch turned back under that one so the way is unbroken; smaller pads and lotus along the edges
         // (not in a line: each a little to one side or the other, bigger or smaller, turned its own way, the gaps
         //  between them uneven, and here and there a second pad lying half over the edge of the chain)
+        /* each pad lies in the road's own plane where it is (tilted up the slope where the road climbs off the
+           lake at the ends, never flat across it), and is lifted just clear of the road over its whole length,
+           so on a rise or a dip no part of it is under the road and none of it stands off it */
+        const up = new THREE.Vector3(0, 1, 0), nrm = new THREE.Vector3(), qt = new THREE.Quaternion(), qy = new THREE.Quaternion(), eu = new THREE.Euler();
+        const padAt = (k, along, lat, r, yaw, lift)=>{
+          const st = S.a + k + along/seg, d = Math.max(1, Math.round(2/seg)), yc = pathY(MAIN, st) + BED;
+          const s = (pathY(MAIN, st + d) - pathY(MAIN, st - d))/(2*d*seg), f = frm(Math.round(st));
+          let over = 0;
+          for(let m=-r; m<=r; m+=1) over = Math.max(over, pathY(MAIN, st + m/seg) + BED - (yc + s*m));
+          const y = Math.max(yc + over + 0.08, LAKE.level + 0.08) + lift;
+          nrm.set(-f.t.x*s, 1, -f.t.z*s).normalize(); qt.setFromUnitVectors(up, nrm); qy.setFromAxisAngle(up, yaw); qt.multiply(qy); eu.setFromQuaternion(qt, "YXZ");
+          return [f.p.x + f.nx*lat + f.t.x*along, y, f.p.z + f.nz*lat + f.t.z*along, eu.y, eu.x, eu.z]; };
         let row = 0;
         for(let k=0; k<=S.n; k+=Math.max(1, Math.round((6.5 + rnd()*4)/seg)), row++){
-          const f = frm(S.a + k), y0 = Math.max(f.y, LAKE.level) + 0.08, l = (rnd() - 0.5)*3.6, r = f.half + 1.0 + Math.abs(l)*0.6 + rnd()*1.6;
-          roadPads.push([f.p.x + f.nx*l, y0 + (row % 14)*0.006, f.p.z + f.nz*l, Math.atan2(f.t.z, -f.t.x) + (rnd() - 0.5)*2.4, 0, 0, r, 1, r*(0.92 + rnd()*0.12)]);
+          const f = frm(S.a + k), l = (rnd() - 0.5)*3.6, r = f.half + 1.0 + Math.abs(l)*0.6 + rnd()*1.6;
+          roadPads.push(padAt(k, 0, l, r, Math.atan2(f.t.z, -f.t.x) + (rnd() - 0.5)*2.4, (row % 14)*0.006).concat([r, 1, r*(0.92 + rnd()*0.12)]));
           if(rnd() < 0.35){ const sd = rnd() < 0.5 ? -1 : 1, l2 = sd*(f.half - 0.5 + rnd()*2), a2 = (rnd() - 0.5)*4, r2 = 3 + rnd()*2.2;
-            roadPads.push([f.p.x + f.nx*l2 + f.t.x*a2, y0 + ((row + 7) % 14)*0.006 + 0.003, f.p.z + f.nz*l2 + f.t.z*a2, rnd()*6.28, 0, 0, r2, 1, r2]); }
+            roadPads.push(padAt(k, a2, l2, r2, rnd()*6.28, ((row + 7) % 14)*0.006 + 0.003).concat([r2, 1, r2])); }
           for(const sd of [-1, 1]) if(rnd() < 0.8){ const o = sd*(f.half + 2.5 + rnd()*2.5), a2 = (rnd() - 0.5)*6, rr = 1.4 + rnd()*1.6;
             fillPads.push([f.p.x + f.nx*o + f.t.x*a2, LAKE.level + 0.03, f.p.z + f.nz*o + f.t.z*a2, rnd()*6.28, 0, 0, rr, 1, rr]);
             if(rnd() < 0.25) lotus.push([f.p.x + f.nx*o*1.08 + f.t.x*a2, LAKE.level + 0.03, f.p.z + f.nz*o*1.08 + f.t.z*a2]); }
@@ -12770,14 +12795,44 @@ if(SPRINGCUP){
     const W = CUT.w, D = 10, wallH = sd=> gradedY(f.p.x + f.nx*sd*(W + 4), f.p.z + f.nz*sd*(W + 4)) - f.y;
     const top = Math.max(9, Math.min(wallH(-1), wallH(1)) + 0.3), lo = Math.min(7.0, top - 3.2);
     const G = new THREE.Group(); G.position.set(f.p.x, f.y, f.p.z); G.rotation.y = yaw; g.add(G);
-    // the arch: wall to wall, bedded into both, its underside a rounded span
-    const sh = new THREE.Shape();
-    sh.moveTo(-W - 3.5, lo - 1.4); sh.lineTo(-W + 0.2, lo - 1.4); sh.quadraticCurveTo(0, lo + 3.2, W - 0.2, lo - 1.4);
-    sh.lineTo(W + 3.5, lo - 1.4); sh.lineTo(W + 3.5, top); sh.lineTo(-W - 3.5, top); sh.closePath();
-    const arch = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, {depth:D, bevelEnabled:true, bevelSize:0.6, bevelThickness:0.6, bevelSegments:1, curveSegments:14}), chalk);
-    arch.position.z = -D/2; G.add(arch);
-    // turf over it (the arch is bedded into the walls either side; nothing hangs loose under it)
-    pbox(G, 2*W + 7, 0.6, D + 1.2, turf, 0, top + 0.25, 0);
+    /* the arch: a natural bridge of chalk left standing when the beck cut down through the ridge, heaped
+       blocks and lumps fused into one span, bedded deep into both walls, mossy underneath and turfed over,
+       its underside a rough vault well clear of the road */
+    const moss2 = PM(0x5f8a3c), chalkF = new THREE.MeshLambertMaterial({map:rockTex, color:0xeeeadc, flatShading:true});
+    const lump = (r, sd)=>{ const q = new THREE.IcosahedronGeometry(r, 1), P = q.attributes.position;
+      for(let k=0;k<P.count;k++){ const x = P.getX(k), y = P.getY(k), z = P.getZ(k);
+        const n = 1 + 0.17*Math.sin(x*1.3 + sd)*Math.cos(z*1.1 - sd*0.7) + 0.11*Math.sin(y*1.9 + sd*1.3) + 0.06*Math.sin((x + z)*3.1 + sd);
+        P.setXYZ(k, x*n, y*n*0.82, z*n); }
+      q.computeVertexNormals(); return q; };
+    const under = x=>{ const a = Math.abs(x); return a < W ? lo - 1.4 + 2.3*(1 - (a/W)*(a/W)) : lo - 1.4 - (a - W)*1.4; };
+    const FRONT = -D/2 + 0.6;                      // (no rock out past here: the water leaves the lip clear of the face)
+    for(let x=-W - 6; x<=W + 6; x+=2.3){
+      for(const z0 of [-2.9, 0, 2.9]){
+        let r = 2.4 + rnd()*1.1, z = z0 + (rnd() - 0.5)*0.8;
+        if(z - r*1.2 < FRONT - 2.2) z = FRONT - 2.2 + r*1.2;
+        let y = Math.max(under(x) + r*1.05, -1);
+        while(true){
+          const m = new THREE.Mesh(lump(r, x*1.7 + z*3.1 + y), chalkF);
+          m.position.set(x + (rnd() - 0.5)*0.6, y, z); m.rotation.y = rnd()*6.28; G.add(m);
+          // moss in the damp under the span, at the back away from the spray
+          if(y < under(x) + r*1.6 && z0 > 0 && Math.abs(x) < W + 1 && rnd() < 0.55){
+            const mm = new THREE.Mesh(lump(r*0.62, x + 9), moss2); mm.position.set(m.position.x, y - r*0.5, z + r*0.35); mm.scale.y = 0.45; G.add(mm); }
+          if(y + r*0.9 >= top - 0.4) break;
+          y += r*1.15; r = 2.2 + rnd()*1.2;
+        }
+      }
+    }
+    // turf over the top, broken and lumpy, the beck running in a channel along its front edge
+    for(let x=-W - 6; x<=W + 6; x+=2.6) for(const z of [0.6, 3.2]){
+      const t = new THREE.Mesh(lump(2.6 + rnd()*0.8, x*2.3 + z), turf); t.position.set(x + (rnd() - 0.5)*0.8, top + 0.05, z + (rnd() - 0.5)*0.6); t.scale.y = 0.32; G.add(t); }
+    for(const sd of [-1, 1]) for(let z=-4.5; z<=4.5; z+=3){
+      const t = new THREE.Mesh(lump(2.8, z + sd*5), turf); t.position.set(sd*(W + 2.5 + rnd()*2), top + 0.05, z); t.scale.y = 0.3; G.add(t); }
+    // blocks fallen from it lying along the foot of the walls either side, bedded in the verge
+    for(const sd of [-1, 1]) for(let z=-22; z<=22; z+=3.2 + rnd()*2.5){
+      const r = 0.9 + rnd()*1.3, m = new THREE.Mesh(lump(r, z*1.9 + sd), chalkF);
+      const gx = f.p.x + f.nx*sd*(W - 1.2) + f.t.x*z, gz = f.p.z + f.nz*sd*(W - 1.2) + f.t.z*z;
+      m.position.set(sd*(W + 0.2 + r*0.3), Math.min(gradedY(gx, gz), surfaceY(gx, gz)) - f.y - r*0.45, z);
+      m.rotation.y = rnd()*6.28; G.add(m); }
     shade(g); mergeStatic(g);
     // the beck across the top, and the curtain off its front edge, down the face and across the road
     const fallMat = new THREE.ShaderMaterial({ uniforms:{uTime:{value:0}}, side:THREE.DoubleSide, transparent:true, depthWrite:false,
@@ -12795,15 +12850,15 @@ if(SPRINGCUP){
     waterMats.push(fallMat);
     // (a sheet that leaves the lip a little out from the face and falls clear of it, curving in a parabola)
     const fw = 2*W - 1, NV = 10, pos = [], uv = [], idx = [];
-    for(let r=0;r<=NV;r++){ const s = r/NV, y = top + 0.4 - (top + 0.4)*s, zz = -D/2 - 0.7 - 2.2*Math.sqrt(s);
+    for(let r=0;r<=NV;r++){ const s = r/NV, y = top + 0.5 - (top + 0.5)*s, zz = -D/2 - 2.0 - 2.4*Math.sqrt(s);
       for(const c of [0, 1]){ pos.push((c - 0.5)*fw, y, zz); uv.push(c, 1 - s); } }
     for(let r=0;r<NV;r++){ const a2 = r*2; idx.push(a2, a2 + 1, a2 + 3, a2, a2 + 3, a2 + 2); }
     const cg = new THREE.BufferGeometry(); cg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); cg.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); cg.setIndex(idx);
     const curtain = new THREE.Mesh(cg, fallMat); curtain.renderOrder = 6; G.add(curtain);
-    const beck = new THREE.Mesh(new THREE.PlaneGeometry(fw, D + 1), new THREE.MeshLambertMaterial({color:0x7ac8e8, emissive:0x103040}));
-    beck.rotation.x = -Math.PI/2; beck.position.set(0, top + 0.62, 0); G.add(beck);
+    const beck = new THREE.Mesh(new THREE.PlaneGeometry(fw + 8, 4.2), new THREE.MeshLambertMaterial({color:0x7ac8e8, emissive:0x103040}));
+    beck.rotation.x = -Math.PI/2; beck.position.set(0, top + 0.5, -D/2 - 0.1); G.add(beck);
     // the little rainbow in the spray, on the near side of the curtain
-    const bow = new THREE.Group(); bow.position.set(0, -0.5, -D/2 - 6); G.add(bow);
+    const bow = new THREE.Group(); bow.position.set(0, -0.5, -D/2 - 7.5); G.add(bow);
     [0xff3a3a, 0xff9a2a, 0xffe83a, 0x5ae05a, 0x3aa8ff, 0x5a5aff, 0xb05aff].forEach((c, k)=>{
       const r = new THREE.Mesh(new THREE.RingGeometry(W + 0.2 - k*0.35, W + 0.55 - k*0.35, 40, 1, 0, Math.PI), new THREE.MeshBasicMaterial({color:c, transparent:true, opacity:0.2, depthWrite:false, side:THREE.DoubleSide}));
       r.renderOrder = 7; bow.add(r); });
@@ -12814,12 +12869,12 @@ if(SPRINGCUP){
     mist.frustumCulled = false; G.add(mist);
     ANIMS.push(t=>{
       for(let k=0;k<NM;k++){ const u = (mph[k] + t*0.25) % 1, a2 = k*2.399;
-        mp[k*3] = (k/NM*2 - 1)*W; mp[k*3 + 1] = u*3.2; mp[k*3 + 2] = -D/2 - 3 + Math.sin(a2)*2.5 + (u - 0.3)*3; }
+        mp[k*3] = (k/NM*2 - 1)*W; mp[k*3 + 1] = u*3.2; mp[k*3 + 2] = -D/2 - 4.4 + Math.sin(a2)*2.5 + (u - 0.3)*3; }
       mg.attributes.position.needsUpdate = true;
     });
     scene.add(g);
     for(let k=-8; k<=8; k++){ const q = frm(byM(i, k*5)); NO_TREES.push([q.p.x, q.p.z, q.half + 12]); }
-    const cx = f.p.x - f.t.x*(D/2 + 1.6), cz = f.p.z - f.t.z*(D/2 + 1.6);
+    const cx = f.p.x - f.t.x*(D/2 + 3.2), cz = f.p.z - f.t.z*(D/2 + 3.2);
     SPRINGFX.falls = {x:cx, z:cz, tx:f.t.x, tz:f.t.z, y:f.y, W, cool:0, side:0};
     roadSign(byM(i, -130), 1, ["THUNDER FORCE", "waterfall over the road"], "#2a5a7a", "#f2fbff");
   }
@@ -12828,10 +12883,13 @@ if(SPRINGCUP){
      column into the pool at its foot, the river the road runs up flowing out of it. Mist boils up off the pool,
      with a rainbow in it. */
   if(SP("cascade")){
-    const C = SP("cascade")[0], y0 = gradedY(C[0], C[1]);
-    const aim = TRACK.river ? TRACK.river.to : [C[0], C[1] - 1];
-    // (local +z runs back into the hill, away from the river; -z out of the mouth of the horseshoe)
-    const yaw = Math.atan2(aim[0] - C[0], aim[1] - C[1]) + Math.PI, cy = Math.cos(yaw), sy = Math.sin(yaw);
+    /* it stands where the beck rises, up on the ridge above the waterfall over the road: its falls are the
+       beck's source, the beck runs along the ridge-top and pours off the arch, and below the arch the creek
+       the road runs up flows away downhill. Water from the top of the hill to the bottom, one stream. */
+    const out = CUT && CUT.out ? CUT.out : [0, 1], HD = CUT && CUT.head ? CUT.head : SP("cascade")[0];
+    const C = [HD[0] - out[0]*5, HD[1] - out[1]*5], y0 = gradedY(C[0], C[1]);
+    // (local +z runs back into the hill, away from the road; -z is the face, toward the beck and the road)
+    const yaw = Math.atan2(out[0], out[1]), cy = Math.cos(yaw), sy = Math.sin(yaw);
     const W = (lx, lz)=> [C[0] + lx*cy + lz*sy, C[1] - lx*sy + lz*cy];
     const g = new THREE.Group(), cliff = new THREE.Group(), chalk = new THREE.MeshLambertMaterial({map:rockTex, color:0xf0ece0}), turf = PM(0x5a8a3a);
     /* the crag: a rugged cone of chalk forty metres high standing back from the pool, its face toward the river
@@ -12843,7 +12901,9 @@ if(SPRINGCUP){
         const x = P.getX(k), y = P.getY(k), z = P.getZ(k), r = Math.hypot(x, z), a = Math.atan2(x, z);
         if(r < 0.01) continue;
         const front = Math.max(0, -Math.cos(a)), n = 1 + 0.16*Math.sin(a*5 + y*0.3) + 0.1*Math.sin(a*11 - y*0.7) + 0.08*Math.sin(y*0.9);
-        const k2 = n*(1 - 0.42*Math.pow(front, 2));
+        // (the face sheer, near enough upright from the foot to the crown, so the falls drop clear of it)
+        const up = (y + (HT + 6)/2)/(HT + 6), fl = 0.42 + 0.34*(1 - up);
+        const k2 = (1 + (n - 1)*(1 - 0.75*front))*(1 - fl*front*front);       // (and smoother: the lumps are on its flanks)
         P.setX(k, x*k2); P.setZ(k, z*k2);
       }
       cg.translate(0, (HT + 6)/2 - 6, CZ);
@@ -12879,8 +12939,8 @@ if(SPRINGCUP){
         "  gl_FragColor = vec4(c, a);",
         "}"].join("\n") });
     waterMats.push(fallMat);
-    { const FW = 8, NV = 16, pos = [], uv = [], idx = [];
-      for(let r=0;r<=NV;r++){ const s = r/NV, y = HT - 1 - (HT - 0.4)*s, zz = CZ - 4.6 - 2.2*s - 4.2*Math.sqrt(s), w = FW*(1 + s*0.6);
+    { const FW = 4.5, NV = 16, pos = [], uv = [], idx = [];
+      for(let r=0;r<=NV;r++){ const s = r/NV, y = HT - 1 - (HT + 0.6)*s, zz = CZ - 4.6 - 2.4*s - 3.6*Math.sqrt(s), w = FW*(1 + s*0.5);
         for(const c of [0, 1]){ pos.push((c - 0.5)*w, y, zz); uv.push(c, 1 - s); } }
       for(let r=0;r<NV;r++){ const a2 = r*2; idx.push(a2, a2 + 1, a2 + 3, a2, a2 + 3, a2 + 2); }
       const fg = new THREE.BufferGeometry(); fg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); fg.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); fg.setIndex(idx);
@@ -13019,7 +13079,12 @@ if(SPRINGCUP){
     const lvl = LAKE.level, sp = Math.hypot(pose.vx, pose.vz);
     if(!inZone || state.phase === "menu"){ SKIM.on = false; SKIM.sunk = false; HYDRO.on = false; return; }
     if(sp > 27.8 && !SKIM.sunk && pose.y > lvl - 0.25){
-      if(!SKIM.on){ SKIM.on = true; SKIM.n++; if(!SKIM.said){ SKIM.said = true; banner("HYDROPLANING!", "#bfe6ff", 1.4, "keep it over 100"); } }
+      if(!SKIM.on){ SKIM.on = true; SKIM.n++;
+        // hitting the water: a great sheet of it thrown up all round the car
+        if(STEAM) for(let k=0;k<70;k++){ const a = Math.random()*6.28, v = 4 + Math.random()*6;
+          STEAM.spawn(pose.x + Math.cos(a)*1.6, lvl + 0.2, pose.z + Math.sin(a)*1.6, Math.cos(a)*v + pose.vx*0.3, 3 + Math.random()*5, Math.sin(a)*v + pose.vz*0.3,
+                      {life:1.1 + Math.random()*0.8, size:[1.0, 3.6 + Math.random()*2], col:[0.9, 0.96, 1.0], alpha:0.85, grav:9, drag:1.2}); }
+        if(actx) SFX.splash(); }
       HYDRO.on = true;
       // the water drags at it all the way across: more than the engine can answer
       const k = Math.max(0, 1 - dt*0.17); pose.vx *= k; pose.vz *= k;
@@ -13027,6 +13092,18 @@ if(SPRINGCUP){
       pose.yawVis = (pose.yawVis || 0)*0.9 + Math.sin(state.t*2.3)*0.02;
       // rooster tails off the rear wheels, and a sheet of spray off the sides
       const fx = pose.vx/sp, fz = pose.vz/sp, rx = -fz, rz = fx;
+      /* rooster tails: two great plumes of water thrown up and back off the rear wheels, arcing over and
+         falling back on the lake behind, and a low sheet fanning out off each side */
+      if(STEAM){
+        SKIM.tail = (SKIM.tail || 0) + dt*150*Math.min(1.3, sp/36);
+        while(SKIM.tail > 1){ SKIM.tail--;
+          const sd = Math.random() < 0.5 ? -1 : 1, wx = pose.x - fx*1.5 + rx*sd*0.9, wz = pose.z - fz*1.5 + rz*sd*0.9, back = 0.2 + Math.random()*0.25;
+          if(Math.random() < 0.72) STEAM.spawn(wx, lvl + 0.25, wz, pose.vx*back + rx*sd*(0.5 + Math.random()*1.5), 5 + Math.random()*5.5, pose.vz*back + rz*sd*(0.5 + Math.random()*1.5),
+                                             {life:1.0 + Math.random()*0.7, size:[0.6, 2.6 + Math.random()*1.8], col:[0.92, 0.97, 1.0], alpha:0.8, grav:11, drag:0.7});
+          else STEAM.spawn(pose.x + rx*sd*1.3 - fx*0.4, lvl + 0.15, pose.z + rz*sd*1.3 - fz*0.4, rx*sd*(5 + Math.random()*4) + pose.vx*0.45, 1.5 + Math.random()*2.2, rz*sd*(5 + Math.random()*4) + pose.vz*0.45,
+                           {life:0.7 + Math.random()*0.5, size:[0.5, 1.9 + Math.random()], col:[0.88, 0.95, 1.0], alpha:0.7, grav:9, drag:1.4});
+        }
+      }
       SKIM.spray += dt*90;
       while(SKIM.spray > 1){ SKIM.spray--;
         const sd = Math.random() < 0.5 ? -1 : 1, wx = pose.x - fx*1.3 + rx*sd*0.85, wz = pose.z - fz*1.3 + rz*sd*0.85;
@@ -13038,8 +13115,9 @@ if(SPRINGCUP){
     } else if(SKIM.on && sp <= 27.8){
       SKIM.on = false; SKIM.sunk = true; HYDRO.on = false;
       for(let k=0;k<50;k++) spawnDust(pose.x + (Math.random() - 0.5)*3, lvl + 0.3, pose.z + (Math.random() - 0.5)*3, [0.82, 0.93, 1.0], 1.1, (Math.random() - 0.5)*7, (Math.random() - 0.5)*7, 4 + Math.random()*6);
+      if(STEAM) for(let k=0;k<50;k++){ const a = Math.random()*6.28, v = 2 + Math.random()*4;
+        STEAM.spawn(pose.x + Math.cos(a)*1.4, lvl + 0.2, pose.z + Math.sin(a)*1.4, Math.cos(a)*v, 3 + Math.random()*4, Math.sin(a)*v, {life:1.0 + Math.random()*0.6, size:[1.0, 3.2], col:[0.88, 0.95, 1.0], alpha:0.8, grav:9, drag:1.2}); }
       if(actx) SFX.splash(); splash.water = 1; GAME.shake = Math.max(GAME.shake || 0, 0.2);
-      banner("SPLOOSH", "#bfe6ff", 1.2, "too slow to stay on top");
     } else HYDRO.on = false;
   };
   /* what happens to the car: the polder's gusts push it across the road, the falls soak it */
@@ -17546,8 +17624,10 @@ function stepCarInner(dt){
   }
   const nIdx = near0.i, nDist = near0.dist, nHalf = near0.half;
   const surf = near0.surf;
-  const offRoad = nDist > nHalf - 0.3;
-  const deepOff = nDist > nHalf + 3.5;
+  /* (up a rushing creek the whole bed is the way: the water is the road, kerb to kerb, not just the strip down its middle) */
+  const creekR = RIVER.on && RIVER.rush ? riverAt(pose.x, pose.z) : null, creekBed = !!(creekR && creekR[0] < RIVER_BED);
+  const offRoad = nDist > nHalf - 0.3 && !creekBed;
+  const deepOff = nDist > nHalf + 3.5 && !creekBed;
   const mudAmt = offRoad ? 0 : near0.mud;          // 0 to 1, blended along the road
   const tarAmt = offRoad ? 0 : pavedAt(pose.x, pose.z);
   /* In the Winter Cup the water is ice: a ford or the creek is not deep and
@@ -17640,8 +17720,9 @@ function stepCarInner(dt){
 
   // resistance sets top speed instead of a hard clamp
   const sgn = Math.sign(along || 1);
-  a -= sgn * (0.0006*along*along*GG.dragK() + (deepOff ? 1.9 : offRoad ? 1.0 : 0.30 + wetAmt*0.34));
-  a -= along * (deepOff ? 0.15 : offRoad ? 0.09 : 0.02 + wetAmt*0.035 - tarAmt*0.006);
+  const wetK = creekR && creekR[0] < RIVER_BANK ? 0.4 : 1;          // (the rushing creek is shallow and fast: it splashes more than it drags)
+  a -= sgn * (0.0006*along*along*GG.dragK() + (deepOff ? 1.9 : offRoad ? 1.0 : 0.30 + wetAmt*0.34*wetK));
+  a -= along * (deepOff ? 0.15 : offRoad ? 0.09 : 0.02 + wetAmt*0.035*wetK - tarAmt*0.006);
   if(offRoad && poolIn > 0) a -= along*0.1*poolIn;          // out in the water off the road it drags hard: no short cut across a lake
   /* The mountain's mud is thick. It holds the car harder the faster it tries
      to go (the tyres and the body are pushing a bow wave of it), so in a
@@ -21960,6 +22041,11 @@ function stepLeafPiles(dt){
     o.x += (o.vx + Math.sin(o.ph)*sway)*dt; o.y += o.vy*dt; o.z += (o.vz + Math.cos(o.ph*0.8)*sway)*dt;
     o.yaw += o.spin*dt; o.tilt = o.kind ? o.tilt + o.spin*dt*0.6 : Math.sin(o.ph)*0.9; o.roll = o.kind ? o.roll : Math.cos(o.ph*1.3)*0.8;
     const gy = surfaceY(o.x, o.z) + 0.02;
+    if(o.y <= gy && o.vy < 0 && MAIN.floor && floorAt(o.x, o.z)){
+      // (never settling on a clean floor: blown on across it and off the side)
+      const n = nearest(o.x, o.z), c = n.path.pts[n.pi], dx = o.x - c.x, dz = o.z - c.z, dl = Math.hypot(dx, dz) || 1;
+      o.y = gy; o.vy = 0.8 + Math.random(); o.vx = dx/dl*(3 + Math.random()*2); o.vz = dz/dl*(3 + Math.random()*2);
+    }
     if(o.y <= gy && o.vy < 0){
       if(o.kind && o.vy < -3){ o.vy *= -0.3; o.spin *= 0.5; o.y = gy; }
       else { o.y = gy; o.air = false; o.vx = o.vy = o.vz = 0; o.tilt = (Math.random() - 0.5)*0.3; o.roll = o.kind ? 0 : (Math.random() - 0.5)*0.3; }
