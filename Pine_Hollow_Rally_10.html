@@ -17745,11 +17745,16 @@ const pose = { x:0, z:0, y:0, h:0, vx:0, vz:0, yawVis:0, roll:0, pitch:0, wheelS
 /* Charge tiers, the mini turbo idea: holding a slide builds a charge whose
    colour tells you what you have banked, and letting go spends it. Nothing
    is gained during the slide itself, only on release. */
+/* Spending it is a real boost, not a catch-up: you come out of the slide with every bit of the speed you had
+   (kick: an instant shove on top), a hard push for a moment, and the limiter lifted (over, m/s) above the car's
+   own top speed. When the push ends the extra doesn't vanish: the lifted limit sinks back slowly, so the speed
+   is carried on down the straight and you get ahead on it. */
 const DRIFT_TIERS = [
-  {at:0.75, name:"BLUE",   col:[0.30, 0.72, 1.00], push:6.9, time:0.90},
-  {at:1.70, name:"ORANGE", col:[1.00, 0.60, 0.12], push:7.0, time:1.40},
-  {at:2.90, name:"VIOLET", col:[0.76, 0.38, 1.00], push:6.9, time:2.00}
+  {at:0.75, name:"BLUE",   col:[0.30, 0.72, 1.00], push:12, time:1.0, kick:3.0, over:5},
+  {at:1.70, name:"ORANGE", col:[1.00, 0.60, 0.12], push:14, time:1.5, kick:4.5, over:8},
+  {at:2.90, name:"VIOLET", col:[0.76, 0.38, 1.00], push:16, time:2.2, kick:6.0, over:12}
 ];
+const DRIFT_OVER_SINK = 2.2;          // how fast the lifted limit sinks back once the push is spent (m/s each second)
 function driftTier(t){
   let idx = -1;
   for(let i=0;i<DRIFT_TIERS.length;i++) if(t >= DRIFT_TIERS[i].at) idx = i;
@@ -17757,7 +17762,7 @@ function driftTier(t){
 }
 const drift = { mode:"off", dir:0, hold:0, spacePrev:false,
                 on:false, t:0, best:0, score:0, angle:0, tier:-1,
-                boostT:0, boostPower:0, boostTier:-1, flash:0 };
+                boostT:0, boostPower:0, boostTier:-1, flash:0, over:0 };
 const splash = { mud:0, water:0 };
 
 function placeAtStart(){
@@ -17775,7 +17780,7 @@ function placeAtStart(){
   pose.lastGy = surfaceY(pose.x, pose.z);
   drift.mode = "off"; drift.dir = 0; drift.hold = 0; drift.spacePrev = false;
   drift.on = false; drift.t = 0; drift.score = 0; drift.tier = -1;
-  drift.boostT = 0; drift.boostPower = 0; drift.boostTier = -1; drift.flash = 0;
+  drift.boostT = 0; drift.boostPower = 0; drift.boostTier = -1; drift.flash = 0; drift.over = 0;
   splash.mud = splash.water = 0;
   trans.gear = 1; trans.target = 1; trans.dir = 1;
   trans.rpm = DRIVE.idle; trans.shiftT = 0; trans.cut = 0; trans.lock = 0; trans.hold = 0;
@@ -17977,7 +17982,7 @@ function stepCarInner(dt){
   let newAlong = along + a*dt;
   if(!thr && !brk && Math.abs(newAlong) < 0.35) newAlong = 0;   // no creeping
   if(newAlong < -11) newAlong = -11;
-  const ceiling = MAXV + (drift.boostT > 0 ? 8 : 0) + GG.ceil() + Math.max(HILLFAST ? pose.over || 0 : 0, pose.surge || 0);   // boost lifts the limiter (and in the swamp, the fireflies you carry; on the Sawtooth, the hill)
+  const ceiling = MAXV + Math.max(drift.over || 0, drift.boostT > 0 ? 8 : 0) + GG.ceil() + Math.max(HILLFAST ? pose.over || 0 : 0, pose.surge || 0);   // boost lifts the limiter (and in the swamp, the fireflies you carry; on the Sawtooth, the hill)
   if(newAlong > ceiling) newAlong = ceiling;
   const netA = (newAlong - along)/Math.max(dt, 0.0001);
 
@@ -18620,7 +18625,15 @@ function stepCarInner(dt){
       drift.boostT = T.time;
       drift.boostPower = T.push;
       drift.boostTier = drift.tier;
+      drift.over = Math.max(drift.over || 0, T.over);
       drift.flash = 1;
+      // out of the slide with all the speed it had, straight along the nose (grip coming back took the sideways
+      // part of it away, which is why a drift used to cost more than its boost gave back), and a kick on top
+      // (half way between where it was going and where the nose points: all the way round to the nose would
+      //  swing it in across the corner; half way, what the returning grip still takes off is about one percent)
+      if(!pose.air){ const s0 = Math.hypot(pose.vx, pose.vz), hx = Math.sin(pose.h), hz = Math.cos(pose.h);
+        let dx = pose.vx/(s0 || 1) + hx, dz = pose.vz/(s0 || 1) + hz; const dl = Math.hypot(dx, dz) || 1;
+        pose.vx = dx/dl*(s0 + T.kick); pose.vz = dz/dl*(s0 + T.kick); }
       if(typeof postMat !== "undefined") postMat.uniforms.uFlash.value = 0.12 + drift.tier*0.07;
     }
     drift.best = Math.max(drift.best, drift.t);
@@ -18635,7 +18648,7 @@ function stepCarInner(dt){
     const push = drift.boostPower * fade * dt;
     pose.vx += nfx*push; pose.vz += nfz*push;
     if(drift.boostT <= 0){ drift.boostTier = -1; drift.boostPower = 0; }
-  }
+  } else if(drift.over > 0) drift.over = Math.max(0, drift.over - DRIFT_OVER_SINK*dt);
   drift.flash = Math.max(0, drift.flash - dt*1.6);
 
   // in thick mud the wheels sink in up to the hubs
@@ -20288,7 +20301,7 @@ function resetCar(at){
   pose.vx = pose.vz = 0; pose.vy = 0; pose.air = false; pose.airT = 0; pose.surge = 0;
   pose.yawVis = 0; pose.steerIn = 0; pose.steerVis = 0; pose.roll = pose.pitch = 0;
   pose.spring = pose.springV = 0; pose.artPitch = pose.artRoll = pose.artBase = 0; pose.bH = pose.bHv = pose.bP = pose.bPv = pose.bR = pose.bRv = 0;
-  drift.mode = "off"; drift.on = false; drift.t = 0; drift.tier = -1; drift.boostT = 0;
+  drift.mode = "off"; drift.on = false; drift.t = 0; drift.tier = -1; drift.boostT = 0; drift.over = 0;
   trans.gear = 1; trans.target = 1; trans.dir = 1; trans.shiftT = 0; trans.cut = 0; trans.hold = 0;
   camH = pose.h;
   camera.position.set(pose.x - Math.sin(pose.h)*9, pose.y + 3.6, pose.z - Math.cos(pose.h)*9);
