@@ -1332,7 +1332,7 @@ const TRACKS = [
            farms:[[150,90],[440,-160],[-110,-300],[640,170],[90,-200]]},
     rails:[[[0,-140],[0,-96]]],
     ground:"tulips", murk:0.35, wind:9,
-    trees:{kinds:["poplar","cherry","leafy"], mix:[0.55, 0.6], tall:[[15,7],[7,4],[8,4]], density:0.32}, rockK:0.15, bushK:0.5, coverPink:0.2,
+    trees:{kinds:["cherry","poplar","leafy"], mix:[0.5, 0.65], tall:[[9,5],[15,7],[9,4]], density:0.36}, rockK:0.15, bushK:0.5, coverPink:0.2,
     stages:["paved","paved","gravel","paved","washboard","gravel"],
     branches:[]},
 
@@ -1350,7 +1350,7 @@ const TRACKS = [
             {pts:[[-280,340],[-180,300],[-100,262],[-40,236],[20,200],[60,120],[128,48]], w:3.2, depth:1.5, bridge:"drum", flow:true}],
     spots:{pagoda:[[-58,-232]], gravel:[[-55,-168]], stones:[[-64,-158],[-44,-176],[-70,-182]], bamboo:[[300,40],[297,205]]},
     ground:"moss", murk:0.12,
-    trees:{kinds:["cherry","maple","pine"], mix:[0.45, 0.55], tall:[[7,5],[6,4],[9,6]], density:0.7}, rockK:0.6, coverPink:0.35,
+    trees:{kinds:["cherry","maple","pine"], mix:[0.55, 0.62], tall:[[9,5],[9,4],[9,6]], density:0.7}, rockK:0.6, coverPink:0.35,
     stages:["gravel","gravel","paved","gravel","rocky"],
     branches:[]},
 
@@ -1370,7 +1370,7 @@ const TRACKS = [
     rails:[[[160,-36],[262,-40]], [[284,-40],[372,-42]], [[416,-92],[352,-282]]],
     widths:[[[398,-123],[352,-282],4.5]],
     ground:"lawn",
-    trees:{kinds:["oak","cherry","weeping"], mix:[0.45, 0.6], tall:[[13,7],[7,4],[7,3]], density:0.45}, rockK:0.2, bushK:0.6, coverPink:0.3,
+    trees:{kinds:["cherry","oak","weeping"], mix:[0.5, 0.5], tall:[[9,5],[13,7],[8,3]], density:0.45}, rockK:0.2, bushK:0.6, coverPink:0.3,
     stages:["gravel","gravel","paved","gravel","washboard"],
     branches:[]},
 
@@ -1387,7 +1387,7 @@ const TRACKS = [
     spots:{falls:[[432,-70]], horse:[[250,-120]]}, horseAng:0.15, horseSize:2.4,
     ridgeCut:{h:15, len:42},
     ground:"chalk",
-    trees:{kinds:["leafy","cherry","oak"], mix:[0.4, 0.5], tall:[[9,5],[7,4],[12,6]], density:0.4}, rockK:0.5, coverPink:0.25,
+    trees:{kinds:["cherry","leafy","oak"], mix:[0.5, 0.5], tall:[[9,5],[9,5],[12,6]], density:0.42}, rockK:0.5, coverPink:0.25,
     stages:["gravel","rutted","washboard","gravel","moguls","broken","paved"],
     branches:[]}
 
@@ -12625,12 +12625,12 @@ function treeDefGeometry(name){
     case "cherry":  return cherryGeometry(0, false);
     case "weeping": return cherryGeometry(1, false);
     case "leafy":   return cherryGeometry(0, true);
-    case "maple":   return hardwoodGeometry(1);
-    case "oak":     return hardwoodGeometry(2);
+    case "maple":   return cherryGeometry(3, "pale");
+    case "oak":     return cherryGeometry(2, "pale");
     case "pine":    return coniferGeometry(0);
     case "spruce":  return coniferGeometry(1);
     case "willow":  return willowGeometry();
-    case "poplar":  return poplarGeometry();
+    case "poplar":  return cherryGeometry(4, "pale");
   }
   return hardwoodGeometry(0);
 }
@@ -12642,31 +12642,14 @@ function treeDefTint(name, c){
   // fresh new leaf: bright lime to deep green
   return c.setHSL(0.22 + Math.random()*0.07, 0.45 + Math.random()*0.15, 0.44 + Math.random()*0.12);
 }
-/* A Lombardy poplar: a tall narrow column of leaves on a slim trunk, the windbreak of the polder (unit height) */
-function poplarGeometry(){
-  const pos = [], col = [], c = new THREE.Color();
-  const put = (geo, shade)=>{ const g = geo.index ? geo.toNonIndexed() : geo, a = g.attributes.position;
-    for(let i=0;i<a.count;i++){ pos.push(a.getX(i), a.getY(i), a.getZ(i)); shade(a.getY(i)); col.push(c.r, c.g, c.b); } };
-  const trunk = new THREE.CylinderGeometry(0.01, 0.022, 0.3, 5); trunk.translate(0, 0.15, 0);
-  put(trunk, ()=> c.setHSL(0.08, 0.15, 0.2));
-  for(let k=0;k<7;k++){
-    const y = 0.2 + k*0.115, r = 0.085*Math.sin(Math.PI*(0.18 + k/7*0.8)) + 0.02;
-    const b = new THREE.IcosahedronGeometry(1, 0); b.scale(r*(0.9 + Math.random()*0.3), 0.11, r*(0.9 + Math.random()*0.3));
-    b.translate((Math.random() - 0.5)*0.02, y + 0.06, (Math.random() - 0.5)*0.02);
-    put(b, yy=> c.setHSL(0, 0, 0.6 + Math.random()*0.3 + yy*0.08));
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
-  g.computeVertexNormals();
-  return g;
-}
 /* A broadleaf: a short trunk and a crown of lumpy blobs, drawn pale so
    the per-tree tint gives it its colour (red, orange, gold). */
 /* A cherry in bloom: a dark trunk forking into spreading limbs, under a rounded, billowing crown
    made of many small clusters of blossom, paler where the light catches the top and a deeper pink
    underneath; white flecks through it. kind 1 is a weeping cherry: arching limbs, a dome of blossom,
-   and chains of it cascading down all round. leafy: the same tree in fresh spring green. (unit height) */
+   and chains of it cascading down all round. leafy: the same tree in fresh spring green, or "pale" for a
+   crown left light so the per-tree tint gives it its colour. Built the same way, for the Spring Cup: kind 2 a
+   broad oak, kind 3 a low layered Japanese maple, kind 4 a Lombardy poplar's column. (unit height) */
 function cherryGeometry(kind, leafy){
   const pos = [], col = [], c = new THREE.Color();
   const put = (geo, shade)=>{
@@ -12682,6 +12665,7 @@ function cherryGeometry(kind, leafy){
   // the crown's colour, by height through it: light on top, deeper underneath
   let cy = 0.6, ch = 0.2;
   const bloom = (white)=> y=>{ const k = Math.max(-1, Math.min(1, (y - cy)/ch));
+    if(leafy === "pale") return c.setHSL(0.1, 0.08, 0.7 + k*0.1 + Math.random()*0.1);
     if(leafy) return c.setHSL(0.25 + Math.random()*0.03, 0.5 + Math.random()*0.1, 0.42 + k*0.1 + Math.random()*0.04);
     if(white) return c.setHSL(0.95, 0.6, 0.86 + k*0.05);
     return c.setHSL(0.935 + Math.random()*0.03, 0.78 + Math.random()*0.12, 0.66 + k*0.09 + Math.random()*0.04); };
@@ -12689,7 +12673,17 @@ function cherryGeometry(kind, leafy){
     b.rotateX(Math.random()*3); b.rotateY(Math.random()*3); b.scale(1, sq || 0.82, 1); b.translate(x, y, z);
     put(b, bloom(!leafy && Math.random() < 0.12)); };
   const la = Math.random()*6.28, ln = 0.02 + Math.random()*0.04;
-  if(kind === 1){
+  if(kind === 4){
+    // the poplar: a slim trunk up the middle, short limbs climbing it, and a narrow column of small clusters
+    const top = new THREE.Vector3(Math.cos(la)*ln*0.5, 0.86, Math.sin(la)*ln*0.5);
+    limb(new THREE.Vector3(0, -0.02, 0), top, 0.026, 0.006);
+    cy = 0.6; ch = 0.32;
+    for(let k=0;k<8;k++){ const a = k*2.4 + Math.random()*0.6, y = 0.2 + k*0.08;
+      limb(new THREE.Vector3(top.x*y, y, top.z*y), new THREE.Vector3(Math.cos(a)*0.05, y + 0.1, Math.sin(a)*0.05), 0.008, 0.003); }
+    for(let y=0.2; y<0.97; y+=0.045){ const w = 0.075*Math.sin(Math.PI*Math.min(1, (y - 0.12)/0.9)) + 0.018, n = w > 0.06 ? 4 : 3;
+      for(let j=0;j<n;j++){ const a = j/n*6.28 + y*7 + Math.random()*0.8, rr = w*(0.45 + Math.random()*0.35);
+        cluster(Math.cos(a)*rr, y + Math.random()*0.02, Math.sin(a)*rr, w*0.62 + 0.012, 1.25, Math.random() < 0.4); } }
+  } else if(kind === 1){
     // the weeping cherry
     const top = new THREE.Vector3(Math.cos(la)*ln, 0.5, Math.sin(la)*ln);
     limb(new THREE.Vector3(0, -0.02, 0), top, 0.034, 0.02);
@@ -12706,23 +12700,27 @@ function cherryGeometry(kind, leafy){
         cluster(top.x + Math.cos(a)*rr, y, top.z + Math.sin(a)*rr, 0.055 - j*0.007, 1.5, true); } }
   } else {
     // the spreading cherry: the trunk forks into three or four limbs, each forking again
-    const top = new THREE.Vector3(Math.cos(la)*ln, 0.3, Math.sin(la)*ln);
-    limb(new THREE.Vector3(0, -0.02, 0), top, 0.036, 0.024);
-    cy = 0.6; ch = 0.18;
-    const tips = [], n = 3 + (Math.random() < 0.6 ? 1 : 0);
+    // (the oak: a taller trunk, five limbs, a bigger rounder crown; the maple: low, wide, and in flat tiers)
+    const S = kind === 2 ? {ty:0.36, tr:0.046, sp:0.16, rise:0.13, n:5, fill:12, fr:0.36, sq:0.86, cy:0.68, cr:0.11}
+            : kind === 3 ? {ty:0.2, tr:0.03, sp:0.17, rise:0.07, n:5, fill:10, fr:0.38, sq:0.5, cy:0.42, cr:0.095}
+            : {ty:0.3, tr:0.036, sp:0.12, rise:0.13, n:0, fill:7, fr:0.3, sq:0.82, cy:0.6, cr:0.1};
+    const top = new THREE.Vector3(Math.cos(la)*ln, S.ty, Math.sin(la)*ln);
+    limb(new THREE.Vector3(0, -0.02, 0), top, S.tr, S.tr*0.66);
+    cy = S.cy; ch = 0.18;
+    const tips = [], n = S.n || 3 + (Math.random() < 0.6 ? 1 : 0);
     for(let k=0;k<n;k++){
       const a = k/n*6.28 + Math.random()*0.7;
-      const mid = new THREE.Vector3(top.x + Math.cos(a)*0.12, top.y + 0.13 + Math.random()*0.04, top.z + Math.sin(a)*0.12);
-      limb(top, mid, 0.02, 0.013);
-      for(const f of [-0.45, 0.45]){ const b = a + f + (Math.random() - 0.5)*0.3, out = 0.1 + Math.random()*0.06;
-        const tip = new THREE.Vector3(mid.x + Math.cos(b)*out, mid.y + 0.09 + Math.random()*0.06, mid.z + Math.sin(b)*out);
+      const mid = new THREE.Vector3(top.x + Math.cos(a)*S.sp, top.y + S.rise + Math.random()*0.04, top.z + Math.sin(a)*S.sp);
+      limb(top, mid, S.tr*0.55, S.tr*0.36);
+      for(const f of [-0.45, 0.45]){ const b = a + f + (Math.random() - 0.5)*0.3, out = (0.1 + Math.random()*0.06)*S.sp/0.12;
+        const tip = new THREE.Vector3(mid.x + Math.cos(b)*out, mid.y + S.rise*0.7 + Math.random()*0.06, mid.z + Math.sin(b)*out);
         limb(mid, tip, 0.012, 0.005); tips.push(tip); }
     }
     // blossom over every tip, and the dome between them filled in so the crown is one billowing cloud
-    tips.forEach(tp=>{ cluster(tp.x, tp.y + 0.02, tp.z, 0.1 + Math.random()*0.03);
-      const a = Math.random()*6.28; cluster(tp.x + Math.cos(a)*0.07, tp.y + 0.07, tp.z + Math.sin(a)*0.07, 0.07 + Math.random()*0.03, 0.82, true); });
-    for(let k=0;k<7;k++){ const a = Math.random()*6.28, u = Math.sqrt(Math.random()), rr = u*0.3;
-      cluster(top.x + Math.cos(a)*rr, cy + 0.06 + (1 - u)*0.1 + (Math.random() - 0.5)*0.05, top.z + Math.sin(a)*rr, 0.09 + Math.random()*0.04); }
+    tips.forEach(tp=>{ cluster(tp.x, tp.y + 0.02, tp.z, S.cr + Math.random()*0.03, S.sq);
+      const a = Math.random()*6.28; cluster(tp.x + Math.cos(a)*0.07, tp.y + 0.07*S.sq/0.82, tp.z + Math.sin(a)*0.07, S.cr*0.7 + Math.random()*0.03, S.sq, true); });
+    for(let k=0;k<S.fill;k++){ const a = Math.random()*6.28, u = Math.sqrt(Math.random()), rr = u*S.fr;
+      cluster(top.x + Math.cos(a)*rr, cy + 0.06 + (1 - u)*0.1*S.sq/0.82 + (Math.random() - 0.5)*0.05, top.z + Math.sin(a)*rr, S.cr*0.9 + Math.random()*0.04, S.sq); }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
@@ -13351,7 +13349,8 @@ if(GLOW){
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(),
         sc = new THREE.Vector3(), v = new THREE.Vector3(), e = new THREE.Euler();
   const tint = new THREE.Color();
-  treeSpots.forEach((list, kind)=>{
+  const treeSets = TREEDEF ? treeSpots.flatMap((l, k)=> [0, 1].map(h=> [l.filter((p, i)=> i % 2 === h), k])) : treeSpots.map((l, k)=> [l, k]);
+  treeSets.forEach(([list, kind])=>{
     if(!list.length) return;
     const inst = new THREE.InstancedMesh(
       GLOW ? (kind < 2 ? glowTreeGeometry(kind).body : coniferGeometry(1))
@@ -15961,9 +15960,10 @@ addEventListener("keydown", e=>{
   if(e.code==="KeyM") toggleMute();
   if(e.code==="KeyX") resetCar();
   if(e.code==="KeyR" && state.phase !== "menu" && MODE !== "online"){ setMode(MODE); resetRace(); }
-  if(e.code==="KeyE"){ trans.auto = false; requestShift(trans.gear+1); }
-  if(e.code==="KeyQ"){ trans.auto = false; requestShift(trans.gear-1); }
-  if(e.code==="KeyT"){ trans.auto = !trans.auto; S.auto = trans.auto; persist(); }
+  if(e.code==="KeyE") manualShift(+1);
+  if(e.code==="KeyQ") manualShift(-1);
+  if(e.code==="KeyT"){ trans.auto = !trans.auto; S.auto = trans.auto; persist(); trans.hold = 0;
+    if(state.phase !== "menu") banner(trans.auto ? "AUTOMATIC" : "MANUAL", UI.key, 1.2, trans.auto ? "gearbox" : "E / Q to shift"); }
 });
 addEventListener("keyup", e=>{ keys[e.code]=false; });
 addEventListener("blur", ()=>{ for(const k in keys) keys[k] = false; });
@@ -16562,7 +16562,7 @@ function placeAtStart(){
   drift.boostT = 0; drift.boostPower = 0; drift.boostTier = -1; drift.flash = 0;
   splash.mud = splash.water = 0;
   trans.gear = 1; trans.target = 1; trans.dir = 1;
-  trans.rpm = DRIVE.idle; trans.shiftT = 0; trans.cut = 0; trans.lock = 0;
+  trans.rpm = DRIVE.idle; trans.shiftT = 0; trans.cut = 0; trans.lock = 0; trans.hold = 0;
   state.idx = gi; state.prevIdx = gi;
   gridRivals();
 }
@@ -16595,6 +16595,14 @@ function torqueCurve(rpm){                   // tired six, peak around 3800
   return Math.max(0.18, 0.62 + 1.15*r - 0.95*r*r) * (rpm > DRIVE.redline ? 0.25 : 1);
 }
 
+/* A shift asked for by hand. In Manual it's simply the shift. In Automatic it no longer turns the gearbox
+   to Manual for good (a stray Q or E next to W did that, and the options still said Automatic): the gear you
+   asked for is held for a couple of seconds, then the automatic takes over again. T, or the options, is
+   what changes the gearbox for good. */
+function manualShift(dir){
+  if(trans.auto) trans.hold = 2.5;
+  requestShift(trans.gear + dir);
+}
 function requestShift(g){
   if(g === trans.gear || g < 1 || g > DRIVE.totals.length) return;
   if(trans.shiftT > 0 || trans.lock > 0) return;
@@ -16679,10 +16687,12 @@ function stepCarInner(dt){
 
   // shift timing: torque eases out through the change, then the new ratio lands
   if(trans.lock > 0) trans.lock -= dt;
+  // a held gear in Automatic: let go of it after a while, or at once if the engine is screaming or labouring in it
+  if(trans.hold > 0){ trans.hold -= dt; if(trans.rpm > DRIVE.up*1.06 || (trans.rpm < DRIVE.down*0.8 && trans.gear > 1)) trans.hold = 0; }
   if(trans.shiftT > 0){
     trans.shiftT -= dt;
     if(trans.shiftT <= DRIVE.shiftTime*0.45) trans.gear = trans.target;
-  } else if((trans.auto || state.phase === "done") && trans.dir > 0 && (state.phase === "racing" || state.phase === "done")){
+  } else if(((trans.auto && !(trans.hold > 0)) || state.phase === "done") && trans.dir > 0 && (state.phase === "racing" || state.phase === "done")){
     const g = trans.gear;
     if(g < DRIVE.totals.length && trans.rpm > (thr ? DRIVE.up : DRIVE.up*0.72)) requestShift(g+1);
     else if(g > 1 && trans.rpm < DRIVE.down && rpmAt(along, g-1) < DRIVE.up*0.90) requestShift(g-1);
@@ -17584,10 +17594,26 @@ function stepCamera(dt, sp){
     camera.position.z += (camPos.z - camera.position.z) * Math.min(1, dt*7);
     camera.position.y += (camPos.y - camera.position.y) * Math.min(1, dt*3);
   } else {
-    camPos.set(pose.x + fx*0.62, pose.y + 1.58, pose.z + fz*0.62);
-    camAim.set(pose.x + fx*12, pose.y + 1.5, pose.z + fz*12);
-    camera.position.x = camPos.x; camera.position.z = camPos.z;
-    camera.position.y += (camPos.y - camera.position.y) * Math.min(1, dt*9);
+    /* First person: you're in the seat, but the view isn't bolted to the bodywork. The eye rides a
+       smoothed height (the ruts and stones don't shake it), and the horizon is set by the road ahead
+       (its own line, which has no bumps in it), held steady and eased; over a jump it keeps the last one */
+    // (both eased on a spring, critically damped: it settles without overshoot, and never jerks when the
+    //  thing it follows changes direction, which the plain easing did on every crest and dip)
+    const spring = (key, target, w, snap)=>{
+      const v = key + "V";
+      if(GAME[key] === undefined || Math.abs(GAME[key] - target) > snap){ GAME[key] = target; GAME[v] = 0; return; }
+      const h = Math.min(dt, 0.05);
+      GAME[v] += (w*w*(target - GAME[key]) - 2*w*GAME[v])*h; GAME[key] += GAME[v]*h;
+    };
+    spring("fpY", pose.y + 1.58, 7, 6);
+    // the slope of the road you're on (main road or a branch), 18m on
+    const nr = nearest(pose.x, pose.z), Pn = nr.path, step = Math.round(18/Pn.seg);
+    const i0 = nr.pi, ia = Pn.closed ? wrapIdx(Pn, i0 + step) : Math.min(Pn.N - 1, i0 + step);
+    const slope = Math.max(-0.35, Math.min(0.35, (Pn.pts[ia].y - Pn.pts[i0].y)/Math.max(1, (ia - i0 + (Pn.closed && ia < i0 ? Pn.N : 0))*Pn.seg)));
+    if(!pose.air) spring("fpAim", GAME.fpY - 0.12 + slope*16, 4.5, 8);
+    camPos.set(pose.x + fx*0.62, GAME.fpY, pose.z + fz*0.62);
+    camAim.set(pose.x + fx*16, GAME.fpAim, pose.z + fz*16);
+    camera.position.set(camPos.x, camPos.y, camPos.z);
   }
   /* on the grid: the view swings round from the front of the car and
      settles in behind it as the lights count down */
@@ -17612,7 +17638,7 @@ function stepCamera(dt, sp){
   if(camMode !== 1){ const gc = gradedY(camera.position.x, camera.position.z) + 1.2; if(camera.position.y < gc) camera.position.y = gc; }
   // rumble only where the surface is actually rough
   if(nearest(pose.x, pose.z).dist > HALF && sp > 4){
-    const r = Math.min(0.045, sp*0.0011);
+    const r = Math.min(0.045, sp*0.0011)*(camMode === 1 ? 0.35 : 1);
     camera.position.y += Math.sin(state.t*29)*r + Math.sin(state.t*53)*r*0.45;
   }
   camera.lookAt(camAim);
@@ -17622,7 +17648,7 @@ function stepCamera(dt, sp){
     const ovT = Math.max(0, Math.min(1, (sp - MAXV)/28));
     GAME.over = (GAME.over || 0) + (ovT - (GAME.over || 0))*Math.min(1, dt*3);
     const ov = GAME.over;
-    if(ov > 0.01 && !pose.air){ const a = 0.035*ov;
+    if(ov > 0.01 && !pose.air){ const a = 0.035*ov*(camMode === 1 ? 0.4 : 1);
       camera.position.y += (Math.sin(state.t*71) + Math.sin(state.t*113)*0.6)*a; camera.position.x += Math.sin(state.t*89)*a*0.6; }
     const rollT = state.phase === "menu" ? 0 : Math.atan(bankSigned(pose.x, pose.z))*0.7;
     GAME.camRoll = (GAME.camRoll || 0) + (rollT - (GAME.camRoll || 0))*Math.min(1, dt*4);
@@ -17634,9 +17660,10 @@ function stepCamera(dt, sp){
     GAME.kick = Math.max(0, (GAME.kick || 0) - dt*0.5);
     const kick = (GAME.kick || 0)*Math.sin(state.t*63);
     const chase = camMode !== 1;
-    const bob = pose.bH*(chase ? 0.45 : 1) + kick*(chase ? 0.6 : 1);
+    // (first person: a share of it, enough to feel the road, not enough to shake the picture)
+    const bob = pose.bH*(chase ? 0.45 : 0.15) + kick*(chase ? 0.6 : 0.2);
     camera.position.y += bob; GAME.bobWas = bob;
-    if(!chase){ camera.rotateX(-pose.bP*0.8); camera.rotateZ(pose.bR*0.8); }
+    if(!chase){ camera.rotateX(-pose.bP*0.12); camera.rotateZ(pose.bR*0.2); }
     else camera.rotateZ(pose.bR*0.25);
   }
   const fovT = 62 + Math.min(1, sp/MAXV)*11 + (GAME.over || 0)*14;      // the frame opens up with speed (and past top speed down the Sawtooth)
@@ -18483,8 +18510,8 @@ function pollInput(dt){
       if(hit(9)) pauseGame();
       if(hit(3)) cycleCamera();
       if(hit(1)) resetCar();
-      if(hit(5)){ trans.auto = false; requestShift(trans.gear+1); }
-      if(hit(4)){ trans.auto = false; requestShift(trans.gear-1); }
+      if(hit(5)) manualShift(+1);
+      if(hit(4)) manualShift(-1);
     } else {
       // menus: d-pad or stick, with key-repeat style timing
       let dir = "";
@@ -19024,7 +19051,7 @@ function resetCar(at){
   pose.yawVis = 0; pose.steerIn = 0; pose.steerVis = 0; pose.roll = pose.pitch = 0;
   pose.spring = pose.springV = 0; pose.artPitch = pose.artRoll = pose.artBase = 0; pose.bH = pose.bHv = pose.bP = pose.bPv = pose.bR = pose.bRv = 0;
   drift.mode = "off"; drift.on = false; drift.t = 0; drift.tier = -1; drift.boostT = 0;
-  trans.gear = 1; trans.target = 1; trans.dir = 1; trans.shiftT = 0; trans.cut = 0;
+  trans.gear = 1; trans.target = 1; trans.dir = 1; trans.shiftT = 0; trans.cut = 0; trans.hold = 0;
   camH = pose.h;
   camera.position.set(pose.x - Math.sin(pose.h)*9, pose.y + 3.6, pose.z - Math.cos(pose.h)*9);
   GAME.stuckT = 0; GAME.wrongT = 0; GAME.resetFlash = 1;
@@ -19910,7 +19937,12 @@ const NET_CFG = {
   key: "sb_publishable_eOsgxtEe3eowA4Lae5_33Q_jQgS00Pa",          // a publishable key: safe in a web page
   lib: "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js",
   ice: [{urls:["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]}],
-  max: 6, laps: 3, hz: 20,
+  max: 6, laps: 3, hz: 30,
+  /* A TURN server relays the cars for a pair of friends whose networks won't let them connect directly
+     (strict NAT, some mobile and office networks). Without one those pairs fall back to the room server
+     at five updates a second. To add one (Cloudflare Calls, Metered, or your own coturn), put it here:
+       turn: {urls:["turn:your.server:3478", "turns:your.server:5349"], username:"...", credential:"..."}  */
+  turn: null,
   // in the menu wherever the game is hosted as a web page (your own site); inside a Claude
   // artifact the page may not reach the room server, so there it hides unless asked for
   enabled: /(^|[#&])(online|mocknet)=1/.test(location.hash) || !/(^|\.)(claude\.ai|claudeusercontent\.com|anthropic\.com)$/.test(location.hostname)
@@ -19939,7 +19971,19 @@ function netClockTick(){
   if(hp && hp.open && hp.dc && hp.dc.readyState === "open"){ try{ hp.dc.send(JSON.stringify(msg)); }catch(e){} }
   else if(NET.tx) NET.tx.send("tping", msg);
 }
+/* how quick the line to each friend is: a ping down the direct line every couple of seconds */
+function netPingTick(){
+  const now = performance.now();
+  if(now - (NET.pingAt || 0) < 2000) return;
+  NET.pingAt = now;
+  NET.peers.forEach(p=>{ if(p.open && p.dc && p.dc.readyState === "open"){ try{ p.dc.send(JSON.stringify({k:"pping", from:NET.id, to:p.id, t0:now})); }catch(e){} } });
+  // and how smooth your own picture is, for the lobby (sent when it changes by much)
+  const P = GFX.prof, fps = P && P.frame > 0 ? Math.round(Math.min(240, 1000/P.frame)) : 0;
+  if(fps && Math.abs(fps - (NET.fps || 0)) >= 8){ NET.fps = fps; netTrackMe(); }
+}
 function netClockMsg(p, m){
+  if(m.k === "pping" && m.to === NET.id && p){ try{ p.dc.send(JSON.stringify({k:"ppong", from:NET.id, to:m.from, t0:m.t0})); }catch(e){} return; }
+  if(m.k === "ppong" && m.to === NET.id && p && typeof m.t0 === "number"){ const rtt = performance.now() - m.t0; if(rtt >= 0 && rtt < 5000) p.rtt = p.rtt ? p.rtt*0.7 + rtt*0.3 : rtt; return; }
   if(m.k === "tping" && m.to === NET.id){
     const back = {k:"tpong", from:NET.id, to:m.from, t0:m.t0, th:netNow()};
     const q = p || NET.peers.get(m.from);
@@ -20089,7 +20133,7 @@ function netSendChat(){
 }
 function netMeta(){
   // (and the wagon you built in the garage, so your friends see you in it)
-  return { id:NET.id, name:NET.name, paint:NET_PAINT(), host:NET.host, track:TRACK_ID, pick:NET.pick, racing:NET.racing, at:NET.joinedAt, car:carOpts(), ready:!!NET.ready, garage:!!NET.inGarage, auto:NET.auto ? NET.auto.n : 0 };
+  return { id:NET.id, name:NET.name, paint:NET_PAINT(), host:NET.host, track:TRACK_ID, pick:NET.pick, racing:NET.racing, at:NET.joinedAt, car:carOpts(), ready:!!NET.ready, garage:!!NET.inGarage, auto:NET.auto ? NET.auto.n : 0, fps:NET.fps || 0 };
 }
 async function netJoin(code, opts){
   if(NET.on) netLeave(true);
@@ -20116,7 +20160,7 @@ async function netJoin(code, opts){
 /* Everyone travelled to the new circuit: the host starts as soon as they are all back in the
    room here (or after 25 seconds, for anyone whose page is slow), with a moment to connect */
 function netAutoStart(){
-  netClockTick();
+  netClockTick(); netPingTick();
   // (and the lobby's JUST JOINED marks wear off)
   if(NET.on && MENU.id === "scLobby"){
     lbFill();
@@ -20183,7 +20227,7 @@ function netSync(list){
     return;
   }
   // only redraw when something anyone can see has changed (presence pings arrive all the time)
-  const sig = JSON.stringify(NET.metas.map(m=> [m.id, m.name, m.ready, m.track, m.pick, m.racing, m.paint, m.garage]).concat(netAway().map(m=> m.id)));
+  const sig = JSON.stringify(NET.metas.map(m=> [m.id, m.name, m.ready, m.track, m.pick, m.racing, m.paint, m.garage, m.fps]).concat(netAway().map(m=> m.id)));
   if(sig !== NET.metaSig || arrived){ NET.metaSig = sig; netRefresh(); }
 }
 
@@ -20248,7 +20292,7 @@ function netDropPeer(p, quiet){
 
 /* ---- the direct lines: WebRTC data channels, set up over the room ---- */
 function netPC(p){
-  const pc = new RTCPeerConnection({iceServers:NET_CFG.ice});
+  const pc = new RTCPeerConnection({iceServers: NET_CFG.turn ? NET_CFG.ice.concat([NET_CFG.turn]) : NET_CFG.ice});
   p.pc = pc;
   pc.onicecandidate = e=>{ if(e.candidate && NET.tx) NET.tx.send("sig", {to:p.id, from:NET.id, ice:e.candidate.toJSON ? e.candidate.toJSON() : e.candidate}); };
   pc.onconnectionstatechange = ()=>{ if(pc.connectionState === "failed"){ p.relay = true; p.open = false; netRefresh(); } };
@@ -20623,7 +20667,10 @@ function showLobby(sel){
   const rows = list.map(m=>{
     const p = NET.peers.get(m.id);
     const fresh = p && now - p.since < 5000;
-    const conn = m.id === me ? "" : m.away ? "reconnecting" : m.racing ? "racing" : m.track !== TRACK_ID ? "on the way" : p ? (p.open || p.relay ? "" : "connecting") : "";
+    // the line to each friend: direct (and how quick), relayed through the room server (slower), or still connecting; and their frame rate
+    const line = !p ? "" : p.open ? "direct" + (p.rtt ? " \u00b7 " + Math.round(p.rtt) + " ms" : "") : p.relay ? "relayed (slower)" : "connecting";
+    const fpsTx = m.fps ? (line ? " \u00b7 " : "") + m.fps + " fps" : "";
+    const conn = m.id === me ? (m.fps ? m.fps + " fps" : "") : m.away ? "reconnecting" : m.racing ? "racing" : m.track !== TRACK_ID ? "on the way" : line + fpsTx;
     const tag = m.garage ? '<span class="rtag gar">IN GARAGE</span>'
               : m.id === hostId ? '<span class="rtag host">HOST</span>'
               : m.ready ? '<span class="rtag ok">READY</span>' : '<span class="rtag">NOT READY</span>';
@@ -21275,6 +21322,9 @@ function frame(now){
   // the first frame after a slow load can be stamped before `last` was taken,
   // which made dt negative and ran the rivals backwards off the lap
   dt = Math.max(0, Math.min(dt, 0.05));
+  /* Online, a machine that can't hold 20 frames a second still races in real time: the car is stepped
+     twice in a frame rather than the whole race running in slow motion on that machine alone */
+  const simDt = MODE === "online" && NET.on && (state.phase === "racing" || state.phase === "done") ? Math.max(0, Math.min(dtRaw, 0.1)) : dt;
   pollInput(dt);
   const run = !GAME.paused;
 
@@ -21314,16 +21364,17 @@ function frame(now){
         GAME.startAt = null;
       }
     } else if(state.phase === "racing"){
-      state.t += dt;
+      state.t += simDt;
     } else if(state.phase === "done"){
       GAME.doneT += dt;
       if(GAME.doneT > 3.4 && !GAME.resultsShown) showResults();
     }
 
-    info = stepCar(dt);
+    if(simDt > dt){ const n = Math.ceil(simDt/0.05); for(let k=0;k<n;k++) info = stepCar(simDt/n); }
+    else info = stepCar(dt);
     checkBrokenBridge();
     stepRivals(dt);
-    netFrame(dt);
+    netFrame(simDt);
     stepLeafPiles(dt);
     stepCritters(dt);
     stepLava(dt);
