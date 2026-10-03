@@ -1334,7 +1334,7 @@ const TRACKS = [
     rails:[[[0,-140],[0,-96]]],
     banks:[[[540,-190],[470,-292],0.45],[[54,-439],[-17,-409],0.5]],
     ground:"tulips", murk:0.35, wind:9,
-    trees:{kinds:["cherry","poplar","leafy"], mix:[0.5, 0.65], tall:[[9,5],[15,7],[9,4]], density:0.36}, rockK:0.15, bushK:0.5, coverPink:0.2,
+    trees:{kinds:["cherry","poplar","leafy"], mix:[0.5, 0.65], tall:[[9,5],[15,7],[9,4]], density:0.14}, rockK:0.1, bushK:0.12, coverPink:0.2, openFields:34,
     stages:["gravel","muddy","washboard","rutted","gravel","muddy","paved"],
     branches:[]},
 
@@ -11347,8 +11347,10 @@ function springGround(c, x, z, t, edge, steep){
     for(const C of CANALS){ const r = canalAt(C, x, z); if(r && r[0] < C.w + 5) return; }
     const k = tulipAt(x, z);
     if(k < 0){ c.offsetHSL(0.01, 0.06, 0.03); return; }                     // the paths and meadows: bright new grass
-    const P = tulipPal(k), w = smoothstep(6, 13, edge)*(1 - steep);
-    c.lerp(tmp.setHSL(P[0], P[1], P[2] + (Math.random() - 0.5)*0.07), w*0.94);
+    // (close to the road the flowers stand up out of the beds, so the bed is soil and leaves; far off it is the band of colour)
+    const P = tulipPal(k), w = smoothstep(6, 13, edge)*(1 - steep), far = smoothstep(55, 110, edge);
+    c.lerp(tmp.setHSL(0.17 + Math.random()*0.05, 0.38, 0.2 + Math.random()*0.06), w*0.75*(1 - far));
+    c.lerp(tmp.setHSL(P[0], P[1]*0.92, P[2] + (Math.random() - 0.5)*0.07), w*(0.22 + 0.7*far));
   } else if(G === "lawn"){
     // inside the maze the floor is deep in clipped leaves: dark mottled greens, a little brown
     const MB = springMazeBox();
@@ -11594,36 +11596,136 @@ if(SPRINGCUP){
     windmill(x, z, Math.atan2(-x, -z) + (rnd() - 0.5)*0.6, 0.55 + rnd()*0.25, 0, gradedY(x, z) - 0.3, [0x2e3b33, 0x7a3a2a, 0x3a4a6a, 0x5a5a4a][k % 4]);
     keep(x, z, 14);
   });
-  /* the bulb fields close to the road: a tulip on a stem in every bed, in the colour of its stripe */
+  /* the bulb fields close to the road: the beds full of tulips, row on row. Painted tulip clumps (cups in the
+     bed's colour on green stems among their leaves), stood up thick over every bed within sixty metres of the
+     road and more thinly beyond, so close to the road the fields are flowers, not paint */
   if(TRACK.ground === "tulips"){
-    const list = [];
+    const CELLPX = 256, tex = new THREE.CanvasTexture(noiseCanvas(1024, 1024, (g, W, H)=>{
+      g.clearRect(0, 0, W, H);
+      const leaf = (x, y, h, lean, col)=>{ g.fillStyle = col; g.beginPath(); g.moveTo(x - 5, y); g.quadraticCurveTo(x - 6 + lean*0.4, y - h*0.6, x + lean, y - h); g.quadraticCurveTo(x + 6 + lean*0.4, y - h*0.55, x + 5, y); g.closePath(); g.fill(); };
+      const cup = (x, y, s, hsl)=>{
+        const [h0, s0, l0] = hsl, base = `hsl(${h0*360},${s0*100}%,${l0*100}%)`, dark = `hsl(${h0*360},${s0*100}%,${Math.max(8, l0*100 - 16)}%)`, lite = `hsl(${h0*360},${s0*90}%,${Math.min(92, l0*100 + 16)}%)`;
+        g.fillStyle = base; g.beginPath(); g.moveTo(x - 9*s, y - 16*s);
+        g.quadraticCurveTo(x - 11*s, y + 3*s, x, y + 4*s); g.quadraticCurveTo(x + 11*s, y + 3*s, x + 9*s, y - 16*s);
+        g.lineTo(x + 5*s, y - 9*s); g.lineTo(x + 2*s, y - 19*s); g.lineTo(x, y - 10*s); g.lineTo(x - 2*s, y - 19*s); g.lineTo(x - 5*s, y - 9*s); g.closePath(); g.fill();
+        g.fillStyle = dark; g.beginPath(); g.moveTo(x - 9*s, y - 16*s); g.quadraticCurveTo(x - 11*s, y + 3*s, x, y + 4*s); g.lineTo(x - 2*s, y - 8*s); g.closePath(); g.fill();
+        g.strokeStyle = lite; g.lineWidth = 2*s; g.beginPath(); g.moveTo(x + 3*s, y - 6*s); g.quadraticCurveTo(x + 6*s, y - 2*s, x + 4*s, y + 1*s); g.stroke();
+      };
+      for(let k=0;k<8;k++){
+        const cx = (k % 4)*CELLPX, cy = H - (Math.floor(k/4) + 1)*CELLPX, P = k < 7 ? tulipPal(k) : null;
+        g.save(); g.beginPath(); g.rect(cx, cy, CELLPX, CELLPX); g.clip();
+        for(const [rowY, sc, n, shade] of [[CELLPX*0.55, 0.85, 9, 0.85], [CELLPX*0.78, 1.15, 7, 1]]){
+          for(let i=0;i<n;i++){
+            const x = cx + (i + 0.5 + (Math.random() - 0.5)*0.5)*CELLPX/n, top = cy + rowY - 60*sc + (Math.random() - 0.5)*14;
+            for(let q=0;q<2;q++) leaf(x + (q ? 6 : -6)*sc, cy + CELLPX, (90 + Math.random()*50)*sc*(shade), (q ? 1 : -1)*(10 + Math.random()*14)*sc, `hsl(${100 + Math.random()*20},${40 + Math.random()*15}%,${(26 + Math.random()*10)*shade}%)`);
+            if(P){ g.strokeStyle = `hsl(105,40%,${30*shade}%)`; g.lineWidth = 3*sc; g.beginPath(); g.moveTo(x, cy + CELLPX); g.lineTo(x + (Math.random() - 0.5)*6, top); g.stroke();
+                   cup(x, top, 1.5*sc, [P[0], P[1], P[2]*(0.9 + 0.1*shade)]); }
+          }
+        }
+        g.restore();
+      }
+    }));
+    tex.anisotropy = 4;
+    const pos = [], scale = [], uv = [], tint = [];
+    const put = (x, z, k, h)=>{ pos.push(x, gradedY(x, z) - 0.04, z); scale.push(h*2.2, h); uv.push((k % 4)*0.25, Math.floor(k/4)*0.25); tint.push(0.86 + rnd()*0.24); };
     paths.forEach(P=>{
-      for(let k=0; k<P.N; k+=Math.max(1, Math.round(1.2/P.seg))){
-        const p = P.pts[k], t = P.tans[k];
-        for(let n=0;n<6;n++){
-          const sd = rnd() < 0.5 ? -1 : 1, o = P.half[k] + 7 + rnd()*30, x = p.x - t.z*sd*o + t.x*(rnd() - 0.5)*3, z = p.z + t.x*sd*o + t.z*(rnd() - 0.5)*3;
-          const c = tulipAt(x, z);
-          if(c < 0 || !clearOf(x, z, 6) || inWaterway(x, z)) continue;
-          list.push([x, gradedY(x, z), z, rnd()*6, (rnd() - 0.5)*0.2, (rnd() - 0.5)*0.2, 0.9 + rnd()*0.5, 0, 0, c]);
+      for(let i=0; i<P.N; i+=Math.max(1, Math.round(2.2/P.seg))){
+        const p = P.pts[i], t = P.tans[i];
+        for(const sd of [-1, 1]) for(let o=P.half[i] + 4; o<P.half[i] + 110; o += o < P.half[i] + 60 ? 1.15 : 2.4){
+          const a = (rnd() - 0.5)*2.2, x = p.x - t.z*sd*o + t.x*a, z = p.z + t.x*sd*o + t.z*a, k = tulipAt(x, z);
+          if(k < 0){ if(rnd() < 0.02 && clearOf(x, z, 4) && !inWaterway(x, z)) put(x, z, 7, 0.5 + rnd()*0.3); continue; }
+          if(!clearOf(x, z, 3.5) || inWaterway(x, z)) continue;
+          put(x, z, k, 0.85 + rnd()*0.25);
         }
       }
     });
-    const stem = new THREE.CylinderGeometry(0.03, 0.03, 0.5, 3); stem.translate(0, 0.25, 0);
-    instances(stem, lam(0x4f8a2a), list, c=> c.setHSL(0.25, 0.5, 0.35));
-    const head = new THREE.CylinderGeometry(0.15, 0.07, 0.26, 6); head.translate(0, 0.6, 0);
-    instances(head, lam(0xffffff), list, (c, L)=>{ const P = tulipPal(L[9]); return c.setHSL(P[0], P[1], P[2] + 0.05); });
+    if(tint.length) scene.add(billboardField(tex, 0.25, pos, scale, uv, tint, null));
+    /* windbreaks: Lombardy poplars in rows along the canals, as on every polder */
+    { const list = [];
+      CANALS.forEach(C=>{ for(let k=0; k<C.S.length - 1; k+=3){ const a = C.S[k], b = C.S[Math.min(C.S.length - 1, k + 1)], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+        const nx = -(b[1] - a[1])/L, nz = (b[0] - a[0])/L;
+        for(const sd of [-1, 1]){ const x = a[0] + nx*sd*(C.w + 7), z = a[1] + nz*sd*(C.w + 7);
+          if(!clearOf(x, z, 9) || barren(x, z)) continue; const h = 15 + rnd()*7; list.push([x, gradedY(x, z) - 0.2, z, rnd()*6.28, 0, 0, h*(0.9 + rnd()*0.2), h, h*(0.9 + rnd()*0.2)]); } } });
+      instances(cherryGeometry(4, "pale"), new THREE.MeshLambertMaterial({vertexColors:true}), list, c=> c.setHSL(0.24 + rnd()*0.06, 0.5 + rnd()*0.15, 0.42 + rnd()*0.1)); }
   }
-  /* farmhouses: brick, with the great steep roof of a polder farm coming down nearly to the ground */
+  /* a polder farm: the farmhouse at the front, two storeys of brick under a stepped gable, its windows framed in
+     white with green shutters, a green door, a chimney; behind it the barn, under a vast steep pyramid of
+     thatch with the owl board at its peak and big green and white doors; a white fence round the yard,
+     haystacks, and a cart */
+  const farm = (x, z, yaw)=>{
+    const g = new THREE.Group(), bricks = [0x8e4632, 0x9a5238, 0x7e3e2c], brick = PM(bricks[Math.floor(rnd()*3)]), white = PM(0xf2efe6), green = PM(0x2f5a3a);
+    const thatch = new THREE.MeshLambertMaterial({map:thatchTex}), tile = PM(0x3a3f44), glassM = PM(0x2a3440), wood = PM(0x6a4a2a);
+    // the barn: low brick walls under the great pyramid roof
+    const BW = 17, BH = 3, BR = 13;
+    pbox(g, BW, BH + 2, BW, brick, 0, (BH - 2)/2, -6);
+    { const rg = new THREE.ConeGeometry(BW*0.79, BR, 4, 1); rg.rotateY(Math.PI/4); rg.translate(0, BH + BR/2 - 0.3, -6);
+      const r = new THREE.Mesh(rg, thatch); g.add(r);
+      pbox(g, 0.12, 1.6, 1.4, white, 0, BH + BR - 2.6, -6 + BW*0.39 - 0.6); }
+    for(const sd of [-1, 1]){ // the barn doors, green with the white braces
+      const q = new THREE.Group(); q.position.set(sd*(BW/2 + 0.02), 0, -6); q.rotation.y = sd*Math.PI/2; g.add(q);
+      pbox(q, 4.2, 2.8, 0.1, green, 0, 1.4, 0); pbox(q, 4.4, 0.18, 0.12, white, 0, 2.85, 0.02);
+      for(const s2 of [-1, 1]){ const b = pbox(q, 0.16, 3.0, 0.12, white, s2*1.05, 1.4, 0.04); b.rotation.z = s2*0.62; pbox(q, 0.16, 2.8, 0.12, white, s2*2.1, 1.4, 0.04); }
+    }
+    // the house in front, its stepped gable to the road
+    const HW = 9, HD = 8, HE = 6.2, HZ = 4 + HD/2;
+    pbox(g, HW, HE + 2, HD, brick, 0, (HE - 2)/2, HZ);
+    // a gabled roof along the house (ridge front to back) and the stepped gable standing up over the front
+    const roofL = new THREE.Shape(); roofL.moveTo(-HW/2 - 0.4, 0); roofL.lineTo(0, 4.4); roofL.lineTo(HW/2 + 0.4, 0); roofL.closePath();
+    const rm = new THREE.Mesh(new THREE.ExtrudeGeometry(roofL, {depth:HD + 0.6, bevelEnabled:false}), tile); rm.position.set(0, HE, HZ - HD/2 - 0.3); g.add(rm);
+    for(let s=0;s<5;s++){ const w = HW - s*1.9, y = HE + s*0.95; pbox(g, w, 0.95, 0.5, brick, 0, y + 0.475, HZ + HD/2 + 0.05); pbox(g, w + 0.2, 0.14, 0.62, white, 0, y + 0.95, HZ + HD/2 + 0.05); }
+    pbox(g, 1.1, 1.0, 0.5, brick, 0, HE + 5.2, HZ + HD/2 + 0.05);
+    const win = (wx, wy, wz, ry)=>{ const q = new THREE.Group(); q.position.set(wx, wy, wz); q.rotation.y = ry; g.add(q);
+      pbox(q, 1.1, 1.5, 0.08, glassM, 0, 0, 0.02); pbox(q, 1.3, 0.12, 0.14, white, 0, 0.78, 0.04); pbox(q, 1.3, 0.12, 0.14, white, 0, -0.78, 0.04);
+      pbox(q, 0.12, 1.66, 0.14, white, -0.6, 0, 0.04); pbox(q, 0.12, 1.66, 0.14, white, 0.6, 0, 0.04); pbox(q, 0.08, 1.5, 0.1, white, 0, 0, 0.05); pbox(q, 1.1, 0.08, 0.1, white, 0, 0.1, 0.05);
+      for(const s2 of [-1, 1]){ pbox(q, 0.58, 1.6, 0.08, green, s2*1.0, 0, 0.06); pbox(q, 0.5, 0.1, 0.1, white, s2*1.0, 0.3, 0.1); pbox(q, 0.5, 0.1, 0.1, white, s2*1.0, -0.3, 0.1); } };
+    const fz = HZ + HD/2 + 0.02;
+    win(-2.6, 2.0, fz, 0); win(2.6, 2.0, fz, 0); win(-2.2, 4.8, fz, 0); win(2.2, 4.8, fz, 0); win(0, 7.0, fz + 0.3, 0);
+    for(const sd of [-1, 1]){ win(sd*(HW/2 + 0.02), 2.0, HZ - 1.6, sd*Math.PI/2); win(sd*(HW/2 + 0.02), 2.0, HZ + 1.8, sd*Math.PI/2); }
+    pbox(g, 1.3, 2.3, 0.1, green, 0, 1.15, fz + 0.04); pbox(g, 1.6, 0.16, 0.18, white, 0, 2.35, fz + 0.06);
+    for(const s2 of [-1, 1]) pbox(g, 0.14, 2.4, 0.16, white, s2*0.72, 1.2, fz + 0.06);
+    pbox(g, 1.0, 3.2, 1.0, brick, HW*0.25, HE + 3.4, HZ - 1); pbox(g, 1.2, 0.2, 1.2, white, HW*0.25, HE + 5.0, HZ - 1);
+    // the yard: a white picket fence, haystacks, a cart
+    const yard = [[-12, 14], [12, 14], [12, -17], [-12, -17]];
+    for(let s=0;s<4;s++){ const a = yard[s], b = yard[(s + 1) % 4], L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.round(L/1.2);
+      if(s === 0) continue;                                                        // (the front stands open to the lane)
+      for(let k=0;k<=n;k++){ const f = k/n; pbox(g, 0.12, 1.0, 0.12, white, a[0] + (b[0] - a[0])*f, 0.5, a[1] + (b[1] - a[1])*f); }
+      const rl = pbox(g, 0.08, 0.1, L, white, (a[0] + b[0])/2, 0.85, (a[1] + b[1])/2); rl.rotation.y = Math.atan2(b[0] - a[0], b[1] - a[1]);
+      const rl2 = pbox(g, 0.08, 0.1, L, white, (a[0] + b[0])/2, 0.45, (a[1] + b[1])/2); rl2.rotation.y = rl.rotation.y; }
+    for(const [hx, hz] of [[-9.5, -12], [-9.5, -8.6]]){ pcyl(g, 1.5, 1.6, 2.4, 10, PM(0xc8a650), hx, 1.2, hz); const c2 = new THREE.Mesh(new THREE.ConeGeometry(1.7, 1.6, 10), PM(0xb89440)); c2.position.set(hx, 3.2, hz); g.add(c2); }
+    pbox(g, 1.8, 0.6, 3.2, wood, 9, 1.0, 8); for(const s2 of [-1, 1]){ const wl = pcyl(g, 0.6, 0.6, 0.15, 12, PM(0x3a2a1a), 9 + s2*1.0, 0.6, 7.5); wl.rotation.z = Math.PI/2; }
+    shade(g); setDown(g, x, z, yaw); keep(x, z, 22);
+  };
+  const thatchTex = new THREE.CanvasTexture(noiseCanvas(128, 128, (q, w, h)=>{ q.fillStyle = "#8a6c3a"; q.fillRect(0, 0, w, h);
+    for(let k=0;k<900;k++){ const x = Math.random()*w, y = Math.random()*h; q.strokeStyle = Math.random() < 0.5 ? "rgba(70,52,26,0.35)" : "rgba(214,190,128,0.35)"; q.lineWidth = 1; q.beginPath(); q.moveTo(x, y); q.lineTo(x + (Math.random() - 0.5)*3, y + 8 + Math.random()*10); q.stroke(); } }));
+  thatchTex.wrapS = thatchTex.wrapT = THREE.RepeatWrapping; thatchTex.repeat.set(4, 4);
   if(SP("farms")) SP("farms").forEach(m=>{
-    const x = m[0], z = m[1];
-    if(!clearOf(x, z, 20) || inWaterway(x, z)) return;
-    const g = new THREE.Group(), L = 22 + rnd()*8, W = 11;
-    pbox(g, W, 3.4, L, 0x8e4632, 0, 1.6, 0);
-    const roof = new THREE.Mesh(new THREE.CylinderGeometry(0.2, W*0.78, 8.5, 4, 1), PM(rnd() < 0.5 ? 0x5a4a32 : 0x3a3f44)); roof.rotation.y = Math.PI/4; roof.scale.set(1, 1, L/W*0.95); roof.position.y = 3.4 + 4.0; g.add(roof);
-    for(const zz of [-L/2 - 0.02, L/2 + 0.02]) pbox(g, 2.2, 2.4, 0.1, 0xf2efe6, 0, 1.6, zz);
-    pbox(g, 1.0, 3, 1.0, 0x6a3a2a, W*0.2, 9.5, L*0.25);
-    setDown(g, x, z, rnd()*6.28); keep(x, z, 18);
+    let x = m[0], z = m[1];
+    // a little back from the lane, facing it
+    const n = nearest(x, z); if(n.dist < n.half + 26){ const p = MAIN.pts[n.pi], dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz) || 1; x = p.x + dx/d*(n.half + 28); z = p.z + dz/d*(n.half + 28); }
+    if(!clearOf(x, z, 22) || inWaterway(x, z)) return;
+    const n2 = nearest(x, z), p2 = MAIN.pts[n2.pi];
+    farm(x, z, Math.atan2(p2.x - x, p2.z - z));
   });
+  /* cows: black and white, grazing in the meadows between the bulb fields, a few to a herd */
+  if(TRACK.ground === "tulips"){
+    const cow = ()=>{ const g = new THREE.Group(), wh = PM(0xf2efe6), bk = PM(0x1c1c1e), pink = PM(0xe8a8a0);
+      pbox(g, 0.95, 0.95, 2.1, wh, 0, 1.25, 0);
+      for(let k=0;k<4;k++) pbox(g, 0.97, 0.5 + rnd()*0.4, 0.4 + rnd()*0.6, bk, 0, 1.2 + (rnd() - 0.5)*0.4, (rnd() - 0.5)*1.5);
+      for(const [lx, lz] of [[-0.32, 0.8], [0.32, 0.8], [-0.32, -0.8], [0.32, -0.8]]) pbox(g, 0.2, 0.85, 0.2, wh, lx, 0.42, lz);
+      const head = new THREE.Group(); head.position.set(0, 1.35, 1.15); head.rotation.x = rnd() < 0.6 ? 0.9 : 0.1; g.add(head);
+      pbox(head, 0.45, 0.5, 0.75, bk, 0, 0, 0.3); pbox(head, 0.42, 0.3, 0.2, pink, 0, -0.12, 0.72); pbox(head, 0.6, 0.08, 0.08, PM(0xe8e0c8), 0, 0.28, 0.1);
+      pbox(g, 0.08, 0.7, 0.08, bk, 0, 1.15, -1.1); pbox(g, 0.35, 0.18, 0.3, pink, 0, 0.72, -0.5);
+      return g; };
+    for(let q=0, herds=0; q<600 && herds<8; q++){
+      const i = Math.floor(rnd()*N), p = MAIN.pts[i], t = MAIN.tans[i], sd = rnd() < 0.5 ? -1 : 1, o = MAIN.half[i] + 25 + rnd()*60;
+      const x = p.x - t.z*sd*o, z = p.z + t.x*sd*o;
+      if(tulipAt(x, z) >= 0 || !clearOf(x, z, 18) || inWaterway(x, z)) continue;
+      let ok = true; for(let k=0;k<8;k++){ const a = k/8*6.28; if(tulipAt(x + Math.cos(a)*12, z + Math.sin(a)*12) >= 0) ok = false; } if(!ok) continue;
+      herds++;
+      for(let c=0;c<3 + Math.floor(rnd()*3);c++){ const a = rnd()*6.28, r = 2 + rnd()*9, cx = x + Math.cos(a)*r, cz = z + Math.sin(a)*r;
+        if(inWaterway(cx, cz)) continue; setDown(cow(), cx, cz, rnd()*6.28); }
+    }
+  }
 
   /* ---- KOI GARDEN ------------------------------------------------------ */
   BOARDWALKS.forEach(bwFlood);
@@ -13966,6 +14068,7 @@ if(GLOW){
       const x = P.pts[i].x + nx*side*off + t.x*jit;
       const z = P.pts[i].z + nz*side*off + t.z*jit;
       { const nn = nearest(x,z); if(nn.dist < Math.max(9.4, nn.half + 3.7)) return false; }   // (a wide road keeps its trees further back)
+      if(TRACK.openFields && nearest(x, z).dist < TRACK.openFields) return false;                // (the polder: open fields along the road)
       if(Math.hypot(x,z) > Math.max(620, FAR + 70)) return false;
       if(inWaterway(x,z) || barren(x,z)) return false;          // trees do not grow in the river
       if(TRACK.treeline && gradedY(x, z) > TRACK.treeline + (Math.random() - 0.7)*14) return false;   // nor above the treeline
