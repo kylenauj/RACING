@@ -17944,7 +17944,7 @@ function recordFor(){ return SAVE.records[TRACK.name] || (SAVE.records[TRACK.nam
 /* ---- the leaderboards: a top ten for every circuit (best lap) and every expedition (fastest
    climb), three initials a line, arcade style. Kept on this computer, and shared through the
    online board wherever the game can reach it (on your own site). ---- */
-const LB = { global:new Map(), busy:new Map(), mark:null };
+const LB = { global:new Map(), busy:new Map(), at:new Map(), mark:null };
 const LB_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 const lbInit = s => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 3);
 function lbLocal(name){ SAVE.boards = SAVE.boards || {}; return SAVE.boards[name] || (SAVE.boards[name] = []); }
@@ -17954,9 +17954,10 @@ function lbRows(name){
     const k = r.i + "|" + r.ms; if(seen.has(k)) return; seen.add(k); out.push(r); });
   return out.slice(0, 10);
 }
-function lbFetch(name){
+/* (fresh: fetched again even if we have it, so laps your friends have just posted show up) */
+function lbFetch(name, fresh){
   if(!NET_CFG.enabled || NET.mock) return Promise.resolve(null);
-  if(LB.global.has(name)) return Promise.resolve(LB.global.get(name));
+  if(LB.global.has(name) && !fresh) return Promise.resolve(LB.global.get(name));
   if(LB.busy.has(name)) return LB.busy.get(name);
   const pr = (async ()=>{
     try{
@@ -17964,7 +17965,7 @@ function lbFetch(name){
       const { data, error } = await sb.from("laps").select("name,lap_ms").eq("track", name).order("lap_ms", {ascending:true}).limit(60);
       if(error) return null;
       const rows = (data || []).map(r=> ({i: lbInit(r.name) || "???", ms: r.lap_ms|0})).filter(r=> r.ms > 0);
-      LB.global.set(name, rows); return rows;
+      LB.global.set(name, rows); LB.at.set(name, performance.now()); return rows;
     } catch(e){ return null; } finally { LB.busy.delete(name); }
   })();
   LB.busy.set(name, pr); return pr;
@@ -17981,12 +17982,21 @@ function lbTableHTML(name, label, mark){
   return '<div class="lb" data-lb="' + esc(name) + '" data-lbl="' + esc(label) + '"><div class="lbhead"><span>' + esc(label) + '</span><span class="scope">' + (world ? 'WORLD' : 'THIS PC') + '</span></div>' +
          '<div class="lbgrid">' + cells + '</div></div>';
 }
-/* redraw any board on screen once the online one has come in */
+/* redraw any board on screen once the online one has come in. In an online room the board is fetched
+   again every so often (it was fetched once and kept, so laps set racing your friends never showed) */
+const LB_STALE = 15000;
 function lbFill(){
   UIEL.querySelectorAll(".lb[data-lb]").forEach(el=>{
     const name = el.dataset.lb, label = el.dataset.lbl;
-    if(LB.global.has(name) || !NET_CFG.enabled || NET.mock) return;
-    lbFetch(name).then(()=>{ if(el.isConnected) el.outerHTML = lbTableHTML(name, label, LB.mark && LB.mark.name === name ? LB.mark : null); });
+    if(!NET_CFG.enabled || NET.mock) return;
+    const stale = NET.on && performance.now() - (LB.at.get(name) || 0) > LB_STALE;
+    if(LB.global.has(name) && !stale) return;
+    if(LB.busy.has(name)) return;
+    LB.at.set(name, performance.now());                     // (a failed fetch waits its turn too)
+    lbFetch(name, stale).then(()=>{
+      // (the screen may have been redrawn meanwhile: put it in whichever board is showing now)
+      UIEL.querySelectorAll('.lb[data-lb]').forEach(e2=>{ if(e2.dataset.lb === name && e2.dataset.lbl === label) e2.outerHTML = lbTableHTML(name, label, LB.mark && LB.mark.name === name ? LB.mark : null); });
+    });
   });
 }
 /* what this run puts on the board: the best lap on a circuit, the time to the top on an expedition */
@@ -18122,6 +18132,7 @@ function applySettings(){
   camMode = S.cam;
   trans.auto = S.auto;
   paintCar(PAINTS[Math.max(0, Math.min(PAINTS.length-1, S.paint|0))].hex);
+  try{ if(NET.on && NET.lastPaint !== S.paint){ NET.lastPaint = S.paint; netTrackMe(); } }catch(e){}
   const print = (S.look | 0) === 0, pixel = (S.look | 0) === 2;
   if(print !== LOOK.print || pixel !== LOOK.pixel){ LOOK.print = print; LOOK.pixel = pixel; sizeRT(); }
   if(S.gfx + ":" + AUTOQ.q !== GFX.sig || !rt) applyQuality();
@@ -19744,7 +19755,14 @@ async function netClient(){
 /* ---- the channel: presence + a handful of events ----
    The real one is Supabase Realtime. The stand-in (#mocknet=1) runs the
    same calls over a BroadcastChannel between tabs of one browser, for testing. */
-const NET_EVENTS = ["sig", "start", "track", "fin", "pos", "abort", "chat"];
+const NET_EVENTS = ["sig", "start", "track", "fin", "pos", "abort", "chat", "bye"];
+/* how long a friend who has dropped out of the room's presence is kept (as "reconnecting") before they
+   count as gone: a blink in the room (a reconnect, a presence update that lands as a leave and a join)
+   must not throw anyone out. Leaving on purpose says "bye", and that drops them at once. */
+const NET_GRACE = 20000;
+/* the last room's channel, still closing: a new one on the same room waits for it (the library hands
+   back a channel that is still leaving, and when it finishes closing it takes the new one with it) */
+let NET_GONE = Promise.resolve();
 async function netTransport(code, meta, h){
   if(NET.mock){
     const bc = new BroadcastChannel("pine-" + code), seen = new Map();
@@ -19754,7 +19772,7 @@ async function netTransport(code, meta, h){
     bc.onmessage = e=>{
       const m = e.data;
       if(m.k === "pres"){ const had = seen.has(m.from); seen.set(m.from, {meta:m.meta, t:performance.now()}); if(!had) hello(); sync(); }
-      else if(m.k === "bye"){ seen.delete(m.from); sync(); }
+      else if(m.k === "bye"){ seen.delete(m.from); h.event("bye", {from:m.from}); sync(); }
       else if(m.k === "ev") h.event(m.event, m.payload);
     };
     const tick = setInterval(()=>{ hello(); const now = performance.now(); let gone = false;
@@ -19768,21 +19786,53 @@ async function netTransport(code, meta, h){
     };
   }
   const sb = await netClient();
-  const ch = sb.channel("pine-" + code, { config:{ broadcast:{ self:false, ack:false }, presence:{ key:NET.id } } });
-  NET_EVENTS.forEach(ev=> ch.on("broadcast", {event:ev}, msg=> h.event(ev, msg.payload)));
-  ch.on("presence", {event:"sync"}, ()=>{
-    const st = ch.presenceState();
-    h.sync(Object.keys(st).map(k=> st[k][st[k].length - 1]).filter(Boolean));
-  });
-  let mine = meta, live = false;
-  ch.subscribe(status=>{
-    if(status === "SUBSCRIBED"){ live = true; ch.track(mine); h.ready(); }
-    else if(status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED"){ live = false; h.error(status); }
-  });
+  await NET_GONE;
+  /* The room's channel. If the server closes it or it errors (a dropped connection, too many updates
+     at once) it is not the end of the room: the library rejoins an errored channel by itself, and if it
+     hasn't come back in a while, or the server closed it outright, a fresh one is opened. Every time it
+     comes back you are put back in the room's presence, as you are now. */
+  const topic = "pine-" + code;
+  let mine = meta, live = false, dead = false, ch = null, retry = null, tries = 0, selfT = 0;
+  const open = ()=>{
+    const c = ch = sb.channel(topic, { config:{ broadcast:{ self:false, ack:false }, presence:{ key:NET.id } } });
+    NET_EVENTS.forEach(ev=> c.on("broadcast", {event:ev}, msg=>{ if(c === ch) h.event(ev, msg.payload); }));
+    c.on("presence", {event:"sync"}, ()=>{
+      if(c !== ch) return;
+      const st = c.presenceState();
+      h.sync(Object.keys(st).map(k=> st[k][st[k].length - 1]).filter(Boolean));
+      // (the room has lost us while the channel stayed up: put us back)
+      if(live && !st[NET.id] && performance.now() - selfT > 4000){ selfT = performance.now(); c.track(mine); }
+    });
+    c.subscribe(status=>{
+      if(dead || c !== ch) return;
+      if(status === "SUBSCRIBED"){ live = true; tries = 0; selfT = performance.now(); c.track(mine); h.ready(); }
+      else if(status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED"){ live = false; h.error(status); heal(status === "CLOSED" ? 1500 : 8000); }
+    });
+  };
+  const heal = wait=>{
+    if(dead || retry) return;
+    retry = setTimeout(async ()=>{
+      retry = null;
+      if(dead || live) return;                                   // (it came back by itself)
+      const old = ch; ch = null;
+      if(old && old.state !== "closed"){ try{ await sb.removeChannel(old); }catch(e){} }
+      if(sb.realtime && Array.isArray(sb.realtime.channels)) sb.realtime.channels = sb.realtime.channels.filter(c=> c !== old);
+      if(dead) return;
+      tries++; open();
+    }, Math.min(20000, wait*(1 + tries)));
+  };
+  open();
   return {
-    send: (event, payload)=>{ if(live) ch.send({type:"broadcast", event, payload}); },
-    track: m=>{ mine = m; if(live) ch.track(m); },
-    leave: ()=>{ try{ sb.removeChannel(ch); }catch(e){} }
+    send: (event, payload)=>{ if(live && ch) ch.send({type:"broadcast", event, payload}); },
+    track: m=>{ mine = m; if(live && ch) ch.track(m); },
+    leave: ()=>{
+      if(dead) return;
+      dead = true; clearTimeout(retry);
+      const c = ch; ch = null; if(!c) return;
+      try{ if(live) c.send({type:"broadcast", event:"bye", payload:{from:NET.id}}); }catch(e){}
+      NET_GONE = Promise.resolve(sb.removeChannel(c)).catch(()=>{}).then(()=>{
+        if(sb.realtime && Array.isArray(sb.realtime.channels)) sb.realtime.channels = sb.realtime.channels.filter(x=> x !== c); });
+    }
   };
 }
 
@@ -19826,7 +19876,7 @@ async function netJoin(code, opts){
                        // (after the host took everyone to a new circuit: start once they have all arrived)
                        auto: opts.auto ? {n:opts.auto, t:performance.now()} : null });
   clearInterval(NET.autoTimer); NET.autoTimer = setInterval(netAutoStart, 500);
-  NET.chat = []; NET.ready = false; NET.draft = "";
+  NET.chat = []; NET.ready = false; NET.draft = ""; NET.gone = new Set();
   try{ const c = JSON.parse(sessionStorage.getItem("pinehollow.chat") || "null"); sessionStorage.removeItem("pinehollow.chat");
        if(c && c.code === code && Array.isArray(c.chat)) NET.chat = c.chat.slice(-40); }catch(e){}
   try{ history.replaceState(null, "", "#track=" + TRACK_ID + "&room=" + code + (NET.mock ? "&mocknet=1" : "")); }catch(e){}
@@ -19845,6 +19895,7 @@ async function netJoin(code, opts){
 function netAutoStart(){
   // (and the lobby's JUST JOINED marks wear off)
   if(NET.on && MENU.id === "scLobby"){
+    lbFill();
     const fresh = [...NET.peers.values()].filter(p=> performance.now() - p.since < 5000).length;
     if(fresh !== NET.freshN){ NET.freshN = fresh; if(!NET.auto) netRefresh(); }
   }
@@ -19862,28 +19913,32 @@ function netLeave(quiet){
   NET.leaving = true; NET.peers.forEach(p=> netDropPeer(p)); NET.leaving = false;
   NET.peers.clear();
   if(NET.tx) NET.tx.leave();
-  NET.tx = null; NET.on = false; NET.racing = false; NET.metas = []; NET.ids = null;
+  NET.tx = null; NET.on = false; NET.racing = false; NET.metas = []; NET.ids = null; clearTimeout(NET.trackTimer);
   try{ history.replaceState(null, "", "#track=" + TRACK_ID); }catch(e){}
   // (in the menus the backdrop's own rivals take over again, or they'd stand frozen where they were)
   if(!quiet){ FIELD = state.phase === "menu" ? rivals : []; }
 }
 /* the one who made the room runs it; if they have gone, whoever has been in it longest */
 function netHostId(){
-  const all = NET.metas.some(m=> m.id === NET.id) ? NET.metas : NET.metas.concat([netMeta()]);
+  let all = NET.metas.some(m=> m.id === NET.id) ? NET.metas : NET.metas.concat([netMeta()]);
+  all = all.concat(netAway().filter(m=> !all.some(a=> a.id === m.id)));
   const list = all.slice().sort((a, b)=> (b.host - a.host) || (a.at - b.at) || (a.id < b.id ? -1 : 1));
   return list.length ? list[0].id : NET.id;
 }
 function netIsHost(){ return netHostId() === NET.id; }
+/* friends who have dropped out of the room's presence but not left: reconnecting, still in the room */
+function netAway(){ const out = []; NET.peers.forEach(p=>{ if(p.missing && p.meta) out.push(Object.assign({}, p.meta, {away:true})); }); return out; }
 function netSync(list){
-  NET.metas = list.filter(m=> m && m.id).slice(0, NET_CFG.max + 2);
+  NET.metas = list.filter(m=> m && m.id && !(NET.gone && NET.gone.has(m.id))).slice(0, NET_CFG.max + 2);
   const ids = new Set(NET.metas.map(m=> m.id));
   // new faces: a car for each, and a direct line to them
   let arrived = false;
-  NET.metas.forEach(m=>{ if(m.id !== NET.id && !NET.peers.has(m.id)){ netAddPeer(m); arrived = true; } else if(NET.peers.has(m.id)) netUpdatePeer(NET.peers.get(m.id), m); });
+  NET.metas.forEach(m=>{ if(m.id !== NET.id && !NET.peers.has(m.id)){ netAddPeer(m); arrived = true; } else if(NET.peers.has(m.id)){ const p = NET.peers.get(m.id); p.missing = 0; netUpdatePeer(p, m); } });
   if(arrived && MENU.id === "scLobby") SFX.ok();
-  // gone from the room: dropped, unless their car is still talking to us directly (the room blinked)
+  /* gone from the room's presence: kept for a while as reconnecting (netFrame drops them if they don't
+     come back), and never while their car is still talking to us directly (the room blinked) */
   NET.ids = ids;
-  NET.peers.forEach((p, id)=>{ if(!ids.has(id) && !netAlive(p)) netDropPeer(p); });
+  NET.peers.forEach((p, id)=>{ if(!ids.has(id) && !p.missing) p.missing = performance.now(); });
   // a friend who joined by link lands on whatever circuit the host is on
   const hostM = NET.metas.find(m=> m.id === netHostId());
   // the host picked another circuit: say so, and everyone readies up again for it
@@ -19898,7 +19953,7 @@ function netSync(list){
     return;
   }
   // only redraw when something anyone can see has changed (presence pings arrive all the time)
-  const sig = JSON.stringify(NET.metas.map(m=> [m.id, m.name, m.ready, m.track, m.pick, m.racing, m.paint, m.garage]));
+  const sig = JSON.stringify(NET.metas.map(m=> [m.id, m.name, m.ready, m.track, m.pick, m.racing, m.paint, m.garage]).concat(netAway().map(m=> m.id)));
   if(sig !== NET.metaSig || arrived){ NET.metaSig = sig; netRefresh(); }
 }
 
@@ -20011,6 +20066,12 @@ function netEvent(ev, d){
   if(!d || typeof d !== "object") return;
   if(ev === "sig") return netSignal(d);
   if(ev === "pos"){ const p = NET.peers.get(d.from); if(p){ p.relay = p.relay || !p.open; netPose(p, d); } return; }
+  if(ev === "bye" && typeof d.from === "string"){
+    if(NET.gone) NET.gone.add(d.from);
+    NET.metas = NET.metas.filter(m=> m.id !== d.from);
+    const p = NET.peers.get(d.from); if(p) netDropPeer(p);
+    return;
+  }
   // (a friend who has only just arrived may not have seen the host yet: the host says so itself)
   const fromHost = d.from === netHostId() || d.host === true;
   if(ev === "track" && fromHost && typeof d.id === "number" && TRACKS[d.id] && d.id !== TRACK_ID){
@@ -20067,7 +20128,16 @@ function netStart(){
   NET.tx.send("start", {from:NET.id, host:true, track:TRACK_ID, grid});
   netBegin(grid);
 }
-function netTrackMe(){ if(NET.tx) NET.tx.track(netMeta()); }
+/* Tell the room what you are and what you drive. Every tweak in the garage lands here, and the room
+   server throws out a client that floods it with presence updates (that was what took players out of the
+   lobby from the garage): so at most one update a second, and the latest state always goes out. */
+function netTrackMe(){
+  if(!NET.tx) return;
+  const now = performance.now(), gap = 1000, since = now - (NET.trackAt || -1e9);
+  clearTimeout(NET.trackTimer); NET.trackTimer = null;
+  const send = ()=>{ NET.trackTimer = null; NET.trackAt = performance.now(); if(NET.tx) NET.tx.track(netMeta()); };
+  if(since >= gap) send(); else NET.trackTimer = setTimeout(send, gap - since);
+}
 /* a grid slot's spot on this circuit, the same way placeAtStart puts you there */
 function netGridPose(slot){
   const gi = Math.round((24 - Math.floor(slot/2)*7)/segLen), p = pts[wrapIdx(MAIN, gi)], t = tans[wrapIdx(MAIN, gi)];
@@ -20082,7 +20152,7 @@ function netGridSpot(slot){
 /* every frame: send yourself, move everyone else */
 function netFrame(dt){
   if(!NET.on) return;
-  if(NET.ids) NET.peers.forEach((p, id)=>{ if(!NET.ids.has(id) && !netAlive(p)) netDropPeer(p); });
+  { const now = performance.now(); NET.peers.forEach(p=>{ if(p.missing && !netAlive(p) && now - p.missing > NET_GRACE) netDropPeer(p); }); }
   const racing = NET.racing && (state.phase === "racing" || state.phase === "countdown" || state.phase === "done");
   if(racing){
     NET.sendAcc += dt; NET.relayAcc += dt;
@@ -20147,7 +20217,7 @@ function netLiveRows(){
   const rows = [{name:NET.name || "You", you:true, paint:NET_PAINT(), fin:state.phase === "done" ? GAME.finishTime : null, prog:progressOf(state.lap - 1, state.idx)}];
   NET.peers.forEach(p=>{ if(!FIELD.includes(p.car)) return;
     rows.push({name:p.meta.name || "Friend", paint:p.meta.paint, fin:p.car.finish, prog:progressOf(p.car.lap || 0, p.car.s || 0), lap:(p.car.lap || 0) + 1,
-               gone:!NET.ids || !NET.ids.has(p.id)}); });
+               gone:!!p.missing && !netAlive(p)}); });
   rows.sort((a, b)=> (a.fin != null) !== (b.fin != null) ? (a.fin != null ? -1 : 1) : a.fin != null ? a.fin - b.fin : b.prog - a.prog);
   return rows;
 }
@@ -20174,12 +20244,20 @@ function netFinish(){
 }
 
 /* ---- the leaderboard: best laps per circuit, shared ---- */
-async function netPostLap(lapS, raceS, online){
-  const name = netNick(); if(!name || !(lapS > 15) || TRACK.test || EXP.on) return;
-  try{
-    const sb = await netClient(); if(!sb) return;
-    await sb.from("laps").insert({ track:TRACK.name, name, lap_ms:Math.round(lapS*1000), race_ms: raceS ? Math.round(raceS*1000) : null, online:!!online });
-  } catch(e){}
+/* After an online race your best lap goes on the circuit's board by itself, under your initials (or the
+   first three letters of your name): no NEW RECORD prompt, which would cover the live finish while your
+   friends are still coming in. It is posted whether or not it makes the top ten on this PC's copy of the
+   board, which can be out of date: the board decides. */
+function netPostLap(){
+  if(TRACK.test || EXP.on || !(state.best > 5) || !isFinite(state.best)) return;
+  const ini = lbInit(SAVE.initials) || lbInit(netNick()) || "???";
+  const c = lbCandidate();
+  if(c){ lbSubmit(c, ini); return; }                        // (in this PC's top ten: on its own board too, then posted)
+  const ms = Math.round(state.best*1000);
+  LB.mark = {name:TRACK.name, ms, i:ini};
+  if(NET_CFG.enabled && !NET.mock) (async ()=>{ try{ const sb = await netClient(); if(!sb) return;
+      await sb.from("laps").insert({ track:TRACK.name, name:ini, lap_ms:ms, race_ms:Math.round(state.t*1000), online:true });
+      const g = LB.global.get(TRACK.name); if(g){ g.push({i:ini, ms}); g.sort((a, b)=> a.ms - b.ms); } } catch(e){} })();
 }
 async function netBoard(name){
   try{
@@ -20246,13 +20324,13 @@ function netLink(){ return location.origin + location.pathname + "#room=" + NET.
 function showLobby(sel){
   if(!NET.on) return showOnline();
   const host = netIsHost(), me = NET.id, now = performance.now(), hostId = netHostId();
-  const list = NET.metas.slice().sort((a, b)=> a.at - b.at);
+  const list = NET.metas.concat(netAway().filter(m=> !NET.metas.some(x=> x.id === m.id))).sort((a, b)=> a.at - b.at);
   if(!list.some(m=> m.id === me)) list.unshift(netMeta());
   const guests = list.filter(m=> m.id !== hostId), readyN = guests.filter(m=> m.ready).length, allReady = readyN === guests.length;
   const rows = list.map(m=>{
     const p = NET.peers.get(m.id);
     const fresh = p && now - p.since < 5000;
-    const conn = m.id === me ? "" : m.racing ? "racing" : m.track !== TRACK_ID ? "on the way" : p ? (p.open || p.relay ? "" : "connecting") : "";
+    const conn = m.id === me ? "" : m.away ? "reconnecting" : m.racing ? "racing" : m.track !== TRACK_ID ? "on the way" : p ? (p.open || p.relay ? "" : "connecting") : "";
     const tag = m.garage ? '<span class="rtag gar">IN GARAGE</span>'
               : m.id === hostId ? '<span class="rtag host">HOST</span>'
               : m.ready ? '<span class="rtag ok">READY</span>' : '<span class="rtag">NOT READY</span>';
@@ -20327,6 +20405,7 @@ function showOnlinePause(){
 /* ---- results ---- */
 function showResults(){
   GAME.resultsShown = true;
+  if(!GAME.lbAsked && MODE === "online"){ GAME.lbAsked = true; LB.mark = null; netPostLap(); }
   if(!GAME.lbAsked){ GAME.lbAsked = true; LB.mark = null; const c = lbCandidate(); if(c){ showInitials(c, showResults); return; } }
   const rows = classification();
   const lead = rows[0].time;
