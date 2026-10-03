@@ -246,6 +246,16 @@
            color:var(--cream);font:inherit;font-size:15px;padding:10px 12px;outline:none;}
   #netChat:focus{background:rgba(0,0,0,.55);box-shadow:inset 3px 0 0 var(--signal);}
   #netChat::placeholder{color:#6f8478;}
+  /* an online race starting on another circuit: everyone loading in, then the grid */
+  .starting .big{font-size:clamp(44px,6vw,78px);}
+  .starting .rsub{margin:2px 0 16px;}
+  .gridbar{height:14px;max-width:420px;border:3px solid var(--ink);background:rgba(0,0,0,.35);overflow:hidden;box-shadow:3px 3px 0 var(--ink);margin:6px 0 18px;}
+  .gridbar i{display:block;height:100%;background:repeating-linear-gradient(135deg,var(--signal) 0 10px,#e0a21e 10px 20px);transition:width .4s;}
+  .gridbar i.wait{width:40%;animation:lslide 1.1s linear infinite;}
+  table.grid.lob tr.loading td{color:#9fb6a8;}
+  .rtag.load{background:rgba(0,0,0,.35);color:#ffd23d;animation:breathe2 1.2s ease-in-out infinite;}
+  @keyframes breathe2{0%,100%{opacity:1}50%{opacity:.45}}
+  @media (prefers-reduced-motion:reduce){.gridbar i.wait,.rtag.load{animation:none}}
   /* the live finish */
   .livehead{font-family:var(--display);font-size:13px;letter-spacing:.14em;color:#6e6250;margin:0 0 8px;}
   .livehead.all{color:#2f6b3c;}
@@ -399,8 +409,9 @@
     "<b>Tip</b> — On the polder, watch the windmills: when their sails race, a gust is about to hit the road.",
     "<b>Tip</b> — The hedges of the maze are solid. Scrape along them and you lose speed: keep off the walls."];
   try{
-    var n = sessionStorage.getItem("pinehollow.loadname");
-    if(n) document.getElementById("lname").textContent = "LOADING · " + n;
+    var n = sessionStorage.getItem("pinehollow.loadname"), h = sessionStorage.getItem("pinehollow.loadhead");
+    sessionStorage.removeItem("pinehollow.loadhead");
+    if(n) document.getElementById("lname").textContent = (h || "LOADING") + " · " + n;
   }catch(e){}
   document.getElementById("ltip").innerHTML = tips[Math.floor(Math.random()*tips.length)];
   try{
@@ -19531,10 +19542,13 @@ function travel(id, boot){
   try{ sessionStorage.setItem(BOOT_KEY, JSON.stringify(boot)); }catch(e){}
   try{ if(NET.on && NET.chat) sessionStorage.setItem("pinehollow.chat", JSON.stringify({code:NET.code, chat:NET.chat.slice(-40)})); }catch(e){}
   const L = document.getElementById("loading");
-  document.getElementById("lname").textContent = "LOADING \u00b7 " + TRACKS[id].name;
-  try{ sessionStorage.setItem("pinehollow.loadname", TRACKS[id].name); }catch(e){}
+  const head = boot && boot.starting ? "RACE STARTING" : "LOADING";
+  document.getElementById("lname").textContent = head + " \u00b7 " + TRACKS[id].name;
+  try{ sessionStorage.setItem("pinehollow.loadname", TRACKS[id].name); sessionStorage.setItem("pinehollow.loadhead", head); }catch(e){}
+  // (in a room: leaving the page to load the next circuit is not leaving the room)
+  if(NET.on) NET.travelling = true;
   L.classList.remove("gone");
-  setTimeout(()=>{ location.hash = "track=" + id; location.reload(); }, 80);
+  setTimeout(()=>{ location.hash = "track=" + id + (NET.mock ? "&mocknet=1" : ""); location.reload(); }, 80);
 }
 
 function showChamp(){
@@ -19772,7 +19786,7 @@ async function netTransport(code, meta, h){
     bc.onmessage = e=>{
       const m = e.data;
       if(m.k === "pres"){ const had = seen.has(m.from); seen.set(m.from, {meta:m.meta, t:performance.now()}); if(!had) hello(); sync(); }
-      else if(m.k === "bye"){ seen.delete(m.from); h.event("bye", {from:m.from}); sync(); }
+      else if(m.k === "bye"){ seen.delete(m.from); h.event("bye", {from:m.from, travel:!!m.travel}); sync(); }
       else if(m.k === "ev") h.event(m.event, m.payload);
     };
     const tick = setInterval(()=>{ hello(); const now = performance.now(); let gone = false;
@@ -19782,7 +19796,7 @@ async function netTransport(code, meta, h){
     return {
       send: (event, payload)=>{ if(!dead) bc.postMessage({k:"ev", event, payload}); },
       track: m=>{ mine = m; hello(); sync(); },
-      leave: ()=>{ if(dead) return; bc.postMessage({k:"bye", from:NET.id}); dead = true; clearInterval(tick); bc.close(); }
+      leave: travel=>{ if(dead) return; bc.postMessage({k:"bye", from:NET.id, travel:!!travel}); dead = true; clearInterval(tick); bc.close(); }
     };
   }
   const sb = await netClient();
@@ -19825,11 +19839,11 @@ async function netTransport(code, meta, h){
   return {
     send: (event, payload)=>{ if(live && ch) ch.send({type:"broadcast", event, payload}); },
     track: m=>{ mine = m; if(live && ch) ch.track(m); },
-    leave: ()=>{
+    leave: travel=>{
       if(dead) return;
       dead = true; clearTimeout(retry);
       const c = ch; ch = null; if(!c) return;
-      try{ if(live) c.send({type:"broadcast", event:"bye", payload:{from:NET.id}}); }catch(e){}
+      try{ if(live) c.send({type:"broadcast", event:"bye", payload:{from:NET.id, travel:!!travel}}); }catch(e){}
       NET_GONE = Promise.resolve(sb.removeChannel(c)).catch(()=>{}).then(()=>{
         if(sb.realtime && Array.isArray(sb.realtime.channels)) sb.realtime.channels = sb.realtime.channels.filter(x=> x !== c); });
     }
@@ -19867,12 +19881,12 @@ function netSendChat(){
 }
 function netMeta(){
   // (and the wagon you built in the garage, so your friends see you in it)
-  return { id:NET.id, name:NET.name, paint:NET_PAINT(), host:NET.host, track:TRACK_ID, pick:NET.pick, racing:NET.racing, at:NET.joinedAt, car:carOpts(), ready:!!NET.ready, garage:!!NET.inGarage };
+  return { id:NET.id, name:NET.name, paint:NET_PAINT(), host:NET.host, track:TRACK_ID, pick:NET.pick, racing:NET.racing, at:NET.joinedAt, car:carOpts(), ready:!!NET.ready, garage:!!NET.inGarage, auto:NET.auto ? NET.auto.n : 0 };
 }
 async function netJoin(code, opts){
   if(NET.on) netLeave(true);
   Object.assign(NET, { on:true, code, id:netNewId(), name:opts.name, host:!!opts.host, racing:false, status:"connecting",
-                       joinedAt:opts.at || Date.now(), metas:[], wantTrack:null, pick:TRACK_ID,
+                       joinedAt:opts.at || Date.now(), metas:[], wantTrack:null, pick:TRACK_ID, starting:null, travelling:false, startSig:"",
                        // (after the host took everyone to a new circuit: start once they have all arrived)
                        auto: opts.auto ? {n:opts.auto, t:performance.now()} : null });
   clearInterval(NET.autoTimer); NET.autoTimer = setInterval(netAutoStart, 500);
@@ -19899,6 +19913,12 @@ function netAutoStart(){
     const fresh = [...NET.peers.values()].filter(p=> performance.now() - p.since < 5000).length;
     if(fresh !== NET.freshN){ NET.freshN = fresh; if(!NET.auto) netRefresh(); }
   }
+  if(NET.on && MENU.id === "scStarting" && NET.starting && !NET.racing){
+    const hm = NET.metas.find(m=> m.id === netHostId() && m.id !== NET.id);
+    const waited = (performance.now() - NET.starting.t)/1000;
+    if(hm && hm.racing && hm.track === TRACK_ID && waited > 4){ NET.starting = null; netSys("The race started before your circuit had loaded: you're in the next one"); showLobby(); }
+    else if(waited > 45){ NET.starting = null; netSys("The start was called off"); showLobby(); }
+  }
   if(!NET.on || !NET.auto || NET.racing) return;
   if(!netIsHost()){ NET.auto = null; return; }
   const here = NET.metas.filter(m=> m.track === TRACK_ID && !m.racing).length;
@@ -19907,7 +19927,7 @@ function netAutoStart(){
   if((here >= NET.auto.n && waited > 3) || waited > 25){ NET.auto = null; netStart(); }
   else netRefresh();
 }
-function netBye(){ if(NET.tx) NET.tx.leave(); }
+function netBye(){ if(NET.tx) NET.tx.leave(!!NET.travelling); }
 function netLeave(quiet){
   if(!NET.on) return;
   NET.leaving = true; NET.peers.forEach(p=> netDropPeer(p)); NET.leaving = false;
@@ -19949,7 +19969,7 @@ function netSync(list){
   if(hostM) NET.hostPick = hostM.pick;
   if(hostM && hostM.id !== NET.id && hostM.track !== TRACK_ID && !NET.racing && !NET.wantTrack){
     NET.wantTrack = hostM.track;
-    travel(hostM.track, {mode:"online", room:NET.code, name:NET.name, at:NET.joinedAt});
+    travel(hostM.track, {mode:"online", room:NET.code, name:NET.name, at:NET.joinedAt, starting:!!hostM.auto, expect:hostM.auto | 0});
     return;
   }
   // only redraw when something anyone can see has changed (presence pings arrive all the time)
@@ -19986,7 +20006,7 @@ function netAddPeer(m){
   const p = { id:m.id, meta:m, car, pc:null, dc:null, open:false, relay:false, since:performance.now(), last:null, recv:0,
               sx:0, sy:0, sz:0, sh:0, sp:0, sr:0, pend:[], carKey:JSON.stringify(m.car || null) };
   NET.peers.set(m.id, p);
-  netSys((m.name || "A friend") + " joined");
+  if(!NET.starting) netSys((m.name || "A friend") + " joined");
   // back mid-race (their connection hiccuped): straight back into the field
   if(NET.racing && !m.spectate){ FIELD = FIELD.concat([car]); mesh.visible = true; }
   if(NET.id < m.id) netCall(p);                        // one side of each pair makes the offer
@@ -20006,8 +20026,8 @@ function netUpdatePeer(p, m){
     scene.remove(old); scene.add(mesh); p.car.mesh = mesh;
   }
 }
-function netDropPeer(p){
-  if(!NET.leaving && p.meta) netSys((p.meta.name || "A friend") + " left");
+function netDropPeer(p, quiet){
+  if(!NET.leaving && !quiet && p.meta) netSys((p.meta.name || "A friend") + " left");
   try{ if(p.dc) p.dc.close(); }catch(e){}
   try{ if(p.pc) p.pc.close(); }catch(e){}
   scene.remove(p.car.mesh);
@@ -20069,7 +20089,7 @@ function netEvent(ev, d){
   if(ev === "bye" && typeof d.from === "string"){
     if(NET.gone) NET.gone.add(d.from);
     NET.metas = NET.metas.filter(m=> m.id !== d.from);
-    const p = NET.peers.get(d.from); if(p) netDropPeer(p);
+    const p = NET.peers.get(d.from); if(p) netDropPeer(p, !!d.travel);
     return;
   }
   // (a friend who has only just arrived may not have seen the host yet: the host says so itself)
@@ -20079,7 +20099,7 @@ function netEvent(ev, d){
   }
   if(ev === "start" && fromHost && d.track === TRACK_ID) netBegin(d.grid || []);
   if(ev === "go" && fromHost && typeof d.track === "number" && TRACKS[d.track] && d.track !== TRACK_ID && !NET.wantTrack){
-    NET.wantTrack = d.track; travel(d.track, {mode:"online", room:NET.code, name:NET.name, at:NET.joinedAt});
+    NET.wantTrack = d.track; travel(d.track, {mode:"online", room:NET.code, name:NET.name, at:NET.joinedAt, starting:true, expect:d.n | 0});
   }
   if(ev === "abort" && fromHost && NET.racing){ NET.racing = false; enterMenuWorld(); showLobby(); }
   if(ev === "fin"){ const p = NET.peers.get(d.from); if(p && typeof d.time === "number") netMarkFinish(p, d.time); }
@@ -20095,7 +20115,7 @@ function netPose(p, d){
 /* ---- racing ---- */
 function netBegin(grid){
   if(GAME.garage || NET.inGarage){ GAME.garage = false; MENU.garage = null; NET.inGarage = false; rivals.forEach(r=>{ r.mesh.visible = true; r.shadow.visible = true; }); closeUI(); }
-  NET.racing = true; netTrackMe();
+  NET.racing = true; NET.starting = null; netTrackMe();
   setMode("online");
   FIELD = [...NET.peers.values()].filter(p=> p.meta && !p.meta.spectate).map(p=> p.car);
   FIELD.forEach(r=>{ r.finish = null; r.lap = 0; r.s = 0; r.mesh.visible = true; });
@@ -20119,13 +20139,13 @@ function netStart(){
   // another circuit: everyone goes there, and the race starts once they have all arrived
   if(NET.pick != null && NET.pick !== TRACK_ID && TRACKS[NET.pick]){
     const n = Math.max(1, NET.metas.length);
-    NET.tx && NET.tx.send("go", {from:NET.id, host:true, track:NET.pick});
-    travel(NET.pick, {mode:"online", room:NET.code, name:NET.name, host:true, at:NET.joinedAt, auto:n});
+    NET.tx && NET.tx.send("go", {from:NET.id, host:true, track:NET.pick, n});
+    travel(NET.pick, {mode:"online", room:NET.code, name:NET.name, host:true, at:NET.joinedAt, auto:n, starting:true});
     return;
   }
   // the grid: host on pole, then everyone in the order they came
   const grid = NET.metas.slice().sort((a, b)=> (b.id === NET.id) - (a.id === NET.id) || a.at - b.at).map(m=> m.id);
-  NET.tx.send("start", {from:NET.id, host:true, track:TRACK_ID, grid});
+  if(NET.tx) NET.tx.send("start", {from:NET.id, host:true, track:TRACK_ID, grid});
   netBegin(grid);
 }
 /* Tell the room what you are and what you drive. Every tweak in the garage lands here, and the room
@@ -20388,6 +20408,42 @@ function showLobby(sel){
 /* redraw the lobby as people come and go, without losing the selection */
 function netRefresh(){
   if(MENU.id === "scLobby") showLobby(MENU.sel);
+  else if(MENU.id === "scStarting") showStarting();
+}
+/* The host started on another circuit, so everyone has just loaded it: not the lobby (which looked as if
+   the start had been called off) but the grid forming. Who is here, who is still loading, and the race
+   starts by itself once everyone has arrived (or after 25 seconds, for anyone whose page is slow). */
+function showStarting(sel){
+  if(!NET.on) return showOnline();
+  const S = NET.starting || {t:performance.now(), n:0}, me = NET.id, host = netIsHost(), hostId = netHostId();
+  const list = NET.metas.concat(netAway().filter(m=> !NET.metas.some(x=> x.id === m.id))).sort((a, b)=> a.at - b.at);
+  if(!list.some(m=> m.id === me)) list.unshift(netMeta());
+  const here = list.filter(m=> m.track === TRACK_ID && !m.away), want = Math.max(S.n || 0, list.length);
+  const rows = list.map(m=>{
+    const ok = m.track === TRACK_ID && !m.away;
+    return '<tr class="' + (m.id === me ? 'you' : '') + (ok ? '' : ' loading') + '"><td class="p"><span class="dot" style="background:' + safeCol(m.paint) + '"></span></td>' +
+      '<td class="n">' + esc(m.name || "Friend") + (m.id === me ? ' <i>(you)</i>' : '') + '</td><td class="x">' +
+      (m.id === hostId ? '<span class="rtag host">HOST</span> ' : '') + (ok ? '<span class="rtag ok">ON THE GRID</span>' : '<span class="rtag load">LOADING</span>') + '</td></tr>';
+  });
+  for(let k=list.length; k<want; k++) rows.push('<tr class="loading"><td class="p"></td><td class="n">a driver on the way…</td><td class="x"><span class="rtag load">LOADING</span></td></tr>');
+  const frac = Math.min(1, here.length/Math.max(1, want)), all = here.length >= want;
+  // (redrawn only when something on it has changed: the presence pings keep coming)
+  const sig = rows.join("") + "|" + host + all;
+  if(MENU.id === "scStarting" && sig === NET.startSig && sel === undefined) return;
+  NET.startSig = sig;
+  openScreen("scStarting",
+    '<div class="cols starting" style="align-items:flex-start"><div class="left"><div class="big">' + (all ? 'GRID READY' : 'GET READY') + '</div>' +
+    '<div class="rsub">' + esc(TRACK.name) + ' · ' + NET_CFG.laps + ' laps · room ' + esc(NET.code) + '</div>' +
+    '<div class="gridbar"><i' + (all ? ' style="width:100%"' : ' style="width:' + Math.round(8 + frac*92) + '%"') + '></i></div>' +
+    '<p class="dimtx">' + (all ? 'Everyone is here. Lights out in a moment…' : here.length + ' of ' + want + ' drivers on the grid. The race starts by itself when everyone has loaded the circuit.') + '</p>' +
+    '<div class="menu" style="margin-top:14px;max-width:320px">' +
+    (host && !all ? '<button class="item" data-act="go"><span>START NOW</span><small>don’t wait</small></button>' : '') +
+    '<button class="item back" data-act="lobby"><span>BACK TO THE LOBBY</span></button></div></div>' +
+    '<div class="right"><h2 class="head sub">Drivers</h2><table class="grid lob">' + rows.join("") + '</table>' +
+    '<div class="detail" style="margin-top:16px"><h3>' + esc(TRACK.name) + '</h3><p>' + esc(TRACK.blurb || "") + '</p></div></div></div>',
+    { sel: sel || 0, back: ()=>{ SFX.back(); NET.starting = null; NET.auto = null; showLobby(); },
+      acts:{ go: ()=>{ SFX.ok(); NET.auto = null; NET.starting = null; netStart(); },
+             lobby: ()=>{ SFX.back(); NET.starting = null; NET.auto = null; netTrackMe(); showLobby(); } } });
 }
 function showOnlinePause(){
   openScreen("scPause",
@@ -20503,7 +20559,10 @@ function boot(){
     try{ localStorage.setItem("pinehollow.buildms." + TRACK_ID, String(Math.round(performance.now()))); }catch(e){} }
   setTimeout(()=> document.getElementById("loading").classList.add("gone"), 160);
   const roomLink = (location.hash.match(/(?:^|[#&])room=([A-Za-z]{4})/) || [])[1];
-  if(b && b.mode === "online" && b.room){ netJoin(b.room, {name:b.name || netNick(), host:!!b.host, at:b.at, auto:b.auto}); showLobby(); }
+  if(b && b.mode === "online" && b.room){
+    netJoin(b.room, {name:b.name || netNick(), host:!!b.host, at:b.at, auto:b.auto});
+    if(b.starting){ NET.starting = {t:performance.now(), n:b.expect || b.auto || 0}; showStarting(); } else showLobby();
+  }
   else if(roomLink){ showOnline(roomLink.toUpperCase()); }
   else if(b && b.mode === "champ" && SAVE.champ && !SAVE.champ.done) showChampIntro();
   else if(b && b.then === "ready" && MODES[b.mode]) showReady(b.mode);
