@@ -19746,6 +19746,37 @@ function netNick(){ return (SAVE.settings.nick || "").slice(0, 16); }
 function netCode(){ const A = "ABCDEFGHJKLMNPQRSTUVWXYZ"; let s = ""; for(let k=0;k<4;k++) s += A[Math.floor(Math.random()*A.length)]; return s; }
 function netNewId(){ return Math.random().toString(36).slice(2, 10); }
 
+/* ---- the shared clock ----
+   Every machine's clock reads differently, so the start can't be "at 12:00:05" on each. Instead each
+   friend asks the host the time, again and again, over the direct line (or the room if there isn't one):
+   half the round trip is the trip one way, and the answer that came back quickest is the most exact.
+   NET.clk.off is the host's clock minus ours, good to a few milliseconds. */
+const netNow = ()=> performance.timeOrigin + performance.now();
+function netClockTick(){
+  if(!NET.on || netIsHost()){ NET.clk = {off:0, n:0, best:0, s:[]}; return; }
+  const C = NET.clk || (NET.clk = {off:0, n:0, best:0, s:[]}), now = performance.now();
+  // (quickly at first, then every couple of seconds to follow the drift)
+  if(now - (C.at || 0) < (C.n < 6 ? 400 : 2000)) return;
+  C.at = now;
+  const hp = NET.peers.get(netHostId()), msg = {k:"tping", from:NET.id, to:netHostId(), t0:netNow()};
+  if(hp && hp.open && hp.dc && hp.dc.readyState === "open"){ try{ hp.dc.send(JSON.stringify(msg)); }catch(e){} }
+  else if(NET.tx) NET.tx.send("tping", msg);
+}
+function netClockMsg(p, m){
+  if(m.k === "tping" && m.to === NET.id){
+    const back = {k:"tpong", from:NET.id, to:m.from, t0:m.t0, th:netNow()};
+    const q = p || NET.peers.get(m.from);
+    if(q && q.open && q.dc && q.dc.readyState === "open"){ try{ q.dc.send(JSON.stringify(back)); }catch(e){} }
+    else if(NET.tx) NET.tx.send("tpong", back);
+  } else if(m.k === "tpong" && m.to === NET.id && m.from === netHostId() && typeof m.t0 === "number" && typeof m.th === "number"){
+    const C = NET.clk || (NET.clk = {off:0, n:0, best:0, s:[]}), now = netNow(), rtt = now - m.t0;
+    if(!(rtt >= 0 && rtt < 5000)) return;
+    C.s.push([rtt, m.th + rtt/2 - now]); if(C.s.length > 12) C.s.shift();
+    const b = C.s.reduce((a, s)=> s[0] < a[0] ? s : a);
+    C.off = b[1]; C.best = b[0]; C.n++;
+  }
+}
+
 /* the Supabase library is only fetched when someone goes online */
 let NET_LIB = null;
 function netLib(){
@@ -19769,7 +19800,7 @@ async function netClient(){
 /* ---- the channel: presence + a handful of events ----
    The real one is Supabase Realtime. The stand-in (#mocknet=1) runs the
    same calls over a BroadcastChannel between tabs of one browser, for testing. */
-const NET_EVENTS = ["sig", "start", "track", "fin", "pos", "abort", "chat", "bye"];
+const NET_EVENTS = ["sig", "start", "track", "fin", "pos", "abort", "chat", "bye", "tping", "tpong"];
 /* how long a friend who has dropped out of the room's presence is kept (as "reconnecting") before they
    count as gone: a blink in the room (a reconnect, a presence update that lands as a leave and a join)
    must not throw anyone out. Leaving on purpose says "bye", and that drops them at once. */
@@ -19889,7 +19920,8 @@ async function netJoin(code, opts){
                        joinedAt:opts.at || Date.now(), metas:[], wantTrack:null, pick:TRACK_ID, starting:null, travelling:false, startSig:"",
                        // (after the host took everyone to a new circuit: start once they have all arrived)
                        auto: opts.auto ? {n:opts.auto, t:performance.now()} : null });
-  clearInterval(NET.autoTimer); NET.autoTimer = setInterval(netAutoStart, 500);
+  clearInterval(NET.autoTimer); NET.autoTimer = setInterval(netAutoStart, 200);
+  NET.clk = {off:0, n:0, best:0, s:[]};
   NET.chat = []; NET.ready = false; NET.draft = ""; NET.gone = new Set();
   try{ const c = JSON.parse(sessionStorage.getItem("pinehollow.chat") || "null"); sessionStorage.removeItem("pinehollow.chat");
        if(c && c.code === code && Array.isArray(c.chat)) NET.chat = c.chat.slice(-40); }catch(e){}
@@ -19907,6 +19939,7 @@ async function netJoin(code, opts){
 /* Everyone travelled to the new circuit: the host starts as soon as they are all back in the
    room here (or after 25 seconds, for anyone whose page is slow), with a moment to connect */
 function netAutoStart(){
+  netClockTick();
   // (and the lobby's JUST JOINED marks wear off)
   if(NET.on && MENU.id === "scLobby"){
     lbFill();
@@ -20049,7 +20082,7 @@ function netWire(p, dc){
   p.dc = dc;
   dc.onopen = ()=>{ p.open = true; p.relay = false; netRefresh(); };
   dc.onclose = ()=>{ p.open = false; };
-  dc.onmessage = e=>{ try{ netPose(p, JSON.parse(e.data)); }catch(err){} };
+  dc.onmessage = e=>{ try{ const m = JSON.parse(e.data); if(m.k) netClockMsg(p, m); else netPose(p, m); }catch(err){} };
 }
 async function netCall(p){
   const pc = netPC(p);
@@ -20085,6 +20118,7 @@ async function netSignal(m){
 function netEvent(ev, d){
   if(!d || typeof d !== "object") return;
   if(ev === "sig") return netSignal(d);
+  if(ev === "tping" || ev === "tpong") return netClockMsg(null, Object.assign({}, d, {k:ev}));
   if(ev === "pos"){ const p = NET.peers.get(d.from); if(p){ p.relay = p.relay || !p.open; netPose(p, d); } return; }
   if(ev === "bye" && typeof d.from === "string"){
     if(NET.gone) NET.gone.add(d.from);
@@ -20097,7 +20131,7 @@ function netEvent(ev, d){
   if(ev === "track" && fromHost && typeof d.id === "number" && TRACKS[d.id] && d.id !== TRACK_ID){
     NET.wantTrack = d.id; travel(d.id, {mode:"online", room:NET.code, name:NET.name, at:NET.joinedAt});
   }
-  if(ev === "start" && fromHost && d.track === TRACK_ID) netBegin(d.grid || []);
+  if(ev === "start" && fromHost && d.track === TRACK_ID) netBegin(d.grid || [], d.goAt);
   if(ev === "go" && fromHost && typeof d.track === "number" && TRACKS[d.track] && d.track !== TRACK_ID && !NET.wantTrack){
     NET.wantTrack = d.track; travel(d.track, {mode:"online", room:NET.code, name:NET.name, at:NET.joinedAt, starting:true, expect:d.n | 0});
   }
@@ -20106,14 +20140,36 @@ function netEvent(ev, d){
   if(ev === "chat" && typeof d.text === "string" && d.from !== NET.id){ const p = NET.peers.get(d.from);
     netChatAdd(d.name || (p && p.meta.name) || "Friend", d.text, d.paint || (p && p.meta.paint)); }
 }
+/* the ground a friend's car is on: their own height says which deck (a bridge, the road under it) */
+function netGround(x, z, yHint){
+  const h = SURF_HINT; SURF_HINT = yHint + 0.6;
+  try{ return surfaceY(x, z); } finally { SURF_HINT = h; }
+}
+/* A word from a friend's car. They come over a line that doesn't wait to resend or keep order, so one
+   can arrive after a newer one: it's thrown away (it pulled the car backwards: the jumping about). Each is
+   kept in a short buffer, stamped with the sender's own clock, for netMoveCar to play back. */
 function netPose(p, d){
   if(typeof d.x !== "number" || !isFinite(d.x + d.z + (d.y || 0))) return;
-  p.last = d; p.recv = performance.now();
+  const now = performance.now();
+  if(typeof d.ts === "number"){
+    if(p.lastTs != null && d.ts <= p.lastTs) return;               // stale: a newer one is already here
+    p.lastTs = d.ts;
+    // how far the sender's clock is from ours, from the quickest arrivals (creeping up slowly, so it follows)
+    const s = now - d.ts;
+    p.off = p.off == null ? s : Math.min(s, p.off + (now - (p.offT || now))*0.02); p.offT = now;
+    if(p.lastArr) p.ivl = p.ivl ? p.ivl*0.9 + (now - p.lastArr)*0.1 : now - p.lastArr;
+    p.lastArr = now;
+    const B = p.buf || (p.buf = []);
+    B.push({ts:d.ts, x:d.x, y:d.y, z:d.z, h:d.h, p:d.p || 0, r:d.r || 0, vx:d.vx || 0, vz:d.vz || 0, vy:d.vy || 0, a:!!d.a,
+            go: Math.max(-1.2, Math.min(1.2, d.y - netGround(d.x, d.z, d.y)))});
+    if(B.length > 40) B.splice(0, B.length - 40);
+  }
+  p.last = d; p.recv = now;
   if(typeof d.fin === "number") netMarkFinish(p, d.fin);
 }
 
 /* ---- racing ---- */
-function netBegin(grid){
+function netBegin(grid, goAt){
   if(GAME.garage || NET.inGarage){ GAME.garage = false; MENU.garage = null; NET.inGarage = false; rivals.forEach(r=>{ r.mesh.visible = true; r.shadow.visible = true; }); closeUI(); }
   NET.racing = true; NET.starting = null; netTrackMe();
   setMode("online");
@@ -20124,6 +20180,15 @@ function netBegin(grid){
   NET.slot = at >= 0 ? at : grid.length + [...NET.peers.keys()].filter(id=> !grid.includes(id) && id < NET.id).length;
   NET.ready = false; NET.feed = [];
   resetRace();
+  /* the countdown runs to GO at the host's moment, read off the wall clock every frame (not added up
+     frame by frame, which fell behind on a slow or stuttering machine) */
+  GAME.goAtNet = 0;
+  if(typeof goAt === "number" && isFinite(goAt)){
+    const synced = netIsHost() || (NET.clk && NET.clk.n > 0);
+    const left = synced ? goAt - (netNow() + (netIsHost() ? 0 : NET.clk.off)) : 3200 + 1300;   // (unsynced: allow for the word's trip)
+    GAME.goAtNet = performance.now() + Math.max(300, Math.min(9000, left));
+    state.countdown = (GAME.goAtNet - performance.now())/1000;
+  }
   /* everyone is put on their own grid slot now, so you see them lined up through the countdown,
      before the first word from their car arrives */
   const now = performance.now();
@@ -20131,7 +20196,7 @@ function netBegin(grid){
     let slot = grid.indexOf(p.id); if(slot < 0) slot = grid.length + [...NET.peers.keys()].filter(id=> !grid.includes(id) && id < p.id).length;
     const q = netGridPose(slot);
     p.last = {x:q.x, y:q.y, z:q.z, h:q.h, p:0, r:0, vx:0, vz:0, lap:0, s:q.i, fin:null};
-    p.recv = now; p.placed = false; p.car.finish = null; p.announced = false;
+    p.recv = now; p.placed = false; p.car.finish = null; p.announced = false; p.buf = []; p.lastTs = null;
   });
 }
 function netStart(){
@@ -20145,8 +20210,11 @@ function netStart(){
   }
   // the grid: host on pole, then everyone in the order they came
   const grid = NET.metas.slice().sort((a, b)=> (b.id === NET.id) - (a.id === NET.id) || a.at - b.at).map(m=> m.id);
-  if(NET.tx) NET.tx.send("start", {from:NET.id, host:true, track:TRACK_ID, grid});
-  netBegin(grid);
+  /* GO is at one moment on the host's clock, far enough ahead for the word to reach everyone: each of
+     them counts down to that moment on their own clock (see netBegin), so the lights go out together */
+  const goAt = netNow() + 3200 + 1400;
+  if(NET.tx) NET.tx.send("start", {from:NET.id, host:true, track:TRACK_ID, grid, goAt});
+  netBegin(grid, goAt);
 }
 /* Tell the room what you are and what you drive. Every tweak in the garage lands here, and the room
    server throws out a client that floods it with presence updates (that was what took players out of the
@@ -20180,7 +20248,7 @@ function netFrame(dt){
       NET.sendAcc = 0;
       const r2 = v=> Math.round(v*100)/100;
       // (where the car is drawn: sunk into the mud or water as far as it is here, tilted the same way)
-      const d = { from:NET.id, x:r2(pose.x), y:r2(pose.y - (pose.sink || 0)), z:r2(pose.z), h:r2(pose.h + pose.yawVis), p:r2(pose.pitch), r:r2(pose.roll), st:r2(pose.steerVis || 0),
+      const d = { from:NET.id, ts:Math.round(performance.now()), vy:r2(pose.vy || 0), a:pose.air ? 1 : 0, x:r2(pose.x), y:r2(pose.y - (pose.sink || 0)), z:r2(pose.z), h:r2(pose.h + pose.yawVis), p:r2(pose.pitch), r:r2(pose.roll), st:r2(pose.steerVis || 0),
                   vx:r2(pose.vx), vz:r2(pose.vz), lap:state.lap - 1, s:state.idx, fin:state.phase === "done" ? GAME.finishTime : null, t:r2(state.t) };
       const js = JSON.stringify(d);
       let relayNeeded = false;
@@ -20198,14 +20266,42 @@ function netMoveCar(p, dt){
   const r = p.car, d = p.last;
   if(!d || !NET.racing){ r.mesh.visible = false; return; }
   r.mesh.visible = FIELD.includes(r);
-  // where it will be by now: the last word, carried on at its own speed, eased into
-  const age = Math.min(0.35, (performance.now() - p.recv)/1000);
-  const tx = d.x + (d.vx || 0)*age, tz = d.z + (d.vz || 0)*age, ty = d.y;
-  const k = 1 - Math.exp(-dt*14);
-  if(!p.placed || Math.hypot(tx - p.sx, tz - p.sz) > 25){ p.sx = tx; p.sy = ty; p.sz = tz; p.sh = d.h; p.sp = d.p || 0; p.sr = d.r || 0; p.placed = true; }
+  /* Where to draw it: played back a beat behind (a little more than the gap between words, so there is
+     nearly always a word either side of the moment drawn) and blended between the two, instead of
+     guessed ahead from the last one. Past the newest word it is carried on at its own speed, briefly. On
+     the ground it sits on our own ground, at the height their car sat above theirs: it can't sink into a
+     hill or float off a dip between words. In the air it flies the arc it was on. */
+  let tx, ty, tz, th, tp, tr;
+  const B = p.buf;
+  const angLerp = (a, b, f)=>{ let d2 = b - a; while(d2 > Math.PI) d2 -= 2*Math.PI; while(d2 < -Math.PI) d2 += 2*Math.PI; return a + d2*f; };
+  if(B && B.length && p.off != null){
+    const delay = Math.max(70, Math.min(320, (p.ivl || 50)*1.5 + 25));
+    const rt = performance.now() - p.off - delay;
+    let k = -1; for(let j=B.length - 1; j>=0; j--) if(B[j].ts <= rt){ k = j; break; }
+    let air, go;
+    if(k < 0){ const a = B[0]; tx = a.x; tz = a.z; ty = a.y; th = a.h; tp = a.p; tr = a.r; air = a.a; go = a.go; }
+    else if(k < B.length - 1){
+      const a = B[k], b = B[k + 1], f = Math.max(0, Math.min(1, (rt - a.ts)/Math.max(1, b.ts - a.ts)));
+      tx = a.x + (b.x - a.x)*f; tz = a.z + (b.z - a.z)*f; ty = a.y + (b.y - a.y)*f;
+      th = angLerp(a.h, b.h, f); tp = angLerp(a.p, b.p, f); tr = angLerp(a.r, b.r, f);
+      air = a.a && b.a; go = a.go + (b.go - a.go)*f;
+    } else {
+      const a = B[k], age = Math.min(0.25, (rt - a.ts)/1000);
+      tx = a.x + a.vx*age; tz = a.z + a.vz*age; ty = a.y + (a.a ? a.vy*age - 9*age*age : 0);
+      th = a.h; tp = a.p; tr = a.r; air = a.a; go = a.go;
+    }
+    const g = netGround(tx, tz, ty);
+    ty = air ? Math.max(ty, g - 0.3) : g + go;
+  } else {
+    // (a friend on an older copy of the game: no stamps, so the last word carried on, and kept on the ground)
+    const age = Math.min(0.35, (performance.now() - p.recv)/1000);
+    tx = d.x + (d.vx || 0)*age; tz = d.z + (d.vz || 0)*age; th = d.h; tp = d.p || 0; tr = d.r || 0;
+    ty = Math.max(d.y, netGround(tx, tz, d.y) - 0.3);
+  }
+  const k = 1 - Math.exp(-dt*30);
+  if(!p.placed || Math.hypot(tx - p.sx, tz - p.sz) > 25){ p.sx = tx; p.sy = ty; p.sz = tz; p.sh = th; p.sp = tp; p.sr = tr; p.placed = true; }
   else { p.sx += (tx - p.sx)*k; p.sy += (ty - p.sy)*k; p.sz += (tz - p.sz)*k;
-         let dh = d.h - p.sh; while(dh > Math.PI) dh -= 2*Math.PI; while(dh < -Math.PI) dh += 2*Math.PI; p.sh += dh*k;
-         p.sp += ((d.p || 0) - p.sp)*k; p.sr += ((d.r || 0) - p.sr)*k; }
+         p.sh = angLerp(p.sh, th, k); p.sp += (tp - p.sp)*k; p.sr += (tr - p.sr)*k; }
   r.mesh.position.set(p.sx, p.sy, p.sz);
   // tilted exactly the way their own car is drawn on their screen (yaw, then pitch and roll)
   r.mesh.rotation.set(p.sp, p.sh, p.sr);
@@ -20997,14 +21093,15 @@ function frame(now){
   if(run){
     if(state.phase === "countdown"){
       const before = Math.ceil(state.countdown);
-      state.countdown -= dt;
+      if(MODE === "online" && GAME.goAtNet) state.countdown = (GAME.goAtNet - performance.now())/1000;
+      else state.countdown -= dt;
       const after = Math.ceil(state.countdown);
       if(after !== before && after >= 1 && after <= 3) SFX.beep();
       /* the launch: when you first went for the throttle, and whether you held it */
       if(CTL.thr){ if(GAME.startAt === null || GAME.startAt === undefined) GAME.startAt = state.countdown; }
       else GAME.startAt = null;
       if(state.countdown <= 0){
-        state.phase = "racing";
+        state.phase = "racing"; GAME.goAtNet = 0;
         postMat.uniforms.uFlash.value = 0.35;
         state.t = 0; state.lapStart = 0;
         GAME.goT = 1.3; GHOST.rec = [];
