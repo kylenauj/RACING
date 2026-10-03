@@ -2208,6 +2208,8 @@ if(TRACK.gallery){
 (TRACK.washes || []).forEach(w=> SPOTS.push([snapTo(MAIN, w), 35]));
 const FLATS = [];
 const LAKE = {on:false};
+/* Koi Garden's skim: while the car is going fast enough over the sunken road, the lake's surface is its ground */
+const HYDRO = {on:false};
 const SWAMPS = [];                    // low flats of black water and tussocks the road wades across
 const BOARDWALKS = [];                // the Swamp Cup's boardwalks: stretches of main road on planks over pools (filled in once the road is final)
 let WATERS = false;                   // any standing water the car can wade (set once the pools are known)
@@ -5146,7 +5148,7 @@ function surfaceY(x, z){
     }
   }
   const h = gridH(x, z);
-  if(WATERS){ const wt = waterTop(x, z); if(wt !== null && h < wt - WADE_DEPTH) return wt - WADE_DEPTH; }   // never deeper than the wheels
+  if(WATERS){ const wt = waterTop(x, z); if(wt !== null && h < wt - WADE_DEPTH) return HYDRO.on && wt === LAKE.level ? wt : wt - WADE_DEPTH; }   // never deeper than the wheels (on top of it, hydroplaning)
   const c = cellAt(x, z);
   const half = c >= 0 && GP[c] >= 0 ? GHW[c] : 5;
   return h + offRoadBump(x, z)*smoothstep(half - 0.5, half + 5.0, distAt(x, z));
@@ -11405,6 +11407,8 @@ if(SPRINGCUP){
     list.forEach((L, k)=>{ e.set(L[4] || 0, L[3] || 0, L[5] || 0, "YXZ"); q4.setFromEuler(e); v.set(L[0], L[1], L[2]); s.set(L[6] || 1, L[7] || L[6] || 1, L[8] || L[6] || 1);
       m4.compose(v, q4, s); im.setMatrixAt(k, m4); if(colour) im.setColorAt(k, colour(c, L, k)); });
     im.instanceMatrix.needsUpdate = true; if(im.instanceColor) im.instanceColor.needsUpdate = true;
+    // (its bounds are the one shape's at the origin: the set's own culling, from where its copies really are, is done for it)
+    im.frustumCulled = false;
     im.castShadow = true; scene.add(im); return im;
   };
   // a piece of the road's own surface, for things that stand on it
@@ -12050,14 +12054,18 @@ if(SPRINGCUP){
       const fm = new THREE.Mesh(fg, new THREE.MeshLambertMaterial({map:tex, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2}));
       fm.receiveShadow = true; scene.add(fm);
     };
-    { const marbleT = new THREE.CanvasTexture(noiseCanvas(128, 128, (q, w, h)=>{ q.fillStyle = "#f2eee6"; q.fillRect(0, 0, w, h); q.fillStyle = "#2a2a30"; q.fillRect(0, 0, w/2, h/2); q.fillRect(w/2, h/2, w/2, h/2); }));
+    { // (the gallery's floor is pale polished stone in big slabs, quiet underfoot: a bold chequer at speed swam)
+      const marbleT = new THREE.CanvasTexture(noiseCanvas(256, 256, (q, w, h)=>{ q.fillStyle = "#6c604c"; q.fillRect(0, 0, w, h);
+        for(let r=0;r<2;r++) for(let c=0;c<2;c++){ const k = 0.95 + Math.random()*0.06; q.fillStyle = "rgb(" + Math.round(172*k) + "," + Math.round(156*k) + "," + Math.round(128*k) + ")"; q.fillRect(c*128 + 1, r*128 + 1, 126, 126); }
+        q.strokeStyle = "rgba(120,104,82,0.3)"; q.lineWidth = 1.2;
+        for(let k=0;k<10;k++){ q.beginPath(); let x = Math.random()*w, y = Math.random()*h; q.moveTo(x, y); for(let s=0;s<6;s++){ x += (Math.random() - 0.3)*40; y += (Math.random() - 0.5)*30; q.lineTo(x, y); } q.stroke(); } }));
       marbleT.wrapS = marbleT.wrapT = THREE.RepeatWrapping;
       const flagT = new THREE.CanvasTexture(noiseCanvas(256, 256, (q, w, h)=>{ q.fillStyle = "#6e6452"; q.fillRect(0, 0, w, h);
         for(let r=0;r<4;r++){ const off = r % 2 ? 32 : 0; for(let c=-1;c<4;c++){ const x = c*64 + off, y = r*64, k = 0.9 + Math.random()*0.18;
           q.fillStyle = "rgb(" + Math.round(168*k) + "," + Math.round(154*k) + "," + Math.round(128*k) + ")"; q.fillRect(x + 2, y + 2, 60, 60); } }
         for(let k=0;k<900;k++){ q.fillStyle = "rgba(90,80,60,0.07)"; q.fillRect(Math.random()*w, Math.random()*h, 2, 2); } }));
       flagT.wrapS = flagT.wrapT = THREE.RepeatWrapping;
-      floorRibbon([H0[0] + XG, H0[1] + ZN], [H0[0] + XG, H0[1] - D], GA.hw, marbleT, 3.2);
+      floorRibbon([H0[0] + XG, H0[1] + ZN], [H0[0] + XG, H0[1] - D], GA.hw, marbleT, 8);
       floorRibbon([H0[0], H0[1] - D - 0.5], [H0[0], H0[1] + D + 0.5], CA.hw, flagT, 4.8);
       floorRibbon([H0[0] - L - 0.5, H0[1] + WA.z], [H0[0] - L + WD + 0.5, H0[1] + WA.z], WA.hw, flagT, 4.8); }
     // the ways through the house are floored in marble
@@ -12234,21 +12242,8 @@ if(SPRINGCUP){
      pads all over the water, and the koi themselves, swimming under the surface and scattering from
      the car. */
   if(TRACK.lakeRoad && TRACK.lakeRoad.length && LAKE.on){
-    /* the giant pads of the road are Victoria water lilies: broad and flat, ribbed with veins out from the
-       middle, and turned up round the edge in a rim that is red underneath. The pads out on the water are
-       ordinary water lilies, notched, veined. */
-    const vicTex = new THREE.CanvasTexture(noiseCanvas(512, 128, (q, w, h)=>{
-      const gr = q.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, "#3c7426"); gr.addColorStop(0.55, "#4f8e2e"); gr.addColorStop(0.8, "#62a238");
-      gr.addColorStop(0.83, "#5a3a22"); gr.addColorStop(0.9, "#a8322a"); gr.addColorStop(1, "#d0583c"); q.fillStyle = gr; q.fillRect(0, 0, w, h);
-      for(let k=0;k<1400;k++){ q.fillStyle = "rgba(" + (Math.random() < 0.5 ? "30,70,20" : "120,170,70") + ",0.18)"; q.fillRect(Math.random()*w, Math.random()*h*0.8, 3 + Math.random()*6, 2 + Math.random()*4); }
-      q.strokeStyle = "rgba(34,66,22,0.85)"; q.lineWidth = 3;
-      for(let k=0;k<32;k++){ const x = k*w/32; q.beginPath(); q.moveTo(x, 4); q.lineTo(x + (Math.random() - 0.5)*4, h*0.8); q.stroke(); }
-      q.strokeStyle = "rgba(34,66,22,0.5)"; q.lineWidth = 1.5;
-      for(let r=1;r<6;r++){ const y = h*0.8*r/6; q.beginPath(); for(let x=0;x<=w;x+=8){ const yy = y + Math.sin(x*0.19)*3; x ? q.lineTo(x, yy) : q.moveTo(x, yy); } q.stroke(); }
-    }));
-    vicTex.wrapS = THREE.RepeatWrapping; vicTex.flipY = false;          // (v runs from the middle of the pad out to the rim)
-    const vicG = new THREE.LatheGeometry([[0, 0], [0.35, 0.002], [0.7, 0.006], [0.86, 0.012], [0.93, 0.035], [0.97, 0.09], [1.0, 0.16], [1.02, 0.18]].map(p=> new THREE.Vector2(p[0], p[1])), 48);
-    const vicM = new THREE.MeshLambertMaterial({map:vicTex, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:-3, polygonOffsetUnits:-3});
+    /* the pads: water lilies, round and notched, veined out from the middle; the road across the lake is a
+       chain of giant ones, each lying a little over the one before it */
     const lilyTex = new THREE.CanvasTexture(noiseCanvas(256, 256, (q, w, h)=>{
       const gr = q.createRadialGradient(w/2, h/2, 4, w/2, h/2, w/2); gr.addColorStop(0, "#9ac858"); gr.addColorStop(0.75, "#5e9a34"); gr.addColorStop(0.97, "#3e6e24"); gr.addColorStop(1, "#7a3a2a");
       q.fillStyle = gr; q.fillRect(0, 0, w, h);
@@ -12264,16 +12259,19 @@ if(SPRINGCUP){
       SPRINGFX.lake = SPRINGFX.lake || [];
       SPRINGFX.lake.push({a:S.a, n:S.n, kind:R.kind});
       if(R.kind === "lily"){
-        // the road itself: a chain of giant pads across it, two then three, rim to rim, and small pads between
+        // the road itself: one giant pad after another down it, each lying a little over the one before, its
+        // notch turned back under that one so the way is unbroken; smaller pads and lotus along the edges
+        // (not in a line: each a little to one side or the other, bigger or smaller, turned its own way, the gaps
+        //  between them uneven, and here and there a second pad lying half over the edge of the chain)
         let row = 0;
-        for(let k=0; k<=S.n; k+=Math.max(1, Math.round(6.6/seg)), row++){
-          const f = frm(S.a + k), y0 = Math.max(f.y, LAKE.level) + 0.03;
-          const lanes = row % 2 ? [[0, 4.5, 0], [-(f.half + 1.0), 3.1, -0.02], [f.half + 1.0, 3.1, -0.02]] : [[-3.4, 4.2, 0.015], [3.4, 4.2, 0.015]];
-          for(const [l, r, dy] of lanes){ const x = f.p.x + f.nx*l, z = f.p.z + f.nz*l;
-            roadPads.push([x, y0 + dy, z, rnd()*6.28, 0, 0, r*(0.95 + rnd()*0.1), 1, r*(0.95 + rnd()*0.1)]); }
-          for(let q=0;q<5;q++){ const l = (rnd()*2 - 1)*(f.half + 2.5), a = (rnd() - 0.5)*5, r = 1.0 + rnd()*1.2;
-            fillPads.push([f.p.x + f.nx*l + f.t.x*a, y0 - 0.02, f.p.z + f.nz*l + f.t.z*a, rnd()*6.28, 0, 0, r, 1, r]);
-            if(rnd() < 0.18 && Math.abs(l) > f.half - 0.5) lotus.push([f.p.x + f.nx*l*1.1 + f.t.x*a, y0, f.p.z + f.nz*l*1.1 + f.t.z*a]); }
+        for(let k=0; k<=S.n; k+=Math.max(1, Math.round((6.5 + rnd()*4)/seg)), row++){
+          const f = frm(S.a + k), y0 = Math.max(f.y, LAKE.level) + 0.08, l = (rnd() - 0.5)*3.6, r = f.half + 1.0 + Math.abs(l)*0.6 + rnd()*1.6;
+          roadPads.push([f.p.x + f.nx*l, y0 + (row % 14)*0.006, f.p.z + f.nz*l, Math.atan2(f.t.z, -f.t.x) + (rnd() - 0.5)*2.4, 0, 0, r, 1, r*(0.92 + rnd()*0.12)]);
+          if(rnd() < 0.35){ const sd = rnd() < 0.5 ? -1 : 1, l2 = sd*(f.half - 0.5 + rnd()*2), a2 = (rnd() - 0.5)*4, r2 = 3 + rnd()*2.2;
+            roadPads.push([f.p.x + f.nx*l2 + f.t.x*a2, y0 + ((row + 7) % 14)*0.006 + 0.003, f.p.z + f.nz*l2 + f.t.z*a2, rnd()*6.28, 0, 0, r2, 1, r2]); }
+          for(const sd of [-1, 1]) if(rnd() < 0.8){ const o = sd*(f.half + 2.5 + rnd()*2.5), a2 = (rnd() - 0.5)*6, rr = 1.4 + rnd()*1.6;
+            fillPads.push([f.p.x + f.nx*o + f.t.x*a2, LAKE.level + 0.03, f.p.z + f.nz*o + f.t.z*a2, rnd()*6.28, 0, 0, rr, 1, rr]);
+            if(rnd() < 0.25) lotus.push([f.p.x + f.nx*o*1.08 + f.t.x*a2, LAKE.level + 0.03, f.p.z + f.nz*o*1.08 + f.t.z*a2]); }
         }
         roadSign(byM(S.a, -90), 1, ["THE LILY PADS", "a road across the lake"], "#2a5a3a", "#f2fbf2");
       } else if(R.kind === "skim"){
@@ -12283,7 +12281,7 @@ if(SPRINGCUP){
           for(const sd of [-1, 1]){ const x = f.p.x + f.nx*sd*w, z = f.p.z + f.nz*sd*w;
             const c = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, 11.6, 12), red); c.position.set(x, y0 + 5.8, z); g.add(c);
             const b = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 1.2, 12), ink); b.position.set(x, LAKE.level + 0.2, z); g.add(b); }
-          const yaw = Math.atan2(f.t.x, f.t.z) + Math.PI/2;
+          const yaw = Math.atan2(f.t.x, f.t.z);                 // (a beam's length is its own x: across the road)
           const kas = new THREE.Mesh(new THREE.BoxGeometry(w*2 + 5, 0.9, 1.1), ink); kas.position.set(f.p.x, y0 + 11.9, f.p.z); kas.rotation.y = yaw; g.add(kas);
           const kas2 = new THREE.Mesh(new THREE.BoxGeometry(w*2 + 4.4, 0.7, 0.9), red); kas2.position.set(f.p.x, y0 + 11.2, f.p.z); kas2.rotation.y = yaw; g.add(kas2);
           const nuki = new THREE.Mesh(new THREE.BoxGeometry(w*2 + 2, 0.6, 0.6), red); nuki.position.set(f.p.x, y0 + 9.2, f.p.z); nuki.rotation.y = yaw; g.add(nuki);
@@ -12313,7 +12311,8 @@ if(SPRINGCUP){
       if(rnd() < 0.22) lotus.push([x + (rnd() - 0.5)*r, LAKE.level + 0.05, z + (rnd() - 0.5)*r]);
     }
     const padCol = (c)=>{ const k = 0.86 + rnd()*0.2; return c.setRGB(k*(0.92 + rnd()*0.12), k, k*(0.85 + rnd()*0.1)); };
-    instances(vicG, vicM, roadPads, padCol);
+    // (over the road they are drawn ahead of it: the road's own surface sits just under them)
+    instances(lilyG, new THREE.MeshLambertMaterial({map:lilyTex, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:-8, polygonOffsetUnits:-8}), roadPads, padCol);
     instances(lilyG, padM, fillPads, padCol);
     instances(lilyG, padM, lakePads, padCol);
     { const pet = new THREE.ConeGeometry(0.28, 0.9, 4); pet.translate(0, 0.45, 0);
@@ -12763,9 +12762,9 @@ if(SPRINGCUP){
     instances(fg, lam(0xffffff, 0x2a2000), list, c=> rnd() < 0.8 ? c.setHSL(0.14, 0.95, 0.56) : c.setHSL(0.12, 0.3, 0.95));
   }
 
-  /* the Koi Skim: over the sunken road through the lake, fast enough (100 km/h) and the car skips across the
-     top of the water like a flat stone, a burst of spray at every touch and a little speed lost each time;
-     too slow, or slowed below it, and it drops in and wades the rest */
+  /* the Koi Skim: over the sunken road through the lake, fast enough (100 km/h) and the car hydroplanes: it rides
+     on top of the water, throwing up great rooster tails of spray behind its wheels, the water dragging at it so it
+     slows the whole way; drop under 100 and it plunges in and wades the rest */
   const SKIM = {on:false, n:0, said:false, sunk:false, spray:0};
   SPRINGFX.skim = SKIM;
   const skimStep = dt=>{
@@ -12773,29 +12772,30 @@ if(SPRINGCUP){
     let inZone = false;
     if(near.path === MAIN) for(const L of SPRINGFX.lake){ if(L.kind !== "skim") continue; let k = near.pi - L.a; if(k < 0) k += N; if(k <= L.n) inZone = true; }
     const lvl = LAKE.level, sp = Math.hypot(pose.vx, pose.vz);
-    if(!inZone || state.phase === "menu"){ SKIM.on = false; SKIM.sunk = false; return; }
-    if(sp > 27.8 && !SKIM.sunk && pose.y < lvl + 0.08){
-      // a touch: bounce off the surface
-      pose.y = lvl + 0.08;
-      if(pose.vy < 1.5){ pose.vy = Math.min(4.6, Math.max(2.4, -pose.vy*0.45 + sp*0.06)); pose.air = true; pose.lastGy = pose.y;
-        pose.vx *= 0.975; pose.vz *= 0.975; SKIM.n++;
-        for(let k=0;k<26;k++) spawnDust(pose.x + (Math.random() - 0.5)*3, lvl + 0.2, pose.z + (Math.random() - 0.5)*3, [0.82, 0.93, 1.0], 0.6,
-          (Math.random() - 0.5)*9 + pose.vx*0.25, (Math.random() - 0.5)*9 + pose.vz*0.25, 3 + Math.random()*4);
-        splash.water = Math.min(1, (splash.water || 0) + 0.35);
-        if(actx && (SKIM.n % 2 === 1)) SFX.splash();
-        GAME.shake = Math.max(GAME.shake || 0, 0.08);
-        if(!SKIM.said){ SKIM.said = true; banner("SKIMMING!", "#bfe6ff", 1.4, "keep it over 100"); }
+    if(!inZone || state.phase === "menu"){ SKIM.on = false; SKIM.sunk = false; HYDRO.on = false; return; }
+    if(sp > 27.8 && !SKIM.sunk && pose.y > lvl - 0.25){
+      if(!SKIM.on){ SKIM.on = true; SKIM.n++; if(!SKIM.said){ SKIM.said = true; banner("HYDROPLANING!", "#bfe6ff", 1.4, "keep it over 100"); } }
+      HYDRO.on = true;
+      // the water drags at it all the way across: more than the engine can answer
+      const k = Math.max(0, 1 - dt*0.17); pose.vx *= k; pose.vz *= k;
+      // and it is light on the water: the tail wanders
+      pose.yawVis = (pose.yawVis || 0)*0.9 + Math.sin(state.t*2.3)*0.02;
+      // rooster tails off the rear wheels, and a sheet of spray off the sides
+      const fx = pose.vx/sp, fz = pose.vz/sp, rx = -fz, rz = fx;
+      SKIM.spray += dt*90;
+      while(SKIM.spray > 1){ SKIM.spray--;
+        const sd = Math.random() < 0.5 ? -1 : 1, wx = pose.x - fx*1.3 + rx*sd*0.85, wz = pose.z - fz*1.3 + rz*sd*0.85;
+        spawnDust(wx, lvl + 0.15, wz, [0.86, 0.95, 1.0], 1.1, -pose.vx*0.35 + rx*sd*(1 + Math.random()*3), -pose.vz*0.35 + rz*sd*(1 + Math.random()*3), 4 + Math.random()*4);
+        if(Math.random() < 0.4) spawnDust(pose.x + rx*sd*1.4, lvl + 0.1, pose.z + rz*sd*1.4, [0.9, 0.97, 1.0], 0.7, rx*sd*(5 + Math.random()*4) - pose.vx*0.1, rz*sd*(5 + Math.random()*4) - pose.vz*0.1, 2 + Math.random()*2);
       }
-      SKIM.on = true;
+      splash.water = Math.min(0.55, (splash.water || 0) + dt*0.6);
+      if(actx && Math.random() < dt*2.5) SFX.splash();
     } else if(SKIM.on && sp <= 27.8){
-      SKIM.on = false; SKIM.sunk = true;
-      for(let k=0;k<40;k++) spawnDust(pose.x + (Math.random() - 0.5)*3, lvl + 0.3, pose.z + (Math.random() - 0.5)*3, [0.82, 0.93, 1.0], 0.9, (Math.random() - 0.5)*6, (Math.random() - 0.5)*6, 4 + Math.random()*5);
-      if(actx) SFX.splash(); splash.water = 1;
-      banner("SPLOOSH", "#bfe6ff", 1.2, "too slow to skim");
-    }
-    // a feather of spray off the back while it skims
-    if(SKIM.on && pose.y < lvl + 0.9){ SKIM.spray += dt*40;
-      while(SKIM.spray > 1){ SKIM.spray--; spawnDust(pose.x - pose.vx/sp*2, lvl + 0.15, pose.z - pose.vz/sp*2, [0.86, 0.95, 1.0], 0.3, -pose.vx*0.15 + (Math.random() - 0.5)*4, -pose.vz*0.15 + (Math.random() - 0.5)*4, 2 + Math.random()*2); } }
+      SKIM.on = false; SKIM.sunk = true; HYDRO.on = false;
+      for(let k=0;k<50;k++) spawnDust(pose.x + (Math.random() - 0.5)*3, lvl + 0.3, pose.z + (Math.random() - 0.5)*3, [0.82, 0.93, 1.0], 1.1, (Math.random() - 0.5)*7, (Math.random() - 0.5)*7, 4 + Math.random()*6);
+      if(actx) SFX.splash(); splash.water = 1; GAME.shake = Math.max(GAME.shake || 0, 0.2);
+      banner("SPLOOSH", "#bfe6ff", 1.2, "too slow to stay on top");
+    } else HYDRO.on = false;
   };
   /* what happens to the car: the polder's gusts push it across the road, the falls soak it */
   SPRINGFX.step = dt=>{
@@ -13901,6 +13901,9 @@ if(GLOW){
         float fx = clamp(transformed.x/${FW.toFixed(2)}, 0.0, 1.0);
         transformed.z += fx*(0.16*sin(uWind*5.5 - transformed.x*3.8 + ph) + 0.05*sin(uWind*9.0 - transformed.x*7.0 + ph*1.7));
         transformed.y -= fx*fx*0.08 + fx*0.03*sin(uWind*3.0 + ph);`);
+      // (a cloth is one sheet seen from both sides: from behind, its picture is read back the right way round)
+      sh.fragmentShader = sh.fragmentShader.replace("#include <map_fragment>",
+        "vec4 texelColor = texture2D(map, gl_FrontFacing ? vUv : vec2(1.0 - vUv.x, vUv.y));\n texelColor = mapTexelToLinear(texelColor);\n diffuseColor *= texelColor;");
     };
     return m;
   });
@@ -18283,6 +18286,25 @@ function stepCamera(dt, sp){
       if(camera.position.y > rm[0]) camera.position.y = rm[0];
       const p = MAIN.pts[rm[2]], t = MAIN.tans[rm[2]], lat = (camera.position.x - p.x)*(-t.z) + (camera.position.z - p.z)*t.x;
       if(Math.abs(lat) > rm[1]){ const d = (Math.abs(lat) - rm[1])*Math.sign(lat); camera.position.x += t.z*d; camera.position.z -= t.x*d; }
+    }
+  }
+  /* in the Spring Cup's walled stretches (the maze, the house, the glasshouse) the view stays on your side of the
+     walls: where a hedge or a wall stands between the car and the camera (reversing, or a hairpin that swings
+     the view round over the next corridor), the camera comes in short of it and up over the hedge tops, and
+     goes back out once the line is clear */
+  if(SPRINGCUP && camMode !== 1 && MAIN.rail){
+    const cx = camera.position.x, cz = camera.position.z;
+    let cut = 1;
+    for(let k=1;k<=8;k++){
+      const f = k/8, n = nearest(pose.x + (cx - pose.x)*f, pose.z + (cz - pose.z)*f);
+      if(n.path === MAIN && MAIN.rail[n.pi] > 0.5 && n.dist > n.half + 0.2){ cut = (k - 1)/8; break; }
+    }
+    const was = GAME.camCut === undefined ? 1 : GAME.camCut;
+    GAME.camCut = was + (cut - was)*Math.min(1, dt*(cut < was ? 14 : 2.5));
+    if(GAME.camCut < 0.999){
+      const k = Math.max(0.3, GAME.camCut);
+      camera.position.x = pose.x + (cx - pose.x)*k; camera.position.z = pose.z + (cz - pose.z)*k;
+      camera.position.y = Math.max(camera.position.y, pose.y + 3.55 + (1 - GAME.camCut)*2.6);
     }
   }
   // never inside the hill: over a crest onto a steep drop the ground behind the car stands higher than the view
