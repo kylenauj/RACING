@@ -1358,20 +1358,21 @@ const TRACKS = [
     branches:[]},
 
   { name:"WISTERIA MANOR", after:"the gardens of a country house", relief:0.45, rollers:0.3, season:"spring", cup:5, kitOnly:true,
-    blurb:"the gardens of Wisteria Manor: off the gravel drive and round the great fountain in front of the house, under the wisteria walk, through the palm house, into the hedge maze with no way out but the road, and over the ha-ha into the deer park",
+    blurb:"the gardens of Wisteria Manor: off the gravel drive and round the great fountain in front of the house, through the carriage arch under its portico and off the end of the terrace, under the wisteria walk, through the palm house, into the hedge maze with no way out but the road, and over the ha-ha into the deer park",
     kit:["crest","kicker"],
     shape:"THE MAZE — between the hedges",
-    feature:"a hedge maze with walls you can't cut, a glasshouse and a wisteria tunnel to drive through, a fountain to go round and a ha-ha to jump",
-    ctrl:[[-200,-20],[-120,-12],[-50,-15],[-10,15],[5,45],[40,62],[75,45],[90,15],[120,-20],[170,-42],[230,-30],[290,-46],[350,-36],[410,-60],
+    feature:"a great house to drive through and jump off the terrace of, a hedge maze with walls you can't cut, a glasshouse and a wisteria tunnel to drive through, a fountain to go round and a ha-ha to jump",
+    ctrl:[[-200,-20],[-120,-12],[-55,-8],[-10,-28],[40,-38],[85,-12],[92,35],[65,72],[42,100],[40,128],[40,156],[41,184],[50,228],[85,262],
+          [140,262],[185,222],[200,160],[195,90],[176,32],[170,-10],[200,-36],[245,-30],[290,-46],[350,-36],[410,-60],
           [428,-98],[398,-123],[358,-124],[320,-140],[330,-185],[400,-190],[440,-215],[440,-260],[380,-270],[330,-300],[290,-335],[230,-322],
           [170,-345],[110,-325],[60,-305],[-60,-262],[-120,-215],[-170,-212],[-215,-165],[-260,-130],[-270,-60]],
     hills:[[40,180,200,6],[-200,-300,180,8]], jumps:[], fords:[], mud:[[[-120,-215],[-215,-165]]], autoFords:0, pits:1,
     flats:[[40,40,130]],
-    set:[[[0,-286],"tabletop"]],
-    spots:{house:[[40,128]], fountain:[[40,8]], pergola:[[160,-36],[262,-40]], glass:[[284,-40],[372,-42]], maze:[[416,-92],[352,-282]],
+    set:[[[0,-286],"tabletop"], [[41,175],"terrace"]],
+    spots:{house:[[40,128]], fountain:[[40,8]], pergola:[[200,-36],[268,-40]], glass:[[290,-44],[372,-42]], maze:[[416,-92],[352,-282]],
            haha:[[0,-286]], topiary:[[-110,10],[30,-55],[140,40],[-30,95]], deer:[[80,-210],[-150,-150],[220,-250]]},
-    rails:[[[160,-36],[262,-40]], [[284,-40],[372,-42]], [[416,-92],[352,-282]]],
-    widths:[[[416,-92],[352,-282],6.6]],
+    rails:[[[40,116],[40,140]], [[200,-36],[268,-40]], [[290,-44],[372,-42]], [[416,-92],[352,-282]]],
+    widths:[[[40,100],[40,150],6.0],[[416,-92],[352,-282],6.6]],
     banks:[[[-243,-146],[-247,-39],0.5]],
     ground:"lawn",
     trees:{kinds:["cherry","oak","weeping"], mix:[0.5, 0.5], tall:[[9,5],[13,7],[8,3]], density:0.45}, rockK:0.2, bushK:0.6, coverPink:0.3,
@@ -2814,7 +2815,7 @@ TRACK.branches.forEach((def, bi)=>{
      staircase  three ledges, one after another, down the hill
      ledge      one big ledge, the tall version of a drop           */
 const JUMP_LEN = { kicker:100, crest:80, double:190, tabletop:115, drop:95,
-                   rhythm:150, staircase:170, ledge:120, pop:40, drum:44, swells:310 };
+                   rhythm:150, staircase:170, ledge:120, pop:40, drum:44, swells:310, terrace:110 };
 /* a pop: a little kicker, 16m of curved face up to a lip 0.7m proud of the road, and straight back down
    behind it. At speed it throws the car 20 or 30 metres down the road. (Off a pop the car may leave at up
    to POP_KICK faster than the road there climbs, so one still pops up a steep hill taken flat out.) */
@@ -2841,6 +2842,9 @@ function shapeJump(P, at, type){
   };
   switch(type){
     case "kicker":   ramp(P, at, 30, 8, 2.0, 50); break;
+    /* Wisteria Manor's terrace: the drive runs out across it to the edge and off; the lawn falls away
+       beyond, which would shrink a kicker, so this one keeps its whole lip and the fall is the flight */
+    case "terrace":  ramp(P, at, 30, 8, 1.8, 50, true); break;
     case "pop":      if(!TRACK.planned) add(-POP_RUN, 4, popShape); break;     // (a planned track lays its pops on the finished road)
     case "crest":    add(-16, 38, crest(1.6, 15, 36)); break;
     case "double":   ramp(P, at, 26, 7, 1.7, 0); ramp(P, at + Math.round(95/seg), 26, 7, 1.9, 0); break;
@@ -11775,35 +11779,184 @@ if(SPRINGCUP){
     const cr = new THREE.Mesh(new THREE.CylinderGeometry(T*0.5, T*0.5, L + T*0.3, 8, 1, false, Math.PI/2, Math.PI), hedgeM); cr.rotation.x = Math.PI/2; cr.scale.set(1, 1, 0.55); cw.add(cr); g.add(cw);
   };
   if(SP("house")){
-    /* the house: a long stone front of three storeys, a portico with six columns and a pediment
-       facing the fountain, two wings coming forward, chimneys and a balustrade on the roof */
+    /* the house: Palladian, in honey-coloured stone. A three-storey centre block, and through the middle of
+       it, under a giant portico of four columns and a pediment with the stable clock, the carriage arch the
+       drive runs through to the garden front; a wing either side coming forward round the forecourt. Every
+       window has its stone surround, sill and glazing bars, a cornice or a pediment over the best floor; the
+       ground floor is rusticated, string courses run along at each floor, a cornice and a balustrade with
+       urns finish the walls, and over them the slate roofs, dormers, chimney stacks with their pots, and a
+       lead cupola on top. The walls are solid: the arch is the only way through. */
     const H0 = SP("house")[0], F0 = SP("fountain") ? SP("fountain")[0] : [H0[0], H0[1] - 100];
     const yaw = Math.atan2(F0[0] - H0[0], F0[1] - H0[1]), g = new THREE.Group();
-    const stone = PM(0xe8dcc0), dark = PM(0x4a4e56), white = PM(0xf6f2e8);
-    const winTex = new THREE.CanvasTexture(noiseCanvas(512, 128, (q, w, h)=>{ q.fillStyle = "#e8dcc0"; q.fillRect(0, 0, w, h);
-      for(let r=0;r<3;r++) for(let c=0;c<16;c++){ const x = 10 + c*31.5, y = 10 + r*40; q.fillStyle = "#f6f2e8"; q.fillRect(x, y, 18, 30); q.fillStyle = "#2a3440"; q.fillRect(x + 2, y + 2, 14, 26);
-        q.fillStyle = "#f6f2e8"; q.fillRect(x + 8, y + 2, 2, 26); q.fillRect(x + 2, y + 13, 14, 2); } }));
-    const front = new THREE.MeshLambertMaterial({map:winTex});
-    pbox(g, 64, 17, 18, stone, 0, 8.5, 0);
-    const face = new THREE.Mesh(new THREE.PlaneGeometry(62, 16), front); face.position.set(0, 8.5, 9.06); g.add(face);
-    for(const sd of [-1, 1]){
-      pbox(g, 18, 14, 30, stone, sd*41, 7, 6);
-      const wf = new THREE.Mesh(new THREE.PlaneGeometry(16, 12), front); wf.position.set(sd*41, 7, 21.06); g.add(wf);
-      const wr = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 13, 5, 4), dark); wr.rotation.y = Math.PI/4; wr.scale.set(0.72, 1, 1.6); wr.position.set(sd*41, 16.5, 6); g.add(wr);
-      for(const cx of [-6, 6]) pbox(g, 1.6, 4.5, 3, 0xb8ab92, sd*41 + cx, 19, 6);
+    const stone = PM(0xe4d3ae), stoneD = PM(0xcab793), white = PM(0xf4efe2), slate = PM(0x56606c), glass = PM(0x28323e), lead = PM(0x48525e), gold = PM(0xd8b04a);
+    const vaultM = new THREE.MeshLambertMaterial({color:0xb4a282, side:THREE.DoubleSide});
+    const AW = 7.6, AH = 10.5, W = 28, D = 10, HC = 18.5, WW = 10, WZ = 22, HW = 14.5, yc = AH - AW;
+    // a window, facing out along its own +z: the panes, an architrave, a sill, glazing bars, and over it a
+    // cornice (cap 1) or a pediment (cap 2)
+    const pedG = (w)=>{ const sh = new THREE.Shape(); sh.moveTo(-w/2, 0); sh.lineTo(w/2, 0); sh.lineTo(0, w*0.22); sh.closePath();
+      return new THREE.ExtrudeGeometry(sh, {depth:0.45, bevelEnabled:false}); };
+    const win = (x, y, z, ry, w, h, cap)=>{
+      const q = new THREE.Group(); q.position.set(x, y, z); q.rotation.y = ry; g.add(q);
+      pbox(q, w, h, 0.2, glass, 0, 0, 0.02);
+      pbox(q, 0.3, h + 0.3, 0.34, white, -w/2 - 0.15, 0, 0.1); pbox(q, 0.3, h + 0.3, 0.34, white, w/2 + 0.15, 0, 0.1);
+      pbox(q, w + 0.6, 0.3, 0.34, white, 0, h/2 + 0.15, 0.1);
+      pbox(q, w + 0.8, 0.28, 0.5, white, 0, -h/2 - 0.16, 0.18);
+      pbox(q, 0.1, h, 0.26, white, 0, 0, 0.06); pbox(q, w, 0.1, 0.26, white, 0, h*0.18, 0.06);
+      if(cap === 1) pbox(q, w + 1.3, 0.34, 0.62, white, 0, h/2 + 0.7, 0.24);
+      if(cap === 2){ const p = new THREE.Mesh(pedG(w + 1.4), white); p.position.set(0, h/2 + 0.55, -0.05); q.add(p); }
+    };
+    const urn = (x, y, z, G = g)=>{ pcyl(G, 0.22, 0.3, 0.3, 8, white, x, y + 0.15, z); pcyl(G, 0.42, 0.18, 0.7, 8, white, x, y + 0.65, z);
+      const t = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), white); t.position.set(x, y + 1.15, z); G.add(t); };
+    // a balustrade along a line at height y: a plinth, the balusters, and the coping
+    const balus = (x0, z0, x1, z1, y)=>{
+      const L = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.round(L/0.75)), ry = Math.atan2(x1 - x0, z1 - z0);
+      const base = pbox(g, 0.5, 0.25, L, white, (x0 + x1)/2, y + 0.12, (z0 + z1)/2); base.rotation.y = ry;
+      const cope = pbox(g, 0.6, 0.22, L + 0.3, white, (x0 + x1)/2, y + 1.15, (z0 + z1)/2); cope.rotation.y = ry;
+      for(let k=0;k<=n;k++){ const f = k/n; pcyl(g, 0.12, 0.17, 0.8, 6, white, x0 + (x1 - x0)*f, y + 0.65, z0 + (z1 - z0)*f); }
+    };
+    // a hipped roof over a rectangle (cx, cz, its width along x and depth along z), from height y
+    const hip = (cx, cz, wx, dz, y, h, top)=>{
+      const rg = new THREE.CylinderGeometry(top, 10, h, 4, 1); rg.rotateY(Math.PI/4);          // (square to the walls, then stretched to them)
+      const r = new THREE.Mesh(rg, slate); r.scale.set(wx/14.142, 1, dz/14.142); r.position.set(cx, y + h/2, cz); g.add(r); };
+
+    /* ---- the centre block, either side of the carriage arch and over it */
+    for(const sd of [-1, 1]) pbox(g, W - AW, HC, D*2, stone, sd*(AW + (W - AW)/2), HC/2, 0);
+    pbox(g, AW*2, HC - AH, D*2, stone, 0, AH + (HC - AH)/2, 0);
+    { const sp = new THREE.Shape();
+      sp.moveTo(-AW, AH); sp.lineTo(AW, AH); sp.lineTo(AW, yc); sp.absarc(0, yc, AW, 0, Math.PI, false); sp.lineTo(-AW, AH);
+      const eg = new THREE.ExtrudeGeometry(sp, {depth:D*2, bevelEnabled:false, curveSegments:24}); eg.translate(0, 0, -D); g.add(new THREE.Mesh(eg, stone));
+      // the vault of the passage, and the stone ring of the arch on both fronts with its keystone
+      const vg = new THREE.CylinderGeometry(AW, AW, D*2, 28, 1, true, -Math.PI/2, Math.PI); vg.rotateX(-Math.PI/2); vg.translate(0, yc, 0);
+      g.add(new THREE.Mesh(vg, vaultM));
+      for(const s of [-1, 1]){
+        const rg = new THREE.Mesh(new THREE.RingGeometry(AW, AW + 1.1, 28, 1, 0, Math.PI), new THREE.MeshLambertMaterial({color:0xf4efe2, side:THREE.DoubleSide}));
+        rg.position.set(0, yc, s*(D + 0.06)); g.add(rg);
+        pbox(g, 1.4, 1.8, 0.5, white, 0, AH + 0.5, s*(D + 0.2));
+        for(const sd of [-1, 1]){ pbox(g, 1.1, yc + 0.4, 0.3, white, sd*(AW + 0.55), (yc + 0.4)/2, s*(D + 0.12));
+          // a lamp either side inside the passage
+          pcyl(g, 0.3, 0.2, 0.8, 6, gold, sd*(AW - 0.35), 4.6, s*(D - 4)); }
+      }
     }
-    const roof = new THREE.Mesh(new THREE.CylinderGeometry(1, 34, 7, 4), dark); roof.rotation.y = Math.PI/4; roof.scale.set(1.3, 1, 0.38); roof.position.set(0, 20.5, 0); g.add(roof);
-    for(const cx of [-24, -8, 8, 24]) pbox(g, 2, 6, 3, 0xb8ab92, cx, 23, -2);
-    for(let cx=-31; cx<=31; cx+=1.2) pbox(g, 0.35, 1.2, 0.35, white, cx, 17.6, 8.8);
-    pbox(g, 64, 0.35, 0.8, white, 0, 18.3, 8.8);
-    // the portico
-    for(let k=0;k<6;k++) pcyl(g, 0.75, 0.85, 12, 12, white, -10 + k*4, 7, 13.5);
-    pbox(g, 24, 1.4, 6, white, 0, 13.6, 12.5);
-    const ped = new THREE.Shape(); ped.moveTo(-12.5, 0); ped.lineTo(12.5, 0); ped.lineTo(0, 5); ped.closePath();
-    const pm = new THREE.Mesh(new THREE.ExtrudeGeometry(ped, {depth:6, bevelEnabled:false}), white); pm.position.set(0, 14.3, 9.5); g.add(pm);
-    for(let k=0;k<5;k++) pbox(g, 26 - k*0.6, 0.35, 3 - k*0.5, 0xd8d0c0, 0, 0.18 + k*0.35, 17.5 + k*0.3);
-    g.traverse(o=>{ if(o.isMesh) o.castShadow = true; });
+    // the plinth, the rusticated ground floor, the string courses, the cornice
+    for(const sd of [-1, 1]){
+      const cx = sd*(AW + (W - AW)/2), L = W - AW;
+      for(const s of [-1, 1]){
+        pbox(g, L, 0.9, 0.5, stoneD, cx, 0.45, s*(D + 0.2));
+        for(let y=1.6; y<7; y+=1.35) pbox(g, L, 0.12, 0.12, stoneD, cx, y, s*(D + 0.05));
+        pbox(g, L, 0.45, 0.4, white, cx, 7.35, s*(D + 0.15));
+      }
+      pbox(g, 0.5, 0.9, D*2 + 0.8, stoneD, sd*(W + 0.2), 0.45, 0);
+    }
+    for(const s of [-1, 1]) pbox(g, W*2, 0.45, 0.4, white, 0, 13.4, s*(D + 0.15));
+    pbox(g, W*2 + 1.4, 0.8, D*2 + 1.4, white, 0, HC + 0.3, 0);
+    balus(-W - 0.4, D + 0.4, W + 0.4, D + 0.4, HC + 0.7); balus(-W - 0.4, -D - 0.4, W + 0.4, -D - 0.4, HC + 0.7);
+    for(const sd of [-1, 1]) balus(sd*(W + 0.4), -D - 0.4, sd*(W + 0.4), D + 0.4, HC + 0.7);
+    for(const x of [-W - 0.4, -14, -AW - 1, AW + 1, 14, W + 0.4]) for(const s of [-1, 1]) urn(x, HC + 1.9, s*(D + 0.4));
+    // the windows of the centre block: four bays either side of the arch, three floors, both fronts
+    for(const s of [-1, 1]) for(const sd of [-1, 1]) for(let b=0;b<4;b++){
+      const x = sd*(11.2 + b*4.2), ry = s > 0 ? 0 : Math.PI, z = s*(D + 0.02);
+      win(x, 3.9, z, ry, 1.7, 2.6, 1);
+      win(x, 10.2, z, ry, 1.9, 3.5, b % 2 ? 1 : 2);
+      win(x, 15.8, z, ry, 1.6, 2.1, 0);
+    }
+    for(const x of [-3.6, 0, 3.6]) win(x, 15.8, -D - 0.02, Math.PI, 1.6, 2.1, 0);
+    /* the portico on the forecourt front: four giant columns on pedestals, the entablature, and the
+       pediment with the stable clock in it, the carriage arch between the middle pair */
+    for(const x of [-14.4, -9.6, 9.6, 14.4]){
+      pbox(g, 2.1, 1.5, 2.1, stoneD, x, 0.75, D + 3);
+      pcyl(g, 0.82, 0.95, 13, 16, white, x, 8.0, D + 3);
+      pbox(g, 0.9*2.3, 0.35, 0.9*2.3, white, x, 1.65, D + 3);
+      pbox(g, 2.2, 0.7, 2.2, white, x, 14.85, D + 3);
+    }
+    pbox(g, 32, 1.7, 4.8, white, 0, 16.05, D + 2.6);
+    { const sh = new THREE.Shape(); sh.moveTo(-16.6, 0); sh.lineTo(16.6, 0); sh.lineTo(0, 5.4); sh.closePath();
+      const pm = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, {depth:4.8, bevelEnabled:false}), white); pm.position.set(0, 16.9, D + 0.2); g.add(pm);
+      const face = new THREE.Mesh(new THREE.CircleGeometry(1.5, 24), white); face.position.set(0, 18.7, D + 5.04); g.add(face);
+      const rimC = new THREE.Mesh(new THREE.RingGeometry(1.5, 1.8, 24), gold); rimC.position.set(0, 18.7, D + 5.05); g.add(rimC);
+      const hand = (L, a)=>{ const m = pbox(g, 0.12, L, 0.05, PM(0x1a1a1a), Math.sin(a)*L/2, 18.7 + Math.cos(a)*L/2, D + 5.08); m.rotation.z = -a; };
+      hand(1.0, 2.1); hand(1.35, 0.35);
+      urn(0, 22.3, D + 2.6); urn(-16.2, 16.9, D + 4.6); urn(16.2, 16.9, D + 4.6); }
+    // the garden front: pilasters, and a balcony over the arch
+    for(const x of [-14.4, -9.6, 9.6, 14.4]) pbox(g, 1.3, HC - 1.4, 0.4, white, x, (HC - 1.4)/2 + 0.7, -D - 0.2);
+    pbox(g, 18, 0.45, 2.6, white, 0, AH + 0.25, -D - 1.3); balus(-8.8, -D - 2.5, 8.8, -D - 2.5, AH + 0.45);
+    win(0, 13.0, -D - 0.02, Math.PI, 2.2, 3.6, 2);
+    /* ---- the wings, forward either side of the forecourt */
+    for(const sd of [-1, 1]){
+      const cx = sd*(W + WW), cz = (WZ - D)/2, dz = WZ + D;
+      pbox(g, WW*2, HW, dz, stone, cx, HW/2, cz);
+      pbox(g, WW*2 + 0.5, 0.9, dz + 0.5, stoneD, cx, 0.45, cz);
+      pbox(g, WW*2 + 1.0, 0.7, dz + 1.0, white, cx, HW + 0.25, cz);
+      for(let y=1.6; y<6.5; y+=1.35) pbox(g, WW*2 + 0.1, 0.12, dz + 0.1, stoneD, cx, y, cz);
+      pbox(g, WW*2 + 0.3, 0.4, dz + 0.3, white, cx, 7.0, cz);
+      hip(cx, cz, WW*2 + 0.8, dz + 0.8, HW + 0.6, 5.5, 2.2);
+      // windows: three bays on the front, two on the inner side over the forecourt, five down the outer side
+      for(const b of [-1, 0, 1]){ win(cx + b*6.2, 3.7, WZ + 0.02, 0, 1.7, 2.5, 1); win(cx + b*6.2, 9.9, WZ + 0.02, 0, 1.8, 3.2, 2);
+                                  win(cx + b*6.2, 3.7, -D - 0.02, Math.PI, 1.7, 2.5, 1); win(cx + b*6.2, 9.9, -D - 0.02, Math.PI, 1.8, 3.2, 1); }
+      for(const z of [14, 19]){ win(sd*(W + 0.02), 3.7, z, -sd*Math.PI/2, 1.7, 2.5, 1); win(sd*(W + 0.02), 9.9, z, -sd*Math.PI/2, 1.8, 3.2, 2); }
+      for(let k=0;k<5;k++){ const z = -6 + k*6.4; win(sd*(W + WW*2 + 0.02), 3.7, z, sd*Math.PI/2, 1.7, 2.5, 1); win(sd*(W + WW*2 + 0.02), 9.9, z, sd*Math.PI/2, 1.8, 3.2, k % 2 ? 1 : 2); }
+      // the wing's chimneys
+      for(const z of [-2, 14]){ pbox(g, 2.4, 5.5, 1.5, stoneD, cx, HW + 4.6, z); pbox(g, 2.7, 0.35, 1.8, white, cx, HW + 7.4, z);
+        for(const x of [-0.7, 0, 0.7]) pcyl(g, 0.22, 0.28, 0.9, 6, PM(0xb0603a), cx + x, HW + 8.0, z); }
+      urn(cx - WW, HW + 0.6, WZ + 0.4); urn(cx + WW, HW + 0.6, WZ + 0.4);
+    }
+    /* ---- the roof of the centre block: slate, dormers, the chimney stacks, and the cupola */
+    hip(0, 0, W*2 + 0.8, D*2 + 0.8, HC + 0.7, 6.2, 3.2);
+    for(const s of [-1, 1]) for(const x of [-21, -14, 14, 21]){
+      const z = s*(D - 2.6), y = HC + 2.6;
+      pbox(g, 1.9, 2.2, 2.4, white, x, y, z); pbox(g, 1.3, 1.4, 0.1, glass, x, y - 0.1, z + s*1.22);
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 1.6, 1.0, 4), lead); cap.rotation.y = Math.PI/4; cap.position.set(x, y + 1.6, z); g.add(cap);
+    }
+    for(const x of [-24, -6, 6, 24]){ pbox(g, 2.6, 6.5, 1.6, stoneD, x, HC + 5.2, 0); pbox(g, 2.9, 0.35, 1.9, white, x, HC + 8.5, 0);
+      for(const dx of [-0.8, 0, 0.8]) pcyl(g, 0.22, 0.28, 1.0, 6, PM(0xb0603a), x + dx, HC + 9.15, 0); }
+    { const y0 = HC + 6.9;
+      pbox(g, 5.4, 1.2, 5.4, white, 0, y0 + 0.6, 0);
+      pcyl(g, 2.5, 2.5, 3.4, 8, white, 0, y0 + 2.9, 0);
+      for(let k=0;k<8;k++){ const a = k/8*Math.PI*2 + Math.PI/8; const p = pbox(g, 1.0, 2.0, 0.1, glass, Math.sin(a)*2.53, y0 + 3.0, Math.cos(a)*2.53); p.rotation.y = a; }
+      pcyl(g, 2.9, 2.9, 0.4, 8, white, 0, y0 + 4.8, 0);
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(2.7, 16, 8, 0, Math.PI*2, 0, Math.PI/2), lead); dome.position.y = y0 + 5.0; g.add(dome);
+      pcyl(g, 0.5, 0.6, 1.2, 8, white, 0, y0 + 8.1, 0);
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), gold); ball.position.y = y0 + 9.1; g.add(ball);
+      pcyl(g, 0.05, 0.05, 1.6, 4, gold, 0, y0 + 10.1, 0); }
+    mergeStatic(g);
+    g.traverse(o=>{ if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
     g.position.set(H0[0], gradedY(H0[0], H0[1]) - 0.3, H0[1]); g.rotation.y = yaw; scene.add(g); keep(H0[0], H0[1], 60);
+    // the walls are solid: the footprint filled with posts the car glances off, all but the arch and the road
+    { const c = Math.cos(yaw), s = Math.sin(yaw), toW = (lx, lz)=> [H0[0] + lx*c + lz*s, H0[1] - lx*s + lz*c];
+      const inside = (lx, lz)=> (Math.abs(lx) <= W && Math.abs(lz) <= D && Math.abs(lx) > AW + 0.8) || (Math.abs(lx) > W - 0.5 && Math.abs(lx) <= W + WW*2 && lz >= -D && lz <= WZ);
+      for(let lx=-W - WW*2 + 1.5; lx<=W + WW*2 - 1.5; lx+=3.6) for(let lz=-D + 1.5; lz<=WZ - 1.5; lz+=3.6){
+        if(!inside(lx, lz)) continue;
+        const [x, z] = toW(lx, lz), n = nearest(x, z);
+        if(n.dist < n.half + 1.2) continue;
+        ISLANDS.push({x, z, r:2.6});
+      }
+      for(const lx of [-14.4, -9.6, 9.6, 14.4]){ const [x, z] = toW(lx, D + 3); ISLANDS.push({x, z, r:1.0}); }
+    }
+    /* the terrace on the garden front: the drive runs out from the arch across it between stone
+       balustrades to the edge, and off it over the steps into the park (the kicker is the edge) */
+    const iA = snapTo(MAIN, H0), J = (TRACK.set || []).find(j=> j[1] === "terrace");
+    if(J){
+      const iK = snapTo(MAIN, J[0]); let n = iK - iA; if(n < 0) n += N;
+      const m0 = 12, m1 = n*seg - 1, T = new THREE.Group();
+      for(const sd of [-1, 1]){ let prev = null;
+        for(let m=m0; m<=m1 + 0.01; m+=2.5){
+          const f = frm(byM(iA, m)), x = f.p.x + f.nx*sd*(f.half + 0.9), z = f.p.z + f.nz*sd*(f.half + 0.9), y = Math.max(f.y, gradedY(x, z)) - 0.05;
+          pcyl(T, 0.12, 0.17, 0.8, 6, white, x, y + 0.65, z);
+          if(prev){ const L = Math.hypot(x - prev[0], z - prev[2]);
+            const cp = pbox(T, 0.55, 0.22, L + 0.2, white, (x + prev[0])/2, (y + prev[1])/2 + 1.15, (z + prev[2])/2); cp.lookAt(x, y + 1.15, z);
+            const bs = pbox(T, 0.5, 0.3, L + 0.2, white, (x + prev[0])/2, (y + prev[1])/2 + 0.15, (z + prev[2])/2); bs.lookAt(x, y + 0.15, z);
+            for(let q=1;q<3;q++){ const f2 = q/3; pcyl(T, 0.12, 0.17, 0.8, 6, white, prev[0] + (x - prev[0])*f2, prev[1] + (y - prev[1])*f2 + 0.65, prev[2] + (z - prev[2])*f2); } }
+          prev = [x, y, z];
+        }
+        // a pier with an urn at the edge, and the stone steps down beside the ramp
+        const f = frm(byM(iA, m1)), x = f.p.x + f.nx*sd*(f.half + 0.9), z = f.p.z + f.nz*sd*(f.half + 0.9), y = Math.max(f.y, gradedY(x, z));
+        pbox(T, 1.1, 1.6, 1.1, white, x, y + 0.8, z); urn(x, y + 1.6, z, T);
+        for(let k=0;k<6;k++){ const o = f.half + 2.4 + k*0.9, sx = f.p.x + f.nx*sd*o, sz = f.p.z + f.nz*sd*o, gy = gradedY(sx, sz), hh = Math.max(0.3, y - gy - k*0.3);
+          const st = pbox(T, 0.9, hh, 6, stoneD, sx, gy + hh/2, sz); st.rotation.y = Math.atan2(f.t.x, f.t.z); }
+      }
+      mergeStatic(T); T.traverse(o=>{ if(o.isMesh) o.castShadow = true; }); scene.add(T);
+      roadSign(byM(iK, -70), -1, ["THE TERRACE", "off the edge into the park"], "#6a4a8a", "#f4ecfa");
+    }
+    roadSign(byM(iA, -95), 1, ["WISTERIA MANOR", "through the carriage arch"], "#6a4a8a", "#f4ecfa");
   }
   if(SP("fountain")){
     /* the great fountain: a stone basin, a column with two bowls, and jets playing */
