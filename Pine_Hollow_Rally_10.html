@@ -1322,7 +1322,7 @@ const TRACKS = [
     kit:["crest","kicker","tabletop"],
     shape:"THE WINDMILL — through its foot",
     feature:"a road through the arched foot of a giant windmill, crosswinds on the open dykes, canals and white lift bridges, and stripes of tulips to the horizon",
-    ctrl:[[0,-330],[0,-230],[0,-130],[0,-30],[0,60],[22,128],[80,170],[200,175],[320,172],[388,140],[450,178],[512,142],[556,84],[566,-30],[566,-170],
+    ctrl:[[0,-330],[0,-230],[0,-130],[0,-30],[0,60],[22,128],[80,170],[200,175],[320,172],[388,150],[450,172],[512,146],[556,84],[566,-30],[566,-170],
           [548,-250],[480,-285],[400,-300],[330,-300],[250,-300],[190,-262],[130,-320],[85,-400],[30,-455],[-20,-430],[-8,-385]],
     hills:[], jumps:[], fords:[], mud:[], autoFords:0, pits:2,
     canals:[{pts:[[-260,40],[720,40]], w:6, depth:2.2, bridge:"lift"},
@@ -1342,8 +1342,8 @@ const TRACKS = [
     shape:"THE KOI POND — the zigzag bridge",
     feature:"a zigzag plank bridge across the koi pond, red drum bridges that hop you over the streams, a bamboo tunnel and a five storey pagoda",
     ctrl:[[0,-300],[0,-200],[-15,-120],[10,-70],[50,-46],[90,-70],[130,-46],[170,-70],[210,-46],[250,-30],[290,10],[300,80],[300,160],[292,220],
-          [255,265],[190,272],[120,250],[60,275],[0,280],[-70,255],[-130,210],[-160,140],[-130,70],[-170,0],[-140,-80],[-125,-180],[-105,-290],
-          [-75,-390],[-30,-430],[2,-385]],
+          [255,265],[190,272],[120,250],[60,275],[0,280],[-70,255],[-130,210],[-160,140],[-130,70],[-170,0],[-140,-80],[-125,-180],[-110,-290],
+          [-92,-372],[-58,-421],[-12,-430],[9,-388]],
     hills:[[150,300,170,9],[-160,0,150,6],[300,120,120,5]], jumps:[], fords:[], mud:[], autoFords:0, pits:0,
     boardwalks:[[[30,-56],[224,-44]]],
     canals:[{pts:[[150,430],[130,300],[120,200],[160,120],[140,40],[132,-24]], w:3.6, depth:1.6, bridge:"drum", flow:true},
@@ -1359,8 +1359,8 @@ const TRACKS = [
     kit:["crest","kicker"],
     shape:"THE MAZE — between the hedges",
     feature:"a hedge maze with walls you can't cut, a glasshouse and a wisteria tunnel to drive through, a fountain to go round and a ha-ha to jump",
-    ctrl:[[-200,-20],[-120,-20],[-50,-15],[-10,15],[5,45],[40,62],[75,45],[90,15],[120,-20],[200,-40],[280,-40],[360,-40],[410,-60],[420,-110],
-          [360,-120],[320,-140],[330,-185],[400,-190],[440,-215],[440,-260],[380,-270],[330,-300],[300,-340],[180,-340],[60,-310],[-60,-260],
+    ctrl:[[-200,-20],[-120,-20],[-50,-15],[-10,15],[5,45],[40,62],[75,45],[90,15],[120,-20],[200,-40],[280,-40],[360,-40],[410,-60],[428,-98],
+          [398,-123],[358,-124],[320,-140],[330,-185],[400,-190],[440,-215],[440,-260],[380,-270],[330,-300],[300,-340],[180,-340],[60,-310],[-60,-260],
           [-170,-200],[-260,-130],[-270,-60]],
     hills:[[40,180,200,6],[-200,-300,180,8]], jumps:[], fords:[], mud:[], autoFords:0, pits:0,
     flats:[[40,40,130]],
@@ -1368,7 +1368,7 @@ const TRACKS = [
     spots:{house:[[40,128]], fountain:[[40,8]], pergola:[[160,-36],[262,-40]], glass:[[284,-40],[372,-42]], maze:[[416,-92],[352,-282]],
            haha:[[0,-286]], topiary:[[-110,10],[30,-55],[140,40],[-30,95]], deer:[[80,-210],[-150,-150],[220,-250]]},
     rails:[[[160,-36],[262,-40]], [[284,-40],[372,-42]], [[416,-92],[352,-282]]],
-    widths:[[[416,-92],[352,-282],4.5]],
+    widths:[[[398,-123],[352,-282],4.5]],
     ground:"lawn",
     trees:{kinds:["oak","cherry","weeping"], mix:[0.45, 0.6], tall:[[13,7],[7,4],[7,3]], density:0.45}, rockK:0.2, bushK:0.6, coverPink:0.3,
     stages:["gravel","gravel","paved","gravel","washboard"],
@@ -1385,6 +1385,7 @@ const TRACKS = [
     fords:[[12,-470]],
     set:[[[459,-150],"swells"]],
     spots:{falls:[[432,-70]], horse:[[250,-120]]}, horseAng:0.15, horseSize:2.4,
+    ridgeCut:{h:15, len:42},
     ground:"chalk",
     trees:{kinds:["leafy","cherry","oak"], mix:[0.4, 0.5], tall:[[9,5],[7,4],[12,6]], density:0.4}, rockK:0.5, coverPink:0.25,
     stages:["gravel","rutted","washboard","gravel","moguls","broken","paved"],
@@ -2005,6 +2006,8 @@ function macro(x, z){
   /* the slot canyon: walls standing up either side of the road through it */
   if(CANYON.on) h += canyonWall(x, z);
   if(GRIV.on && !GRIV.off) h = Math.min(h, rivCarve(x, z, h));
+  /* Rainbow Downs: the chalk ridge across the road, and the cutting the road goes through it in */
+  if(CUT) h += cutAt(x, z);
   /* the hilltop the village sits on, levelled to the summit */
   if(TOWN.on){
     const d = Math.hypot(x - TOWN.x, z - TOWN.z);
@@ -2026,6 +2029,54 @@ function trackCtrl(t){
 const MAIN = makePath(TRACK.ctrl.map(vec), true, TRACK.half || 5.7);
 retangent(MAIN);
 const EASE_PASSES = easeCorners(MAIN, TRACK.minR || ROUTE_MIN_RADIUS);
+/* Rainbow Downs' falls are part of the land: a chalk ridge runs across the downs, the road goes through it
+   in a cutting with sheer white walls, and a beck along the ridge-top runs out over the natural arch that
+   spans the cutting and pours off it across the road (the arch and the water: see the Spring Cup's set
+   pieces). The ridge is measured off the road's own line through it, so the road itself is never lifted. */
+let CUT = null;
+if(TRACK.ridgeCut && TRACK.spots && TRACK.spots.falls){
+  const i = snapTo(MAIN, TRACK.spots.falls[0]), R = Math.round(240/MAIN.seg), pts = [];
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for(let k=-R; k<=R; k++){ const j = wrapIdx(MAIN, i + k), p = MAIN.pts[j], t = MAIN.tans[j];
+    pts.push([p.x, p.z, -t.z, t.x, k*MAIN.seg]); x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); z0 = Math.min(z0, p.z); z1 = Math.max(z1, p.z); }
+  const c = TRACK.ridgeCut, p0 = MAIN.pts[i], t0 = MAIN.tans[i];
+  // the beck comes from the side the high ground is on
+  const hill = (TRACK.hills || []).slice().sort((a, b)=> b[3] - a[3])[0];
+  const feed = hill && ((hill[0] - p0.x)*(-t0.z) + (hill[1] - p0.z)*t0.x) < 0 ? -1 : 1;
+  CUT = {i, pts, h:c.h || 14, len:c.len || 40, w:9.2, feed, box:[x0 - 160, x1 + 160, z0 - 160, z1 + 160]};
+  // the beck along the crest of the ridge, out to the top of the arch
+  const at = l=> [p0.x - t0.z*l, p0.z + t0.x*l];
+  TRACK.canals = (TRACK.canals || []).concat([{pts:[at(feed*130), at(feed*80), at(feed*40), at(feed*(CUT.w + 3.5))], w:2.6, depth:1.1, bridge:"none", flow:true}]);
+}
+/* how far into the cutting a point is, 0 to 1: there the road's verge meets the wall straight off, as in the
+   slot canyon, instead of being smoothed into a long bank that buried the walls */
+function cutIn(x, z){
+  if(!CUT) return 0;
+  const B = CUT.box;
+  if(x < B[0] || x > B[1] || z < B[2] || z > B[3]) return 0;
+  const P = CUT.pts;
+  let best = Infinity, bk = 0;
+  for(let k=0;k<P.length;k+=6){ const d = (P[k][0] - x)**2 + (P[k][1] - z)**2; if(d < best){ best = d; bk = k; } }
+  for(let k=Math.max(0, bk - 6); k<=Math.min(P.length - 1, bk + 6); k++){ const d = (P[k][0] - x)**2 + (P[k][1] - z)**2; if(d < best){ best = d; bk = k; } }
+  const q = P[bk], v = (x - q[0])*q[2] + (z - q[1])*q[3], u = q[4] + (x - q[0])*q[3] - (z - q[1])*q[2];
+  return (1 - smoothstep(CUT.len*0.5, CUT.len*1.1, Math.abs(u)))*(1 - smoothstep(30, 55, Math.abs(v)));
+}
+function cutAt(x, z){
+  const B = CUT.box;
+  if(x < B[0] || x > B[1] || z < B[2] || z > B[3]) return 0;
+  const P = CUT.pts;
+  let best = Infinity, bk = 0;
+  for(let k=0;k<P.length;k+=6){ const d = (P[k][0] - x)**2 + (P[k][1] - z)**2; if(d < best){ best = d; bk = k; } }
+  for(let k=Math.max(0, bk - 6); k<=Math.min(P.length - 1, bk + 6); k++){ const d = (P[k][0] - x)**2 + (P[k][1] - z)**2; if(d < best){ best = d; bk = k; } }
+  const q = P[bk], v = (x - q[0])*q[2] + (z - q[1])*q[3], u = q[4] + (x - q[0])*q[3] - (z - q[1])*q[2];
+  const r = 1 - smoothstep(CUT.len*0.35, CUT.len, Math.abs(u));
+  if(r <= 0) return 0;
+  const a = Math.abs(v);
+  // sheer walls a few metres off the road, then the ridge rolling away over the downs
+  const wall = smoothstep(CUT.w, CUT.w + 2.2, a + 0.6*Math.sin(u*0.55 + a*0.4));
+  const fade = 1 - smoothstep(70, 150, a);
+  return CUT.h*r*wall*fade*(1 + 0.05*Math.sin(x*0.13 + z*0.11) + 0.03*Math.sin(x*0.41 - z*0.37));
+}
 MAIN.mainFrom = 0; MAIN.mainTo = MAIN.N;
 
 /* ---- the set pieces ------------------------------------------------------
@@ -4568,6 +4619,7 @@ function caveOf(s){ for(const C of CAVES){ if(s >= C.a && s <= C.b) return C; } 
    the maze, the arch through the windmill's foot, the glasshouse): the car is held on the road, and
    bounces off. MAIN.rail marks them (1 between the walls). */
 MAIN.rail = new Float32Array(MAIN.N);
+if(CUT) for(let k=-Math.round(CUT.len*0.55/MAIN.seg); k<=Math.round(CUT.len*0.55/MAIN.seg); k++) MAIN.rail[wrapIdx(MAIN, CUT.i + k)] = 1;
 (TRACK.rails || []).forEach(d=>{
   let a = snapTo(MAIN, d[0]), b = snapTo(MAIN, d[1]);
   let n = b - a; if(n < 0) n += MAIN.N;
@@ -4866,7 +4918,7 @@ function bwPool(x, z){
           const inPit = PIT.on ? 1 - smoothstep(PIT.r*0.9, PIT.r*1.05,
                           Math.hypot(-GHALF + a*GSTEP - PIT.x, -GHALF + b*GSTEP - PIT.z)) : 0;
           // in the slot canyon the rock stands straight up off the verge
-          const inCan = CANYON.on && P === MAIN ? canyonAt(-GHALF + a*GSTEP, -GHALF + b*GSTEP) : 0;
+          const inCan = P === MAIN ? Math.max(CANYON.on ? canyonAt(-GHALF + a*GSTEP, -GHALF + b*GSTEP) : 0, CUT ? cutIn(-GHALF + a*GSTEP, -GHALF + b*GSTEP) : 0) : 0;
           // over the whirlpool's lip the land falls away at once: a sheer drop off the road's edge, not an embankment
           const inWh = GATOR && BOWL.on && P === MAIN ? (()=>{ const xg = -GHALF + a*GSTEP, zg = -GHALF + b*GSTEP;
             return 1 - smoothstep(-1, 1.5, Math.hypot(xg - BOWL.x, zg - BOWL.z) - whirlLip(xg, zg)); })()
@@ -11645,6 +11697,8 @@ if(SPRINGCUP){
     const geo = new THREE.BoxGeometry(T, H + 0.4, L + T*0.4), uvA = geo.attributes.uv;
     for(let k=0;k<uvA.count;k++) uvA.setXY(k, uvA.getX(k)*L/3, uvA.getY(k)*H/3);
     const m = new THREE.Mesh(geo, hedgeM); m.position.set((x0 + x1)/2, y + (H + 0.4)/2, (z0 + z1)/2); m.rotation.y = Math.atan2(x1 - x0, z1 - z0); g.add(m);
+    const cw = new THREE.Group(); cw.position.copy(m.position); cw.position.y = y + H + 0.4; cw.rotation.y = m.rotation.y;
+    const cr = new THREE.Mesh(new THREE.CylinderGeometry(T*0.5, T*0.5, L + T*0.3, 8, 1, false, Math.PI/2, Math.PI), hedgeM); cr.rotation.x = Math.PI/2; cr.scale.set(1, 1, 0.55); cw.add(cr); g.add(cw);
   };
   if(SP("house")){
     /* the house: a long stone front of three storeys, a portico with six columns and a pediment
@@ -11808,18 +11862,40 @@ if(SPRINGCUP){
         if(prev) hedgeRun(g, prev[0], prev[1], x, z, H, T);
         prev = [x, z];
       } }
-    // the rest of the maze: walls on a grid, wherever they keep clear of the road
-    const C = 11, bx0 = Math.floor((x0 - 22)/C)*C, bz0 = Math.floor((z0 - 22)/C)*C, bx1 = x1 + 22, bz1 = z1 + 22;
-    const ok = (x, z)=> clearOf(x, z, 2.2 + T) && !inWaterway(x, z);
-    for(let x=bx0; x<=bx1; x+=C) for(let z=bz0; z<=bz1; z+=C){
-      const edge = x === bx0 || z === bz0 || x + C > bx1 || z + C > bz1;
-      for(const [dx, dz] of [[C, 0], [0, C]]){
-        if(!edge && rnd() < 0.45) continue;
-        if(x + dx > bx1 + 0.1 || z + dz > bz1 + 0.1) continue;
-        let good = true; for(let u=0; u<=1.001; u+=0.25) if(!ok(x + dx*u, z + dz*u)) { good = false; break; }
-        if(good) hedgeRun(g, x, z, x + dx, z + dz, H, T);
-      }
+    /* the rest of the maze: a real one. A grid of cells 7m across walled in hedge, carved into a
+       labyrinth (every corridor reachable, dead ends and all) by a walk that knocks through to a cell it
+       hasn't been to until there are none left; then the road cuts its way through the middle, and every
+       stretch of hedge that would stand on it is left out, so the corridors open off the road. */
+    const C = 7, bx0 = x0 - 24, bz0 = z0 - 24, nX = Math.ceil((x1 + 24 - bx0)/C), nZ = Math.ceil((z1 + 24 - bz0)/C);
+    const seen = new Uint8Array(nX*nZ), wallE = new Uint8Array(nX*nZ).fill(1), wallS = new Uint8Array(nX*nZ).fill(1), stack = [0];
+    seen[0] = 1;
+    while(stack.length){
+      const c = stack[stack.length - 1], cx = c % nX, cz = (c - cx)/nX, nb = [];
+      if(cx > 0 && !seen[c - 1]) nb.push(c - 1); if(cx < nX - 1 && !seen[c + 1]) nb.push(c + 1);
+      if(cz > 0 && !seen[c - nX]) nb.push(c - nX); if(cz < nZ - 1 && !seen[c + nX]) nb.push(c + nX);
+      if(!nb.length){ stack.pop(); continue; }
+      const n2 = nb[Math.floor(rnd()*nb.length)];
+      if(n2 === c + 1) wallE[c] = 0; else if(n2 === c - 1) wallE[c - 1] = 0; else if(n2 === c + nX) wallS[c] = 0; else wallS[c - nX] = 0;
+      seen[n2] = 1; stack.push(n2);
     }
+    const ok = (x, z)=> clearOf(x, z, 1.2 + T) && !inWaterway(x, z);
+    // a wall, in the pieces of it that keep clear of the road
+    const wall = (ax, az, bx, bz)=>{
+      const n = 7; let run = null, last = null;
+      for(let q=0;q<=n;q++){
+        const x = ax + (bx - ax)*q/n, z = az + (bz - az)*q/n, good = ok(x, z);
+        if(good){ if(!run) run = [x, z]; last = [x, z]; }
+        if((!good || q === n) && run){ if(Math.hypot(last[0] - run[0], last[1] - run[1]) > 0.9) hedgeRun(g, run[0], run[1], last[0], last[1], H, T); run = null; }
+      }
+    };
+    for(let cz=0; cz<nZ; cz++) for(let cx=0; cx<nX; cx++){
+      const c = cz*nX + cx, x = bx0 + cx*C, z = bz0 + cz*C;
+      if(wallE[c] && cx < nX - 1) wall(x + C, z, x + C, z + C);
+      if(wallS[c] && cz < nZ - 1) wall(x, z + C, x + C, z + C);
+    }
+    // the outer hedge all round, open only where the road comes in and goes out
+    const ex = bx0 + nX*C, ez = bz0 + nZ*C;
+    wall(bx0, bz0, ex, bz0); wall(bx0, ez, ex, ez); wall(bx0, bz0, bx0, ez); wall(ex, bz0, ex, ez);
     shade(g); mergeStatic(g); scene.add(g);
     // an arch of hedge over the way in and the way out
     for(const k of [0, S.n]){ const f = frm(S.a + k), ag = new THREE.Group(), w = f.half + 0.5 + T/2;
@@ -11857,69 +11933,73 @@ if(SPRINGCUP){
   }
 
   /* ---- RAINBOW DOWNS --------------------------------------------------- */
-  /* the falls: a chalk crag arching over the road, a beck pouring off its lip straight down across the
-     road, so you drive through the curtain; spray hangs at its foot with a little rainbow in it */
-  if(SP("falls")){
-    const i = snapTo(MAIN, SP("falls")[0]), f = frm(i), yaw = Math.atan2(f.t.x, f.t.z), g = new THREE.Group();
-    const chalk = new THREE.MeshLambertMaterial({map:rockTex, color:0xf0ece0}), turf = PM(0x5a8a3a);
-    const W = f.half + 1.2, lip = 9.5;
+  /* THUNDER FORCE: over the cutting through the chalk ridge stands a natural arch, the ridge's own chalk
+     left spanning the gap; the beck that runs along the crest comes out across the top of it and pours off
+     its front edge, a curtain of water down the face and straight across the road under it, so you drive
+     through the falls. Spray at the foot, a little rainbow in it. */
+  if(SP("falls") && CUT){
+    const i = CUT.i, f = frm(i), yaw = Math.atan2(f.t.x, f.t.z), g = new THREE.Group();
+    const chalk = new THREE.MeshLambertMaterial({map:rockTex, color:0xf2eee2}), turf = PM(0x5a8a3a), moss = PM(0x4e7a2e);
+    // (its top level with the lower of the two walls it springs from, its opening under that)
+    const W = CUT.w, D = 10, wallH = sd=> gradedY(f.p.x + f.nx*sd*(W + 4), f.p.z + f.nz*sd*(W + 4)) - f.y;
+    const top = Math.max(9, Math.min(wallH(-1), wallH(1)) + 0.3), lo = Math.min(7.0, top - 3.2);
     const G = new THREE.Group(); G.position.set(f.p.x, f.y, f.p.z); G.rotation.y = yaw; g.add(G);
-    // two buttresses of chalk either side, built up from the ground to the lip, a lintel across on them,
-    // every outer face of them clad in boulders of chalk
-    const chalkBox = new THREE.MeshLambertMaterial({map:rockTex, color:0xe2ded0});
-    const boulder = (x, y, z, s)=>{ const r = new THREE.Mesh(rockGeometry(Math.floor(rnd()*40)*0.7 + 1), chalk); r.position.set(x, y, z);
-      r.scale.set(s*(0.9 + rnd()*0.4), s*(0.7 + rnd()*0.4), s*(0.9 + rnd()*0.4)); r.rotation.set(rnd()*6, rnd()*6, rnd()*6); G.add(r); };
-    for(const sd of [-1, 1]){
-      pbox(G, 5, lip + 4, 9, chalkBox, sd*(W + 3.2), (lip + 4)/2 - 1.5, 0.5);
-      for(let yy=-0.5; yy<lip + 3; yy+=2.4){
-        for(const zz of [-4.4, 5.4]) for(const xo of [0.6, 3.0]) boulder(sd*(W + 0.8 + xo + rnd()*0.6), yy + rnd(), zz + (rnd() - 0.5)*0.6, 1.5 + rnd()*0.9);
-        for(const zz of [-2.5, 0.5, 3.5]) boulder(sd*(W + 5.8 + rnd()*0.5), yy + rnd(), zz, 1.6 + rnd()*0.9);
-      }
-    }
-    pbox(G, 2*W + 12, 3.4, 9, chalkBox, 0, lip + 1.7, 0.5);
-    for(let xx=-W - 1; xx<=W + 1; xx+=2.4) for(const zz of [-4.3, 5.3]) boulder(xx + (rnd() - 0.5), lip + 1.0 + rnd()*1.6, zz, 1.4 + rnd()*0.8);
-    const sod = pbox(G, 2*W + 13, 0.5, 9.5, turf, 0, lip + 3.6, 0.5);
-    // tufts of grass hanging over the lip
-    for(let q=0;q<14;q++) pbox(G, 0.9 + rnd(), 0.8, 0.5, turf, -W - 4 + rnd()*(2*W + 8), lip + 3.2 - rnd()*0.4, -4.1);
+    // the arch: wall to wall, bedded into both, its underside a rounded span
+    const sh = new THREE.Shape();
+    sh.moveTo(-W - 3.5, lo - 1.4); sh.lineTo(-W + 0.2, lo - 1.4); sh.quadraticCurveTo(0, lo + 3.2, W - 0.2, lo - 1.4);
+    sh.lineTo(W + 3.5, lo - 1.4); sh.lineTo(W + 3.5, top); sh.lineTo(-W - 3.5, top); sh.closePath();
+    const arch = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, {depth:D, bevelEnabled:true, bevelSize:0.6, bevelThickness:0.6, bevelSegments:1, curveSegments:14}), chalk);
+    arch.position.z = -D/2; G.add(arch);
+    // turf over it, ragged at the edges, and boulders where it meets the walls
+    pbox(G, 2*W + 7, 0.6, D + 1.2, turf, 0, top + 0.25, 0);
+    for(let q=0;q<16;q++) pbox(G, 0.8 + rnd(), 0.7, 0.5, turf, -W - 3 + rnd()*(2*W + 6), top - 0.1 - rnd()*0.4, (rnd() < 0.5 ? -1 : 1)*(D/2 + 0.6));
+    for(const sd of [-1, 1]) for(let q=0;q<5;q++){ const s = 1.4 + rnd()*1.3, r = new THREE.Mesh(rockGeometry(q*1.7 + (sd > 0 ? 3 : 0)), chalk);
+      r.position.set(sd*(W + 0.6 + rnd()*1.5), lo - 2 + q*1.8, (rnd() < 0.5 ? -1 : 1)*(D/2 + 0.2)); r.scale.set(s, s*0.8, s*0.7); r.rotation.set(rnd(), rnd()*6, rnd()); G.add(r); }
+    for(let q=0;q<10;q++) pbox(G, 0.6 + rnd()*1.2, 0.25, 0.5, moss, -W + rnd()*2*W, lo - 1.2 + rnd()*0.6, -D/2 - 0.55);
     shade(g); mergeStatic(g);
-    // the curtain of water, and the beck on top running to the lip
+    // the beck across the top, and the curtain off its front edge, down the face and across the road
     const fallMat = new THREE.ShaderMaterial({ uniforms:{uTime:{value:0}}, side:THREE.DoubleSide, transparent:true, depthWrite:false,
       vertexShader:"varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }",
       fragmentShader:["uniform float uTime; varying vec2 vUv;",
         "float h(float x){ return fract(sin(x*127.1)*43758.5); }",
         "void main(){",
-        "  float col = floor(vUv.x*70.0), sp = 0.9 + 0.7*h(col);",
-        "  float s = fract(vUv.y*2.5 + uTime*sp + h(col + 3.0));",
+        "  float col = floor(vUv.x*80.0), sp = 0.9 + 0.7*h(col);",
+        "  float s = fract(vUv.y*2.2 + uTime*sp + h(col + 3.0));",
         "  float streak = smoothstep(0.0, 0.5, s)*(1.0 - smoothstep(0.5, 1.0, s));",
         "  vec3 c = mix(vec3(0.55, 0.82, 0.95), vec3(0.97, 1.0, 1.0), streak*0.85 + (1.0 - vUv.y)*0.35);",
-        "  float a = (0.42 + 0.4*streak)*smoothstep(0.0, 0.05, vUv.x)*smoothstep(1.0, 0.95, vUv.x)*(0.6 + 0.4*h(col + 9.0));",
+        "  float a = (0.45 + 0.42*streak)*smoothstep(0.0, 0.06, vUv.x)*smoothstep(1.0, 0.94, vUv.x)*(0.6 + 0.4*h(col + 9.0));",
         "  gl_FragColor = vec4(c, a);",
         "}"].join("\n") });
     waterMats.push(fallMat);
-    const curtain = new THREE.Mesh(new THREE.PlaneGeometry(2*W + 3, lip + 0.6, 1, 1), fallMat);
-    curtain.position.set(0, (lip + 0.6)/2 - 0.3, -4.2); curtain.renderOrder = 6; G.add(curtain);
-    const beck = new THREE.Mesh(new THREE.PlaneGeometry(2*W, 6), new THREE.MeshLambertMaterial({color:0x7ac8e8, emissive:0x103040}));
-    beck.rotation.x = -Math.PI/2; beck.position.set(0, lip + 3.9, 0.5); G.add(beck);
-    // the little rainbow in the spray, just past the curtain
-    const bow = new THREE.Group(); bow.position.set(0, -0.5, 7); G.add(bow);
-    const BOWC = [0xff3a3a, 0xff9a2a, 0xffe83a, 0x5ae05a, 0x3aa8ff, 0x5a5aff, 0xb05aff];
-    BOWC.forEach((c, k)=>{ const r = new THREE.Mesh(new THREE.RingGeometry(W + 3.2 - k*0.35, W + 3.55 - k*0.35, 40, 1, 0, Math.PI), new THREE.MeshBasicMaterial({color:c, transparent:true, opacity:0.22, depthWrite:false, side:THREE.DoubleSide}));
+    // (a sheet that leaves the lip a little out from the face and falls clear of it, curving in a parabola)
+    const fw = 2*W - 1, NV = 10, pos = [], uv = [], idx = [];
+    for(let r=0;r<=NV;r++){ const s = r/NV, y = top + 0.4 - (top + 0.4)*s, zz = -D/2 - 0.7 - 2.2*Math.sqrt(s);
+      for(const c of [0, 1]){ pos.push((c - 0.5)*fw, y, zz); uv.push(c, 1 - s); } }
+    for(let r=0;r<NV;r++){ const a2 = r*2; idx.push(a2, a2 + 1, a2 + 3, a2, a2 + 3, a2 + 2); }
+    const cg = new THREE.BufferGeometry(); cg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); cg.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); cg.setIndex(idx);
+    const curtain = new THREE.Mesh(cg, fallMat); curtain.renderOrder = 6; G.add(curtain);
+    const beck = new THREE.Mesh(new THREE.PlaneGeometry(fw, D + 1), new THREE.MeshLambertMaterial({color:0x7ac8e8, emissive:0x103040}));
+    beck.rotation.x = -Math.PI/2; beck.position.set(0, top + 0.62, 0); G.add(beck);
+    // the little rainbow in the spray, on the near side of the curtain
+    const bow = new THREE.Group(); bow.position.set(0, -0.5, -D/2 - 6); G.add(bow);
+    [0xff3a3a, 0xff9a2a, 0xffe83a, 0x5ae05a, 0x3aa8ff, 0x5a5aff, 0xb05aff].forEach((c, k)=>{
+      const r = new THREE.Mesh(new THREE.RingGeometry(W + 0.2 - k*0.35, W + 0.55 - k*0.35, 40, 1, 0, Math.PI), new THREE.MeshBasicMaterial({color:c, transparent:true, opacity:0.2, depthWrite:false, side:THREE.DoubleSide}));
       r.renderOrder = 7; bow.add(r); });
-    // the mist at its foot
     const NM = 160, mp = new Float32Array(NM*3), mph = new Float32Array(NM);
-    for(let k=0;k<NM;k++){ mph[k] = Math.random(); }
+    for(let k=0;k<NM;k++) mph[k] = Math.random();
     const mg = new THREE.BufferGeometry(); mg.setAttribute("position", new THREE.BufferAttribute(mp, 3).setUsage(THREE.DynamicDrawUsage));
     const mist = new THREE.Points(mg, new THREE.PointsMaterial({color:0xffffff, size:1.6, transparent:true, opacity:0.32, depthWrite:false}));
     mist.frustumCulled = false; G.add(mist);
     ANIMS.push(t=>{
-      for(let k=0;k<NM;k++){ const u = (mph[k] + t*0.25) % 1, a = k*2.399;
-        mp[k*3] = (k/NM*2 - 1)*(W + 2); mp[k*3 + 1] = u*3.2; mp[k*3 + 2] = Math.sin(a)*2.5 + (u - 0.3)*4; }
+      for(let k=0;k<NM;k++){ const u = (mph[k] + t*0.25) % 1, a2 = k*2.399;
+        mp[k*3] = (k/NM*2 - 1)*W; mp[k*3 + 1] = u*3.2; mp[k*3 + 2] = -D/2 - 3 + Math.sin(a2)*2.5 + (u - 0.3)*3; }
       mg.attributes.position.needsUpdate = true;
     });
     scene.add(g);
-    for(let k=-6; k<=6; k++){ const q = frm(byM(i, k*3)); NO_TREES.push([q.p.x, q.p.z, q.half + 16]); }
-    SPRINGFX.falls = {x:f.p.x, z:f.p.z, tx:f.t.x, tz:f.t.z, y:f.y, W, cool:0, side:0};
-    roadSign(byM(i, -110), 1, ["THUNDER FORCE", "waterfall over the road"], "#2a5a7a", "#f2fbff");
+    for(let k=-8; k<=8; k++){ const q = frm(byM(i, k*5)); NO_TREES.push([q.p.x, q.p.z, q.half + 12]); }
+    const cx = f.p.x - f.t.x*(D/2 + 1.6), cz = f.p.z - f.t.z*(D/2 + 1.6);
+    SPRINGFX.falls = {x:cx, z:cz, tx:f.t.x, tz:f.t.z, y:f.y, W, cool:0, side:0};
+    roadSign(byM(i, -130), 1, ["THUNDER FORCE", "waterfall over the road"], "#2a5a7a", "#f2fbff");
   }
   /* the Rollercoaster's board, at the top */
   const SWELL = AUTO_JUMPS.find(a=> a.type === "swells");
