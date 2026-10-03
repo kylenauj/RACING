@@ -11232,7 +11232,15 @@ if(BLOOM){
      RAINBOW DOWNS   straight through a waterfall, the Rollercoaster's six swells
                      down the hill, balloons, sheep and a white horse in the chalk
    (The ground they lie on is painted by springGround as the land is built.) */
-const SPRINGFX = { step:null, falls:null, wind:0, windSoon:0, windT:0 };
+const SPRINGFX = { step:null, falls:null, wind:0, windSoon:0, windT:0, maze:null };
+/* a leaf clipped off the maze's hedges: the hedges' own greens, from deep shade to fresh growth, a few
+   gone yellow or brown where they have lain a while */
+function hedgeLeafColour(c){
+  const r = Math.random();
+  if(r < 0.08) return c.setHSL(0.13 + Math.random()*0.04, 0.45, 0.38 + Math.random()*0.1);
+  if(r < 0.13) return c.setHSL(0.08 + Math.random()*0.03, 0.4, 0.26 + Math.random()*0.08);
+  return c.setHSL((84 + Math.random()*34)/360, 0.38 + Math.random()*0.24, 0.17 + Math.random()*0.2);
+}
 function springHash(a, b){ const h = Math.sin(a*127.1 + b*311.7)*43758.5453; return h - Math.floor(h); }
 /* the bulb fields: the colour of tulip at a point (an index into tulipPal), or -1 for none. Fields
    of 88 by 60 metres, a grass path round each, the beds in stripes one way or the other */
@@ -11261,6 +11269,17 @@ function horseShape(u, v){
 }
 /* the ground of each Spring Cup circuit, over the plain spring grass (c is the colour so far; t is
    how far from the road's dirt edge, 0 to 1; edge is metres past the road's edge; steep, 0 to 1) */
+/* the square the hedge maze stands in (worked out once, from the road through it, as the maze itself is) */
+function springMazeBox(){
+  if(springMazeBox.b !== undefined) return springMazeBox.b;
+  const S = TRACK.spots && TRACK.spots.maze;
+  if(!S) return (springMazeBox.b = null);
+  let a = snapTo(MAIN, S[0]), b = snapTo(MAIN, S[1]), n = b - a; if(n < 0) n += MAIN.N; if(n > MAIN.N/2){ const q = a; a = b; b = q; n = MAIN.N - n; }
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for(let k=0;k<=n;k++){ const p = MAIN.pts[wrapIdx(MAIN, a + k)]; x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); z0 = Math.min(z0, p.z); z1 = Math.max(z1, p.z); }
+  const m = 6.4 + 24;
+  return (springMazeBox.b = [x0 - m, x1 + m, z0 - m, z1 + m]);
+}
 function springGround(c, x, z, t, edge, steep){
   const G = TRACK.ground, tmp = springGround.tmp || (springGround.tmp = new THREE.Color());
   if(G === "tulips"){
@@ -11271,6 +11290,13 @@ function springGround(c, x, z, t, edge, steep){
     const P = tulipPal(k), w = smoothstep(6, 13, edge)*(1 - steep);
     c.lerp(tmp.setHSL(P[0], P[1], P[2] + (Math.random() - 0.5)*0.07), w*0.94);
   } else if(G === "lawn"){
+    // inside the maze the floor is deep in clipped leaves: dark mottled greens, a little brown
+    const MB = springMazeBox();
+    if(MB && x > MB[0] && x < MB[1] && z > MB[2] && z < MB[3] && edge > 1.5){
+      const n = 0.5 + 0.5*Math.sin(x*1.7 + Math.sin(z*1.3)*2)*Math.sin(z*1.9 + x*0.6), r0 = Math.random();
+      c.setHSL(r0 < 0.12 ? 0.11 + Math.random()*0.03 : (84 + n*30 + Math.random()*8)/360, 0.38 + Math.random()*0.15, 0.15 + n*0.09 + Math.random()*0.05);
+      return;
+    }
     // the lawns, mown in broad stripes, a little darker in the hollows
     if(edge < 3) return;
     const b = Math.floor((x*0.83 + z*0.56)/8) & 1, w = smoothstep(3, 9, edge);
@@ -11651,36 +11677,64 @@ if(SPRINGCUP){
       setDown(g, s[0], s[1], rnd()*6); NO_TREES.push([s[0], s[1], 2]);
     });
   }
-  /* the bamboo grove: tall green culms both sides of the road, straight up and then leaning in over it
-     until their tops cross, so the road runs down a tunnel of leaves */
+  /* the bamboo grove: clumps of tall culms both sides of the road, each one rising straight and then
+     arching over the road in one long curve, jointed every couple of metres with a pale ring at each node
+     and tapering to the tip, and hung from halfway up with fans of narrow drooping leaves on short side
+     branches, so the road runs down a green tunnel */
   if(SP("bamboo")){
-    const S = stretch(SP("bamboo")[0], SP("bamboo")[1]), low = [], high = [], leaves = [];
-    for(let k=-Math.round(10/seg); k<=S.n + Math.round(10/seg); k+=Math.max(1, Math.round(0.45/seg))){
+    const S = stretch(SP("bamboo")[0], SP("bamboo")[1]), segs = [], nodes = [], sprays = [];
+    const seg3 = (A, B, r, list)=>{ const dx = B[0] - A[0], dy = B[1] - A[1], dz = B[2] - A[2], L = Math.hypot(dx, dy, dz);
+      list.push([A[0], A[1], A[2], Math.atan2(dx, dz), Math.acos(Math.max(-1, Math.min(1, dy/L))), 0, r, L, r]); };
+    for(let k=-Math.round(10/seg); k<=S.n + Math.round(10/seg); k+=Math.max(1, Math.round(2.3/seg))){
       const f = frm(S.a + k);
       for(const sd of [-1, 1]){
-        if(rnd() < 0.1) continue;
-        const o = f.half + 0.9 + rnd()*rnd()*8, x = f.p.x + f.nx*sd*o + f.t.x*(rnd() - 0.5)*0.8, z = f.p.z + f.nz*sd*o + f.t.z*(rnd() - 0.5)*0.8;
-        const y = gradedY(x, z) - 0.2, H = 11 + rnd()*8, h0 = H*(0.4 + rnd()*0.14);
-        low.push([x, y, z, 0, 0, 0, 1, h0, 1]);
-        // the upper culm, from the knee to a tip out over the road
-        const tipL = -sd*(rnd()*4.5 - 1) + (o > f.half + 4 ? sd*2 : 0), tx = f.p.x + f.nx*tipL, tz = f.p.z + f.nz*tipL, ty = y + H;
-        const dx = tx - x, dy = ty - (y + h0), dz = tz - z, L = Math.hypot(dx, dy, dz);
-        const yaw = Math.atan2(dx, dz), pitch = Math.acos(dy/L);
-        high.push([x, y + h0, z, yaw, pitch, 0, 0.85, L, 0.85]);
-        for(let q=0;q<7;q++){ const u = 0.3 + q*0.11 + rnd()*0.06; leaves.push([x + dx*u + (rnd() - 0.5)*2, y + h0 + dy*u - 0.4 - rnd()*0.6, z + dz*u + (rnd() - 0.5)*2, rnd()*6, rnd()*0.7, rnd()*0.7, 0.8 + rnd()*0.9, 0.35 + rnd()*0.2]); }
+        if(rnd() < 0.08) continue;
+        // a clump: a few culms from one root, the outer ones further back off the road
+        const n = 3 + Math.floor(rnd()*4), cl = f.half + 1.4 + rnd()*2.2, ca = (rnd() - 0.5)*1.6;
+        for(let c=0;c<n;c++){
+          const o = cl + rnd()*2.2, al = ca + (rnd() - 0.5)*1.4;
+          const bx = f.p.x + f.nx*sd*o + f.t.x*al, bz = f.p.z + f.nz*sd*o + f.t.z*al, y0 = gradedY(bx, bz) - 0.3;
+          const H = 10 + rnd()*7, r0 = 0.08 + rnd()*0.06;
+          // where the tip ends up: out over the road (the nearer ones further across)
+          const tipL = -sd*(rnd()*4.2 - 0.8) + sd*(o - f.half - 1.4)*0.35, ta = al + (rnd() - 0.5)*5;
+          const B = [bx, y0, bz];
+          const C = [f.p.x + f.nx*sd*(o - 0.4) + f.t.x*al, y0 + H*(0.62 + rnd()*0.12), f.p.z + f.nz*sd*(o - 0.4) + f.t.z*al];
+          const T = [f.p.x + f.nx*tipL + f.t.x*ta, y0 + H, f.p.z + f.nz*tipL + f.t.z*ta];
+          const at = u=>{ const a1 = (1 - u)*(1 - u), b1 = 2*u*(1 - u), c1 = u*u; return [a1*B[0] + b1*C[0] + c1*T[0], a1*B[1] + b1*C[1] + c1*T[1], a1*B[2] + b1*C[2] + c1*T[2]]; };
+          const NS = 9; let prev = B;
+          for(let s=1;s<=NS;s++){
+            const u = s/NS, p = at(u), r = r0*(1 - u*0.62);
+            seg3(prev, p, r, segs);
+            if(s < NS) seg3([p[0] - (p[0] - prev[0])*0.03, p[1] - (p[1] - prev[1])*0.03, p[2] - (p[2] - prev[2])*0.03], p, r*1.28, nodes);
+            // from halfway up: short side branches ending in fans of leaves, hanging off every node
+            if(u > 0.4){ const m = u > 0.85 ? 4 : 2 + Math.floor(rnd()*2);
+              for(let q=0;q<m;q++){ const yaw = rnd()*6.28, out = 0.3 + rnd()*0.7;
+                sprays.push([p[0] + Math.sin(yaw)*out, p[1] - 0.2 - rnd()*0.4, p[2] + Math.cos(yaw)*out, yaw, 0.15 + rnd()*0.35, (rnd() - 0.5)*0.4, 1.2 + rnd()*0.9]); } }
+            prev = p;
+          }
+        }
       }
     }
-    const cg = new THREE.CylinderGeometry(0.075, 0.1, 1, 6, 1, true); cg.translate(0, 0.5, 0);
-    const culmM = new THREE.MeshLambertMaterial({side:THREE.DoubleSide});
-    instances(cg, culmM, low, c=> c.setHSL(0.2 + rnd()*0.06, 0.5 + rnd()*0.2, 0.42 + rnd()*0.12));
-    // (the upper part leans: its own turn about x, then the yaw)
-    const ug = new THREE.CylinderGeometry(0.05, 0.075, 1, 5, 1, true); ug.translate(0, 0.5, 0);
-    instances(ug, culmM, high.map(h=> [h[0], h[1], h[2], h[3], h[4], 0, h[6], h[7], h[8]]), c=> c.setHSL(0.2 + rnd()*0.06, 0.55, 0.45 + rnd()*0.1));
-    const lg = new THREE.IcosahedronGeometry(1, 0); lg.scale(1, 0.35, 1);
-    instances(lg, new THREE.MeshLambertMaterial({}), leaves, c=> c.setHSL(0.2 + rnd()*0.09, 0.45 + rnd()*0.25, 0.28 + rnd()*0.14));
+    // one internode: a slightly tapering open tube (base at 0, one unit tall); one node: a short ring
+    const cg = new THREE.CylinderGeometry(0.88, 1, 1, 7, 1, true); cg.translate(0, 0.5, 0);
+    instances(cg, new THREE.MeshLambertMaterial({side:THREE.DoubleSide}), segs, c=>{ const r = rnd(); return r < 0.08 ? c.setHSL(0.16 + rnd()*0.03, 0.42, 0.36 + rnd()*0.06) : c.setHSL(0.24 + rnd()*0.06, 0.45 + rnd()*0.2, 0.34 + rnd()*0.12); });
+    const ng = new THREE.CylinderGeometry(1, 1, 1, 7); ng.translate(0, 0.5, 0);
+    instances(ng, new THREE.MeshLambertMaterial({}), nodes.map(q=> [q[0], q[1], q[2], q[3], q[4], q[5], q[6], 0.09, q[8]]), c=> c.setHSL(0.2 + rnd()*0.04, 0.32, 0.6 + rnd()*0.1));
+    // a fan of seven narrow leaves, each drooping toward its tip, on a little stalk
+    const lp = [], li = [];
+    for(let q=0;q<7;q++){
+      const yaw = (q/6 - 0.5)*2.4 + (rnd() - 0.5)*0.2, L = 0.34 + rnd()*0.12, w = 0.035 + rnd()*0.012, cy = Math.cos(yaw), sy = Math.sin(yaw), base = lp.length/3;
+      const P = [[0, 0, 0.05], [w, 0.02, 0.05 + L*0.3], [0, -L*0.55, 0.05 + L*0.95], [-w, 0.02, 0.05 + L*0.3]];
+      P.forEach(v=> lp.push(v[0]*cy + v[2]*sy, v[1], -v[0]*sy + v[2]*cy));
+      li.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    }
+    const sg = new THREE.BufferGeometry(); sg.setAttribute("position", new THREE.Float32BufferAttribute(lp, 3)); sg.setIndex(li); sg.computeVertexNormals();
+    const sI = instances(sg, new THREE.MeshLambertMaterial({side:THREE.DoubleSide}), sprays, c=> rnd() < 0.1 ? c.setHSL(0.17, 0.45, 0.45) : c.setHSL(0.25 + rnd()*0.06, 0.45 + rnd()*0.2, 0.28 + rnd()*0.12));
+    if(sI) sI.castShadow = true;
     for(let k=0;k<=S.n;k+=Math.round(6/seg)){ const f = frm(S.a + k); NO_TREES.push([f.p.x, f.p.z, f.half + 9]); }
     roadSign(byM(S.a, -90), -1, ["BAMBOO GROVE", "lights on"], "#3a5a24", "#eaf4d0");
   }
+
 
   /* ---- WISTERIA MANOR -------------------------------------------------- */
   const hedgeTex = new THREE.CanvasTexture(noiseCanvas(128, 128, (g, w, h)=>{
@@ -11896,6 +11950,49 @@ if(SPRINGCUP){
     // the outer hedge all round, open only where the road comes in and goes out
     const ex = bx0 + nX*C, ez = bz0 + nZ*C;
     wall(bx0, bz0, ex, bz0); wall(bx0, ez, ex, ez); wall(bx0, bz0, bx0, ez); wall(ex, bz0, ex, ez);
+    /* Leaves: the maze is thick with them. Clippings all over the floor of every corridor, heaped in
+       drifts along the foot of the hedges (and in the dead ends, where nothing ever stirs them), all in
+       the hedges' own greens. The road through it is carpeted too: those are loose (see the litter on the
+       road), and the car blows them up and away as it goes. */
+    SPRINGFX.maze = {a:S.a, n:S.n};
+    {
+      const lg = new THREE.BufferGeometry();
+      lg.setAttribute("position", new THREE.Float32BufferAttribute([0,0,0.16, 0.07,0,0.05, 0.06,0,-0.08, 0,0,-0.15, -0.06,0,-0.08, -0.07,0,0.05], 3));
+      lg.setIndex([0,1,5, 1,2,5, 2,4,5, 2,3,4]); lg.computeVertexNormals();
+      const carpet = [], drift = [];
+      const onFloor = (x, z)=> clearOf(x, z, 0.6) && !inWaterway(x, z);
+      for(let k=0; k<70000; k++){
+        const x = bx0 + rnd()*(ex - bx0), z = bz0 + rnd()*(ez - bz0);
+        if(!onFloor(x, z)) continue;
+        carpet.push([x, gradedY(x, z) + 0.03 + rnd()*0.04, z, rnd()*6.28, (rnd() - 0.5)*0.5, (rnd() - 0.5)*0.5, 1.3 + rnd()*1.1]);
+      }
+      // the drifts: low mounds of leaves along every hedge, thicker in the corners
+      const hedgeFoot = [];
+      for(let cz=0; cz<nZ; cz++) for(let cx=0; cx<nX; cx++){
+        const c = cz*nX + cx, x = bx0 + cx*C, z = bz0 + cz*C;
+        if(wallE[c] && cx < nX - 1) hedgeFoot.push([x + C, z, x + C, z + C]);
+        if(wallS[c] && cz < nZ - 1) hedgeFoot.push([x, z + C, x + C, z + C]);
+      }
+      hedgeFoot.push([bx0, bz0, ex, bz0], [bx0, ez, ex, ez], [bx0, bz0, bx0, ez], [ex, bz0, ex, ez]);
+      hedgeFoot.forEach(w=>{
+        const L = Math.hypot(w[2] - w[0], w[3] - w[1]), ux = (w[2] - w[0])/L, uz = (w[3] - w[1])/L;
+        for(let s=0; s<L; s+=1.3) for(const sd of [-1, 1]){
+          if(rnd() < 0.2) continue;
+          const o = T/2 + 0.25 + rnd()*0.7, x = w[0] + ux*s - uz*sd*o, z = w[1] + uz*s + ux*sd*o;
+          if(!onFloor(x, z)) continue;
+          const h = 0.12 + rnd()*0.2, y0 = gradedY(x, z);
+          // a low heap under it (dark: the leaves underneath, in shadow) ...
+          drift.push([x, y0 - 0.08, z, rnd()*6.28, 0, 0, 0.8 + rnd()*0.5, h, 0.55 + rnd()*0.3]);
+          // ... and the leaves lying all over it, piled highest against the hedge
+          for(let q=0;q<11;q++){ const a = rnd()*6.28, rr = Math.sqrt(rnd())*0.95, hx = x + Math.cos(a)*rr, hz = z + Math.sin(a)*rr;
+            carpet.push([hx, y0 + (h + 0.32)*(1 - rr*rr)*0.95 + 0.02, hz, rnd()*6.28, (rnd() - 0.5)*1.0, (rnd() - 0.5)*1.0, 1.3 + rnd()*1.0]); }
+        }
+      });
+      const lm = new THREE.MeshLambertMaterial({side:THREE.DoubleSide});
+      const lI = instances(lg, lm, carpet, c=> hedgeLeafColour(c)); if(lI) lI.castShadow = false;
+      const dg = new THREE.IcosahedronGeometry(1, 1); dg.translate(0, 0.35, 0);
+      const dI = instances(dg, new THREE.MeshLambertMaterial({}), drift, c=> c.setHSL((86 + rnd()*28)/360, 0.4 + rnd()*0.15, 0.12 + rnd()*0.07)); if(dI) dI.castShadow = false;
+    }
     shade(g); mergeStatic(g); scene.add(g);
     // an arch of hedge over the way in and the way out
     for(const k of [0, S.n]){ const f = frm(S.a + k), ag = new THREE.Group(), w = f.half + 0.5 + T/2;
@@ -20805,6 +20902,17 @@ const LITTER = { items:[], leaf:null, stick:null, home:[] };
     }
     BRANCHES.forEach(P=>{ for(const f of [0.3, 0.55, 0.8]){ const i = Math.round(P.N*f); if(clearHere(P, i)) scatter(P, i, 45, 0, 12); } });
   }
+  // Wisteria Manor's maze: the road through it carpeted in clippings off the hedges, kerb to kerb
+  if(typeof SPRINGFX !== "undefined" && SPRINGFX.maze){
+    const M0 = SPRINGFX.maze, step = Math.max(1, Math.round(2.5/MAIN.seg));
+    for(let k=-Math.round(6/MAIN.seg); k<=M0.n + Math.round(6/MAIN.seg); k+=step){
+      const i = wrapIdx(MAIN, M0.a + k), t = MAIN.tans[i], p = MAIN.pts[i], hw = MAIN.half[i] + 0.4;
+      for(let q=0;q<85;q++){
+        const along = (Math.random() - 0.5)*2.6, lat = (Math.random()*2 - 1)*hw*(0.5 + 0.5*Math.sqrt(Math.random()));
+        put(0, p.x + t.x*along - t.z*lat, p.z + t.z*along + t.x*lat); items[items.length - 1].hedge = true;
+      }
+    }
+  }
   // sticks: thick over the old tar, a few everywhere in the woods
   paths.forEach(P=>{
     for(let i=0;i<P.N;i+=Math.max(1, Math.round(5/P.seg))){
@@ -20828,7 +20936,7 @@ const LITTER = { items:[], leaf:null, stick:null, home:[] };
   const c = new THREE.Color();
   let li = 0, si = 0;
   items.forEach(o=>{ o.slot = o.kind ? si++ : li++;
-    if(!o.kind){ pileColour(c); LITTER.leaf.setColorAt(o.slot, c); } });
+    if(!o.kind){ o.hedge ? hedgeLeafColour(c) : pileColour(c); LITTER.leaf.setColorAt(o.slot, c); } });
   if(LITTER.leaf && LITTER.leaf.instanceColor) LITTER.leaf.instanceColor.needsUpdate = true;
   [LITTER.leaf, LITTER.stick].forEach(m=>{ if(m){ m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); } });
 }
