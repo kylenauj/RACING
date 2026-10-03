@@ -9439,6 +9439,14 @@ function swampStep(dt){
   }
 }
 
+/* what the road is made of where it is not the road: the Spring Cup's planks (a wooden bridge's deck) and
+   marble (the manor's floors). Clean surfaces: no leaves, sticks, stones or dust on them, and their own sound. */
+const FLOOR = {NONE:0, PLANKS:1, MARBLE:2};
+function floorAt(x, z){
+  if(!MAIN.floor) return 0;
+  const n = nearest(x, z);
+  return n.path === MAIN && n.dist < n.half + 1.5 ? MAIN.floor[n.pi] : 0;
+}
 /* the walls of a walled stretch: the same hold the boardwalk's rails have */
 function railStep(dt){
   if(pose.air) return;
@@ -11196,6 +11204,7 @@ if(FALL || WINTER || BLOOM){
   ANIMS.push(t=>{
     const dt = Math.max(0, Math.min(0.1, t - last)); last = t;
     const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
+    pts.visible = !(SPRINGCUP && MAIN.floor && floorAt(cx, cz) === FLOOR.MARBLE);      // (no blossom falling indoors)
     for(let i=0;i<N;i++){
       let x = pos[i*3], y = pos[i*3+1], z = pos[i*3+2];
       y -= dt*(WINTER ? 0.9 + (i%7)*0.1 : BLOOM ? 0.6 + (i%7)*0.08 : 1.1 + (i%7)*0.12);
@@ -11385,6 +11394,9 @@ if(SPRINGCUP){
   const stretch = (A, B)=>{ let a = snapTo(MAIN, A), b = snapTo(MAIN, B), n = b - a; if(n < 0) n += N; if(n > N/2){ const q = a; a = b; b = q; n = N - n; } return {a, b, n}; };
   const keep = (x, z, r)=>{ NO_TREES.push([x, z, r]); PROP_KEEP.push([x, z, r]); };
   const lam = (c, e)=> new THREE.MeshLambertMaterial({color:c, emissive:e || 0});
+  // every wooden deck is planks
+  MAIN.floor = new Uint8Array(N);
+  for(let i=0;i<N;i++) if(MAIN.bwDeck && MAIN.bwDeck[i]) MAIN.floor[i] = FLOOR.PLANKS;
   const shade = g=>{ g.traverse(o=>{ if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; } }); return g; };
   /* a mesh of many copies of one shape, each with its own place, turn, size and colour */
   const instances = (geo, mat, list, colour)=>{
@@ -12026,17 +12038,31 @@ if(SPRINGCUP){
     mergeStatic(g);
     g.traverse(o=>{ if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
     g.position.set(H0[0], y0, H0[1]); scene.add(g);
-    // the marble floor of the gallery, laid over the road the length of it
-    { const tex = new THREE.CanvasTexture(noiseCanvas(128, 128, (q, w, h)=>{ q.fillStyle = "#f2eee6"; q.fillRect(0, 0, w, h); q.fillStyle = "#2a2a30"; q.fillRect(0, 0, w/2, h/2); q.fillRect(w/2, h/2, w/2, h/2); }));
-      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-      const a = snapTo(MAIN, [H0[0] + XG, H0[1] + ZN]), b = snapTo(MAIN, [H0[0] + XG, H0[1] - D]); let n = b - a; if(n < 0) n += N;
+    /* the floors laid over the road through the house: black and white marble down the gallery, pale
+       flagstones through the two arches */
+    const floorRibbon = (A, B, hw, tex, tile)=>{
+      const a = snapTo(MAIN, A), b = snapTo(MAIN, B); let s0 = a, n = b - a; if(n < 0) n += N; if(n > N/2){ s0 = b; n = N - n; }
       const pos = [], uv = [], idx = [];
-      for(let k=0;k<=n;k++){ const f = frm(a + k); for(const s of [-1, 1]){ const x = f.p.x + f.nx*s*(GA.hw - 0.1), z = f.p.z + f.nz*s*(GA.hw - 0.1);
-        pos.push(x, Math.max(f.y, roadY(f.p.x + f.nx*s*(f.half - 0.2), f.p.z + f.nz*s*(f.half - 0.2))) + 0.05, z); uv.push((s + 1)*GA.hw/3.2, k*seg/3.2); }
+      for(let k=0;k<=n;k++){ const f = frm(s0 + k); for(const s of [-1, 1]){ const x = f.p.x + f.nx*s*(hw - 0.1), z = f.p.z + f.nz*s*(hw - 0.1);
+        pos.push(x, Math.max(f.y, roadY(f.p.x + f.nx*s*(f.half - 0.2), f.p.z + f.nz*s*(f.half - 0.2))) + 0.05, z); uv.push((s + 1)*hw/tile, k*seg/tile); }
         if(k) idx.push((k - 1)*2, (k - 1)*2 + 1, k*2, (k - 1)*2 + 1, k*2 + 1, k*2); }
       const fg = new THREE.BufferGeometry(); fg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); fg.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); fg.setIndex(idx); fg.computeVertexNormals();
       const fm = new THREE.Mesh(fg, new THREE.MeshLambertMaterial({map:tex, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2}));
-      fm.receiveShadow = true; scene.add(fm); }
+      fm.receiveShadow = true; scene.add(fm);
+    };
+    { const marbleT = new THREE.CanvasTexture(noiseCanvas(128, 128, (q, w, h)=>{ q.fillStyle = "#f2eee6"; q.fillRect(0, 0, w, h); q.fillStyle = "#2a2a30"; q.fillRect(0, 0, w/2, h/2); q.fillRect(w/2, h/2, w/2, h/2); }));
+      marbleT.wrapS = marbleT.wrapT = THREE.RepeatWrapping;
+      const flagT = new THREE.CanvasTexture(noiseCanvas(256, 256, (q, w, h)=>{ q.fillStyle = "#6e6452"; q.fillRect(0, 0, w, h);
+        for(let r=0;r<4;r++){ const off = r % 2 ? 32 : 0; for(let c=-1;c<4;c++){ const x = c*64 + off, y = r*64, k = 0.9 + Math.random()*0.18;
+          q.fillStyle = "rgb(" + Math.round(168*k) + "," + Math.round(154*k) + "," + Math.round(128*k) + ")"; q.fillRect(x + 2, y + 2, 60, 60); } }
+        for(let k=0;k<900;k++){ q.fillStyle = "rgba(90,80,60,0.07)"; q.fillRect(Math.random()*w, Math.random()*h, 2, 2); } }));
+      flagT.wrapS = flagT.wrapT = THREE.RepeatWrapping;
+      floorRibbon([H0[0] + XG, H0[1] + ZN], [H0[0] + XG, H0[1] - D], GA.hw, marbleT, 3.2);
+      floorRibbon([H0[0], H0[1] - D - 0.5], [H0[0], H0[1] + D + 0.5], CA.hw, flagT, 4.8);
+      floorRibbon([H0[0] - L - 0.5, H0[1] + WA.z], [H0[0] - L + WD + 0.5, H0[1] + WA.z], WA.hw, flagT, 4.8); }
+    // the ways through the house are floored in marble
+    for(let i=0;i<N;i++){ const p = MAIN.pts[i], lx = p.x - H0[0], lz = p.z - H0[1];
+      if((Math.abs(lx) <= L && lz >= -D - 1 && lz <= D + 1) || (Math.abs(lx) >= L - WD - 1 && Math.abs(lx) <= L + 1 && lz >= D && lz <= ZN + 1)) MAIN.floor[i] = FLOOR.MARBLE; }
     // the ground it stands on keeps clear of trees and bushes; the courtyard is the parterre's
     for(let x=-L + 10; x<=L - 10; x+=20) keep(H0[0] + x, H0[1], 20);
     for(const sd of [-1, 1]) for(let z=D + 10; z<=ZN; z+=20) keep(H0[0] + sd*(L - WD/2), H0[1] + z, 20);
@@ -12208,22 +12234,46 @@ if(SPRINGCUP){
      pads all over the water, and the koi themselves, swimming under the surface and scattering from
      the car. */
   if(TRACK.lakeRoad && TRACK.lakeRoad.length && LAKE.on){
-    const lilyG = new THREE.CircleGeometry(1, 22, 0.25, Math.PI*2 - 0.5); lilyG.rotateX(-Math.PI/2);
-    const padM = new THREE.MeshLambertMaterial({side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:-3, polygonOffsetUnits:-3});
-    const roadPads = [], lakePads = [], lotus = [];
+    /* the giant pads of the road are Victoria water lilies: broad and flat, ribbed with veins out from the
+       middle, and turned up round the edge in a rim that is red underneath. The pads out on the water are
+       ordinary water lilies, notched, veined. */
+    const vicTex = new THREE.CanvasTexture(noiseCanvas(512, 128, (q, w, h)=>{
+      const gr = q.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, "#3c7426"); gr.addColorStop(0.55, "#4f8e2e"); gr.addColorStop(0.8, "#62a238");
+      gr.addColorStop(0.83, "#5a3a22"); gr.addColorStop(0.9, "#a8322a"); gr.addColorStop(1, "#d0583c"); q.fillStyle = gr; q.fillRect(0, 0, w, h);
+      for(let k=0;k<1400;k++){ q.fillStyle = "rgba(" + (Math.random() < 0.5 ? "30,70,20" : "120,170,70") + ",0.18)"; q.fillRect(Math.random()*w, Math.random()*h*0.8, 3 + Math.random()*6, 2 + Math.random()*4); }
+      q.strokeStyle = "rgba(34,66,22,0.85)"; q.lineWidth = 3;
+      for(let k=0;k<32;k++){ const x = k*w/32; q.beginPath(); q.moveTo(x, 4); q.lineTo(x + (Math.random() - 0.5)*4, h*0.8); q.stroke(); }
+      q.strokeStyle = "rgba(34,66,22,0.5)"; q.lineWidth = 1.5;
+      for(let r=1;r<6;r++){ const y = h*0.8*r/6; q.beginPath(); for(let x=0;x<=w;x+=8){ const yy = y + Math.sin(x*0.19)*3; x ? q.lineTo(x, yy) : q.moveTo(x, yy); } q.stroke(); }
+    }));
+    vicTex.wrapS = THREE.RepeatWrapping; vicTex.flipY = false;          // (v runs from the middle of the pad out to the rim)
+    const vicG = new THREE.LatheGeometry([[0, 0], [0.35, 0.002], [0.7, 0.006], [0.86, 0.012], [0.93, 0.035], [0.97, 0.09], [1.0, 0.16], [1.02, 0.18]].map(p=> new THREE.Vector2(p[0], p[1])), 48);
+    const vicM = new THREE.MeshLambertMaterial({map:vicTex, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:-3, polygonOffsetUnits:-3});
+    const lilyTex = new THREE.CanvasTexture(noiseCanvas(256, 256, (q, w, h)=>{
+      const gr = q.createRadialGradient(w/2, h/2, 4, w/2, h/2, w/2); gr.addColorStop(0, "#9ac858"); gr.addColorStop(0.75, "#5e9a34"); gr.addColorStop(0.97, "#3e6e24"); gr.addColorStop(1, "#7a3a2a");
+      q.fillStyle = gr; q.fillRect(0, 0, w, h);
+      q.strokeStyle = "rgba(48,88,28,0.7)"; q.lineWidth = 2;
+      for(let k=0;k<26;k++){ const a = k/26*Math.PI*2; q.beginPath(); q.moveTo(w/2, h/2); q.quadraticCurveTo(w/2 + Math.cos(a + 0.12)*w*0.25, h/2 + Math.sin(a + 0.12)*h*0.25, w/2 + Math.cos(a)*w*0.49, h/2 + Math.sin(a)*h*0.49); q.stroke(); }
+      for(let k=0;k<500;k++){ q.fillStyle = "rgba(" + (Math.random() < 0.5 ? "40,80,25" : "150,200,90") + ",0.15)"; q.fillRect(Math.random()*w, Math.random()*h, 3, 3); }
+    }));
+    const lilyG = new THREE.CircleGeometry(1, 28, 0.22, Math.PI*2 - 0.44); lilyG.rotateX(-Math.PI/2);
+    const padM = new THREE.MeshLambertMaterial({map:lilyTex, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
+    const roadPads = [], fillPads = [], lakePads = [], lotus = [];
     TRACK.lakeRoad.forEach(R=>{
       const S = stretch(R.from, R.to);
       SPRINGFX.lake = SPRINGFX.lake || [];
       SPRINGFX.lake.push({a:S.a, n:S.n, kind:R.kind});
       if(R.kind === "lily"){
-        // the road itself, giant pads overlapping kerb to kerb and over the edges, layer on layer
-        let layer = 0;
-        for(let k=0; k<=S.n; k+=Math.max(1, Math.round(3.0/seg))){
-          const f = frm(S.a + k);
-          for(const l of [-(f.half - 1.2), 0.4*(rnd() - 0.5), f.half - 1.2]){
-            const r = 3.4 + rnd()*1.6, x = f.p.x + f.nx*(l + (rnd() - 0.5)*1.4), z = f.p.z + f.nz*(l + (rnd() - 0.5)*1.4);
-            roadPads.push([x, Math.max(f.y, LAKE.level) + 0.04 + (layer++ % 7)*0.012, z, rnd()*6.28, 0, 0, r, 1, r]);
-          }
+        // the road itself: a chain of giant pads across it, two then three, rim to rim, and small pads between
+        let row = 0;
+        for(let k=0; k<=S.n; k+=Math.max(1, Math.round(6.6/seg)), row++){
+          const f = frm(S.a + k), y0 = Math.max(f.y, LAKE.level) + 0.03;
+          const lanes = row % 2 ? [[0, 4.5, 0], [-(f.half + 1.0), 3.1, -0.02], [f.half + 1.0, 3.1, -0.02]] : [[-3.4, 4.2, 0.015], [3.4, 4.2, 0.015]];
+          for(const [l, r, dy] of lanes){ const x = f.p.x + f.nx*l, z = f.p.z + f.nz*l;
+            roadPads.push([x, y0 + dy, z, rnd()*6.28, 0, 0, r*(0.95 + rnd()*0.1), 1, r*(0.95 + rnd()*0.1)]); }
+          for(let q=0;q<5;q++){ const l = (rnd()*2 - 1)*(f.half + 2.5), a = (rnd() - 0.5)*5, r = 1.0 + rnd()*1.2;
+            fillPads.push([f.p.x + f.nx*l + f.t.x*a, y0 - 0.02, f.p.z + f.nz*l + f.t.z*a, rnd()*6.28, 0, 0, r, 1, r]);
+            if(rnd() < 0.18 && Math.abs(l) > f.half - 0.5) lotus.push([f.p.x + f.nx*l*1.1 + f.t.x*a, y0, f.p.z + f.nz*l*1.1 + f.t.z*a]); }
         }
         roadSign(byM(S.a, -90), 1, ["THE LILY PADS", "a road across the lake"], "#2a5a3a", "#f2fbf2");
       } else if(R.kind === "skim"){
@@ -12262,8 +12312,9 @@ if(SPRINGCUP){
       lakePads.push([x, LAKE.level + 0.03 + rnd()*0.01, z, rnd()*6.28, 0, 0, r, 1, r]); made++;
       if(rnd() < 0.22) lotus.push([x + (rnd() - 0.5)*r, LAKE.level + 0.05, z + (rnd() - 0.5)*r]);
     }
-    const padCol = (c)=> c.setHSL(0.25 + rnd()*0.09, 0.5 + rnd()*0.2, 0.28 + rnd()*0.14);
-    instances(lilyG, padM, roadPads, padCol);
+    const padCol = (c)=>{ const k = 0.86 + rnd()*0.2; return c.setRGB(k*(0.92 + rnd()*0.12), k, k*(0.85 + rnd()*0.1)); };
+    instances(vicG, vicM, roadPads, padCol);
+    instances(lilyG, padM, fillPads, padCol);
     instances(lilyG, padM, lakePads, padCol);
     { const pet = new THREE.ConeGeometry(0.28, 0.9, 4); pet.translate(0, 0.45, 0);
       const list = [], ctr = [];
@@ -12275,39 +12326,53 @@ if(SPRINGCUP){
 
     /* the koi: big ones, gold, white with red, black and orange, cream, swimming just under the surface in
        slow loops round the lake and the zigzag pond, tails beating, and darting off when the car comes */
-    { const body = new THREE.SphereGeometry(1, 12, 8); body.scale(0.3, 0.17, 1);
-      const tail = new THREE.BufferGeometry(); tail.setAttribute("position", new THREE.Float32BufferAttribute([0,0,-0.8, 0.42,0,-1.55, -0.42,0,-1.55, 0,0.02,-0.8, -0.42,0,-1.55, 0.42,0,-1.55], 3));
-      const fin = new THREE.BufferGeometry(); fin.setAttribute("position", new THREE.Float32BufferAttribute([0.22,0,0.3, 0.62,0,-0.05, 0.25,0,-0.1, -0.22,0,0.3, -0.25,0,-0.1, -0.62,0,-0.05,
-                                                                                                             0.22,-0.01,0.3, 0.25,-0.01,-0.1, 0.62,-0.01,-0.05, -0.22,-0.01,0.3, -0.62,-0.01,-0.05, -0.25,-0.01,-0.1], 3));
-      [tail, fin].forEach(gg=> gg.computeVertexNormals());
-      const patch = new THREE.SphereGeometry(1, 8, 6); patch.scale(0.2, 0.08, 0.32);
-      const KOI = [];
-      const homes = [];
+    { /* a koi: a tapered body (in two halves, so it bends as it swims), a dorsal fin, pectoral fins and a
+         forked tail, seen through the water: its colours softened toward the water's and a little see-through */
+      const prof = [[0, -1.02], [0.06, -0.92], [0.13, -0.7], [0.2, -0.4], [0.25, -0.1], [0.26, 0.15], [0.24, 0.45], [0.19, 0.7], [0.12, 0.88], [0.04, 1.0], [0, 1.03]];
+      const half = (lo, hi)=>{ const pts = prof.filter(p=> p[1] >= lo - 0.001 && p[1] <= hi + 0.001).map(p=> new THREE.Vector2(p[0], p[1]));
+        const g = new THREE.LatheGeometry(pts, 14); g.rotateX(Math.PI/2); g.scale(1, 0.62, 1); return g; };
+      const front = half(0, 1.03), back = half(-1.02, 0);
+      const tri = (...v)=>{ const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(v, 3)); g.computeVertexNormals(); return g; };
+      const tailG = tri(0,0,-0.9, 0.5,0.03,-1.55, 0.12,0,-1.25,  0,0,-0.9, 0.12,0,-1.25, -0.12,0,-1.25,  0,0,-0.9, -0.12,0,-1.25, -0.5,0.03,-1.55);
+      const finG = tri(0.18,-0.05,0.42, 0.62,-0.08,0.12, 0.22,-0.06,0.12,  -0.18,-0.05,0.42, -0.22,-0.06,0.12, -0.62,-0.08,0.12,
+                       0,0.14,0.35, 0,0.32,0.0, 0,0.14,-0.25);
+      const patch = new THREE.SphereGeometry(1, 10, 6); patch.scale(0.17, 0.06, 0.3);
+      const KOI = [], homes = [];
       for(let q=0, made=0; q<3000 && made<60; q++){
         const a = rnd()*Math.PI*2, e = Math.sqrt(rnd())*0.85, x = LAKE.x + Math.cos(a)*LAKE.rx*e, z = LAKE.z + Math.sin(a)*LAKE.rz*e;
         if(LAKE.level - gradedY(x, z) < 0.8) continue;
-        homes.push([x, z, LAKE.level - 0.1, 6 + rnd()*14]); made++;
+        homes.push([x, z, LAKE.level, 6 + rnd()*14]); made++;
       }
       // and schools of them close beside the roads across the lake, where you see them as you go
       SPRINGFX.lake.forEach(L=>{ for(let q=0, made=0; q<1500 && made<45; q++){
-        const f = frm(L.a + Math.floor(rnd()*L.n)), sd = rnd() < 0.5 ? -1 : 1, o = f.half + 5 + rnd()*22, x = f.p.x + f.nx*sd*o, z = f.p.z + f.nz*sd*o;
+        const f = frm(L.a + Math.floor(rnd()*L.n)), sd = rnd() < 0.5 ? -1 : 1, o = f.half + 6 + rnd()*22, x = f.p.x + f.nx*sd*o, z = f.p.z + f.nz*sd*o;
         if(LAKE.level - gradedY(x, z) < 0.6) continue;
-        homes.push([x, z, LAKE.level - 0.1, 3 + rnd()*6]); made++; } });
+        homes.push([x, z, LAKE.level, 3 + rnd()*6]); made++; } });
       BOARDWALKS.forEach(W=>{ for(let q=0, made=0; q<400 && made<14; q++){ const p = W.pts[Math.floor(rnd()*W.pts.length)], a = rnd()*6.28, d = p.h + 4 + rnd()*10, x = p.x + Math.cos(a)*d, z = p.z + Math.sin(a)*d;
-        if(bwPool(x, z) < 0.6) continue; homes.push([x, z, W.level - 0.08, 3 + rnd()*4]); made++; } });
-      const kinds = [[0xf2f2ea, 0xe0401a], [0xff8a1e, 0xff8a1e], [0xf8c838, 0xf8c838], [0xf2f2ea, 0x1a1a1a], [0xff6a14, 0x1a1a1a], [0xf4ead2, 0xe0401a]];
+        if(bwPool(x, z) < 0.6) continue; homes.push([x, z, W.level, 3 + rnd()*4]); made++; } });
+      // kohaku, ogon, showa, chagoi, yamabuki, tancho: body colour, patch colour
+      const kinds = [[0xf4f0e6, 0xe2421c], [0xf2a43a, 0xf2a43a], [0x262422, 0xe2541c], [0xb08250, 0xb08250], [0xf6d040, 0xf6d040], [0xf4f0e6, 0xe2421c], [0xf07a24, 0x262422]];
+      const water = new THREE.Color(0x4e6e5c);
       homes.forEach((h, k)=>{ const K = kinds[k % kinds.length];
-        KOI.push({hx:h[0], hz:h[1], y:h[2], R:h[3], a:rnd()*6.28, sp:(0.35 + rnd()*0.4)*(rnd() < 0.5 ? -1 : 1), s:1.0 + rnd()*0.7, ph:rnd()*6, flee:0, fx:0, fz:0, c1:K[0], c2:K[1]}); });
+        KOI.push({hx:h[0], hz:h[1], lvl:h[2], R:h[3], a:rnd()*6.28, sp:(0.35 + rnd()*0.4)*(rnd() < 0.5 ? -1 : 1), s:1.0 + rnd()*0.6, ph:rnd()*6,
+                  flee:0, fx:0, fz:0, c1:K[0], c2:K[1], up:0, upT:2 + rnd()*12, tancho:k % kinds.length === 5}); });
       if(KOI.length){
-        /* (the water over them is nearly opaque, so they are drawn after it, a little see-through: bright fish just
-           under the surface; the lily pads, above them, still hide them) */
+        /* (the water over them is nearly opaque, so they are drawn after it and see-through, coloured toward it:
+           fish under the surface; the lily pads, above them, still hide them) */
         const mk = (g, m)=>{ const im = new THREE.InstancedMesh(g, m, KOI.length); im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.frustumCulled = false; im.renderOrder = 4; scene.add(im); return im; };
-        const kM = o=> new THREE.MeshLambertMaterial(Object.assign({transparent:true, opacity:0.88, depthWrite:false}, o));
-        const bm = mk(body, kM({emissive:0x2a160c})), tm = mk(tail, kM({side:THREE.DoubleSide, opacity:0.7}));
-        const fm = mk(fin, kM({side:THREE.DoubleSide, opacity:0.65})), pm = mk(patch, kM({opacity:0.92}));
+        const kM = o=> new THREE.MeshLambertMaterial(Object.assign({transparent:true, depthWrite:false, side:THREE.DoubleSide}, o));
+        const fm = mk(front, kM({opacity:0.7, emissive:0x1a1208})), bk = mk(back, kM({opacity:0.7, emissive:0x1a1208}));
+        const tm = mk(tailG, kM({opacity:0.42})), pf = mk(finG, kM({opacity:0.4})), pm = mk(patch, kM({opacity:0.74}));
         const c = new THREE.Color();
-        KOI.forEach((K, k)=>{ bm.setColorAt(k, c.setHex(K.c1)); tm.setColorAt(k, c.setHex(K.c1)); fm.setColorAt(k, c.setHex(K.c1)); pm.setColorAt(k, c.setHex(K.c2)); });
-        [bm, tm, fm, pm].forEach(m=> m.instanceColor.needsUpdate = true);
+        KOI.forEach((K, k)=>{ const c1 = c.setHex(K.c1).lerp(water, 0.3); [fm, bk, tm, pf].forEach(m=> m.setColorAt(k, c1));
+          pm.setColorAt(k, c.setHex(K.c2).lerp(water, 0.25)); });
+        [fm, bk, tm, pf, pm].forEach(m=> m.instanceColor.needsUpdate = true);
+        // rings spreading on the surface where one comes up
+        const RINGS = [], ringG = new THREE.RingGeometry(0.85, 1, 32); ringG.rotateX(-Math.PI/2);
+        for(let k=0;k<14;k++){ const m = new THREE.Mesh(ringG, new THREE.MeshBasicMaterial({color:0xe8f4f0, transparent:true, opacity:0, depthWrite:false}));
+          m.renderOrder = 5; m.visible = false; scene.add(m); RINGS.push({m, t:9}); }
+        let ringNext = 0;
+        const ring = (x, y, z)=>{ const R = RINGS[ringNext++ % RINGS.length]; R.t = 0; R.m.position.set(x, y + 0.02, z); R.m.visible = true; };
         const m4 = new THREE.Matrix4(), m5 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e3 = new THREE.Euler(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3();
         let lastT = null;
         const swim = (t, always)=>{
@@ -12317,20 +12382,27 @@ if(SPRINGCUP){
           KOI.forEach((K, k)=>{
             const px = K.hx + Math.cos(K.a)*K.R*(1 + 0.15*Math.sin(t*0.3 + K.ph)) + K.fx, pz = K.hz + Math.sin(K.a)*K.R + K.fz;
             // a car close by, and going, sends them darting off, out from under it
-            const dx = px - cx, dz = pz - cz, d = Math.hypot(dx, dz);
-            if(d < 14 && csp > 4) K.flee = 1;
+            const dx = px - cx, dz = pz - cz, dd = Math.hypot(dx, dz);
+            if(dd < 14 && csp > 4){ K.flee = 1; K.up = 0; }
             K.flee = Math.max(0, K.flee - dt*0.5);
-            if(K.flee > 0 && d > 0.1){ K.fx += dx/d*K.flee*dt*9; K.fz += dz/d*K.flee*dt*9; }
+            if(K.flee > 0 && dd > 0.1){ K.fx += dx/dd*K.flee*dt*9; K.fz += dz/dd*K.flee*dt*9; }
             K.fx *= 1 - dt*0.25; K.fz *= 1 - dt*0.25;
             K.a += K.sp*dt*(1 + K.flee*4)/Math.max(2, K.R)*3;
-            const head = Math.atan2(-Math.sin(K.a)*K.sp, Math.cos(K.a)*K.sp) + Math.PI/2*Math.sign(K.sp), wag = Math.sin(t*(5 + K.flee*10) + K.ph)*0.22;
-            v3.set(px, K.y + Math.sin(t*0.8 + K.ph)*0.04, pz); e3.set(0, head + wag*0.3, 0); q4.setFromEuler(e3); s3.set(K.s, K.s, K.s);
+            // now and then one comes up to the surface, a ring spreading where it breaks it
+            K.upT -= dt; if(K.upT <= 0 && live){ K.upT = 6 + Math.random()*14; K.up = 1.6; ring(px, K.lvl, pz); }
+            K.up = Math.max(0, K.up - dt);
+            const depth = 0.32 - 0.24*Math.min(1, K.up) + Math.sin(t*0.7 + K.ph)*0.05;
+            const head = Math.atan2(-Math.sin(K.a)*K.sp, Math.cos(K.a)*K.sp) + Math.PI/2*Math.sign(K.sp), beat = 5 + K.flee*11, wag = Math.sin(t*beat + K.ph);
+            v3.set(px, K.lvl - depth, pz); e3.set(0, head + wag*0.08, 0); q4.setFromEuler(e3); s3.set(K.s, K.s, K.s);
             m4.compose(v3, q4, s3);
-            bm.setMatrixAt(k, m4); fm.setMatrixAt(k, m4);
-            m5.makeRotationY(wag*1.6); m5.premultiply(m4); tm.setMatrixAt(k, m5);
-            v3.set(0, 0.12, 0.15); v3.applyMatrix4(m4); m5.copy(m4); m5.setPosition(v3); pm.setMatrixAt(k, m5);
+            fm.setMatrixAt(k, m4); pf.setMatrixAt(k, m4);
+            // the back half and the tail swing from the middle of the body, the tail further
+            m5.makeRotationY(wag*0.35); m5.premultiply(m4); bk.setMatrixAt(k, m5);
+            m5.makeRotationY(wag*0.7); m5.premultiply(m4); tm.setMatrixAt(k, m5);
+            v3.set(0, 0.1, K.tancho ? 0.75 : 0.2); v3.applyMatrix4(m4); m5.copy(m4); m5.setPosition(v3); pm.setMatrixAt(k, m5);
           });
-          [bm, tm, fm, pm].forEach(m=> m.instanceMatrix.needsUpdate = true);
+          [fm, bk, tm, pf, pm].forEach(m=> m.instanceMatrix.needsUpdate = true);
+          RINGS.forEach(R=>{ if(R.t > 3){ R.m.visible = false; return; } R.t += dt; const s = 0.4 + R.t*2.2; R.m.scale.set(s, 1, s); R.m.material.opacity = 0.55*(1 - R.t/3); });
         };
         swim(0, true); lastT = null; ANIMS.push(t=> swim(t));
       }
@@ -14017,6 +14089,7 @@ if(GLOW){
       const z = P.pts[i].z + nz*side*off + t.z*(Math.random()-0.5)*14;
       if(nearest(x,z).dist < 6.9) return false;
       if(inWaterway(x,z) || barren(x,z)) return false;
+      if(MAIN.floor && floorAt(x, z)) return false;
       const s = 0.10 + Math.pow(Math.random(), 2.4)*0.5;
       pebbleSpots[(Math.random()*3)|0].push([x, gradedY(x,z) - s*0.35, z, s]);
       return true;
@@ -14064,6 +14137,7 @@ if(GLOW){
         const z = P.pts[i].z + nz*side*off + t.z*(Math.random()-0.5)*14;
         if(nearest(x,z).dist < P.half[i] + 0.3) continue;
         if(inWaterway(x,z) || barren(x,z)) continue;
+        if(MAIN.floor && floorAt(x, z)) continue;
         const s2 = 0.10 + Math.pow(Math.random(), 2.4)*0.55;
         spots[(Math.random()*3)|0].push([x, gradedY(x,z) - s2*0.30, z, s2]);
         n++;
@@ -16590,7 +16664,7 @@ function startAudio(){
     return {g, f:fl};
   };
   AUD.road = { mid:loop("bandpass", 900, 0.9), low:loop("lowpass", 140, 0.7), high:loop("highpass", 3200, 0.6),
-               slide:loop("bandpass", 1500, 1.6), wade:loop("bandpass", 1100, 0.5), leaf:loop("bandpass", 3600, 0.7) };
+               slide:loop("bandpass", 1500, 1.6), wade:loop("bandpass", 1100, 0.5), leaf:loop("bandpass", 3600, 0.7), marble:loop("bandpass", 520, 1.3) };
   AUD.wind = loop("lowpass", 500, 0.4);
   // straight-cut gears: a thin whine that climbs with road speed in each gear, loudest on the overrun
   { const o = actx.createOscillator(); o.type = "triangle"; const o2 = actx.createOscillator(); o2.type = "sine";
@@ -17006,11 +17080,17 @@ function stepAudio(info, dt){
     R.mid.g.gain.setTargetAtTime(ground*crunch*v*(0.16 + off*0.1)*(1 - sand*0.35), now, 0.06);
     R.mid.f.frequency.setTargetAtTime((sand ? 450 : snow ? 1300 : 700) + sp*(snow ? 30 : 22), now, 0.1);
     // the stones themselves: sparse pings, faster and louder with speed, gone in mud, snow and water
-    const planks = onPlanks();
+    const floorK = SPRINGCUP ? floorAt(pose.x, pose.z) : 0, marble = floorK === FLOOR.MARBLE;
+    const planks = onPlanks() || floorK === FLOOR.PLANKS;
+    AUD.marbleNow = marble;
     AUD.grit.g.gain.setTargetAtTime(planks ? 0 : ground*crunch*Math.pow(v, 0.8)*(0.22 + off*0.12)*(1 - snow*0.6)*(1 - sand*0.5), now, 0.06);
     AUD.grit.src.playbackRate.setTargetAtTime(0.55 + v*1.1, now, 0.1);
     AUD.grit.pk.frequency.setTargetAtTime(sand ? 1600 : 2600 + v*800, now, 0.1);
-    if(planks) R.mid.g.gain.setTargetAtTime(0, now, 0.04);
+    if(planks || marble) R.mid.g.gain.setTargetAtTime(0, now, 0.04);
+    if(marble) AUD.grit.g.gain.setTargetAtTime(0, now, 0.04);
+    // on marble: the smooth roll of the tyres, a hum that rises with speed, and a squeal when they slide
+    R.marble.g.gain.setTargetAtTime(marble && ground ? Math.min(1, sp/30)*0.11 : 0, now, 0.06);
+    R.marble.f.frequency.setTargetAtTime(380 + sp*9, now, 0.1);
     // on the planks: a knock for every board under the front and back wheels, and a hollow drum under them
     AUD.plankAcc = (AUD.plankAcc || 0) + (planks && ground ? sp*dt/0.62 : 0);
     const knockEvery = Math.max(1, Math.ceil(sp/0.62/22));                 // (no more than ~22 knocks a second; the drum covers the rest)
@@ -17031,7 +17111,7 @@ function stepAudio(info, dt){
     // the tyres scrubbing sideways: a drift, a slide, a hard corner
     const slide = Math.min(1, (drift.on ? 1 : 0) + Math.max(0, (info.slip || 0) - 1.2)*0.25)*Math.min(1, sp/15)*ground;
     R.slide.g.gain.setTargetAtTime(slide*(0.10 + ice*0.05)*(1 - mud*0.5), now, 0.05);
-    R.slide.f.frequency.setTargetAtTime((ice ? 2600 : 1200) + (drift.tier + 1)*350, now, 0.1);
+    R.slide.f.frequency.setTargetAtTime((ice || AUD.marbleNow ? 2600 : 1200) + (drift.tier + 1)*350, now, 0.1);
     // wading: a continuous churn while the wheels are in the water
     R.wade.g.gain.setTargetAtTime(ground*Math.min(1, wet*1.5)*Math.min(1, sp/8)*0.22*(0.8 + Math.random()*0.4), now, 0.03);
     R.wade.f.frequency.setTargetAtTime(700 + sp*25, now, 0.1);
@@ -17057,6 +17137,7 @@ function stepAudio(info, dt){
     if(n.path === MAIN && ((n.pi - GALLERY.a)%MAIN.N + MAIN.N)%MAIN.N <= GALLERY.b - GALLERY.a) room = 0.55;
   }
   if(live && GORGE.on && deckAt(pose.x, pose.z) > 0.5) room = Math.max(room, 0.3);
+  if(live && AUD.marbleNow) room = Math.max(room, 0.5);                      // (the manor's hallways ring)
   if(live && TUNNELS.length){ const n = nearest(pose.x, pose.z); if(n.path === MAIN && TUNNELS.some(T=> n.pi >= T.a && n.pi <= T.b)) room = 0.6; }
   AUD.verbSend.gain.setTargetAtTime(room, now, 0.3);
   // rivals: heard where they are, louder close by, and pitched by their speed
@@ -18021,12 +18102,13 @@ function stepCarInner(dt){
   // spray off the rear wheels, and rubber where it is sliding on the hard stuff
   const rx = -nfz, rz = nfx;                       // lateral unit vector
   const slid = Math.abs(slip);
-  const working = sp > 4 && (offRoad || hand || slid > 2.2);
+  const onFloor = SPRINGCUP ? floorAt(pose.x, pose.z) : 0;                  // (a clean floor throws up nothing)
+  const working = !onFloor && sp > 4 && (offRoad || hand || slid > 2.2);
   // cornering load: yaw rate times speed is the lateral acceleration the
   // outside tyres are carrying, which is when they start tearing at the surface
   const yawRate = Math.abs(pose.steerIn * rate);
   const latAcc = yawRate * sp;
-  const hardTurn = !pose.air && latAcc > 5.0 && sp > 6;
+  const hardTurn = !onFloor && !pose.air && latAcc > 5.0 && sp > 6;
   const wading = (inWater || inMud) && sp > 3;
   if(working || wading){
     const force = Math.min(3.0, slid*0.22 + sp*0.03 + (inWater ? sp*0.11 : wading ? sp*0.05 : 0));
@@ -21537,6 +21619,8 @@ const LITTER = { items:[], leaf:null, stick:null, home:[] };
       if(Math.random() < pr && clearHere(P, i)) scatter(P, i, tar > 0.5 ? 3 + Math.floor(Math.random()*3) : 2, 1, 6);
     }
   });
+  // (none on a clean floor: a wooden deck or the manor's marble)
+  if(MAIN.floor) for(let k=items.length - 1; k>=0; k--) if(floorAt(items[k].x, items[k].z)) items.splice(k, 1);
   items.forEach(o=> LITTER.home.push([o.x, o.y, o.z, o.yaw]));
   // a leaf: a little pointed oval, double sided; a stick: a thin crooked rod
   const lg = new THREE.BufferGeometry();
