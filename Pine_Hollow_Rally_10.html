@@ -1410,7 +1410,7 @@ const TRACKS = [
     /* up the river: off the north road into the creek, up its rushing water toward the cascade (one long climb, no steps to throw you) */
     river:{from:[190,88], to:[395,-25], toFalls:7, pools:7, rush:true, down:70, up:1, downDir:[-0.5,1]},
     /* the chasm on the west side, the beck far below, and the bridge over it */
-    gorge:{at:[-240,-185], depth:24, reach:150, wall:30, span:38},
+    gorge:{at:[-240,-185], depth:24, reach:150, wall:30, span:29},          // (the deck ends where the chasm does: past its lip the road is on the ground)
     fords:[[12,-470]],
     set:[[[459,-150],"swells"]],
     spots:{falls:[[432,-70]], horse:[[250,-120]], henge:[[-195,-130]], cascade:[[336,-42]]}, horseAng:0.15, horseSize:2.4,
@@ -2389,6 +2389,26 @@ function canalLevels(){
     if(C.flow){ for(let k=1;k<lv.length;k++) lv[k] = Math.min(lv[k], lv[k-1]); }
     else { const lo = Math.min(...lv); lv.fill(lo); }
     C.lv = lv.map(v=> v - 0.95);
+    /* where a bridged stream comes down to the road, its water runs on under the deck at least 0.6m below the
+       road's line, never standing over the road beside the bridge; a stream drops to it in a little rapid and
+       never climbs again below it (its bed is carved from these levels, so the channel goes down with it) */
+    if(C.bridge !== "none"){
+      // (only where it really goes under the road: a stream running along beside the road is left as it is, or
+      //  its deeper channel pulled the road's own line down into a dip)
+      const P = MAIN, n = C.S.length, D = new Float64Array(n), Y = new Float64Array(n), at = new Float64Array(n);
+      for(let k=0;k<n;k++){
+        let best = Infinity, by = 0;
+        for(let i=0;i<P.N;i+=2){ const d = (P.pts[i].x - C.S[k][0])**2 + (P.pts[i].z - C.S[k][1])**2; if(d < best){ best = d; by = P.pts[i].y; } }
+        D[k] = Math.sqrt(best); Y[k] = by; at[k] = k ? at[k - 1] + Math.hypot(C.S[k][0] - C.S[k - 1][0], C.S[k][1] - C.S[k - 1][1]) : 0;
+      }
+      for(let c=0;c<n;c++){
+        if(!(D[c] < 4 && (c === 0 || D[c] <= D[c - 1]) && (c === n - 1 || D[c] <= D[c + 1]))) continue;
+        for(let k=0;k<n;k++) if(Math.abs(at[k] - at[c]) < 18 && D[k] < 16)
+          C.lv[k] = Math.min(C.lv[k], Y[k] + BED - 0.6 - 0.5*(1 - smoothstep(7, 16, D[k])));
+      }
+      if(C.flow) for(let k=1;k<C.lv.length;k++) C.lv[k] = Math.min(C.lv[k], C.lv[k - 1]);
+      else C.lv.fill(Math.min(...C.lv));                     // (a canal stays level: all of it comes down together)
+    }
   });
 }
 function canalLevelAt(C, s){ const k = Math.max(0, Math.min(C.lv.length - 1, Math.floor(s))), f = Math.min(1, s - k); return C.lv[k]*(1 - f) + C.lv[Math.min(C.lv.length - 1, k + 1)]*f; }
@@ -2423,6 +2443,9 @@ if(!TRACK.test){
   CALM.forEach(c=> taken.push([c[0], c[1] + 40]));
   TRACK.branches.forEach(b=>{ taken.push([snapTo(MAIN, b.a), 90]); taken.push([snapTo(MAIN, b.b), 90]); });
   const gap = (a, b)=>{ const d = Math.abs(a - b) % N; return Math.min(d, N - d)*seg; };
+  // (seeded, so a course comes out the same every time it loads: the pits used to move about from one load to
+  //  the next, and now and then one landed where its rim threw the car)
+  const prng = seeded(7919 + TRACK_ID*104729);
   const pick = (reach, minR, clearM)=>{
     let best = -1, bs = -Infinity;
     for(let i=0;i<N;i+=4){
@@ -2431,7 +2454,7 @@ if(!TRACK.test){
       if(!ok) continue;
       let c = Infinity; for(const t of taken) c = Math.min(c, gap(i, t[0]) - t[1]);
       if(c < clearM) continue;
-      const sc = c + Math.random()*40;
+      const sc = c + prng()*40;
       if(sc > bs){ bs = sc; best = i; }
     }
     return best;
@@ -3361,7 +3384,8 @@ if(DROP.on){
 }
 /* mud pits: a soft hollow full of the stuff (sand in the desert, slush in the snow) */
 PITS.forEach(at=>{
-  const span = Math.round(15/MAIN.seg);
+  // (on the Spring Cup, driven flat out, a longer, gentler hollow: a short one's rim throws the car at 150)
+  const span = Math.round((TRACK.season === "spring" ? 25 : 15)/MAIN.seg);
   for(let k=-span;k<=span;k++){
     const i = wrapIdx(MAIN, at + k), t = k/span;
     MAIN.pts[i].y -= (TRACK.expedition ? 0.85 : 0.55)*0.5*(1 + Math.cos(Math.PI*t));
@@ -8009,9 +8033,10 @@ if(RIVER.on){
     const A = S[Math.max(0, j-2)], B = S[Math.min(S.length-1, j+2)];
     let tx = B[0]-A[0], tz = B[1]-A[1]; const tl = Math.hypot(tx, tz) || 1; tx/=tl; tz/=tl;
     const side = Math.random() < 0.5 ? -1 : 1;
-    const u = side*(RIVER_BED - 1 + Math.random()*(RIVER_BANK - RIVER_BED + 3));
+    // (a rushing creek is driven kerb to kerb, so its rocks keep to the banks, out of the bed)
+    const u = side*(RIVER.rush ? RIVER_BED + 1.5 + Math.random()*(RIVER_BANK - RIVER_BED + 2) : RIVER_BED - 1 + Math.random()*(RIVER_BANK - RIVER_BED + 3));
     const x = S[j][0] - tz*u, z = S[j][1] + tx*u;
-    if(nearest(x, z).dist < 7.2) continue;               // keep the driven line clear
+    if(nearest(x, z).dist < (RIVER.rush ? RIVER_BED + 1 : 7.2)) continue;               // keep the driven line clear
     const sc = 0.4 + Math.pow(Math.random(), 1.6)*1.6;
     const rock = new THREE.Mesh(rockGeometry(placed%3), rockMat);
     rock.position.set(x, gradedY(x, z) + sc*0.05, z);
