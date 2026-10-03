@@ -12663,7 +12663,8 @@ if(SPRINGCUP){
     const ok = (x, z)=> clearOf(x, z, 1.2 + T) && !inWaterway(x, z);
     // a wall, in the pieces of it that keep clear of the road
     const wall = (ax, az, bx, bz)=>{
-      const n = 7; let run = null, last = null;
+      // (tested every 0.75m: the long outer walls tested at a few points stepped clean over the road and stood across it)
+      const n = Math.max(7, Math.ceil(Math.hypot(bx - ax, bz - az)/0.75)); let run = null, last = null;
       for(let q=0;q<=n;q++){
         const x = ax + (bx - ax)*q/n, z = az + (bz - az)*q/n, good = ok(x, z);
         if(good){ if(!run) run = [x, z]; last = [x, z]; }
