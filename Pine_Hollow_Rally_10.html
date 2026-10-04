@@ -21490,7 +21490,9 @@ function netSendChat(){
 }
 function netMeta(){
   // (and the wagon you built in the garage, so your friends see you in it)
-  return { id:NET.id, name:NET.name, paint:NET_PAINT(), host:NET.host, track:TRACK_ID, pick:NET.pick, racing:NET.racing, at:NET.joinedAt, car:carOpts(), ready:!!NET.ready, garage:!!NET.inGarage, auto:NET.auto ? NET.auto.n : 0, fps:NET.fps || 0 };
+  return { id:NET.id, name:NET.name, paint:NET_PAINT(), host:NET.host, track:TRACK_ID, pick:NET.pick, racing:NET.racing, at:NET.joinedAt, car:carOpts(), ready:!!NET.ready, garage:!!NET.inGarage, auto:NET.auto ? NET.auto.n : 0, fps:NET.fps || 0,
+           // (the host's race, for anyone whose page missed the word to start: they join it from this)
+           race: NET.racing && NET.race && netIsHost() ? NET.race : null };
 }
 async function netJoin(code, opts){
   if(NET.on) netLeave(true);
@@ -21515,7 +21517,7 @@ async function netJoin(code, opts){
   addEventListener("beforeunload", netBye);
 }
 /* Everyone travelled to the new circuit: the host starts as soon as they are all back in the
-   room here (or after 25 seconds, for anyone whose page is slow), with a moment to connect */
+   room here (or after a minute, for anyone whose page is slow), with a moment to connect */
 function netAutoStart(){
   netClockTick(); netPingTick();
   // (and the lobby's JUST JOINED marks wear off)
@@ -21527,15 +21529,20 @@ function netAutoStart(){
   if(NET.on && MENU.id === "scStarting" && NET.starting && !NET.racing){
     const hm = NET.metas.find(m=> m.id === netHostId() && m.id !== NET.id);
     const waited = (performance.now() - NET.starting.t)/1000;
-    if(hm && hm.racing && hm.track === TRACK_ID && waited > 4){ NET.starting = null; netSys("The race started before your circuit had loaded: you're in the next one"); showLobby(); }
-    else if(waited > 45){ NET.starting = null; netSys("The start was called off"); showLobby(); }
+    if(hm && hm.racing && hm.track === TRACK_ID && waited > 4){
+      netCatchRace(hm);
+      if(!NET.racing && waited > 8){ NET.starting = null; netSys("The race started too long before your circuit had loaded: you're in the next one"); showLobby(); }
+    }
+    else if(waited > 90 && !(hm && hm.auto)){ NET.starting = null; netSys("The start was called off"); showLobby(); }
   }
   if(!NET.on || !NET.auto || NET.racing) return;
   if(!netIsHost()){ NET.auto = null; return; }
   const here = NET.metas.filter(m=> m.track === TRACK_ID && !m.racing).length;
   const waited = (performance.now() - NET.auto.t)/1000;
   NET.auto.here = here;
-  if((here >= NET.auto.n && waited > 3) || waited > 25){ NET.auto = null; netStart(); }
+  // (a slow machine loading a circuit for the first time can take a while: wait up to a minute for everyone, the
+  //  host can always START NOW, and anyone who still arrives late joins the race under way: see netCatchRace)
+  if((here >= NET.auto.n && waited > 3) || waited > 60){ NET.auto = null; netStart(); }
   else netRefresh();
 }
 function netBye(){ if(NET.tx) NET.tx.leave(!!NET.travelling); }
@@ -21578,6 +21585,7 @@ function netSync(list){
     if(NET.ready){ NET.ready = false; netTrackMe(); }
   }
   if(hostM) NET.hostPick = hostM.pick;
+  netCatchRace(hostM);
   if(hostM && hostM.id !== NET.id && hostM.track !== TRACK_ID && !NET.racing && !NET.wantTrack){
     NET.wantTrack = hostM.track;
     travel(hostM.track, {mode:"online", room:NET.code, name:NET.name, at:NET.joinedAt, starting:!!hostM.auto, expect:hostM.auto | 0});
@@ -21588,6 +21596,19 @@ function netSync(list){
   if(sig !== NET.metaSig || arrived){ NET.metaSig = sig; netRefresh(); }
 }
 
+/* The host is racing on this circuit and we never heard the word to start (or heard it before the page could
+   act on it, or our page was still loading the circuit): join that race now, from what the host's presence says. Up to 45 seconds after the lights go out
+   you are put on your grid slot and away (a few seconds down, but in it); later than that you wait for the
+   next one. A race you have already been in (finished it, or left it) is not rejoined. */
+function netCatchRace(hostM){
+  if(!NET.on || NET.racing || !hostM || hostM.id === NET.id || !hostM.racing || !hostM.race || hostM.track !== TRACK_ID) return;
+  const R = hostM.race; if(!R.k || R.k === NET.raceK || !Array.isArray(R.grid) || typeof R.goAt !== "number") return;
+  if(MENU.id !== "scStarting" && MENU.id !== "scLobby" && !GAME.garage) return;
+  const hostNow = netNow() + (NET.clk && NET.clk.n > 0 ? NET.clk.off : 0);
+  if(hostNow - R.goAt > 45000){ NET.raceK = R.k; return; }
+  netSys("Joining the race already under way");
+  netBegin(R.grid, R.goAt, R.k);
+}
 /* ---- the cars: each friend is a rival the network drives ---- */
 function netNameTag(name, paint){
   const c = document.createElement("canvas"); c.width = 256; c.height = 64; const g = c.getContext("2d");
@@ -21709,7 +21730,7 @@ function netEvent(ev, d){
   if(ev === "track" && fromHost && typeof d.id === "number" && TRACKS[d.id] && d.id !== TRACK_ID){
     NET.wantTrack = d.id; travel(d.id, {mode:"online", room:NET.code, name:NET.name, at:NET.joinedAt});
   }
-  if(ev === "start" && fromHost && d.track === TRACK_ID) netBegin(d.grid || [], d.goAt);
+  if(ev === "start" && fromHost && d.track === TRACK_ID && !(d.k && NET.raceK === d.k)) netBegin(d.grid || [], d.goAt, d.k);
   if(ev === "go" && fromHost && typeof d.track === "number" && TRACKS[d.track] && d.track !== TRACK_ID && !NET.wantTrack){
     NET.wantTrack = d.track; travel(d.track, {mode:"online", room:NET.code, name:NET.name, at:NET.joinedAt, starting:true, expect:d.n | 0});
   }
@@ -21747,7 +21768,8 @@ function netPose(p, d){
 }
 
 /* ---- racing ---- */
-function netBegin(grid, goAt){
+function netBegin(grid, goAt, k){
+  NET.raceK = k || null;
   if(GAME.garage || NET.inGarage){ GAME.garage = false; MENU.garage = null; NET.inGarage = false; rivals.forEach(r=>{ r.mesh.visible = true; r.shadow.visible = true; }); closeUI(); }
   NET.racing = true; NET.starting = null; netTrackMe();
   setMode("online");
@@ -21790,9 +21812,18 @@ function netStart(){
   const grid = NET.metas.slice().sort((a, b)=> (b.id === NET.id) - (a.id === NET.id) || a.at - b.at).map(m=> m.id);
   /* GO is at one moment on the host's clock, far enough ahead for the word to reach everyone: each of
      them counts down to that moment on their own clock (see netBegin), so the lights go out together */
-  const goAt = netNow() + 3200 + 1400;
-  if(NET.tx) NET.tx.send("start", {from:NET.id, host:true, track:TRACK_ID, grid, goAt});
-  netBegin(grid, goAt);
+  const goAt = netNow() + 3200 + 1400, k = netNewId();
+  const word = {from:NET.id, host:true, track:TRACK_ID, grid, goAt, k};
+  NET.race = {k, grid, goAt};
+  if(NET.tx) NET.tx.send("start", word);
+  /* The word to start went out once, and a friend whose page was still settling into the room (just loaded
+     the circuit, or the line blinked) never heard it: they sat on the grid screen and were sent back to the
+     lobby. Now it is said again every 0.6 seconds until the lights go out (a repeat is ignored), and the race
+     rides on the host's presence too, which everyone hears all the time (see netSync). */
+  clearInterval(NET.startRep);
+  NET.startRep = setInterval(()=>{ if(!NET.on || !NET.racing || !NET.race || NET.race.k !== k || netNow() > goAt + 1500){ clearInterval(NET.startRep); return; }
+    if(NET.tx) NET.tx.send("start", word); }, 600);
+  netBegin(grid, goAt, k);
 }
 /* Tell the room what you are and what you drive. Every tweak in the garage lands here, and the room
    server throws out a client that floods it with presence updates (that was what took players out of the
@@ -22089,7 +22120,7 @@ function netRefresh(){
 }
 /* The host started on another circuit, so everyone has just loaded it: not the lobby (which looked as if
    the start had been called off) but the grid forming. Who is here, who is still loading, and the race
-   starts by itself once everyone has arrived (or after 25 seconds, for anyone whose page is slow). */
+   starts by itself once everyone has arrived (or after a minute, for anyone whose page is slow). */
 function showStarting(sel){
   if(!NET.on) return showOnline();
   const S = NET.starting || {t:performance.now(), n:0}, me = NET.id, host = netIsHost(), hostId = netHostId();
