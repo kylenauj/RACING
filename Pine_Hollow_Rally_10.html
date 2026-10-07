@@ -3086,7 +3086,7 @@ const AUTO_JUMPS = [];
   (TRACK.spans || []).forEach(d=>{ if(d.road < 0) busy.push([snapTo(MAIN, d.at), d.span + 70]); });
   (TRACK.leaps || []).forEach(d=> busy.push([snapTo(MAIN, d.at), 130]));
   CROSSES.forEach(c=> busy.push([snapTo(MAIN, c), 60]));
-  (TRACK.fords || []).forEach(f=> busy.push([snapTo(MAIN, f), 55]));
+  (TRACK.fords || []).forEach(f=> busy.push([snapTo(MAIN, f), 115]));      // (and its causeway, carried down a hillside: see addFord)
   if(TRACK.gorge) busy.push([snapTo(MAIN, TRACK.gorge.at), TRACK.gorge.span + 45]);
   CALM.forEach(c=> busy.push([c[0], c[1]*0.8 + 8]));
   SPOTS.forEach(c=> busy.push(c));
@@ -3665,6 +3665,25 @@ function addFord(P, at){
         for(let it=0; it<F; it++) for(let k=Math.max(k0+1, kEnd - F); k<kEnd; k++){
           const a = P.pts[wrapIdx(P, at + dir*(k-1))].y, c = P.pts[wrapIdx(P, at + dir*(k+1))].y;
           P.pts[wrapIdx(P, at + dir*k)].y = (a + P.pts[wrapIdx(P, at + dir*k)].y + c)/3;
+        }
+      }
+    } else {
+      /* the same on the main road: a ford on a hillside (Bear Creek's second) had its causeway faded out over
+         25m where the hill fell away 15m beneath it, a 60% wall standing across the road right where a crest
+         jump came down. The causeway is carried on down the road instead, no steeper than 12%, until it meets
+         the land, and its foot rounded off */
+      const R2 = Math.round(220/seg), k0 = Math.round(30/seg), g = 0.12*seg, F = Math.round(20/seg);
+      for(const dir of [-1, 1]){
+        let prev = P.pts[wrapIdx(P, at + dir*k0)].y, kEnd = k0;
+        for(let k=k0+1; k<=R2; k++){
+          const q = P.pts[wrapIdx(P, at + dir*k)];
+          if(q.y < prev - g){ q.y = prev - g; kEnd = k; }
+          else if(k*seg > 80) break;                       // (back on the land: the rest of the road is its own)
+          prev = q.y;
+        }
+        if(kEnd > k0) for(let it=0; it<F; it++) for(let k=Math.max(k0+1, kEnd - F); k<=kEnd + F; k++){
+          const a2 = P.pts[wrapIdx(P, at + dir*(k-1))].y, c2 = P.pts[wrapIdx(P, at + dir*(k+1))].y;
+          P.pts[wrapIdx(P, at + dir*k)].y = (a2 + P.pts[wrapIdx(P, at + dir*k)].y + c2)/3;
         }
       }
     }
@@ -4839,6 +4858,23 @@ const DECK_SINK = 0.5, DECK_TOP = 0.105;       // the ground's road sunk under t
       const u = k*seg, w = smoothstep(E0*0.25, E0, u)*(1 - smoothstep(L0 - E0, L0 - E0*0.25, u)), i = wrapIdx(MAIN, a + k);
       MAIN.pts[i].y = MAIN.pts[i].y*(1 - w) + Math.min(MAIN.pts[i].y, bed)*w;
       if(w > 0.45){ MAIN.surf[i] = SURF.WATER; MAIN.wet[i] = Math.max(MAIN.wet[i], smoothstep(0.45, 0.8, w)); }
+    }
+    /* and the road climbs back out no steeper than 12%: a wade laid across a rise (Willow Marsh's long one runs
+       over a 15m hump) had its far end come up out of the water as a 60% wall in 20m; the cutting carries on
+       past the end instead, down through the hill, and eases back into the road's own line */
+    const g = 0.12*seg, mid = Math.round(n/2), R2 = n + Math.round(160/seg), F = Math.round(16/seg);
+    for(const dir of [-1, 1]){
+      let prev = MAIN.pts[wrapIdx(MAIN, a + mid)].y, k0 = -1, k1 = -1;
+      for(let j=1; j<=R2; j++){
+        const k = mid + dir*j, q = MAIN.pts[wrapIdx(MAIN, a + k)];
+        if(q.y > prev + g){ q.y = prev + g; if(k0 < 0) k0 = j; k1 = j; }
+        else if(j > n - mid + Math.round(10/seg)) break;
+        prev = q.y;
+      }
+      if(k1 > 0) for(let it=0; it<F; it++) for(let j=Math.max(1, k0 - F); j<=k1 + F; j++){
+        const i0 = wrapIdx(MAIN, a + mid + dir*(j-1)), i = wrapIdx(MAIN, a + mid + dir*j), i2 = wrapIdx(MAIN, a + mid + dir*(j+1));
+        MAIN.pts[i].y = Math.min(MAIN.pts[i].y, (MAIN.pts[i0].y + MAIN.pts[i].y + MAIN.pts[i2].y)/3);
+      }
     }
     // and either side of it the road stays up out of the water for a while, easing back to
     // its own line: the pool can't run out along a road that carries on downhill
