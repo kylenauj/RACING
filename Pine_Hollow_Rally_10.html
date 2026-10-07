@@ -176,6 +176,24 @@
   .item .tro + span{margin-right:auto;}
   .trophyBig{width:150px;height:150px;display:block;margin:4px 0 6px;filter:drop-shadow(4px 5px 0 rgba(0,0,0,.45));animation:troIn .7s cubic-bezier(.2,1.6,.4,1) both;}
   @keyframes troIn{from{transform:scale(.2) rotate(-25deg);opacity:0}to{transform:none;opacity:1}}
+  /* the front page's showcase: the circuit record, its wagon on a podium (drawn through the clear window) */
+  .showcase{position:relative;max-width:460px;margin-left:auto;border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);
+    background:linear-gradient(180deg,rgba(9,20,14,.82) 0,rgba(9,20,14,.82) 92px,rgba(9,20,14,0) 92px,rgba(9,20,14,0) calc(100% - 74px),rgba(9,20,14,.86) calc(100% - 74px));}
+  .showcase .sc-top{display:flex;align-items:center;gap:12px;padding:10px 16px 6px 132px;height:92px;box-sizing:border-box;border-bottom:3px solid var(--ink);}
+  .showcase .sc-tro{position:absolute;left:4px;top:-44px;width:128px;height:128px;flex:none;
+    filter:drop-shadow(4px 4px 0 var(--ink)) drop-shadow(0 0 18px rgba(255,210,61,.55));animation:scTro 3.2s ease-in-out infinite;}
+  @keyframes scTro{0%,100%{transform:translateY(0) rotate(-3deg);}50%{transform:translateY(-5px) rotate(3deg);}}
+  .showcase .sc-head{display:flex;flex-direction:column;}
+  .showcase .sc-k{font-family:var(--display);font-weight:800;font-size:13px;letter-spacing:.2em;color:var(--signal);}
+  .showcase .sc-track{font-family:var(--display);font-weight:800;font-size:28px;letter-spacing:.03em;color:var(--cream);text-transform:uppercase;line-height:1.05;text-shadow:3px 3px 0 var(--ink);}
+  .showcase .sc-view{height:250px;}
+  .showcase .sc-foot{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 16px 12px;height:74px;box-sizing:border-box;border-top:3px solid var(--ink);}
+  .showcase .sc-ini{display:block;font-family:var(--display);font-weight:800;font-size:34px;letter-spacing:.2em;color:var(--signal);line-height:1;text-shadow:3px 3px 0 var(--ink);}
+  .showcase .sc-car{display:block;font-size:12.5px;font-weight:600;color:#9fb6a8;margin-top:4px;}
+  .showcase .sc-time{text-align:right;} .showcase .sc-time b{display:block;font-family:var(--display);font-style:italic;font-weight:800;font-size:34px;color:var(--cream);line-height:1;text-shadow:3px 3px 0 var(--ink);}
+  .showcase .sc-time small{display:block;font-family:var(--display);font-size:11px;letter-spacing:.16em;color:#9fb6a8;margin-top:5px;}
+  .showcase.empty .sc-time b{font-size:20px;font-style:normal;color:#9fb6a8;}
+  @media (max-width:760px){ .showcase{margin:0 auto;} .showcase .sc-view{height:180px;} }
   /* the race picker */
   .rsel{width:100%;max-width:1180px;margin:auto 0;display:flex;flex-direction:column;}
   .rsel h2.head{margin-bottom:14px;}
@@ -19452,6 +19470,10 @@ const SAVE = (()=>{
       if(!(s.settings && s.settings.gfxAuto)){ if(def.settings.gfx === 0) def.settings.gfx = 2; def.settings.gfxAuto = true; }   // Full becomes Auto, once
       def.records = s.records || {};
       def.champ = s.champ || null;
+      // (and everything else that was saved: the top-ten boards, your initials, the cup trophies. Only the
+      //  three above were read back, so the boards and trophies were lost on every load, and a change of
+      //  circuit is a load)
+      for(const k of Object.keys(s)) if(!(k in def)) def[k] = s[k];
     }
   }catch(e){}
   return def;
@@ -19466,9 +19488,30 @@ const LB = { global:new Map(), busy:new Map(), at:new Map(), mark:null };
 const LB_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 const lbInit = s => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 3);
 function lbLocal(name){ SAVE.boards = SAVE.boards || {}; return SAVE.boards[name] || (SAVE.boards[name] = []); }
+/* The car a record was set in, kept with it (what the front page shows turning on its podium). Only the
+   options the garage has, each clamped to its range, and the paint a colour: a record from the online board is
+   anyone's, so nothing in it is trusted as it comes. */
+const CAR_KEYS = {model:4, fender:3, rim:7, wheel:3, livery:3, stripe:6, ride:3, roof:5, hood:4, decal:4, logo:7, logoCol:4, lamps:3, glow:5, tyre:3, tent:4, exhaust:4, flame:4};
+const CAR_ACC = ["rack", "spare", "cans", "shovel", "lights", "flaps", "bull", "pod", "tape", "snorkel", "ladder", "whip"];
+function carPack(o){
+  if(!o) return null;
+  const c = {p: String(o.paint || ""), b: o.beat ? 1 : 0, t: o.tint ? 1 : 0};
+  for(const k in CAR_KEYS) c[k] = o[k] | 0;
+  c.a = CAR_ACC.filter(k=> o.acc && o.acc[k]).map(k=> CAR_ACC.indexOf(k));
+  return c;
+}
+function carUnpack(c){
+  if(typeof c === "string"){ try{ c = JSON.parse(c); }catch(e){ return null; } }
+  if(!c || typeof c !== "object") return null;
+  const o = {paint: /^#[0-9a-f]{6}$/i.test(c.p) ? c.p : PAINTS[0].hex, beat: !!c.b, rust: c.b ? 38 : 0, tint: !!c.t, acc: {}};
+  for(const k in CAR_KEYS){ const v = c[k] | 0; o[k] = Math.max(0, Math.min(CAR_KEYS[k] - 1, v)); }
+  if(c.ride === undefined) o.ride = 1;
+  (Array.isArray(c.a) ? c.a : []).forEach(i=>{ const k = CAR_ACC[i | 0]; if(k) o.acc[k] = true; });
+  return o;
+}
 function lbRows(name){
   const seen = new Set(), out = [];
-  lbLocal(name).map(r=> ({i:r.i, ms:r.ms})).concat(LB.global.get(name) || []).sort((a, b)=> a.ms - b.ms).forEach(r=>{
+  lbLocal(name).map(r=> ({i:r.i, ms:r.ms, car:r.car || null, here:true})).concat(LB.global.get(name) || []).sort((a, b)=> a.ms - b.ms).forEach(r=>{
     const k = r.i + "|" + r.ms; if(seen.has(k)) return; seen.add(k); out.push(r); });
   return out.slice(0, 10);
 }
@@ -19480,9 +19523,11 @@ function lbFetch(name, fresh){
   const pr = (async ()=>{
     try{
       const sb = await netClient(); if(!sb) return null;
-      const { data, error } = await sb.from("laps").select("name,lap_ms").eq("track", name).order("lap_ms", {ascending:true}).limit(60);
+      // (with the car each lap was set in, where the board has a column for it; without, where it hasn't)
+      let { data, error } = await sb.from("laps").select(LB.noCar ? "name,lap_ms" : "name,lap_ms,car").eq("track", name).order("lap_ms", {ascending:true}).limit(60);
+      if(error && !LB.noCar){ LB.noCar = true; ({ data, error } = await sb.from("laps").select("name,lap_ms").eq("track", name).order("lap_ms", {ascending:true}).limit(60)); }
       if(error) return null;
-      const rows = (data || []).map(r=> ({i: lbInit(r.name) || "???", ms: r.lap_ms|0})).filter(r=> r.ms > 0);
+      const rows = (data || []).map(r=> ({i: lbInit(r.name) || "???", ms: r.lap_ms|0, car: r.car || null})).filter(r=> r.ms > 0);
       LB.global.set(name, rows); LB.at.set(name, performance.now()); return rows;
     } catch(e){ return null; } finally { LB.busy.delete(name); }
   })();
@@ -19528,13 +19573,20 @@ function lbCandidate(){
   const ms = Math.round(s0*1000), rows = lbRows(TRACK.name), rank = rows.filter(r=> r.ms <= ms).length;
   return rank < 10 ? {name:TRACK.name, ms, rank, label: EXP.on ? "FASTEST CLIMBS" : "BEST LAPS"} : null;
 }
+/* a lap onto the online board, with the car it was set in; if the board has no column for the car yet, the lap
+   goes on without it (and every one after it), so a board set up before cars were kept still takes laps */
+async function lbInsert(sb, row){
+  if(!LB.noCar){ const { error } = await sb.from("laps").insert(Object.assign({}, row, {car: carPack(carOpts())})); if(!error) return; LB.noCar = true; }
+  await sb.from("laps").insert(row);
+}
 function lbSubmit(c, ini){
-  const L = lbLocal(c.name); L.push({i:ini, ms:c.ms, d:Date.now()}); L.sort((a, b)=> a.ms - b.ms); L.length = Math.min(L.length, 10);
+  const car = carPack(carOpts());
+  const L = lbLocal(c.name); L.push({i:ini, ms:c.ms, d:Date.now(), car}); L.sort((a, b)=> a.ms - b.ms); L.length = Math.min(L.length, 10);
   SAVE.initials = ini; persist();
   LB.mark = {name:c.name, ms:c.ms, i:ini};
   if(NET_CFG.enabled && !NET.mock) (async ()=>{ try{ const sb = await netClient(); if(!sb) return;
-      await sb.from("laps").insert({ track:c.name, name:ini, lap_ms:c.ms, race_ms: EXP.on ? c.ms : Math.round(state.t*1000), online: MODE === "online" });
-      const g = LB.global.get(c.name); if(g){ g.push({i:ini, ms:c.ms}); g.sort((a, b)=> a.ms - b.ms); } } catch(e){} })();
+      await lbInsert(sb, { track:c.name, name:ini, lap_ms:c.ms, race_ms: EXP.on ? c.ms : Math.round(state.t*1000), online: MODE === "online" });
+      const g = LB.global.get(c.name); if(g){ g.push({i:ini, ms:c.ms, car}); g.sort((a, b)=> a.ms - b.ms); } } catch(e){} })();
 }
 /* NEW RECORD: three letters, arcade style. Up and down change the letter, left and right move,
    or just type them; Enter to sign it, Escape to leave it off the board */
@@ -20939,7 +20991,7 @@ function showMain(sel){
     '<button class="item" data-act="opts" data-k="opts"><span>OPTIONS</span></button>' +
     '<button class="item" data-act="help" data-k="help"><span>HOW TO DRIVE</span></button>' +
     '<button class="item back" data-act="exit" data-k="exit"><span>EXIT</span><small>back to kylenauj.com</small></button>' +
-    '</div></div><div class="right"></div></div>',
+    '</div></div><div class="right">' + showcaseHTML() + '</div></div>',
     { sel: sel || 0, back: showTitle,
       acts:{ solo:()=>{ SFX.ok(); showSolo(); },
              multi:()=>{ SFX.ok(); if(NET.on) showLobby(); else if(NET_CFG.enabled) showOnline(); else showNetOff(); },
@@ -20947,6 +20999,86 @@ function showMain(sel){
              opts:()=>{ SFX.ok(); showOptions(()=> showMain(MI("opts"))); },
              help:()=>{ SFX.ok(); showHelp(()=> showMain(MI("help"))); },
              exit:()=>{ SFX.back(); exitToSite(); } } });
+  // (the world board for this circuit, when it comes in, may hold a faster lap than this computer's)
+  if(NET_CFG.enabled && !NET.mock && !TRACK.test) lbFetch(TRACK.name).then(()=>{ if(MENU.id === "scMain") showcaseFill(); });
+  showcaseFill();
+}
+/* ---- the front page's showcase: the record on this circuit, the wagon it was set in turning on a podium under a
+   big trophy, who set it and the time. With no record yet, your own wagon waits on the podium for the first. ---- */
+const SHOW = { scene:null, cam:null, car:null, key:"", rows:null, a:0.7 };
+function showcaseHTML(){
+  return '<div class="showcase" id="showcase"><div class="sc-top">' + trophySVG(CUP_KIND[Math.max(0, CUPS.findIndex(c=> c.rounds.includes(TRACK_ID)))] || "summer", "gold", "sc-tro") +
+    '<div class="sc-head"><span class="sc-k">CIRCUIT RECORD</span><b class="sc-track">' + esc(TRACK.name) + '</b></div></div>' +
+    '<div class="sc-view" id="scView"></div>' +
+    '<div class="sc-foot"><div class="sc-who"><b class="sc-ini" id="scIni">—</b><span class="sc-car" id="scCar"></span></div>' +
+    '<div class="sc-time"><b id="scTime">—</b><small id="scScope"></small></div></div></div>';
+}
+function showcaseFill(){
+  const el = document.getElementById("showcase"); if(!el) return;
+  const rows = TRACK.test ? [] : lbRows(TRACK.name), top = rows[0], world = LB.global.has(TRACK.name) && top && !top.here;
+  const opts = top ? (carUnpack(top.car) || null) : null;
+  // (a record from before cars were kept: the stock wagon, not yours, which would say you set it)
+  const car = opts || (top ? {paint:PAINTS[0].hex, model:0, acc:{rack:true}} : carOpts()), models = ["Box wagon", "Sport wagon", "Woodie", "Safari 4x4"];
+  const paint = PAINTS.find(p=> p.hex.toLowerCase() === String(car.paint).toLowerCase());
+  document.getElementById("scIni").textContent = top ? top.i : "YOU?";
+  document.getElementById("scTime").textContent = top ? fmt(top.ms/1000) : "no record yet";
+  document.getElementById("scScope").textContent = top ? (world ? "WORLD RECORD" : "BEST ON THIS PC") : "set the first lap here";
+  document.getElementById("scCar").textContent = top && !opts ? "the wagon they drove isn't on the board" :
+    [models[car.model | 0] || models[0], paint ? paint.name : "", car.beat ? "patina" : ""].filter(Boolean).join(" · ");
+  el.classList.toggle("empty", !top);
+  showcaseCar(Object.assign({}, car, {dirt:false, cargo:false}));
+}
+function showcaseCar(opts){
+  if(!SHOW.scene){
+    const s = SHOW.scene = new THREE.Scene();
+    SHOW.cam = new THREE.PerspectiveCamera(30, 1.4, 0.5, 60);
+    // its own backdrop, so the wagon isn't lost against the trees: a dark studio, lit warm behind the podium
+    { const c = document.createElement("canvas"); c.width = 256; c.height = 160; const q = c.getContext("2d");
+      const bg = q.createRadialGradient(128, 70, 6, 128, 90, 170); bg.addColorStop(0, "#3c5a40"); bg.addColorStop(0.55, "#16291c"); bg.addColorStop(1, "#08120c");
+      q.fillStyle = bg; q.fillRect(0, 0, 256, 160);
+      for(let k=0;k<900;k++){ q.fillStyle = "rgba(0,0,0," + (Math.random()*0.12) + ")"; q.fillRect(Math.random()*256, Math.random()*160, 2, 2); }
+      s.background = new THREE.CanvasTexture(c); }
+    s.add(new THREE.HemisphereLight(0xfff4e0, 0x3a3226, 0.95));
+    const key = new THREE.DirectionalLight(0xfff0d8, 1.35); key.position.set(4, 7, 5); s.add(key);
+    const rim = new THREE.DirectionalLight(0xbfd8ff, 0.7); rim.position.set(-5, 3, -6); s.add(rim);
+    // the podium: a dark drum with a gold band, a pool of light on its top
+    const pod = new THREE.Group(); s.add(pod); SHOW.pod = pod;
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(3.3, 3.5, 0.55, 48), new THREE.MeshStandardMaterial({color:0x1d2a22, roughness:0.6, metalness:0.2}));
+    drum.position.y = -0.28; pod.add(drum);
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(3.52, 3.52, 0.12, 48, 1, true), new THREE.MeshStandardMaterial({color:0xd9a520, roughness:0.3, metalness:0.9, emissive:0x3a2600}));
+    band.position.y = -0.08; pod.add(band);
+    const g = document.createElement("canvas"); g.width = g.height = 128; const q = g.getContext("2d"), rg = q.createRadialGradient(64, 64, 4, 64, 64, 64);
+    rg.addColorStop(0, "rgba(255,236,170,0.55)"); rg.addColorStop(1, "rgba(255,236,170,0)"); q.fillStyle = rg; q.fillRect(0, 0, 128, 128);
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(3.25, 48), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(g), transparent:true, depthWrite:false}));
+    pool.rotation.x = -Math.PI/2; pool.position.y = 0.005; pod.add(pool);
+  }
+  const key = JSON.stringify(opts);
+  if(key === SHOW.key) return;
+  SHOW.key = key;
+  if(SHOW.car){ SHOW.pod.remove(SHOW.car); }
+  try{ SHOW.car = buildWagon(opts); } catch(e){ SHOW.car = buildWagon({paint:opts.paint}); }
+  SHOW.car.traverse(m=>{ if(m.isMesh){ m.castShadow = false; m.frustumCulled = false; } });
+  const fl = SHOW.car.userData.flames || []; fl.forEach(([a, b])=>{ a.visible = false; b.visible = false; });
+  SHOW.pod.add(SHOW.car);
+}
+/* drawn by the game's own renderer straight onto the page, in the showcase's window, after the frame */
+function renderShowcase(dt){
+  if(MENU.id !== "scMain" || !SHOW.scene || !SHOW.car) return;
+  const v = document.getElementById("scView"); if(!v) return;
+  const r = v.getBoundingClientRect(), cr = renderer.domElement.getBoundingClientRect();
+  if(r.width < 20 || r.height < 20 || cr.width < 1) return;
+  const sz = renderer.getSize(new THREE.Vector2()), kx = sz.x/cr.width, ky = sz.y/cr.height;
+  const x = Math.floor((r.left - cr.left)*kx), w = Math.ceil(r.width*kx) + 1, h = Math.ceil(r.height*ky) + 1, y = Math.floor(sz.y - (r.bottom - cr.top)*ky);
+  SHOW.a += dt*0.45;
+  SHOW.pod.rotation.y = SHOW.a;
+  SHOW.cam.aspect = w/h; SHOW.cam.updateProjectionMatrix();
+  SHOW.cam.position.set(0, 2.2, 8.6); SHOW.cam.lookAt(0, 0.62, 0);
+  const ac = renderer.autoClear;
+  renderer.setRenderTarget(null); renderer.autoClear = false;
+  renderer.setScissorTest(true); renderer.setScissor(x, y, w, h); renderer.setViewport(x, y, w, h);
+  renderer.clearDepth();
+  renderer.render(SHOW.scene, SHOW.cam);
+  renderer.setScissorTest(false); renderer.setViewport(0, 0, sz.x, sz.y); renderer.autoClear = ac;
 }
 /* out of the game and back to the website: the whole window, even when the game sits in a frame on a page */
 const EXIT_URL = "https://kylenauj.com";
@@ -22004,8 +22136,8 @@ function netPostLap(){
   const ms = Math.round(state.best*1000);
   LB.mark = {name:TRACK.name, ms, i:ini};
   if(NET_CFG.enabled && !NET.mock) (async ()=>{ try{ const sb = await netClient(); if(!sb) return;
-      await sb.from("laps").insert({ track:TRACK.name, name:ini, lap_ms:ms, race_ms:Math.round(state.t*1000), online:true });
-      const g = LB.global.get(TRACK.name); if(g){ g.push({i:ini, ms}); g.sort((a, b)=> a.ms - b.ms); } } catch(e){} })();
+      await lbInsert(sb, { track:TRACK.name, name:ini, lap_ms:ms, race_ms:Math.round(state.t*1000), online:true });
+      const g = LB.global.get(TRACK.name); if(g){ g.push({i:ini, ms, car:carPack(carOpts())}); g.sort((a, b)=> a.ms - b.ms); } } catch(e){} })();
 }
 async function netBoard(name){
   try{
@@ -22890,6 +23022,7 @@ function frame(now){
   followShadow();
   const tDraw = performance.now();
   renderView(now*0.001);
+  renderShowcase(Math.min(0.1, Math.max(0, (now - (SHOW.last || now))*0.001))); SHOW.last = now;
   /* where the frame's time goes, for the frame rate readout: the game's own work, the time spent
      handing the picture to the graphics chip, and the whole frame. If the frame takes far longer
      than the two together, the wait is on the graphics chip (or the browser is capping the rate). */
