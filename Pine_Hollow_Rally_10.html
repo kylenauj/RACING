@@ -245,6 +245,27 @@
   .lbr.none{opacity:.38;}
   .lbr.me{background:rgba(255,210,61,.6);}
   .lobbyboard{border:3px solid var(--ink);background:rgba(10,24,16,.82);box-shadow:4px 4px 0 var(--ink);padding:10px 12px 8px;margin-top:18px;}
+  .lobbyboard .lcirc{display:flex;gap:12px;align-items:center;margin-bottom:8px;} .lobbyboard .lcirc canvas{width:72px;height:72px;flex:none;border:2px solid var(--ink);}
+  .lobbyboard .lcirc b{display:block;font-family:var(--display);font-size:18px;color:var(--cream);} .lobbyboard .lcirc small{font-size:12.5px;color:#9fb6a8;line-height:1.35;}
+  .lbnone{margin:4px 0 2px;font-size:13.5px;font-style:italic;opacity:.75;}
+  table.grid.lob td.n small.car{display:block;font-size:12px;font-weight:600;color:#9fb6a8;margin-top:1px;}
+  table.grid.lob tr.you td.n small.car{color:#c9b98a;}
+  /* the way in to multiplayer */
+  .left.online .nmcard{margin:0 0 14px;padding:10px 14px 10px;background:rgba(9,20,14,.78);border:3px solid var(--ink);border-left:7px solid var(--accent);box-shadow:4px 4px 0 var(--ink);}
+  .left.online .nmcard label{display:block;font-family:var(--display);font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#9fb6a8;margin-bottom:6px;}
+  .left.online .nmcard small{display:block;margin-top:6px;font-size:12.5px;color:#9fb6a8;}
+  .left.online .nmrow{display:flex;align-items:center;gap:12px;}
+  .left.online .nmtag{flex:1;min-width:0;font-family:'Saira Condensed',Arial,sans-serif;font-style:italic;font-weight:800;font-size:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    -webkit-text-stroke:5px #000;paint-order:stroke fill;}
+  .netin{font-family:var(--body);font-size:19px;font-weight:600;padding:7px 11px;width:13em;max-width:100%;box-sizing:border-box;border:3px solid var(--ink);
+    background:#f7efd8;color:#1a1410;box-shadow:3px 3px 0 var(--ink);text-transform:none;outline:none;}
+  .netin:focus{border-color:var(--signal);box-shadow:3px 3px 0 var(--ink),0 0 0 2px var(--signal);}
+  .netin.code{font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:.32em;text-transform:uppercase;width:6.4em;text-align:center;padding:6px 4px 6px 12px;}
+  .netin.code::placeholder{letter-spacing:.12em;font-size:15px;opacity:.55;}
+  .left.online .joinrow{display:flex;gap:10px;align-items:stretch;} .left.online .joinrow .item{flex:1;}
+  .left.online .netmsg{min-height:1.3em;margin:10px 0 0;font-size:14px;font-weight:700;color:#ffb98a;}
+  .detail.howto ol{margin:6px 0 10px;padding-left:1.3em;} .detail.howto li{margin:0 0 6px;font-size:15px;line-height:1.4;color:#2c2516;}
+  .detail.howto p{font-size:14px;color:#5e4c2a;margin:0;}
   .lobbyboard .lb{margin:0;} .lobbyboard .lbr{border-bottom-color:rgba(243,230,196,.12);} .lobbyboard .lbr .rk{color:var(--signal);}
   .lobbyboard .lbhead{color:#9fb6a8;}
   /* NEW RECORD: three big letter slots */
@@ -19471,7 +19492,10 @@ function lbFetch(name, fresh){
 function lbTableHTML(name, label, mark){
   const rows = lbRows(name), world = LB.global.has(name);
   let lit = false, cells = "";
-  for(let k=0;k<10;k++){
+  // (an empty board says so in one line, rather than ten rows of dashes)
+  if(!rows.length) return '<div class="lb" data-lb="' + esc(name) + '" data-lbl="' + esc(label) + '"><div class="lbhead"><span>' + esc(label) + '</span><span class="scope">' + (world ? 'WORLD' : 'THIS PC') + '</span></div>' +
+    '<p class="lbnone">No ' + (/CLIMB/.test(label) ? 'climbs' : 'laps') + ' on the board yet: set the first.</p></div>';
+  for(let k=0;k<Math.max(5, Math.min(10, Math.ceil(rows.length/2)*2));k++){
     const r = rows[k], me = !!(r && mark && !lit && r.ms === mark.ms && r.i === mark.i); if(me) lit = true;
     cells += '<div class="lbr' + (me ? ' me' : '') + (r ? '' : ' none') + '"><span class="rk">' + (k + 1) + '</span><span class="ini">' + (r ? esc(r.i) : '–––') +
              '</span><span class="tm">' + (r ? fmt(r.ms/1000) : '—') + '</span></div>';
@@ -20989,8 +21013,7 @@ function raceDetailHTML(id){
   const t = TRACKS[id], rows = lbRows(t.name);
   return '<h3>' + esc(t.name) + (t.shape ? '<span class="rshape">' + esc(t.shape) + '</span>' : '') + '</h3>' + trackFacts(id) +
          (t.feature ? '<p class="rfeat">' + esc(t.feature.charAt(0).toUpperCase() + t.feature.slice(1)) + '.</p>' : '') +
-         (t.test ? '' : rows.length ? lbTableHTML(t.name, t.expedition ? "FASTEST CLIMBS" : "BEST LAPS")
-                                    : '<p class="rnone">No ' + (t.expedition ? 'climbs' : 'laps') + ' on the board yet: set the first.</p>');
+         (t.test ? '' : lbTableHTML(t.name, t.expedition ? "FASTEST CLIMBS" : "BEST LAPS"));
 }
 function showTracks(mode, group, focusCup){
   const exped = mode === "expedition";
@@ -22001,25 +22024,38 @@ function netBoardHTML(rows){
 }
 
 /* ---- the screens ---- */
-function netInputStyle(){ return 'style="font:inherit;font-size:22px;padding:8px 12px;width:100%;max-width:320px;box-sizing:border-box;border:3px solid #000;border-radius:6px;background:#f7efd8;color:#1a1410;text-transform:uppercase"'; }
+/* The way in to racing with friends: your name (typed as you want it shown: it was drawn in capitals while you
+   typed it and then appeared as typed everywhere else), how it will look over your car, and the two ways in:
+   host a room, or join one with its four letter code, right there on the same row. */
 function showOnline(prefill){
-  const nick = netNick();
+  const nick = netNick(), paint = NET_PAINT();
   openScreen("scOnline",
-    '<div class="cols"><div class="left"><h2 class="head">Multiplayer</h2>' +
-    '<label class="dimtx" for="netName">YOUR NAME</label><input id="netName" maxlength="16" autocomplete="off" value="' + esc(nick) + '" ' + netInputStyle() + '>' +
-    '<div class="menu" style="margin-top:14px">' +
-    '<button class="item" data-act="host"><span>HOST A RACE</span></button>' +
-    '<button class="item" data-act="join"><span>JOIN WITH CODE</span></button>' +
-    '</div><input id="netCode" maxlength="4" autocomplete="off" placeholder="CODE" value="' + esc(prefill || "") + '" ' + netInputStyle() + '>' +
-    '<div class="menu" style="margin-top:14px"><button class="item back" data-act="back"><span>BACK</span></button></div>' +
-    '<p class="dimtx" id="netMsg" style="margin-top:10px"></p></div>' +
-    '<div class="right"></div></div>',
+    '<div class="cols"><div class="left online"><h2 class="head">Multiplayer</h2>' +
+    '<div class="nmcard"><label for="netName">Your driver name</label>' +
+    '<div class="nmrow"><input id="netName" class="netin" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Type a name" value="' + esc(nick) + '">' +
+    '<span class="nmtag" id="nmTag" style="color:' + safeCol(paint) + '">' + esc(nick || "Your name") + '</span></div>' +
+    '<small>Shown over your car and in the room, just as you type it.</small></div>' +
+    '<div class="menu">' +
+    '<button class="item" data-act="host"><span>HOST A RACE</span><small>make a room, invite friends</small></button>' +
+    '<div class="joinrow"><button class="item" data-act="join"><span>JOIN A FRIEND</span></button>' +
+    '<input id="netCode" class="netin code" maxlength="4" autocomplete="off" spellcheck="false" placeholder="CODE" value="' + esc(prefill || "") + '"></div>' +
+    '<button class="item back" data-act="back"><span>BACK</span></button></div>' +
+    '<p class="netmsg" id="netMsg"></p></div>' +
+    '<div class="right"><div class="detail howto"><h3>Racing with friends</h3><ol>' +
+    '<li><b>One of you hosts.</b> You get a room with a four letter code.</li>' +
+    '<li><b>Share it.</b> Send the invite link from the lobby, or read out the code for them to type here.</li>' +
+    '<li><b>Everyone readies up</b> (and can tune their wagon in the garage meanwhile); the host picks the circuit and starts.</li>' +
+    '</ol><p>Up to ' + NET_CFG.max + ' drivers, ' + NET_CFG.laps + ' laps. Late? You join the race already under way.</p></div></div></div>',
     { sel: prefill ? 1 : 0, back: ()=> showMain(MI("multi")),
       acts:{ host: ()=>{ if(!netSaveNick()) return; SFX.ok(); netEnter(netCode(), true); },
              join: ()=>{ if(!netSaveNick()) return; const c = (document.getElementById("netCode").value || "").toUpperCase().replace(/[^A-Z]/g, "");
-                         if(c.length !== 4){ netMsg("Type the four letter code first."); document.getElementById("netCode").focus(); return; }
+                         if(c.length !== 4){ netMsg("Type the four letter code from your friend first."); document.getElementById("netCode").focus(); return; }
                          SFX.ok(); netEnter(c, false); },
              back: ()=>{ SFX.back(); showMain(MI("multi")); } } });
+  // the tag over the car follows the name as it's typed; the code is letters only, in capitals
+  const nm = document.getElementById("netName"), tag = document.getElementById("nmTag"), cd = document.getElementById("netCode");
+  if(nm && tag) nm.addEventListener("input", ()=>{ tag.textContent = nm.value.trim() || "Your name"; netMsg(""); });
+  if(cd) cd.addEventListener("input", ()=>{ const v = cd.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4); if(v !== cd.value) cd.value = v; netMsg(""); });
   if(prefill && nick){ const j = UIEL.querySelector('[data-act="join"]'); if(j) j.focus(); }
   else setTimeout(()=>{ const n = document.getElementById("netName"); if(n && !n.value) n.focus(); }, 30);
 }
@@ -22039,6 +22075,11 @@ function netPickTrack(id){
   if(!NET.on){ netEnter(netCode(), true); }
   NET.pick = id; netTrackMe();
   showLobby(1);
+}
+function netPickId(){
+  const hm = NET.metas.find(m=> m.id === netHostId());
+  const id = netIsHost() ? NET.pick : hm && typeof hm.pick === "number" ? hm.pick : TRACK_ID;
+  return TRACKS[id] ? id : TRACK_ID;
 }
 function netPickName(){
   const hm = NET.metas.find(m=> m.id === netHostId());
@@ -22063,7 +22104,7 @@ function showLobby(sel){
               : m.id === hostId ? '<span class="rtag host">HOST</span>'
               : m.ready ? '<span class="rtag ok">READY</span>' : '<span class="rtag">NOT READY</span>';
     return '<tr' + (m.id === me ? ' class="you"' : '') + '><td class="p"><span class="dot" style="background:' + safeCol(m.paint) + '"></span></td>' +
-      '<td class="n">' + esc(m.name || "Friend") + (m.id === me ? ' <i>(you)</i>' : '') + (fresh ? ' <b class="new">NEW</b>' : '') + '</td>' +
+      '<td class="n">' + esc(m.name || "Friend") + (m.id === me ? ' <i>(you)</i>' : '') + (fresh ? ' <b class="new">NEW</b>' : '') + netCarLine(m) + '</td>' +
       '<td class="x">' + (conn ? '<span class="conn">' + conn + '</span> ' : '') + tag + '</td></tr>';
   });
   for(let k=list.length; k<Math.min(NET_CFG.max, list.length + 1); k++) rows.push('<tr class="empty"><td class="p"></td><td class="n">waiting for a friend…</td><td class="x"></td></tr>');
@@ -22111,7 +22152,19 @@ function showLobby(sel){
   if(box){ box.value = NET.draft || ""; box.addEventListener("input", ()=>{ NET.draft = box.value; });
     if(typing){ box.focus(); box.setSelectionRange(box.value.length, box.value.length); } }
   netChatPaint();
-  { const el = document.getElementById("netBoard"); if(el){ el.innerHTML = lbTableHTML(pick, "BEST LAPS"); lbFill(); } }
+  { const el = document.getElementById("netBoard"), id = netPickId(), t = TRACKS[id];
+    if(el && t){
+      el.innerHTML = '<div class="lcirc"><canvas width="96" height="96"></canvas><div><b>' + esc(t.name) + '</b><small>' + (t.shape ? esc(t.shape) + '<br>' : '') +
+        (trackThumb(id).len/1000).toFixed(1) + ' km \u00b7 ' + NET_CFG.laps + ' laps</small></div></div>' + lbTableHTML(t.name, "BEST LAPS");
+      drawThumb(el.querySelector("canvas"), id); lbFill();
+    } }
+}
+/* what each driver turned up in, under their name: the wagon and its paint */
+function netCarLine(m){
+  const models = ["Box wagon", "Sport wagon", "Woodie", "Safari 4x4"], c = m.car || {};
+  const paint = PAINTS.find(p=> m.paint && p.hex.toLowerCase() === String(m.paint).toLowerCase());
+  const bits = [models[c.model | 0] || models[0]].concat(paint ? [paint.name] : []).concat(c.beat ? ["patina"] : []);
+  return '<small class="car">' + esc(bits.join(" \u00b7 ")) + '</small>';
 }
 /* redraw the lobby as people come and go, without losing the selection */
 function netRefresh(){
