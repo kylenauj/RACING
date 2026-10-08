@@ -16434,6 +16434,17 @@ function patinate(mat, seed, amt){      // (amt: how far gone, 0 to 1; a whole b
    front seats with headrests (or a pickup's bench) and a rear bench. c: {zDash, zSeat, zRear (or null),
    belt, half (inside half width), steer (the wheel's x), seat (colour), bench} */
 const CABIN_M = {};
+/* a side profile ([z, y] points) cut at z = c, keeping the part ahead (keepAhead) or behind: the bodies are
+   one interval tall at every z (the arches only cut up from below), so a straight cut is always clean */
+function clipZ(pts, c, keepAhead){
+  const out = [], inside = p=> keepAhead ? p[0] >= c : p[0] <= c;
+  for(let i=0;i<pts.length;i++){
+    const A = pts[i], B = pts[(i + 1) % pts.length], ia = inside(A), ib = inside(B);
+    if(ia) out.push(A);
+    if(ia !== ib){ const t = (c - A[0])/(B[0] - A[0]); out.push([c, A[1] + (B[1] - A[1])*t]); }
+  }
+  return out;
+}
 function buildCabin(parent, c){
   const mk = (k, col, r)=> CABIN_M[k] || (CABIN_M[k] = new THREE.MeshStandardMaterial({color:col, roughness:r, metalness:0.05, flatShading:true}));
   const dark = mk("dash", 0x1e1c1a, 0.85), floor = mk("floor", 0x2a2622, 1), wheelM = mk("wheel", 0x141414, 0.7);
@@ -16697,7 +16708,21 @@ function buildWagon(opts){
   arch(AXLE_F);
   if(o.sport) body.push([L, SILL], [L + 0.04, 0.58], [L - 0.14, 0.73], [WSB, BELT], [-L + 0.05, BELT], [-L, 0.8]);
   else body.push([L, SILL], [L, 0.72], [L - 0.1, 0.84], [1.2, BELT], [-L + 0.05, BELT], [-L, 0.86]);
-  extrude(body, 1.72, M.paint, 0.04);
+  /* hollow where you can see in: solid ahead of the screen and behind the tailgate, and between them two
+     side walls on a sunken floor, door cards and wheel tubs inside (no painted lid at the waist) */
+  const CAB_A = WSB - 0.02, CAB_B = -L + 0.14, FLOOR = BELT - 0.55, BW = 1.72;
+  extrude(clipZ(body, CAB_A, true), BW, M.paint, 0.04);
+  extrude(clipZ(body, CAB_B, false), BW, M.paint, 0.04);
+  const midBody = clipZ(clipZ(body, CAB_A, false), CAB_B, true);
+  for (const s of [1, -1]) extrude(midBody, 0.1, M.paint, 0.04, s * (BW/2 - 0.05));
+  box(1.16, FLOOR - SILL + 0.04, CAB_A - CAB_B, M.under, 0, (FLOOR + SILL)/2, (CAB_A + CAB_B)/2);
+  M.card = mat(0x2a2522, { roughness: 0.95 });
+  for (const s of [1, -1]) {
+    for (const [a, b] of sideSpans(CAB_B + 0.05, CAB_A - 0.05, FLOOR, 0.02)) box(0.03, BELT - FLOOR - 0.02, b - a, M.card, s * 0.71, (BELT + FLOOR)/2, (a + b)/2);
+    box(0.04, 0.05, CAB_A - CAB_B - 0.1, M.card, s * 0.72, BELT + 0.02, (CAB_A + CAB_B)/2);
+    for (const cz of [AXLE_R, AXLE_F]) if (cz > CAB_B && cz < CAB_A + ARCH)
+      box(0.16, ARCH_TOP - FLOOR + 0.04, Math.min(CAB_A, cz + ARCH) - Math.max(CAB_B, cz - ARCH), M.card, s * 0.64, (ARCH_TOP + FLOOR)/2, (Math.min(CAB_A, cz + ARCH) + Math.max(CAB_B, cz - ARCH))/2);
+  }
 
   // ---- Greenhouse ----
   extrude([[WSB, BELT], [WST, ROOF - 0.02], [RT, ROOF], [RB, BELT]], 1.58, M.glass);
@@ -16714,13 +16739,17 @@ function buildWagon(opts){
   // ---- Front ----
   if(o.sport){
     box(0.7, 0.14, 0.04, M.plastic, 0, 0.58, L + 0.03);
-    box(0.34, 0.12, 0.05, M.head, 0.58, 0.62, L - 0.02).rotation.y = -0.15;
-    box(0.34, 0.12, 0.05, o.beater ? M.headDim : M.head, -0.58, 0.62, L - 0.02).rotation.y = 0.15;
-    box(0.1, 0.06, 0.04, M.amber, 0.82, 0.5, L + 0.02);
-    box(0.1, 0.06, 0.04, M.amber, -0.82, 0.5, L + 0.02);
+    // (laid on the nose's slope, standing proud of it)
+    for (const s of [1, -1]) {
+      const hl = box(0.36, 0.13, 0.05, s < 0 && o.beater ? M.headDim : M.head, s * 0.58, 0.63, L + 0.035); hl.rotation.set(-0.7, -s * 0.15, 0);
+      const hb = box(0.4, 0.17, 0.03, M.plastic, s * 0.58, 0.63, L + 0.01); hb.rotation.set(-0.7, -s * 0.15, 0);
+      box(0.1, 0.06, 0.04, M.amber, s * 0.82, 0.5, L + 0.07);
+    }
     box(1.84, 0.2, 0.16, M.plastic, 0, 0.36, L + 0.08);
-    box(0.5, 0.08, 0.5, M.paint, 0, BELT - 0.02, 1.62);                    // the hood scoop
-    box(0.42, 0.05, 0.04, M.plastic, 0, BELT, 1.88);
+    // the hood scoop, laid on the hood's slope
+    { const hs = Math.atan2(BELT - 0.73, L - 0.14 - WSB), hy = z => BELT + 0.04 - (z - WSB)*Math.tan(hs);
+      box(0.5, 0.08, 0.5, M.paint, 0, hy(1.62) + 0.02, 1.62).rotation.x = hs;
+      box(0.42, 0.05, 0.03, M.plastic, 0, hy(1.87) + 0.04, 1.875).rotation.x = hs; }
     for (const s of [1, -1]) cyl(0.07, 0.05, 10, M.head, 'z', s * 0.62, 0.33, L + 0.17);   // fog lamps
     // black cladding along the sills and a lip under the nose
     for (const s of [1, -1]) for (const [a, b] of sideSpans(-2.2, 2.2, 0.28)) box(0.03, 0.16, b - a, M.plastic, s * (SIDE + 0.012), 0.36, (a + b)/2);
@@ -16758,7 +16787,10 @@ function buildWagon(opts){
     box(0.02, 0.03, WSB - RB, M.trim, s * 0.795, BELT + 0.015, (WSB + RB)/2);
     box(0.03, 0.03, 0.12, M.chrome, s * 0.915, 0.8, -0.1);
     box(0.03, 0.03, 0.12, M.chrome, s * 0.915, 0.8, -1.28);
-    box(0.12, 0.1, 0.06, M.trim, s * 0.97, BELT + 0.08, WSB - 0.13);
+    // the mirror, on a stalk out of the door's front corner
+    box(0.12, 0.035, 0.05, M.trim, s * 0.9, BELT + 0.05, WSB - 0.16);
+    box(0.1, 0.11, 0.12, M.trim, s * 0.99, BELT + 0.1, WSB - 0.17);
+    box(0.08, 0.085, 0.012, M.glass, s * 0.99, BELT + 0.1, WSB - 0.235);
     box(0.24, 0.22, 0.02, M.trim, s * 0.74, 0.3, -1.88);
     box(0.01, 0.05, 0.1, M.amber, x, 0.6, 2.1);
     box(0.01, 0.05, 0.1, M.tail, x, 0.6, -2.12);
@@ -16802,8 +16834,9 @@ function buildWagon(opts){
 
   if(o.sport){
     // a proper roof spoiler on two stands
-    box(1.5, 0.05, 0.34, M.paint, 0, ROOF + 0.13, RT - 0.05).rotation.x = -0.1;
-    for (const s of [1, -1]) box(0.05, 0.12, 0.12, M.plastic, s * 0.55, ROOF + 0.06, RT + 0.02);
+    // a proper roof spoiler, its wing held on two end plates that stand on the roof's back edge
+    box(1.5, 0.05, 0.34, M.paint, 0, ROOF + 0.15, RT - 0.08).rotation.x = -0.1;
+    for (const s of [1, -1]) box(0.05, 0.16, 0.36, M.paint, s * 0.73, ROOF + 0.09, RT - 0.08);
   } else {
     box(1.62, 0.03, 0.2, M.roof, 0, ROOF + 0.04, RT - 0.12).rotation.x = -0.12;
   }
@@ -17430,6 +17463,8 @@ function buildRival(kind, opts){
     rim:    mat(opt.rim || 0x9a9a92, { roughness: 0.5, metalness: 0.6 }),
     rimW:   mat(0xeeebe2, { roughness: 0.5, metalness: 0.2 }),
     rubber2:mat(0x0e0e0e, { roughness: 0.95 }),
+    card:   mat(0x2a2522, { roughness: 0.95 }),
+    glassD: mat(0x1d2a33, { roughness: 0.15, metalness: 0.6, envMapIntensity: 1.0 }),
     head:   mat(0xfff3c4, { emissive: 0xffe9a0, emissiveIntensity: 0.7 }),
     tail:   mat(0xb01818, { emissive: 0xff1a10, emissiveIntensity: 0.22 }),
     amber:  mat(0xe08a1e, { emissive: 0x552800, emissiveIntensity: 0.4 }),
@@ -17503,7 +17538,7 @@ function buildRival(kind, opts){
     return add(geo, material, x, 0, 0);
   };
   /* the side profile of a lower body, [z, y] points, arches cut round the wheels */
-  const lower = (R, F, sill, belt, nose, WR, AR, AF, archR, width, material) => {
+  const lower = (R, F, sill, belt, nose, WR, AR, AF, archR, width, material, cab) => {
     const pts = [[R, sill]];
     const arch = cz => {
       for (let i = 0; i <= 14; i++) {
@@ -17513,7 +17548,21 @@ function buildRival(kind, opts){
     };
     arch(AR); arch(AF);
     pts.push([F, sill], [F, nose], [F - 0.08, belt], [R, belt]);
-    return extrude(pts, width, material, 0.03);
+    if (!cab) return extrude(pts, width, material, 0.03);
+    // hollow where you can see in: two side walls on a sunken floor between the solid nose and tail
+    const [zA, zB] = cab, floor = belt - 0.55;
+    extrude(clipZ(pts, zA, true), width, material, 0.03);
+    extrude(clipZ(pts, zB, false), width, material, 0.03);
+    const mid = clipZ(clipZ(pts, zA, false), zB, true);
+    for (const s of [1, -1]) extrude(mid, 0.1, material, 0.03, s * (width/2 - 0.05));
+    box(1.1, floor - sill + 0.04, zA - zB, M.under, 0, (floor + sill)/2, (zA + zB)/2);
+    for (const s of [1, -1]) {
+      box(0.03, belt - floor - 0.02, zA - zB - 0.1, M.card, s * (width/2 - 0.135), (belt + floor)/2, (zA + zB)/2);
+      for (const cz of [AR, AF]) if (cz - archR < zA && cz + archR > zB) {
+        const a = Math.max(zB, cz - archR), b = Math.min(zA, cz + archR);
+        box(0.16, WR + archR - floor + 0.06, b - a, M.card, s * (width/2 - 0.2), (WR + archR + floor)/2 + 0.01, (a + b)/2);
+      }
+    }
   };
 
   let S;   // wheel setup for this body
@@ -17523,7 +17572,7 @@ function buildRival(kind, opts){
   case "box": {
     S = { WR: 0.32, AF: 1.36, AR: -1.30, TRK: 0.74, tw: 0.2 };
     const F = 2.38, R = -2.42, SILL = 0.3, BELT = 0.9, SIDE = 0.86;
-    lower(R, F, SILL, BELT, 0.8, S.WR, S.AR, S.AF, 0.42, 1.72, M.paint);
+    lower(R, F, SILL, BELT, 0.8, S.WR, S.AR, S.AF, 0.42, 1.72, M.paint, [1.03, R + 0.12]);
     // tall upright glasshouse, flat back
     extrude([[1.05, BELT], [0.5, 1.46], [-2.36, 1.48], [-2.4, BELT]], 1.6, M.glass);
     box(1.64, 0.06, 2.9, M.paint, 0, 1.49, -0.93);
@@ -17597,7 +17646,7 @@ function buildRival(kind, opts){
   case "trail": {
     S = { WR: 0.42, AF: 1.28, AR: -1.14, TRK: 0.82, tw: 0.3, knobby: true };
     const F = 2.1, R = -2.02, SILL = 0.62, BELT = 1.2, SIDE = 0.9;
-    lower(R, F, SILL, BELT, 1.1, S.WR, S.AR, S.AF, 0.52, 1.8, M.paint);
+    lower(R, F, SILL, BELT, 1.1, S.WR, S.AR, S.AF, 0.52, 1.8, M.paint, [0.93, 0.3]);
     // chunky black flares over the arches
     for (const z of [S.AF, S.AR]) for (const s of [1, -1]) {
       const fl = add(new THREE.TorusGeometry(0.54, 0.06, 4, 10, Math.PI), M.rubber, s * 0.91, S.WR, z);
@@ -17608,8 +17657,8 @@ function buildRival(kind, opts){
     extrude([[0.95, BELT], [0.7, 1.72], [0.2, 1.74], [0.3, BELT]], 1.66, M.glass);
     extrude([[0.3, BELT], [0.2, 1.8], [-1.96, 1.8], [-2.0, BELT]], 1.7, M.paint2);
     for (const s of [1, -1]) {
-      box(0.02, 0.36, 0.7, M.glass, s * 0.855, 1.5, -0.35);             // side glass in the top
-      box(0.02, 0.36, 0.6, M.glass, s * 0.855, 1.5, -1.35);
+      box(0.02, 0.36, 0.7, M.glassD, s * 0.855, 1.5, -0.35);            // side glass in the top
+      box(0.02, 0.36, 0.6, M.glassD, s * 0.855, 1.5, -1.35);
       box(0.1, 0.14, 0.06, M.trim, s * 0.98, 1.3, 0.85);
       box(0.012, 0.5, 0.015, M.trim, s * (SIDE + 0.005), 0.92, 0.2);    // door shut line
       box(0.03, 0.03, 0.12, M.chrome, s * (SIDE + 0.01), 1.05, -0.02);
@@ -17688,7 +17737,7 @@ function buildRival(kind, opts){
   case "pickup": {
     S = { WR: 0.37, AF: 1.62, AR: -1.5, TRK: 0.8, tw: 0.26 };
     const F = 2.62, R = -2.62, SILL = 0.4, BELT = 1.0, SIDE = 0.92;
-    lower(R, F, SILL, BELT, 0.92, S.WR, S.AR, S.AF, 0.47, 1.84, M.paint);
+    lower(R, F, SILL, BELT, 0.92, S.WR, S.AR, S.AF, 0.47, 1.84, M.paint, [0.98, -0.36]);
     // cab only; the bed is open behind it
     extrude([[1.0, BELT], [0.52, 1.64], [-0.3, 1.66], [-0.36, BELT]], 1.62, M.glass);
     box(1.64, 0.06, 0.88, M.paint, 0, 1.67, 0.1);
