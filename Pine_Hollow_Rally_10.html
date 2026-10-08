@@ -15055,14 +15055,15 @@ if(JUNGLE){
       }
     }
     // the rim rail: posts and two rails, open where the road comes on and goes off
-    const half = q.half + 1.35, gapA = Math.asin(Math.min(1, half/L.R)) + 0.02;
-    const inGap = a=>{ for(const s of [1, -1]){ const c = roadA + s*Math.acos(Math.min(1, T.off/L.R)); let d = Math.abs(((a - c) % (Math.PI*2) + Math.PI*3) % (Math.PI*2) - Math.PI); if(d < gapA) return true; } return false; };
-    const NP = Math.round(L.R*Math.PI*2/2.4);
+    // (open just where the plank way really runs through the rim, wherever its curve takes it, the gateposts either side)
+    const inGap = a=>{ const px = L.x + Math.cos(a)*(L.R - 0.2), pz = L.z + Math.sin(a)*(L.R - 0.2), k = skyAt(px, pz, 4);
+      return !!k && Math.abs(k.lat) < k.half + 1.3; };
+    const NP = Math.round(L.R*Math.PI*2/1.2);
     let prev = null;
     for(let k=0;k<=NP;k++){
       const a = k/NP*Math.PI*2, px = L.x + Math.cos(a)*(L.R - 0.2), pz = L.z + Math.sin(a)*(L.R - 0.2);
       if(inGap(a)){ prev = null; continue; }
-      posts.push([px, y + 0.55, pz, 0, 0, 0, 0.18, 1.2, 0.18]);
+      if(k % 2 === 0 || inGap(a + Math.PI*2/NP) || inGap(a - Math.PI*2/NP)) posts.push([px, y + 0.55, pz, 0, 0, 0, 0.18, 1.2, 0.18]);
       if(prev){ span(beams, [prev[0], y + 1.05, prev[1]], [px, y + 1.05, pz], 0.12, 0.12); span(beams, [prev[0], y + 0.55, prev[1]], [px, y + 0.55, pz], 0.08, 0.08); }
       prev = [px, pz];
     }
@@ -15168,9 +15169,10 @@ if(JUNGLE){
        on each and a lintel over the road, a threshold beam under the boards, the ropes tied off to it */
     C.trees.forEach(T=>{
       const L = SKY_PLATS.find(Q=> Q.T === T); if(!L) return;
-      const half = Math.sqrt(Math.max(1, L.R*L.R - T.off*T.off));
       for(const dir of [-1, 1]){
-        const q = at(C.a + T.k + dir*(half - 0.25)/seg), w = q.half + 1.35, G = 5.4;
+        let sx = C.a + T.k; for(let n=0; n<600; n++){ const q0 = at(sx); if(Math.hypot(q0.x - L.x, q0.z - L.z) >= L.R - 0.15) break; sx += dir*0.1; }
+        const half = Math.abs(sx - (C.a + T.k))*seg;
+        const q = at(sx), w = q.half + 1.35, G = 5.4;
         const A = [q.x + q.nx*w, q.z + q.nz*w], B = [q.x - q.nx*w, q.z - q.nz*w];
         for(const p2 of [A, B]){
           posts.push([p2[0], q.y + G/2, p2[1], 0, 0, 0, 0.42, G, 0.42]);
@@ -19205,7 +19207,9 @@ function stepCarInner(dt){
   if(plat && pose.y > plat.y - 1.6){
     const dx = pose.x - plat.x, dz = pose.z - plat.z, d = Math.hypot(dx, dz) || 0.01, ux = dx/d, uz = dz/d;
     const vr = pose.vx*ux + pose.vz*uz, rim = plat.R - 1.15;
-    if(d > rim && (GAME.railGone || 0) <= 0){
+    // (no rim across the plank way: it runs straight through, between the gateposts, onto the bridge)
+    const way = skyAt(pose.x, pose.z, 2.5), onWay = !!way && Math.abs(way.lat) < way.half + 0.9;
+    if(d > rim && !onWay && (GAME.railGone || 0) <= 0){
       if(vr > 13){ GAME.railGone = 1.2; GAME.shake = Math.max(GAME.shake || 0, 0.35); SFX.bump(vr*0.8); if(actx) burst(0.25, "bandpass", 900, 0.35, 2, 0, 400); }
       else { pose.x = plat.x + ux*rim; pose.z = plat.z + uz*rim; if(vr > 0){ pose.vx -= ux*vr*1.3; pose.vz -= uz*vr*1.3; if(vr > 3){ SFX.bump(vr*0.6); GAME.shake = Math.max(GAME.shake || 0, Math.min(0.4, vr*0.04)); } } }
     }
