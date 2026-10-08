@@ -61,6 +61,10 @@
   .left.garage .menu{gap:5px;} .left.garage .item{padding:6px 14px 5px;font-size:clamp(14px,1.3vw,17px);}
   .left.garage h2.head{margin-bottom:12px;}
   .left.garage .gmenu{min-height:calc(8*(1.25em + 19px));}
+  /* (the garage's column stands from the top, never re-centred: the tabs, the rows and the buttons stay put
+      whatever's said below them, and only the description box grows, downward) */
+  .screen.garage .cols{align-items:flex-start;margin:0;}
+  .screen.garage .cols > .right{align-self:stretch;}
   .left.garage .gfoot{display:flex;gap:10px;margin-top:10px;} .left.garage .gfoot .item{flex:1;justify-content:center;}
   .left.garage .gdesc{margin-top:12px;padding:9px 14px;min-height:4.8em;font-size:14px;line-height:1.4;color:#dbe6d4;
     background:rgba(9,20,14,.78);border:2px solid var(--ink);border-left:6px solid var(--accent);box-shadow:3px 3px 0 var(--ink);}
@@ -16717,6 +16721,11 @@ function buildWagon(opts){
   for (const s of [1, -1]) extrude(midBody, 0.1, M.paint, 0.04, s * (BW/2 - 0.05));
   box(1.16, FLOOR - SILL + 0.04, CAB_A - CAB_B, M.under, 0, (FLOOR + SILL)/2, (CAB_A + CAB_B)/2);
   M.card = mat(0x2a2522, { roughness: 0.95 });
+  /* the hood's top, as built (its profile plus the edge's round-over), and how far it falls toward the nose:
+     whatever lies on the hood sits on this, on either body */
+  const HZ0 = o.sport ? WSB : 1.2, HZ1 = o.sport ? L - 0.14 : L - 0.1, HY1 = o.sport ? 0.73 : 0.84;
+  const HOOD_TILT = Math.atan2(BELT - HY1, HZ1 - HZ0);
+  const hoodTop = z => BELT + 0.04 - (BELT - HY1)*(Math.max(HZ0, Math.min(HZ1, z)) - HZ0)/(HZ1 - HZ0);
   for (const s of [1, -1]) {
     for (const [a, b] of sideSpans(CAB_B + 0.05, CAB_A - 0.05, FLOOR, 0.02)) box(0.03, BELT - FLOOR - 0.02, b - a, M.card, s * 0.71, (BELT + FLOOR)/2, (a + b)/2);
     box(0.04, 0.05, CAB_A - CAB_B - 0.1, M.card, s * 0.72, BELT + 0.02, (CAB_A + CAB_B)/2);
@@ -16747,9 +16756,8 @@ function buildWagon(opts){
     }
     box(1.84, 0.2, 0.16, M.plastic, 0, 0.36, L + 0.08);
     // the hood scoop, laid on the hood's slope
-    { const hs = Math.atan2(BELT - 0.73, L - 0.14 - WSB), hy = z => BELT + 0.04 - (z - WSB)*Math.tan(hs);
-      box(0.5, 0.08, 0.5, M.paint, 0, hy(1.62) + 0.02, 1.62).rotation.x = hs;
-      box(0.42, 0.05, 0.03, M.plastic, 0, hy(1.87) + 0.04, 1.875).rotation.x = hs; }
+    box(0.5, 0.08, 0.5, M.paint, 0, hoodTop(1.62) + 0.02, 1.62).rotation.x = HOOD_TILT;
+    box(0.42, 0.05, 0.03, M.plastic, 0, hoodTop(1.87) + 0.04, 1.875).rotation.x = HOOD_TILT;
     for (const s of [1, -1]) cyl(0.07, 0.05, 10, M.head, 'z', s * 0.62, 0.33, L + 0.17);   // fog lamps
     // black cladding along the sills and a lip under the nose
     for (const s of [1, -1]) for (const [a, b] of sideSpans(-2.2, 2.2, 0.28)) box(0.03, 0.16, b - a, M.plastic, s * (SIDE + 0.012), 0.36, (a + b)/2);
@@ -16788,9 +16796,10 @@ function buildWagon(opts){
     box(0.03, 0.03, 0.12, M.chrome, s * 0.915, 0.8, -0.1);
     box(0.03, 0.03, 0.12, M.chrome, s * 0.915, 0.8, -1.28);
     // the mirror, on a stalk out of the door's front corner
-    box(0.12, 0.035, 0.05, M.trim, s * 0.9, BELT + 0.05, WSB - 0.16);
-    box(0.1, 0.11, 0.12, M.trim, s * 0.99, BELT + 0.1, WSB - 0.17);
-    box(0.08, 0.085, 0.012, M.glass, s * 0.99, BELT + 0.1, WSB - 0.235);
+    const mz = s < 0 && (o.safari || A.snorkel) ? WSB - 0.42 : WSB - 0.17;          // (behind the snorkel on its side)
+    box(0.12, 0.035, 0.05, M.trim, s * 0.9, BELT + 0.05, mz + 0.01);
+    box(0.1, 0.11, 0.12, M.trim, s * 0.99, BELT + 0.1, mz);
+    box(0.08, 0.085, 0.012, M.chrome, s * 0.99, BELT + 0.1, mz - 0.065);
     box(0.24, 0.22, 0.02, M.trim, s * 0.74, 0.3, -1.88);
     box(0.01, 0.05, 0.1, M.amber, x, 0.6, 2.1);
     box(0.01, 0.05, 0.1, M.tail, x, 0.6, -2.12);
@@ -16993,10 +17002,10 @@ function buildWagon(opts){
   }
   if (A.tape) {
     // rally tape: a black X across each headlamp, against stones
-    const lp = o.sport ? {x:0.58, y:0.62, z:L + 0.035, w:0.34, h:0.12} : o.woodie ? {x:0.66, y:0.66, z:L + 0.12, w:0.17, h:0.17} : {x:0.6, y:0.64, z:2.38, w:0.3, h:0.16};
+    const lp = o.sport ? {x:0.58, y:0.649, z:L + 0.059, w:0.34, h:0.12, tilt:-0.7} : o.woodie ? {x:0.66, y:0.66, z:L + 0.12, w:0.17, h:0.17} : {x:0.6, y:0.64, z:2.38, w:0.3, h:0.16};
     const a = Math.atan2(lp.h, lp.w), len = Math.hypot(lp.w, lp.h);
     for (const s of [1, -1]) for (const k of [1, -1])
-      box(len, 0.024, 0.008, M.trim, s * lp.x, lp.y, lp.z).rotation.z = k * a;
+      box(len, 0.024, 0.008, M.trim, s * lp.x, lp.y, lp.z).rotation.set(lp.tilt || 0, lp.tilt ? -s * 0.15 : 0, k * a);
   }
   /* ---- the woodie: a fifties woody wagon. From the front doors back the whole body above the sills is built
      in wood: mahogany panels framed in pale ash, rails top and bottom, a post at every shut line and between,
@@ -17059,15 +17068,23 @@ function buildWagon(opts){
   if (o.safari || A.snorkel) {
     // it runs up the pillar behind the mirror and into the body just under the
     // waist, behind the front arch and its flare, so the wheel turns clear of it
-    const sx = -(SIDE + 0.07), sz = Math.min(WSB - 0.32, AXLE_F - ARCH - ARCH_M - 0.12), sb = BELT - 0.1;
-    cyl(0.055, ROOF + 0.12 - sb, 8, M.plastic, 'y', sx, (ROOF + 0.12 + sb)/2, sz);
-    box(0.16, 0.12, 0.2, M.plastic, sx, ROOF + 0.16, sz + 0.05);
-    box(0.13, 0.08, 0.22, M.plastic, sx + 0.03, sb, sz - 0.05);
+    // (laid along the pillar's own rake, out of the wing at the screen's foot and up to the roof's edge)
+    const lean = (WST - WSB)/(ROOF - BELT), zAt = y => WSB + 0.03 + lean*(y - BELT);
+    const P0 = new THREE.Vector3(-(SIDE - 0.005), BELT - 0.02, zAt(BELT - 0.02)), P1 = new THREE.Vector3(-0.865, ROOF + 0.05, zAt(ROOF + 0.05));
+    const dv = new THREE.Vector3().subVectors(P1, P0), pipe = add(new THREE.CylinderGeometry(0.055, 0.055, dv.length(), 14), M.plastic, (P0.x + P1.x)/2, (P0.y + P1.y)/2, (P0.z + P1.z)/2);
+    pipe.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dv.clone().normalize());
+    for (const t of [0.3, 0.7]) { const c = P0.clone().lerp(P1, t); box(0.1, 0.03, 0.06, M.trim, c.x + 0.03, c.y, c.z); }   // clamps to the pillar
+    box(0.14, 0.05, 0.16, M.plastic, P0.x, BELT + 0.045, P0.z);                                                           // its foot on the wing
+    box(0.16, 0.12, 0.2, M.plastic, P1.x, P1.y + 0.06, P1.z + 0.04);                                                      // the head, facing forward
+    box(0.12, 0.07, 0.02, M.trim, P1.x, P1.y + 0.06, P1.z + 0.145);
   }
   // ---- the hood ----
-  if ((opt.hood | 0) === 1) box(1.5, 0.01, o.sport ? 0.9 : 1.05, M.matte, 0, BELT + 0.014, o.sport ? 1.65 : 1.72).rotation.x = 0.08;
-  if ((opt.hood | 0) === 2 && !o.sport) { box(0.5, 0.09, 0.55, M.paint, 0, BELT + 0.02, 1.62); box(0.42, 0.05, 0.04, M.plastic, 0, BELT + 0.03, 1.9); }
-  if ((opt.hood | 0) === 3) for (const s of [1, -1]) box(0.3, 0.012, 0.9, M.matte, s * 0.45, BELT + 0.016, 1.72).rotation.x = 0.08;   // louvred vents
+  if ((opt.hood | 0) === 1) box(1.5, 0.01, o.sport ? 0.9 : 1.05, M.matte, 0, hoodTop(o.sport ? 1.65 : 1.72) + 0.006, o.sport ? 1.65 : 1.72).rotation.x = HOOD_TILT;
+  if ((opt.hood | 0) === 2 && !o.sport) { box(0.5, 0.09, 0.55, M.paint, 0, hoodTop(1.62) + 0.03, 1.62).rotation.x = HOOD_TILT; box(0.42, 0.05, 0.04, M.plastic, 0, hoodTop(1.9) + 0.045, 1.9).rotation.x = HOOD_TILT; }
+  if ((opt.hood | 0) === 3) for (const s of [1, -1]) {                                                        // louvred vents
+    box(0.3, 0.012, 0.9, M.matte, s * 0.45, hoodTop(1.72) + 0.007, 1.72).rotation.x = HOOD_TILT;
+    for (let k = 0; k < 6; k++) { const z = 1.36 + k * 0.14; box(0.26, 0.02, 0.025, M.plastic, s * 0.45, hoodTop(z) + 0.02, z).rotation.x = HOOD_TILT; }
+  }
   /* ---- decals, logos and the livery: one plan for every place on the car ----
      Every sticker has a place it wants, and some have a second choice. Each place holds one thing, and
      they are handed out in order: the livery's roundel first, then the flames and the chequers, then the
@@ -17171,8 +17188,8 @@ function buildWagon(opts){
       sticker(m, w, h, 0, y, z - 0.02*Math.cos(lean), lean, Math.PI, 0);
     };
     const onRoof = (m, w, h) => sticker(m, w, h, 0, ROOF + 0.052, ROOF_LOGO_Z, -Math.PI/2, 0, Math.PI);
-    const onHood = (m, w, h) => { const hz = o.sport ? 1.75 : 1.72, hy = (o.sport ? 0.73 + (0.83 - 0.73)*(L - 0.14 - hz)/(L - 0.14 - WSB) : 0.84 + (BELT - 0.84)*(L - 0.1 - hz)/(L - 0.1 - 1.2)) + 0.012;
-      sticker(m, w, h, 0, hy + ((opt.hood | 0) === 1 ? 0.008 : 0), hz, -Math.PI/2 + 0.08, 0, Math.PI); };
+    const onHood = (m, w, h) => { const hz = o.sport ? 1.75 : 1.72, hy = hoodTop(hz) + 0.006;
+      sticker(m, w, h, 0, hy + ((opt.hood | 0) === 1 ? 0.008 : 0), hz, -Math.PI/2 + HOOD_TILT, 0, Math.PI); };
     /* as big as the flank allows between za and zb: from just over the sill (or the chequers) to just under
        the glass, and as long as the panel is at the height of its lowest edge */
     const bigSide = (za, zb) => {
@@ -17228,8 +17245,7 @@ function buildWagon(opts){
        its foot, a flange where it comes through, and a slash cut top with a rain flap. It stands where the
        hood is clear: beside the scoop and the stripes, or in the middle between the vents */
     const vents = (opt.hood | 0) === 3, sx = vents ? 0 : 0.56, sz = vents ? (o.sport ? 2.0 : 1.95) : (o.sport ? 1.55 : 1.6);
-    const hoodY = z => o.sport ? 0.73 + (0.83 - 0.73)*(L - 0.14 - z)/(L - 0.14 - WSB) : 0.84 + (BELT - 0.84)*(L - 0.1 - z)/(L - 0.1 - 1.2);
-    const base = hoodY(sz), H = 0.95, R0 = 0.085;
+    const base = hoodTop(sz) - 0.01, H = 0.95, R0 = 0.085;
     cyl(R0 + 0.035, 0.03, 14, M.chrome, 'y', sx, base + 0.01, sz);
     cyl(R0, H, 14, M.chrome, 'y', sx, base + H/2, sz);
     cyl(R0 + 0.022, H*0.42, 14, M.matte, 'y', sx, base + 0.06 + H*0.21, sz);
@@ -17264,7 +17280,7 @@ function buildWagon(opts){
     const lh = (o.sport ? 1.12 : 1.3)*88/184/2 + 0.04, roofLogo = held.ROOF === "the logo";
     const runs = roofLogo ? [[ROOF_LOGO_Z + lh, WST + 0.075], [RT - 0.075, ROOF_LOGO_Z - lh]] : [[RT - 0.075, WST + 0.075]];
     for (const x of [-0.18, 0.18]) {
-      box(0.16, 0.008, 1.1, M.stripe, x, BELT + ((opt.hood | 0) === 1 ? 0.02 : 0.008), 1.7).rotation.x = 0.08;
+      box(0.16, 0.008, 1.1, M.stripe, x, hoodTop(1.7) + ((opt.hood | 0) === 1 ? 0.016 : 0.006), 1.7).rotation.x = HOOD_TILT;
       for (const [z0, z1] of runs) if (z1 - z0 > 0.1) box(0.16, 0.008, z1 - z0, M.stripe, x, ROOF + 0.045, (z0 + z1)/2);
     }
     if (roofLogo) notes.push("The roof stripes break round the roof logo.");
@@ -17281,11 +17297,13 @@ function buildWagon(opts){
 
   // ---- Beater details ----
   if (o.beater) {
-    box(0.012, 0.58, 0.86, M.door, 0.906, 0.63, 0.53);
+    // (each piece kept to this body's own lines: the sport's waist is lower and its nose falls away)
+    const hoodY = z => hoodTop(z) - 0.004;
+    box(0.012, BELT - 0.34, 0.86, M.door, 0.906, (BELT + 0.34)/2, 0.53);
     box(0.012, 0.1, 0.22, M.rust, -0.906, 0.4, -0.72);
     box(0.012, 0.12, 0.16, M.rust, 0.906, 0.42, -2.02);
     box(0.012, 0.08, 0.14, M.rust, -0.906, 0.38, 2.05);
-    box(0.25, 0.012, 0.18, M.rust, -0.4, 0.925, 1.7).rotation.x = 0.08;
+    box(0.25, 0.012, 0.18, M.rust, -0.4, hoodY(1.7) + 0.006, 1.7).rotation.x = HOOD_TILT;
     box(0.3, 0.04, 0.01, M.rust, 0.35, 0.49, REAR - 0.002);
     box(0.3, 0.08, 0.005, M.sticker, -0.38, 0.54, REAR - 0.002);
     for (const x of [0.785, -0.785]) for (const s of [1, -1]) {
@@ -17302,7 +17320,8 @@ function buildWagon(opts){
     // the hood sprung a little at one corner, and a dented, primer-grey front wing from the scrapyard on the passenger's side
     if (!o.sport) { const hd = box(0.6, 0.012, 0.7, M.paint, -0.38, 0.905, 1.75); hd.rotation.set(0.08, 0, 0.035); }
     const wing = mat(0x6e6e68, { roughness: 1 });
-    for (const [a, b] of sideSpans(1.0, L - 0.05, 0.6)) box(0.012, 0.26, b - a, wing, -0.907, 0.75, (a + b)/2);
+    if (o.sport) for (const [a, b] of sideSpans(1.0, L - 0.3, 0.44)) box(0.012, 0.22, b - a, wing, -0.907, 0.56, (a + b)/2);
+    else for (const [a, b] of sideSpans(1.0, L - 0.05, 0.6)) box(0.012, 0.26, b - a, wing, -0.907, 0.75, (a + b)/2);
   }
 
   // ---- Wheels ----
@@ -17509,7 +17528,7 @@ function buildRival(kind, opts){
   const mirror = (x, y, z) => { for (const s of [1, -1]) {
     const st = box(0.14, 0.03, 0.04, M.trim, s * (x - 0.05), y - 0.06, z); st.rotation.z = s * 0.4;
     box(0.09, 0.15, 0.13, M.trim, s * (x + 0.04), y + 0.02, z - 0.02);
-    box(0.075, 0.12, 0.012, M.glass, s * (x + 0.04), y + 0.02, z - 0.088); } };
+    box(0.075, 0.12, 0.012, M.chrome, s * (x + 0.04), y + 0.02, z - 0.088); } };
   const wipers = (z, y, x0, tilt) => { for (const x of [x0, -x0 * 0.1]) { const wp = box(0.6, 0.015, 0.025, M.trim, x - 0.15, y + 0.02, z); wp.rotation.z = 0.12; wp.rotation.x = tilt;
     box(0.03, 0.03, 0.05, M.trim, x + 0.12, y, z + 0.02); } };
   const beltRubber = (x, y, z0, z1) => { for (const s of [1, -1]) box(0.025, 0.035, z0 - z1, M.rubber2, s * x, y, (z0 + z1) / 2); };
@@ -22695,11 +22714,11 @@ function showGarage(next, back, cat, sel){
     '<div class="menu gmenu">' +
     list.map(O => '<button class="item opt" data-opt="' + O.key + '"><span>' + esc(O.label) +
                   '</span><span class="val">' + optValue(O) + '</span></button>').join("") + '</div>' +
-    '<div class="gdesc"><p class="gd"></p><p class="gn"></p></div>' +
     '<div class="gfoot"><button class="item" data-act="go"><span>DONE</span></button>' +
     '<button class="item back" data-act="back"><span>BACK</span></button></div>' +
     '<div class="hint"><kbd>Q</kbd><kbd>E</kbd> tab &nbsp; <kbd>\u2191</kbd><kbd>\u2193</kbd> pick &nbsp; <kbd>\u2190</kbd><kbd>\u2192</kbd> change &nbsp; <kbd>Enter</kbd> done' +
-    '<br>or click the <b>\u2039 \u203A</b> arrows (a right click steps back)</div></div>' +
+    '<br>or click the <b>\u2039 \u203A</b> arrows (a right click steps back)</div>' +
+    '<div class="gdesc"><p class="gd"></p><p class="gn"></p></div></div>' +
     '<div class="right"></div></div>',
     { cls:"garage", back: leave(back), sel: sel === undefined ? GCATS.length : sel,
       onSel: el=>{
@@ -22712,6 +22731,10 @@ function showGarage(next, back, cat, sel){
       acts:{ gcat: el=>{ SFX.move(); showGarage(next, back, +el.dataset.gcat, +el.dataset.gcat); },
              go: ()=>{ SFX.ok(); leave(next)(); }, back: ()=>{ SFX.back(); leave(back)(); } } });
   MENU.garage = {next, back, cat};
+  // the rows take the room of the longest tab's, measured off a real row, so DONE and BACK never move
+  { const gm = UIEL.querySelector(".gmenu"), it = gm && gm.querySelector(".item");
+    if(it){ const most = Math.max(...GCATS.map((c, k)=> GOPTS.filter(O => O.cat === k).length)), gap = parseFloat(getComputedStyle(gm).rowGap) || 5;
+      gm.style.minHeight = (most*it.offsetHeight + (most - 1)*gap) + "px"; } }
   if(MENU.onSel) MENU.onSel(MENU.items[MENU.sel]);
   garageNotes();
 }
