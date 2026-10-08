@@ -1519,7 +1519,7 @@ const TRACKS = [
           [-300,-252],[-250,-330]],
     hills:[[300,-10,125,13],[85,135,150,-9],[-150,205,110,12],[-405,105,100,12],[-372,-48,95,-9],[-320,-215,105,12],[20,-400,140,1]],
     jumps:[], fords:[[215,-338]], autoFords:0,
-    swamps:[{at:[90,140], r:115, name:"BLACKWATER"}, {at:[-366,-50], r:72, name:"CROCODILE POOL"}],
+    swamps:[{at:[96,128], r:84, name:"BLACKWATER"}, {at:[-366,-50], r:56, name:"CROCODILE POOL"}],
     boardwalks:[[[-12,-405],[38,-401]]],
     /* the treetop roads: from one ridge to the other on the main road, the giants they hang from set
        out along them by themselves; gaps: a stretch with no planks, a kicker in front of it */
@@ -1530,10 +1530,10 @@ const TRACKS = [
     trees:{kinds:["rainforest","palm","fig"], mix:[0.55, 0.62], tall:[[20,12],[9,6],[15,8]], density:1.9}, rockK:0.15, bushK:0.4,
     branches:[
       // the low road: down off the ridge into the swamp, under the platforms twice, and up the far ridge
-      {a:[296,-62], b:[-245,252], via:[[332,-6],[322,62],[278,122],[220,150],[160,108],[118,52],[68,52],[36,112],[8,180],[-60,214],[-140,236]],
-       half:3.2, jumps:[], tune:0.9, fixed:true, low:true, label:"MUD ROAD", mainLabel:"CANOPY"},
-      {a:[-368,222], b:[-250,-330], via:[[-440,180],[-455,95],[-448,10],[-432,-58],[-404,-80],[-370,-80],[-330,-88],[-292,-140],[-272,-220]],
-       half:3.2, jumps:[], tune:0.9, fixed:true, low:true, label:"MUD ROAD", mainLabel:"CANOPY"}
+      {a:[268,-140], b:[-245,252], via:[[262,-72],[250,-8],[226,52],[160,108],[96,120],[36,112],[-30,150],[-100,196],[-170,232]],
+       half:3.2, jumps:[], tune:0.7, fixed:true, low:true, label:"MUD ROAD", mainLabel:"CANOPY"},
+      {a:[-368,222], b:[-250,-330], via:[[-400,172],[-412,96],[-408,20],[-390,-48],[-370,-80],[-342,-124],[-314,-196],[-284,-266]],
+       half:3.2, jumps:[], tune:0.45, fixed:true, low:true, label:"MUD ROAD", mainLabel:"CANOPY"}
     ]}
 
 ];
@@ -3964,6 +3964,15 @@ function canopyProfile(){
     for(let k=Math.round(46/seg); k < C.n - Math.round(34/seg); ){
       if(gapNear(k, 24)){ k += Math.round(4/seg); continue; }
       const i = wrapIdx(P, C.a + k), t = P.tans[i], r = 3.0 + rnd()*1.3, off = P.half[i] + 3.4 + r;
+      /* (a giant stands clear of the mud road below, buttresses and all: on whichever side of the deck
+         that leaves room, or not here at all) */
+      // (and its platform never low over the mud road: where that runs under the disc, well under it)
+      const platR = off + P.half[i] + 1.8, deckY = line(k);
+      const roadGap = sd=>{ const x = P.pts[i].x - t.z*sd*off, z = P.pts[i].z + t.x*sd*off; let d = 1e9;
+        BRANCHES.forEach(B=>{ for(let j=0;j<B.N;j+=2){ const e = Math.hypot(B.pts[j].x - x, B.pts[j].z - z);
+          d = Math.min(d, e - B.half[j]); if(e < platR + B.half[j] + 3 && deckY - macro(B.pts[j].x, B.pts[j].z) < 8) d = -1; } }); return d; };
+      const need = r*2.6 + 3;
+      if(roadGap(side) < need){ if(roadGap(-side) >= need) side = -side; else { k += Math.round(4/seg); continue; } }
       anchors.push(k);
       C.trees.push({k, i, side, r, off, x:P.pts[i].x - t.z*side*off, z:P.pts[i].z + t.x*side*off, h:46 + rnd()*14, hut:rnd() < 0.7});
       side = -side;
@@ -14879,7 +14888,7 @@ if(JUNGLE){
   const plankM = new THREE.MeshLambertMaterial({color:0xffffff}), woodM = new THREE.MeshLambertMaterial({color:0xffffff}), ropeM = PM(0xb79c6a);
   const woodCol = (c, L)=> c.setHSL(0.075 + rnd()*0.02, 0.32 + rnd()*0.12, 0.27 + rnd()*0.1);
   const darkCol = (c)=> c.setHSL(0.07, 0.3, 0.17 + rnd()*0.05);
-  const planks = [], beams = [], posts = [], ropes = [], darkBeams = [];
+  const planks = [], beams = [], posts = [], ropes = [], darkBeams = [], lamps = [];
 
   /* ---- a giant ---- */
   function giant(x, z, r, H, opts){
@@ -14989,7 +14998,7 @@ if(JUNGLE){
       }
     }
     // the rim rail: posts and two rails, open where the road comes on and goes off
-    const half = q.half + 1.2, gapA = Math.asin(Math.min(1, half/L.R)) + 0.05;
+    const half = q.half + 1.35, gapA = Math.asin(Math.min(1, half/L.R)) + 0.02;
     const inGap = a=>{ for(const s of [1, -1]){ const c = roadA + s*Math.acos(Math.min(1, T.off/L.R)); let d = Math.abs(((a - c) % (Math.PI*2) + Math.PI*3) % (Math.PI*2) - Math.PI); if(d < gapA) return true; } return false; };
     const NP = Math.round(L.R*Math.PI*2/2.4);
     let prev = null;
@@ -15057,10 +15066,11 @@ if(JUNGLE){
     for(let s=s0; s<=s1; s+=0.42/seg){
       const q = at(s), i = q.i;
       if(P.skyGap[i] && P.skyGap[wrapIdx(P, i + 1)]) continue;
-      if(onPlat(q.x, q.z)) continue;
-      const qa = at(s - 0.2/seg), qb = at(s + 0.2/seg), pitch = -Math.atan2(qb.y - qa.y, 0.4);
-      const w = (q.half + 1.45)*2*(rnd() < 0.05 ? 0.8 : 1);
-      planks.push([q.x + q.nx*(rnd() - 0.5)*0.3, q.y - 0.04, q.z + q.nz*(rnd() - 0.5)*0.3, Math.atan2(q.tx, q.tz) + (rnd() - 0.5)*0.05, pitch, 0, w, 0.08, 0.34]);
+      // (on across each platform too, laid square on its boards: the road runs through as one plank way, no ragged join at the rim)
+      const on = onPlat(q.x, q.z);
+      const qa = at(s - 0.2/seg), qb = at(s + 0.2/seg), pitch = on ? 0 : -Math.atan2(qb.y - qa.y, 0.4);
+      const w = (q.half + 1.45)*2*(!on && rnd() < 0.05 ? 0.8 : 1), jig = on ? 0.06 : 0.3;
+      planks.push([q.x + q.nx*(rnd() - 0.5)*jig, q.y - 0.04 + (on ? 0.05 : 0), q.z + q.nz*(rnd() - 0.5)*jig, Math.atan2(q.tx, q.tz) + (rnd() - 0.5)*(on ? 0.01 : 0.05), pitch, 0, w, 0.08, 0.34]);
     }
     // stringers, cross beams, posts, the two ropes a side, all every 2.4m
     const step = 2.4/seg; let prev = null;
@@ -15082,6 +15092,26 @@ if(JUNGLE){
       }
       prev = {side, y:q.y, gap:gapHere, plat};
     }
+    /* where each bridge meets a platform: a timber gateway on the rim, two stout posts with a lantern
+       on each and a lintel over the road, a threshold beam under the boards, the ropes tied off to it */
+    C.trees.forEach(T=>{
+      const L = SKY_PLATS.find(Q=> Q.T === T); if(!L) return;
+      const half = Math.sqrt(Math.max(1, L.R*L.R - T.off*T.off));
+      for(const dir of [-1, 1]){
+        const q = at(C.a + T.k + dir*(half - 0.25)/seg), w = q.half + 1.35, G = 5.4;
+        const A = [q.x + q.nx*w, q.z + q.nz*w], B = [q.x - q.nx*w, q.z - q.nz*w];
+        for(const p2 of [A, B]){
+          posts.push([p2[0], q.y + G/2, p2[1], 0, 0, 0, 0.42, G, 0.42]);
+          lamps.push([p2[0], q.y + G + 0.2, p2[1]]);
+        }
+        span(darkBeams, [A[0], q.y + G - 0.25, A[1]], [B[0], q.y + G - 0.25, B[1]], 0.38, 0.38);
+        span(darkBeams, [A[0], q.y - 0.12, A[1]], [B[0], q.y - 0.12, B[1]], 0.45, 0.3);
+        // short timber rails from each gatepost out along the bridge, where its ropes are tied off
+        const q2 = at(C.a + T.k + dir*(half + 2.2)/seg);
+        for(const sd of [1, -1]){ const pA = [q.x + q.nx*sd*w, q.z + q.nz*sd*w], pB = [q2.x + q2.nx*sd*(q2.half + 1.35), q2.z + q2.nz*sd*(q2.half + 1.35)];
+          for(const hh of [1.05, 0.55]) span(beams, [pA[0], q.y + hh, pA[1]], [pB[0], q2.y + hh, pB[1]], 0.13, 0.13); }
+      }
+    });
     // the guy ropes: fanned down to the rail line from high on each giant's trunk, both ways along the bridge
     C.trees.forEach(T=>{
       const L = SKY_PLATS.find(Q=> Q.T === T), anchorY = L.y + 9;
@@ -15129,6 +15159,8 @@ if(JUNGLE){
   inst(unitBox, woodM, darkBeams, darkCol);
   inst(new THREE.CylinderGeometry(0.5, 0.6, 1, 6), woodM, posts, darkCol);
   inst(unitRope, ropeM, ropes);
+  if(lamps.length){ const lm = new THREE.MeshLambertMaterial({color:0xffd890, emissive:0xffa040, emissiveIntensity:1.1});
+    inst(new THREE.BoxGeometry(0.3, 0.4, 0.3), lm, lamps.map(L=> [L[0], L[1], L[2], 0, 0, 0, 1, 1, 1])); }
 
   /* ---- giants on the ground too: a few beside the mud roads, buttresses right down to the verge ---- */
   {
