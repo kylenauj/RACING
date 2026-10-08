@@ -21506,13 +21506,17 @@ function lavaReset(){
    part of the lap, so you're put back on the approach to the bridge to have another go. */
 /* off a treetop deck: through the ropes or short of a gap, and down to the swamp. No reset: the mud road
    is down there to carry on along. Said once, as the car drops away from the planks. */
-const CANOPY_FALL = {on:false, t:0};
+const CANOPY_FALL = {on:false, t:0, upT:-99};      // (upT: when the car was last up at a deck's height)
 function checkCanopyFall(){
   if(!CANOPY.length || state.phase !== "racing" || GAME.paused) return;
   if(!CANOPY_FALL.on){
     const k = skyAt(pose.x, pose.z, 6), L = platAt(pose.x, pose.z, 4);
     const top = L ? L.y : k && MAIN.sky[k.i] ? k.y : null;
-    if(top !== null && pose.air && pose.y < top - 3.5 && pose.vy < -4){
+    if(top !== null && pose.y > top - 1.5) CANOPY_FALL.upT = state.t;
+    /* (only a car that was up on the planks a moment ago has fallen off them: one on the mud road under
+       a deck, thrown off the ground by a bump, is just jumping a bump) */
+    const wasUp = state.t >= CANOPY_FALL.upT && state.t - CANOPY_FALL.upT < 2.2;
+    if(top !== null && wasUp && pose.air && pose.y < top - 3.5 && pose.vy < -4){
       CANOPY_FALL.on = true; CANOPY_FALL.t = state.t;
       const gap = k && (k.gap || MAIN.skyGap[k.i]);
       banner(gap ? "TOO SHORT!" : "OVER THE SIDE!", "#ff8a3a", 2.2, "down to the mud road: keep going");
@@ -21749,6 +21753,7 @@ function resetRace(){
   placeAtStart();
   if(typeof resetPiles === "function") resetPiles();
   resetCritters();
+  if(typeof CANOPY_FALL !== "undefined"){ CANOPY_FALL.on = false; CANOPY_FALL.upT = -99; }
   EXP.camps.forEach(c=> c.reached = false); EXP.last = -1; EXP.resets = 0; pose.over = 0;
   car.visible = true; carShadow.visible = true;
   camH = pose.h;
