@@ -1510,20 +1510,27 @@ const TRACKS = [
     kit:["crest"],
     shape:"TANGLEROOT — over the canopy, under the roots",
     feature:"two high roads through the treetops on platforms and rope bridges, gaps to jump, and the mud road under them when you fall",
-    ctrl:[[-150,-400],[-40,-406],[70,-396],[170,-366],[245,-310],[282,-226],[268,-140],[296,-62],[302,10],
+    ctrl:[[-150,-400],[-40,-406],[70,-396],[118,-380],
+          // THE GREAT KAPOK: right round the giant and up its trunk on a spiral of planks, out over the road
+          // you came in on, and off the top across a gap onto the hill
+          [156,-387],[167,-393],[173,-404],[173,-416],[167,-427],[156,-433],[144,-433],[133,-427],[127,-416],[127,-404],[133,-393],
+          [147,-379],[160,-366],[171,-355],[190,-340],[215,-326],
+          [245,-310],[282,-226],[268,-140],[296,-62],[302,10],
           // the first canopy: off the ridge into the treetops, giant to giant across the swamp
           [270,60],[215,95],[155,108],[100,98],[45,108],[-5,134],[-55,160],[-112,182],
           [-180,212],[-245,252],[-312,262],[-368,222],[-394,150],
           // the second canopy: off the ridge, south over the black water to the far ridge
           [-398,80],[-392,14],[-378,-52],[-358,-116],[-338,-180],
           [-300,-252],[-250,-330]],
-    hills:[[300,-10,125,13],[85,135,150,-9],[-150,205,110,12],[-405,105,100,12],[-372,-48,95,-9],[-320,-215,105,12],[20,-400,140,1]],
-    jumps:[], fords:[[215,-338]], autoFords:0,
+    hills:[[300,-10,125,13],[85,135,150,-9],[-150,205,110,12],[-405,105,100,12],[-372,-48,95,-9],[-320,-215,105,12],[20,-400,140,1],[168,-356,34,19],[198,-337,40,11],[222,-322,55,8]],
+    flats:[[168,-356,24]],
+    jumps:[], fords:[], autoFords:0,
     swamps:[{at:[96,128], r:84, name:"BLACKWATER"}, {at:[-366,-50], r:56, name:"CROCODILE POOL"}],
     boardwalks:[[[-12,-405],[38,-401]]],
     /* the treetop roads: from one ridge to the other on the main road, the giants they hang from set
        out along them by themselves; gaps: a stretch with no planks, a kicker in front of it */
-    canopy:[{from:[300,24], to:[-122,186], gaps:[{at:[160,108], len:11, kick:1.3}, {at:[36,112], len:13, kick:1.5}]},
+    canopy:[{from:[156,-387], to:[196,-337], spiral:{at:[150,-410], r:7.5}, top:[133,-393], gaps:[{at:[163,-363], len:10, kick:1.6}]},
+            {from:[300,24], to:[-122,186], gaps:[{at:[160,108], len:11, kick:1.3}, {at:[36,112], len:13, kick:1.5}]},
             {from:[-398,72], to:[-336,-186], gaps:[{at:[-370,-78], len:12, kick:1.4}]}],
     mud:[[[-150,-400],[-40,-406]], [[245,-310],[268,-140]], [[-245,252],[-368,222]], [[-300,-252],[-250,-330]]],
     stages:["muddy","rutted","muddy","broken","muddy","rutted"],
@@ -2062,7 +2069,8 @@ if(SWAMPGP){
   // (the Spring Cup's: canals and streams, walled stretches, and where each set piece stands)
   TRACK.canals = (TRACK.canals||[]).map(c=> Object.assign({}, c, {pts: c.pts.map(mv)}));
   TRACK.rails = (TRACK.rails||[]).map(r=> [mv(r[0]), mv(r[1])].concat(r.slice(2)));
-  TRACK.canopy = (TRACK.canopy||[]).map(c=> Object.assign({}, c, {from: mv(c.from), to: mv(c.to),
+  TRACK.canopy = (TRACK.canopy||[]).map(c=> Object.assign({}, c, {from: mv(c.from), to: mv(c.to), top: c.top && mv(c.top),
+    spiral: c.spiral && Object.assign({}, c.spiral, {at: mv(c.spiral.at)}),
     gaps: (c.gaps || []).map(g=> Object.assign({}, g, {at: mv(g.at)}))}));
   if(TRACK.spots){ const S = {}; Object.keys(TRACK.spots).forEach(k=> S[k] = TRACK.spots[k].map(mv)); TRACK.spots = S; }
 }
@@ -3940,6 +3948,7 @@ MAIN.sky = new Uint8Array(MAIN.N);       // on a canopy's planks, clear of the g
 MAIN.skyGap = new Uint8Array(MAIN.N);    // ... where the planks are missing: nothing under you but the swamp
 MAIN.skyDeck = new Uint8Array(MAIN.N);   // the planked stretch, ends included (drawn as planks, no mud on it)
 MAIN.skyPlat = new Uint8Array(MAIN.N);   // on a giant's platform (a timber rail, not ropes)
+MAIN.skyW = new Float32Array(MAIN.N);    // 0 to 1 onto the planks from the dirt at either end
 const SKY_HASH = new Map(), SKY_CELL = 12;
 const SKY_PLATS = [];                    // the giants' platforms: {x, z, y, R, rd (the trunk), obst: [x, z, r] on it}
 /* the platform a point is on (within its rim, outside its trunk), or null */
@@ -3953,43 +3962,81 @@ function canopyProfile(){
     const rnd = seeded(7300 + ci*17);
     // (each end on the very top of its ridge: the deck goes out level off the crest)
     const crest = (at, dir)=>{ let best = at, by = -Infinity; for(let k=-Math.round(36/seg); k<=Math.round(36/seg); k++){ const i = wrapIdx(P, at + k); if(P.pts[i].y > by + 0.02){ by = P.pts[i].y; best = i; } } return best; };
-    C.a = crest(C.a); C.b = crest(C.b); C.n = C.b - C.a; if(C.n < 0) C.n += N;
+    if(!C.def.spiral){ C.a = crest(C.a); C.b = crest(C.b); C.n = C.b - C.a; if(C.n < 0) C.n += N; }
     const ya = P.pts[C.a].y, yb = P.pts[C.b].y;
     const line = k=> ya + (yb - ya)*k/C.n;
     const gapNear = (k, m)=> C.gaps.some(g=>{ let kg = g.at - C.a; if(kg < 0) kg += N; return Math.abs(k - kg) < g.n/2 + m/seg; });
-    /* the giants it hangs from: every 55 to 75 metres, the first and last well out from the ridges, never
-       beside a gap, one side and then the other, each standing just off the deck with a platform round it */
-    const anchors = [0];
-    let side = rnd() < 0.5 ? -1 : 1;
-    for(let k=Math.round(46/seg); k < C.n - Math.round(34/seg); ){
-      if(gapNear(k, 24)){ k += Math.round(4/seg); continue; }
-      const i = wrapIdx(P, C.a + k), t = P.tans[i], r = 3.0 + rnd()*1.3, off = P.half[i] + 3.4 + r;
-      /* (a giant stands clear of the mud road below, buttresses and all: on whichever side of the deck
-         that leaves room, or not here at all) */
-      // (and its platform never low over the mud road: where that runs under the disc, well under it)
-      const platR = off + P.half[i] + 1.8, deckY = line(k);
-      const roadGap = sd=>{ const x = P.pts[i].x - t.z*sd*off, z = P.pts[i].z + t.x*sd*off; let d = 1e9;
-        BRANCHES.forEach(B=>{ for(let j=0;j<B.N;j+=2){ const e = Math.hypot(B.pts[j].x - x, B.pts[j].z - z);
-          d = Math.min(d, e - B.half[j]); if(e < platR + B.half[j] + 3 && deckY - macro(B.pts[j].x, B.pts[j].z) < 8) d = -1; } }); return d; };
-      const need = r*2.6 + 3;
-      if(roadGap(side) < need){ if(roadGap(-side) >= need) side = -side; else { k += Math.round(4/seg); continue; } }
-      anchors.push(k);
-      C.trees.push({k, i, side, r, off, x:P.pts[i].x - t.z*side*off, z:P.pts[i].z + t.x*side*off, h:46 + rnd()*14, hut:rnd() < 0.7});
-      side = -side;
-      k += Math.round((56 + rnd()*20)/seg);
-    }
-    anchors.push(C.n);
-    // the deck: the line, sagging between the platforms like a rope bridge, flat across each platform
     const deck = new Float64Array(C.n + 1), pf = Math.round(13/seg);
+    if(C.def.spiral){
+      /* THE GREAT KAPOK: the road leaves the ground and climbs right round the giant's trunk on one steady
+         grade, eased in and out, to the top of the spiral; on out level over the road below, a kicker, the
+         gap, and the landing on the hill's peak a couple of metres down (its height sets the climb) */
+      let kTop = snapTo(P, C.def.top) - C.a; if(kTop < 0) kTop += N;
+      C.kTop = kTop;
+      /* the gap goes over the crest of the hill the road runs out onto (wherever the road's own line puts it),
+         so the landing is always on the far side, going down; the deck before it stays well over the ground */
+      const g0 = C.gaps[0], orig = k=> P.pts[wrapIdx(P, C.a + k)].y;
+      // (where the road comes up onto the hill's flat top: the gap ends just short of it, and you land on the top)
+      let top = -Infinity; for(let k=kTop + Math.round(30/seg); k<=C.n; k++) top = Math.max(top, orig(k));
+      let kLand = kTop + Math.round(30/seg); while(kLand < C.n && orig(kLand) < top - 0.6) kLand++;
+      const kGap1 = Math.max(kTop + Math.round(28/seg) + g0.n, kLand + 1), kGap0 = kGap1 - g0.n;
+      g0.at = wrapIdx(P, C.a + kGap0 + Math.floor(g0.n/2));
+      // (and the deck before it stands clear over the hill's true flank, not just the road's eased line over it)
+      let hi = -Infinity; for(let k=kTop; k<=kGap1; k++){ const q = P.pts[wrapIdx(P, C.a + k)]; hi = Math.max(hi, orig(k), macro(q.x, q.z)); }
+      const yLand = orig(Math.min(C.n, kGap1 + 1)), yTop = yLand + 2.6, E = Math.round(18/seg);
+      C.forceSky = [kTop, kGap1];             // (where the hill's flank stands higher, the run out is cut through it)
+      const ease = k=>{ const u = k/kTop, a = Math.min(0.3, E/kTop);
+        return u < a ? u*u/(2*a*(1 - a)) : u > 1 - a ? 1 - (1 - u)*(1 - u)/(2*a*(1 - a)) : (u - a/2)/(1 - a); };
+      for(let k=0;k<=C.n;k++){
+        if(k <= kTop) deck[k] = ya + (yTop - ya)*ease(k);
+        else if(k < kGap1) deck[k] = yTop - (k > kGap0 ? (yTop - yLand)*(k - kGap0)/g0.n : 0);
+        else deck[k] = yLand + (P.pts[wrapIdx(P, C.a + k)].y - yLand)*smoothstep(kGap1, C.n, k);
+      }
+      for(let k=0;k<=kGap0;k++) P.skyPlat[wrapIdx(P, C.a + k)] = 1;          // (timber rails all the way up)
+    } else {
+      /* the giants it hangs from: every 55 to 75 metres, the first and last well out from the ridges, never
+         beside a gap, one side and then the other, each standing just off the deck with a platform round it */
+      const anchors = [0];
+      let side = rnd() < 0.5 ? -1 : 1;
+      for(let k=Math.round(46/seg); k < C.n - Math.round(34/seg); ){
+        if(gapNear(k, 24)){ k += Math.round(4/seg); continue; }
+        const i = wrapIdx(P, C.a + k), t = P.tans[i], r = 3.0 + rnd()*1.3, off = P.half[i] + 3.4 + r;
+        /* (a giant stands clear of the mud road below, buttresses and all: on whichever side of the deck
+           that leaves room, or not here at all) */
+        // (and its platform never low over the mud road: where that runs under the disc, well under it)
+        const platR = off + P.half[i] + 1.8, deckY = line(k);
+        const roadGap = sd=>{ const x = P.pts[i].x - t.z*sd*off, z = P.pts[i].z + t.x*sd*off; let d = 1e9;
+          BRANCHES.forEach(B=>{ for(let j=0;j<B.N;j+=2){ const e = Math.hypot(B.pts[j].x - x, B.pts[j].z - z);
+            d = Math.min(d, e - B.half[j]); if(e < platR + B.half[j] + 3 && deckY - macro(B.pts[j].x, B.pts[j].z) < 8) d = -1; } }); return d; };
+        const need = r*2.6 + 3;
+        if(roadGap(side) < need){ if(roadGap(-side) >= need) side = -side; else { k += Math.round(4/seg); continue; } }
+        anchors.push(k);
+        C.trees.push({k, i, side, r, off, x:P.pts[i].x - t.z*side*off, z:P.pts[i].z + t.x*side*off, h:46 + rnd()*14, hut:rnd() < 0.7});
+        side = -side;
+        k += Math.round((56 + rnd()*20)/seg);
+      }
+    anchors.push(C.n);
+    /* each platform at a height of its own, up and down through the treetops, never steeper than 10% to
+       the next, and down to the far side of every gap: a jump is always a jump down */
+    const H = anchors.map(k=> line(k));
+    for(let q=1;q<anchors.length-1;q++) H[q] += -1.5 + rnd()*9.5;
+    for(let pass=0; pass<6; pass++) for(let q=1;q<anchors.length;q++){
+      const d = Math.max(4, (anchors[q] - anchors[q-1] - 2*pf)*seg)*0.12;
+      if(q < anchors.length - 1){ H[q] = Math.min(H[q], H[q-1] + d, H[q+1] + d); H[q] = Math.max(H[q], H[q-1] - d, H[q+1] - d); }
+      const gapIn = C.gaps.some(g=>{ let kg = g.at - C.a; if(kg < 0) kg += N; return kg > anchors[q-1] && kg < anchors[q]; });
+      if(gapIn && q < anchors.length - 1) H[q] = Math.min(H[q], H[q-1] - 1.2);
+    }
+    // the deck: from platform to platform, a rope bridge's sag on the way, flat across each platform
     for(let q=0;q<anchors.length-1;q++){
       const k0 = anchors[q] + (q ? pf : 0), k1 = anchors[q+1] - (q < anchors.length - 2 ? pf : 0);
       const s = Math.min(0.9, (k1 - k0)*seg*0.011);
       for(let k=anchors[q]; k<=anchors[q+1]; k++){
-        const u = Math.max(0, Math.min(1, (k - k0)/Math.max(1, k1 - k0)));
-        deck[k] = line(k) - s*Math.sin(Math.PI*u)**2;          // (level where it meets each platform: no crest to hop off)
+        const u = Math.max(0, Math.min(1, (k - k0)/Math.max(1, k1 - k0))), e = u*u*(3 - 2*u);
+        deck[k] = H[q] + (H[q+1] - H[q])*e - s*Math.sin(Math.PI*u)**2;          // (level where it meets each platform: no crest to hop off)
       }
     }
     for(const T of C.trees) for(let k=T.k - pf; k<=T.k + pf; k++) P.skyPlat[wrapIdx(P, C.a + k)] = 1;
+    }
     /* the gaps: planks gone for a car's length or two, a kicker built up on the deck in front of each so
        a car carrying its speed sails across (the far side on the line; the rivals ride the gap as if it
        were bridged, and so does the profile) */
@@ -4013,7 +4060,7 @@ function canopyProfile(){
     let k0 = -1, k1 = -1;
     for(let k=0;k<=C.n;k++){
       const i = wrapIdx(P, C.a + k), p = P.pts[i];
-      if(deck[k] - macro(p.x, p.z) > 1.4){ P.sky[i] = 1; P.noStamp[i] = 1; if(k0 < 0) k0 = k; k1 = k; }
+      if(deck[k] - macro(p.x, p.z) > 1.4 || (C.forceSky && k >= C.forceSky[0] && k < C.forceSky[1])){ P.sky[i] = 1; P.noStamp[i] = 1; if(k0 < 0) k0 = k; k1 = k; }
     }
     C.k0 = k0; C.k1 = k1;
     /* each giant's platform: a ring of planks right round the trunk at the deck's height, wide enough that
@@ -4022,7 +4069,11 @@ function canopyProfile(){
       const y = pathY(P, wrapIdx(P, C.a + T.k)) + BED;
       SKY_PLATS.push({x:T.x, z:T.z, y, R:T.off + P.half[T.i] + 1.8, rd:T.r*0.86, T, obst:[]});
     }
-    for(let k=Math.max(0, k0 - Math.round(6/seg)); k<=Math.min(C.n, k1 + Math.round(6/seg)); k++) P.skyDeck[wrapIdx(P, C.a + k)] = 1;
+    for(let k=Math.max(0, k0 - Math.round(6/seg)); k<=Math.min(C.n, k1 + Math.round(6/seg)); k++){
+      const i = wrapIdx(P, C.a + k); P.skyDeck[i] = 1;
+      // (how far onto the planks: the dirt rolls onto them over the first few metres, never a lip)
+      P.skyW[i] = smoothstep(0, Math.round(2.4/seg), Math.min(k - (k0 - Math.round(6/seg)), (k1 + Math.round(6/seg)) - k));
+    }
     // planks: no mud, no ruts, no water, no washboard
     for(let k=0;k<=C.n;k++){
       const i = wrapIdx(P, C.a + k); if(!P.skyDeck[i]) continue;
@@ -4068,7 +4119,7 @@ function skyAt(x, z, reach){
 function carveCanopy(y, x, z){
   const s = skyAt(x, z, 24);
   if(!s || !MAIN.sky[s.i]) return y;
-  const lim = s.y - 4.2 + Math.max(0, s.d - (s.half + 5))*0.9;
+  const lim = s.y - 2.2 + Math.max(0, s.d - (s.half + 5))*0.9;
   return Math.min(y, lim);
 }
 if(CANOPY.length) canopyProfile();
@@ -4538,7 +4589,7 @@ function carveWater(y, x, z){
 }
 /* ground nothing grows on: the open dunes, the canyon's walls */
 function barren(x, z){
-  if(CANOPY.length && skyAt(x, z, 9)) return true;                                       // (nothing grows up into a treetop deck)
+  if(CANOPY.length && skyAt(x, z, 15)) return true;                                       // (nothing grows up into a treetop deck)
   if(TRACK.banks && TRACK.banks.length && onBankWall(x, z)) return true;     // (up a banked wall)
   if(GIANT.on && Math.hypot(x - GIANT.x, z - GIANT.z) < GIANT.ring - 7) return true;   // the oak's own ground
   if(SPANS.length && lavaNear(x, z) > 0.2) return true;                                   // nothing grows by the lava
@@ -4916,7 +4967,8 @@ const NOTES = (()=>{
     out.push({at: wrapIdx(P, B.splitAt - Math.round(30/seg)), kind:"fork", dir: -sd, mods:[], label: B.def.label});
   });
   PITS.forEach(at=> add(at - Math.round(15/seg), "mud"));
-  CROSSES.forEach(c=>{ if(SPANS.some(sp=> sp.over && Math.hypot(sp.x - c[0], sp.z - c[1]) < 40)) return; for(let i=0;i<N;i++){ const p = P.pts[i]; if(Math.hypot(p.x - c[0], p.z - c[1]) < 2.5){ add(i - Math.round(25/seg), "crossing"); i += Math.round(60/seg); } } });
+  CROSSES.forEach(c=>{ if(SPANS.some(sp=> sp.over && Math.hypot(sp.x - c[0], sp.z - c[1]) < 40)) return;
+    /* (a treetop deck passing high over the road is no crossing) */ if(CANOPY.length && skyAt(c[0], c[1], 6)) return; for(let i=0;i<N;i++){ const p = P.pts[i]; if(Math.hypot(p.x - c[0], p.z - c[1]) < 2.5){ add(i - Math.round(25/seg), "crossing"); i += Math.round(60/seg); } } });
   if(LAKE.on && LAKE.frozen){
     for(let i=0;i<N;i++){ const a = iceAt(P.pts[i].x, P.pts[i].z) > 0.5, b = iceAt(P.pts[(i+N-1)%N].x, P.pts[(i+N-1)%N].z) > 0.5; if(a && !b) add(i - Math.round(10/seg), "ice"); }
   }
@@ -5572,10 +5624,14 @@ function surfaceY(x, z){
   /* a treetop deck: the planks, out to their edge, unless the car is well below them (fallen, or on the
      road underneath); over a gap there is nothing, except for the rivals, who ride it as if bridged */
   if(CANOPY.length){
+    // (the whole planked stretch, its ends on the ridges too: the ground there is no longer quite the road's height)
+    const k = skyAt(x, z, 1.25);
+    if(k && MAIN.skyDeck[k.i] && (!k.gap || SURF_RIVAL) && !(SURF_HINT !== null && SURF_HINT < k.y - 2.5)){
+      const w = MAIN.sky[k.i] ? 1 : MAIN.skyW[k.i];
+      return w >= 1 ? k.y : gridH(x, z) + (k.y - gridH(x, z))*w;
+    }
     const L = platAt(x, z);
     if(L && !(SURF_HINT !== null && SURF_HINT < L.y - 2.5)) return L.y;
-    const k = skyAt(x, z, 1.25);
-    if(k && (!k.gap || SURF_RIVAL) && !(SURF_HINT !== null && SURF_HINT < k.y - 2.5) && MAIN.sky[k.i]) return k.y;
   }
   if(SPANS.length){
     const f = spanFind(x, z, 1.3);
@@ -14866,6 +14922,7 @@ if(GLOW){
    ropes a side, and guy ropes fanned down to it from each trunk. At a gap the boards stop, broken ends
    hanging, the ropes snapped, and an arch over the deck in front says JUMP. */
 const JUNGLE_GIANTS = [];
+const GLADES = [];                         // [x, z, r]: open ground the forest's trees keep out of (ferns still grow)
 if(JUNGLE){
   const P = MAIN, N = P.N, seg = P.seg, rnd = seeded(4401);
   const VC = new THREE.MeshLambertMaterial({vertexColors:true});
@@ -15057,6 +15114,21 @@ if(JUNGLE){
     giant(L.x, L.z, T.r, Math.max(44, y - gradedY(L.x, L.z) + 28 + rnd()*10), {away:roadA});
   });
 
+  /* ---- the Great Kapok: the biggest of them all, the spiral of planks wound round its trunk on timber
+     brackets, guy ropes down to the outer rail from high up the trunk ---- */
+  CANOPY.forEach(C=>{
+    if(!C.def.spiral) return;
+    const cx = C.def.spiral.at[0], cz = C.def.spiral.at[1], r = C.def.spiral.r;
+    giant(cx, cz, r, Math.max(80, P.pts[wrapIdx(P, C.a + C.kTop)].y - gradedY(cx, cz) + 55), {});
+    GLADES.push([cx, cz, 60]);                   // (it stands alone in a glade of ferns, so you see it coming)
+    for(let k=C.k0; k<=C.kTop; k+=Math.round(5/seg)){
+      const q = at(C.a + k), dx = q.x - cx, dz = q.z - cz, d = Math.hypot(dx, dz), ux = dx/d, uz = dz/d;
+      const inner = d - (q.half + 1.4), outer = d + q.half + 1.4;
+      span(darkBeams, [cx + ux*r*0.8, q.y - 6.5, cz + uz*r*0.8], [cx + ux*inner, q.y - 0.3, cz + uz*inner], 0.4, 0.4);
+      span(darkBeams, [cx + ux*r*0.85, q.y - 0.35, cz + uz*r*0.85], [cx + ux*outer, q.y - 0.35, cz + uz*outer], 0.35, 0.45);
+      if(Math.round(k/Math.round(5/seg)) % 2 === 0) span(ropes, [cx + ux*r*0.7, q.y + 11, cz + uz*r*0.7], [cx + ux*(outer - 0.1), q.y + 1.05, cz + uz*(outer - 0.1)], 0.04, 0.04);
+    }
+  });
   /* ---- the rope bridges: every planked station that is not on a platform ---- */
   const onPlat = (x, z)=> SKY_PLATS.some(L=> Math.hypot(x - L.x, z - L.z) < L.R - 0.3);
   CANOPY.forEach(C=>{
@@ -15317,7 +15389,8 @@ if(JUNGLE){
       const jit = (Math.random()-0.5)*26;
       const x = P.pts[i].x + nx*side*off + t.x*jit;
       const z = P.pts[i].z + nz*side*off + t.z*jit;
-      { const nn = nearest(x,z); if(nn.dist < (JUNGLE ? Math.max(6.4, nn.half + 2.8) : Math.max(9.4, nn.half + 3.7))) return false; }   // (a wide road keeps its trees further back)
+      { const nn = nearest(x,z); if(nn.dist < (JUNGLE ? Math.max(6.4, nn.half + 2.8) : Math.max(9.4, nn.half + 3.7))) return false; }
+      if(GLADES.some(g=> Math.hypot(x - g[0], z - g[1]) < g[2])) return false;   // (a wide road keeps its trees further back)
       if(TRACK.openFields && nearest(x, z).dist < TRACK.openFields) return false;                // (the polder: open fields along the road)
       if(Math.hypot(x,z) > Math.max(620, FAR + 70)) return false;
       if(inWaterway(x,z) || barren(x,z)) return false;          // trees do not grow in the river
