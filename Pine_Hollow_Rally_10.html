@@ -1518,7 +1518,7 @@ const TRACKS = [
           [-398,80],[-392,14],[-378,-52],[-358,-116],[-338,-180],
           [-300,-252],[-250,-330]],
     hills:[[300,-10,125,13],[85,135,150,-9],[-150,205,110,12],[-405,105,100,12],[-372,-48,95,-9],[-320,-215,105,12],[20,-400,140,1]],
-    jumps:[], fords:[],
+    jumps:[], fords:[[215,-338]], autoFords:0,
     swamps:[{at:[90,140], r:115, name:"BLACKWATER"}, {at:[-366,-50], r:72, name:"CROCODILE POOL"}],
     boardwalks:[[[-12,-405],[38,-401]]],
     /* the treetop roads: from one ridge to the other on the main road, the giants they hang from set
@@ -18641,6 +18641,11 @@ function stepAudio(info, dt){
     const knockEvery = Math.max(1, Math.ceil(sp/0.62/22));                 // (no more than ~22 knocks a second; the drum covers the rest)
     while(AUD.plankAcc >= knockEvery){ AUD.plankAcc -= knockEvery; SFX.plank(Math.min(1, sp/25)); }
     AUD.deck.g.gain.setTargetAtTime(planks && ground ? Math.min(1, sp/20)*0.16 : 0, now, 0.05);
+    // up on a rope bridge in the treetops: the ropes and timbers groan under the weight now and then
+    if(planks && ground && CANOPY.length && sp > 4 && Math.random() < dt*0.9){
+      const f = 140 + Math.random()*90; tone(f, 0.45 + Math.random()*0.3, "sawtooth", 0.025, f*(0.7 + Math.random()*0.5));
+      burst(0.3, "bandpass", 420 + Math.random()*300, 0.03, 6, 0.05, 260);
+    }
     AUD.deck.f.frequency.setTargetAtTime(170 + sp*2.2, now, 0.1);
     // the gearbox: its whine rides the road speed times the gear, louder off the throttle
     { const along = Math.abs(pose.vx*Math.sin(pose.h) + pose.vz*Math.cos(pose.h)), gi = Math.max(0, Math.min(DRIVE.totals.length - 1, trans.gear - 1));
