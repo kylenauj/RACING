@@ -53,7 +53,11 @@
     padding:max(3vh,env(safe-area-inset-top)) max(4vw,env(safe-area-inset-right))
             max(3vh,env(safe-area-inset-bottom)) max(4vw,env(safe-area-inset-left));
     overflow:auto;
+    /* (never a scrollbar: one turning up when a description runs long would take its width and shove the whole
+        screen sideways; a short window still scrolls, by wheel, touch or the selection) */
+    scrollbar-width:none;
   }
+  .screen::-webkit-scrollbar{width:0;height:0;}
   .screen.on{display:flex;}
   .screen.dim{background:linear-gradient(90deg,rgba(9,20,14,.92) 0%,rgba(9,20,14,.78) 45%,rgba(9,20,14,.35) 100%);}
   .screen.veil{background:rgba(6,14,10,.72);}
@@ -63,7 +67,6 @@
   .left.garage .gmenu{min-height:calc(8*(1.25em + 19px));}
   /* (the garage's column stands from the top, never re-centred: the tabs, the rows and the buttons stay put
       whatever's said below them, and only the description box grows, downward) */
-  .screen.garage .cols{align-items:flex-start;margin:0;}
   .screen.garage .cols > .right{align-self:stretch;}
   .left.garage .gfoot{display:flex;gap:10px;margin-top:10px;} .left.garage .gfoot .item{flex:1;justify-content:center;}
   .left.garage .gdesc{margin-top:12px;padding:9px 14px;min-height:4.8em;font-size:14px;line-height:1.4;color:#dbe6d4;
@@ -117,7 +120,10 @@
   @media (prefers-reduced-motion:reduce){#scTitle .press{animation:none}}
 
   /* two column menus: slanted plates on the left, detail on the right */
-  .cols{display:flex;gap:4vw;align-items:center;width:100%;max-width:1180px;margin:auto 0;}
+  /* (every menu stands from a fixed top: centred once, as it opens, and held there (placeCols), never re-centred
+      on whatever it holds this moment: picking a row whose description, card or note is longer only grows that
+      box downward, and never moves the buttons, the tabs or the other side) */
+  .cols{display:flex;gap:4vw;align-items:flex-start;width:100%;max-width:1180px;margin:0 0 auto;}
   .cols > .left{flex:0 0 min(420px,46vw);}
   .cols > .right{flex:1 1 auto;min-width:0;}
   h2.head{font-family:var(--display);font-weight:400;font-size:clamp(28px,3.4vw,44px);
@@ -461,14 +467,14 @@
     .cols > .left{flex-basis:auto;}
   }
   /* short windows: tighten the plates so long lists fit without scrolling */
-  @media (max-height:760px){
-    .menu{gap:6px;}
-    .item{padding:7px 18px 6px;font-size:clamp(15px,1.5vw,19px);}
+  @media (max-height:960px){
+    .menu{gap:5px;}
+    .item{padding:6px 18px 5px;font-size:clamp(15px,1.5vw,19px);}
     .item.back{padding:6px 16px;}
     h2.head{margin-bottom:12px;}
     .keys2{gap:4px 16px;font-size:15px;}
   }
-  @media (max-height:560px){
+  @media (max-height:640px){
     .item{padding:5px 16px 4px;}
     .menu{gap:4px;}
     .keys2{font-size:14px;gap:2px 14px;}
@@ -22078,8 +22084,31 @@ const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>
 /* a colour another player sent us: only ever a hex colour, never anything that could reach into markup */
 const safeCol = c => /^#[0-9a-f]{3,8}$/i.test(String(c || "")) ? c : "#cccccc";
 
+/* the menu's place on the screen: centred on what it holds as it opens, then held while it stays open (and
+   while it's redrawn in place, a tab or a group changed), so nothing in it ever moves as you go up and down */
+// (and the shorter of its two sides centred against the taller the same way: set as it opens, then held)
+let COLS_AT = {id:null, top:0, l:0, r:0};
+function placeCols(id, keep){
+  const scr = UIEL.firstElementChild, cols = scr && scr.querySelector(".cols");
+  if(!cols) return;
+  const L = cols.querySelector(":scope > .left"), Rt = cols.querySelector(":scope > .right");
+  if(!keep || COLS_AT.id !== id){
+    cols.style.paddingTop = "0px"; if(L) L.style.marginTop = "0px"; if(Rt) Rt.style.marginTop = "0px";
+    let l = 0, r = 0;
+    if(L && Rt && getComputedStyle(cols).flexDirection === "row" && !scr.classList.contains("garage")){
+      const d = Math.round((L.offsetHeight - Rt.offsetHeight)/2);
+      if(d > 0) r = d; else l = -d;
+    }
+    if(L) L.style.marginTop = l + "px"; if(Rt) Rt.style.marginTop = r + "px";
+    const cs = getComputedStyle(scr), room = scr.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    COLS_AT = {id, top: Math.max(0, Math.round((room - cols.offsetHeight)/2)), l, r};
+  }
+  cols.style.paddingTop = COLS_AT.top + "px";
+  if(L) L.style.marginTop = COLS_AT.l + "px"; if(Rt) Rt.style.marginTop = COLS_AT.r + "px";
+}
 function openScreen(id, html, o){
   o = o || {};
+  const again = MENU.id === id;
   UIEL.innerHTML = '<div class="screen on ' + (o.cls || "dim") + '" id="' + id + '">' + html + '</div>';
   MENU.custom = MENU.type = null;
   MENU.id = id; MENU.back = o.back || null; MENU.onSel = o.onSel || null;
@@ -22099,6 +22128,7 @@ function openScreen(id, html, o){
   GAME.ui = true;
   MENU.sel = -1;
   select(Math.min(o.sel || 0, MENU.items.length-1), true);
+  placeCols(id, again);
 }
 function closeUI(){ UIEL.innerHTML = ""; MENU.id = null; MENU.items = []; GAME.ui = false; }
 function select(i, quiet){
@@ -24440,6 +24470,7 @@ boot();
 requestAnimationFrame(frame);
 
 addEventListener("resize", ()=>{
+  if(MENU.id) placeCols(MENU.id, false);
   camera.aspect = window.innerWidth/window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
