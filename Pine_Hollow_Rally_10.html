@@ -22919,7 +22919,7 @@ function netPingTick(){
   NET.peers.forEach(p=>{ if(p.open && p.dc && p.dc.readyState === "open"){ try{ p.dc.send(JSON.stringify({k:"pping", from:NET.id, to:p.id, t0:now})); }catch(e){} } });
   // and how smooth your own picture is, for the lobby (sent when it changes by much)
   const P = GFX.prof, fps = P && P.frame > 0 ? Math.round(Math.min(240, 1000/P.frame)) : 0;
-  if(fps && Math.abs(fps - (NET.fps || 0)) >= 8){ NET.fps = fps; netTrackMe(); }
+  if(fps && Math.abs(fps - (NET.fps || 0)) >= 8){ NET.fps = fps; netTrackMe(true); }
 }
 function netClockMsg(p, m){
   if(m.k === "pping" && m.to === NET.id && p){ try{ p.dc.send(JSON.stringify({k:"ppong", from:NET.id, to:m.from, t0:m.t0})); }catch(e){} return; }
@@ -22963,7 +22963,7 @@ async function netClient(){
    same calls over a BroadcastChannel between tabs of one browser, for testing. */
 // (every event anyone sends must be here: the room only passes on the ones it was told to listen for. "go" was
 //  missing, so when the host started on another circuit their friends never heard and the host raced alone)
-const NET_EVENTS = ["sig", "start", "go", "track", "fin", "pos", "abort", "chat", "bye", "tping", "tpong"];
+const NET_EVENTS = ["sig", "start", "go", "track", "fin", "pos", "abort", "chat", "bye", "tping", "tpong", "meta"];
 /* how long a friend who has dropped out of the room's presence is kept (as "reconnecting") before they
    count as gone: a blink in the room (a reconnect, a presence update that lands as a leave and a join)
    must not throw anyone out. Leaving on purpose says "bye", and that drops them at once. */
@@ -23001,6 +23001,21 @@ async function netTransport(code, meta, h){
      comes back you are put back in the room's presence, as you are now. */
   const topic = "pine-" + code;
   let mine = meta, live = false, dead = false, ch = null, retry = null, tries = 0, selfT = 0;
+  /* The room server lets each player update their presence at most 5 times in any 30 seconds, and shuts the
+     channel of anyone who goes over (and with it every word sent while it's down: a start, a "go"). So
+     presence goes out at most 4 times in 31 seconds, at least a second and a half apart, the latest state
+     only, rejoins included; everything quicker travels as a broadcast ("meta"), see netTrackMe. */
+  const P_MAX = 4, P_WIN = 31000, P_GAP = 1500;
+  let pLog = [], pTimer = null;
+  const pushTrack = ()=>{
+    clearTimeout(pTimer); pTimer = null;
+    if(dead || !live || !ch) return;
+    const now = performance.now(); pLog = pLog.filter(t=> now - t < P_WIN);
+    const last = pLog.length ? pLog[pLog.length - 1] : -1e9;
+    const wait = pLog.length >= P_MAX ? P_WIN - (now - pLog[0]) + 60 : Math.max(0, P_GAP - (now - last));
+    if(wait > 0){ pTimer = setTimeout(pushTrack, wait); return; }
+    pLog.push(now); ch.track(mine);
+  };
   const open = ()=>{
     const c = ch = sb.channel(topic, { config:{ broadcast:{ self:false, ack:false }, presence:{ key:NET.id } } });
     NET_EVENTS.forEach(ev=> c.on("broadcast", {event:ev}, msg=>{ if(c === ch) h.event(ev, msg.payload); }));
@@ -23009,11 +23024,11 @@ async function netTransport(code, meta, h){
       const st = c.presenceState();
       h.sync(Object.keys(st).map(k=> st[k][st[k].length - 1]).filter(Boolean));
       // (the room has lost us while the channel stayed up: put us back)
-      if(live && !st[NET.id] && performance.now() - selfT > 4000){ selfT = performance.now(); c.track(mine); }
+      if(live && !st[NET.id] && performance.now() - selfT > 8000 && !pTimer){ selfT = performance.now(); pushTrack(); }
     });
     c.subscribe(status=>{
       if(dead || c !== ch) return;
-      if(status === "SUBSCRIBED"){ live = true; tries = 0; selfT = performance.now(); c.track(mine); h.ready(); }
+      if(status === "SUBSCRIBED"){ live = true; tries = 0; selfT = performance.now(); pushTrack(); h.ready(); }
       else if(status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED"){ live = false; h.error(status); heal(status === "CLOSED" ? 1500 : 8000); }
     });
   };
@@ -23032,10 +23047,10 @@ async function netTransport(code, meta, h){
   open();
   return {
     send: (event, payload)=>{ if(live && ch) ch.send({type:"broadcast", event, payload}); },
-    track: m=>{ mine = m; if(live && ch) ch.track(m); },
+    track: m=>{ mine = m; pushTrack(); },
     leave: travel=>{
       if(dead) return;
-      dead = true; clearTimeout(retry);
+      dead = true; clearTimeout(retry); clearTimeout(pTimer);
       const c = ch; ch = null; if(!c) return;
       try{ if(live) c.send({type:"broadcast", event:"bye", payload:{from:NET.id, travel:!!travel}}); }catch(e){}
       NET_GONE = Promise.resolve(sb.removeChannel(c)).catch(()=>{}).then(()=>{
@@ -23075,7 +23090,7 @@ function netSendChat(){
 }
 function netMeta(){
   // (and the wagon you built in the garage, so your friends see you in it)
-  return { id:NET.id, name:NET.name, paint:NET_PAINT(), host:NET.host, track:TRACK_ID, pick:NET.pick, racing:NET.racing, at:NET.joinedAt, car:carOpts(), ready:!!NET.ready, garage:!!NET.inGarage, auto:NET.auto ? NET.auto.n : 0, fps:NET.fps || 0,
+  return { id:NET.id, seq:NET.metaSeq || 0, name:NET.name, paint:NET_PAINT(), host:NET.host, track:TRACK_ID, pick:NET.pick, racing:NET.racing, at:NET.joinedAt, car:carOpts(), ready:!!NET.ready, garage:!!NET.inGarage, auto:NET.auto ? NET.auto.n : 0, fps:NET.fps || 0,
            // (the host's race, for anyone whose page missed the word to start: they join it from this)
            race: NET.racing && NET.race && netIsHost() ? NET.race : null };
 }
@@ -23087,7 +23102,7 @@ async function netJoin(code, opts){
                        auto: opts.auto ? {n:opts.auto, t:performance.now()} : null });
   clearInterval(NET.autoTimer); NET.autoTimer = setInterval(netAutoStart, 200);
   NET.clk = {off:0, n:0, best:0, s:[]};
-  NET.chat = []; NET.ready = false; NET.draft = ""; NET.gone = new Set();
+  NET.chat = []; NET.ready = false; NET.draft = ""; NET.gone = new Set(); NET.live = new Map(); NET.presList = null; NET.metaSeq = 0;
   try{ const c = JSON.parse(sessionStorage.getItem("pinehollow.chat") || "null"); sessionStorage.removeItem("pinehollow.chat");
        if(c && c.code === code && Array.isArray(c.chat)) NET.chat = c.chat.slice(-40); }catch(e){}
   try{ history.replaceState(null, "", "#track=" + TRACK_ID + "&room=" + code + (NET.mock ? "&mocknet=1" : "")); }catch(e){}
@@ -23160,6 +23175,10 @@ function netIsHost(){ return netHostId() === NET.id; }
 /* friends who have dropped out of the room's presence but not left: reconnecting, still in the room */
 function netAway(){ const out = []; NET.peers.forEach(p=>{ if(p.missing && p.meta) out.push(Object.assign({}, p.meta, {away:true})); }); return out; }
 function netSync(list){
+  NET.presList = list;
+  // (each friend as the room's presence has them, or as their own latest word has them, whichever is newer)
+  const L = NET.live;
+  list = list.map(m=>{ const w = m && L && L.get(m.id); return w && (w.seq || 0) > (m.seq || 0) ? w : m; });
   NET.metas = list.filter(m=> m && m.id && !(NET.gone && NET.gone.has(m.id))).slice(0, NET_CFG.max + 2);
   const ids = new Set(NET.metas.map(m=> m.id));
   // new faces: a car for each, and a direct line to them
@@ -23236,6 +23255,8 @@ function netAddPeer(m){
               sx:0, sy:0, sz:0, sh:0, sp:0, sr:0, pend:[], carKey:JSON.stringify(m.car || null) };
   NET.peers.set(m.id, p);
   if(!NET.starting) netSys((m.name || "A friend") + " joined");
+  // (a newcomer hears where everyone is up to straight away, not when the room's slower record catches up)
+  netTrackMe(true);
   // back mid-race (their connection hiccuped): straight back into the field
   if(NET.racing && !m.spectate){ FIELD = FIELD.concat([car]); mesh.visible = true; }
   if(NET.id < m.id) netCall(p);                        // one side of each pair makes the offer
@@ -23316,6 +23337,14 @@ function netEvent(ev, d){
   if(ev === "sig") return netSignal(d);
   if(ev === "tping" || ev === "tpong") return netClockMsg(null, Object.assign({}, d, {k:ev}));
   if(ev === "pos"){ const p = NET.peers.get(d.from); if(p){ p.relay = p.relay || !p.open; netPose(p, d); } return; }
+  if(ev === "meta"){
+    if(typeof d.id !== "string" || d.id === NET.id) return;
+    const L = NET.live || (NET.live = new Map()), had = L.get(d.id);
+    if(had && (had.seq || 0) >= (d.seq || 0)) return;
+    L.set(d.id, d);
+    if(NET.presList) netSync(NET.presList);
+    return;
+  }
   if(ev === "bye" && typeof d.from === "string"){
     if(NET.gone) NET.gone.add(d.from);
     NET.metas = NET.metas.filter(m=> m.id !== d.from);
@@ -23425,12 +23454,17 @@ function netStart(){
 /* Tell the room what you are and what you drive. Every tweak in the garage lands here, and the room
    server throws out a client that floods it with presence updates (that was what took players out of the
    lobby from the garage): so at most one update a second, and the latest state always goes out. */
-function netTrackMe(){
+function netTrackMe(quiet){
   if(!NET.tx) return;
-  const now = performance.now(), gap = 1000, since = now - (NET.trackAt || -1e9);
-  clearTimeout(NET.trackTimer); NET.trackTimer = null;
-  const send = ()=>{ NET.trackTimer = null; NET.trackAt = performance.now(); if(NET.tx) NET.tx.track(netMeta()); };
-  if(since >= gap) send(); else NET.trackTimer = setTimeout(send, gap - since);
+  NET.metaSeq = (NET.metaSeq || 0) + 1;
+  // (a burst of changes, a few garage clicks, goes out as one word a moment later)
+  clearTimeout(NET.trackTimer);
+  NET.trackTimer = setTimeout(()=>{
+    NET.trackTimer = null; if(!NET.tx) return;
+    const m = netMeta();
+    NET.tx.send("meta", m);                       // everyone, now
+    if(!quiet) NET.tx.track(m);                   // the room's own record, as the server allows (see netTransport)
+  }, 120);
 }
 /* a grid slot's spot on this circuit, the same way placeAtStart puts you there */
 function netGridPose(slot){
