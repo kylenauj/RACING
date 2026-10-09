@@ -22961,7 +22961,9 @@ async function netClient(){
 /* ---- the channel: presence + a handful of events ----
    The real one is Supabase Realtime. The stand-in (#mocknet=1) runs the
    same calls over a BroadcastChannel between tabs of one browser, for testing. */
-const NET_EVENTS = ["sig", "start", "track", "fin", "pos", "abort", "chat", "bye", "tping", "tpong"];
+// (every event anyone sends must be here: the room only passes on the ones it was told to listen for. "go" was
+//  missing, so when the host started on another circuit their friends never heard and the host raced alone)
+const NET_EVENTS = ["sig", "start", "go", "track", "fin", "pos", "abort", "chat", "bye", "tping", "tpong"];
 /* how long a friend who has dropped out of the room's presence is kept (as "reconnecting") before they
    count as gone: a blink in the room (a reconnect, a presence update that lands as a leave and a join)
    must not throw anyone out. Leaving on purpose says "bye", and that drops them at once. */
@@ -22979,7 +22981,7 @@ async function netTransport(code, meta, h){
       const m = e.data;
       if(m.k === "pres"){ const had = seen.has(m.from); seen.set(m.from, {meta:m.meta, t:performance.now()}); if(!had) hello(); sync(); }
       else if(m.k === "bye"){ seen.delete(m.from); h.event("bye", {from:m.from, travel:!!m.travel}); sync(); }
-      else if(m.k === "ev") h.event(m.event, m.payload);
+      else if(m.k === "ev" && NET_EVENTS.includes(m.event)) h.event(m.event, m.payload);   // (only what the real room listens for)
     };
     const tick = setInterval(()=>{ hello(); const now = performance.now(); let gone = false;
       for(const [id, v] of seen) if(now - v.t > 12000){ seen.delete(id); gone = true; }
@@ -23109,12 +23111,19 @@ function netAutoStart(){
     const fresh = [...NET.peers.values()].filter(p=> performance.now() - p.since < 5000).length;
     if(fresh !== NET.freshN){ NET.freshN = fresh; if(!NET.auto) netRefresh(); }
   }
+  /* in the lobby with the host's race under way: keep trying to join it (it waits on our clock being set by
+     the host's, and the room only says something when someone's state changes, which may not be soon) */
+  if(NET.on && MENU.id === "scLobby" && !NET.racing){
+    const hm = NET.metas.find(m=> m.id === netHostId() && m.id !== NET.id);
+    if(hm && hm.racing && hm.track === TRACK_ID) netCatchRace(hm);
+  }
   if(NET.on && MENU.id === "scStarting" && NET.starting && !NET.racing){
     const hm = NET.metas.find(m=> m.id === netHostId() && m.id !== NET.id);
     const waited = (performance.now() - NET.starting.t)/1000;
-    if(hm && hm.racing && hm.track === TRACK_ID && waited > 4){
+    if(hm && hm.racing && hm.track === TRACK_ID){
       netCatchRace(hm);
-      if(!NET.racing && waited > 8){ NET.starting = null; netSys("The race started too long before your circuit had loaded: you're in the next one"); showLobby(); }
+      // (only once it's settled that the race is too far gone: not while our clock is still being set)
+      if(!NET.racing && hm.race && NET.raceK === hm.race.k){ NET.starting = null; netSys("The race started too long before your circuit had loaded: you're in the next one"); showLobby(); }
     }
     else if(waited > 90 && !(hm && hm.auto)){ NET.starting = null; netSys("The start was called off"); showLobby(); }
   }
@@ -23141,7 +23150,8 @@ function netLeave(quiet){
 }
 /* the one who made the room runs it; if they have gone, whoever has been in it longest */
 function netHostId(){
-  let all = NET.metas.some(m=> m.id === NET.id) ? NET.metas : NET.metas.concat([netMeta()]);
+  // (ourselves as the room will see us: only what the choice needs, since netMeta asks who the host is)
+  let all = NET.metas.some(m=> m.id === NET.id) ? NET.metas : NET.metas.concat([{id:NET.id, host:NET.host, at:NET.joinedAt}]);
   all = all.concat(netAway().filter(m=> !all.some(a=> a.id === m.id)));
   const list = all.slice().sort((a, b)=> (b.host - a.host) || (a.at - b.at) || (a.id < b.id ? -1 : 1));
   return list.length ? list[0].id : NET.id;
@@ -23187,8 +23197,12 @@ function netCatchRace(hostM){
   if(!NET.on || NET.racing || !hostM || hostM.id === NET.id || !hostM.racing || !hostM.race || hostM.track !== TRACK_ID) return;
   const R = hostM.race; if(!R.k || R.k === NET.raceK || !Array.isArray(R.grid) || typeof R.goAt !== "number") return;
   if(MENU.id !== "scStarting" && MENU.id !== "scLobby" && !GAME.garage) return;
-  const hostNow = netNow() + (NET.clk && NET.clk.n > 0 ? NET.clk.off : 0);
-  if(hostNow - R.goAt > 45000){ NET.raceK = R.k; return; }
+  /* how long ago the lights went out, on the host's clock: never judged before our clock has been set by the
+     host's (two machines' clocks can be minutes apart, and a friend just arrived was being told the race had
+     started minutes ago and shut out of it); until then, wait: the next word from the room tries again */
+  if(!(NET.clk && NET.clk.n > 0)) return;
+  const hostNow = netNow() + NET.clk.off;
+  if(hostNow - R.goAt > 60000){ NET.raceK = R.k; return; }
   netSys("Joining the race already under way");
   netBegin(R.grid, R.goAt, R.k);
 }
