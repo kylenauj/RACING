@@ -9993,21 +9993,60 @@ if(SWAMPGP || JUNGLE){
     }
   }
 }
-/* the boardwalk's rails: a car that runs out to the edge of the deck is held on it, and bounces off */
+/* ---- touching a wall: one way for every wall, rail, parapet and trunk in the game ----
+   (nx, nz): the way into the wall, a unit vector; over: how far the car is into it. A glancing touch keeps
+   the car going along the wall (a scrape that costs more the harder it went in, a small knock off it) and
+   turns its nose along the wall, so it slides on instead of nosing back in and grinding to a stop; a hit
+   nearer head on stops it and knocks it back. o.sound: "scrape" or "bump" (default). */
+function wallTouch(nx, nz, over, o){
+  o = o || {};
+  /* (called within a hand's breadth of the wall as well as in it: just off it, straight after a touch, the
+     nose is still eased along it, so steering into the wall doesn't nod it in and out) */
+  const now = performance.now(), held = now - (GAME.wallAt || -1e9) < 90;
+  if(over > 0){ pose.x -= nx*over; pose.z -= nz*over; GAME.wallAt = now; }
+  else if(!held) return 0;
+  const tx = -nz, tz = nx;                                 // along it
+  const vn = pose.vx*nx + pose.vz*nz;                      // how fast into the wall
+  let vt = pose.vx*tx + pose.vz*tz;
+  const glance = held || vn <= 0 || Math.atan2(vn, Math.abs(vt)) < 1.05;      // under 60 degrees in
+  // the nose along the wall, the way the car is going, left a few degrees in so it still reads as a scrape:
+  // swung round over a few frames on the knock, then eased there every moment it's against the wall
+  // (so steering into the wall settles into a steady angle instead of nodding in and out)
+  if(glance && Math.abs(vt) > 1 && Math.sin(pose.h)*pose.vx + Math.cos(pose.h)*pose.vz >= 0){
+    const sg = vt >= 0 ? 1 : -1, want = Math.atan2(tx*sg, tz*sg), keep = 0.1;
+    let dev = pose.h - want; while(dev > Math.PI) dev -= 2*Math.PI; while(dev < -Math.PI) dev += 2*Math.PI;
+    const into = Math.sin(pose.h)*nx + Math.cos(pose.h)*nz;
+    if(into > Math.sin(keep) && Math.abs(dev) > keep){
+      const d = Math.sign(dev)*keep - dev;
+      pose.h += held ? d*0.45 : Math.sign(d)*Math.min(Math.abs(d), 0.14);
+    }
+  }
+  if(vn <= 0 || over <= 0) return 0;
+  if(glance){
+    vt *= held ? 0.9965 : 1 - Math.min(0.35, vn*0.02);    // (held: a fifth of the speed a second; the knock: more the harder in)
+    const off = held ? 0 : Math.min(1.2, vn*0.12);
+    pose.vx = tx*vt - nx*off; pose.vz = tz*vt - nz*off;
+  } else {
+    pose.vx -= nx*vn*1.25; pose.vz -= nz*vn*1.25;
+    pose.vx *= 0.85; pose.vz *= 0.85;
+  }
+  if(vn > 1.5 && (GAME.bumpCool || 0) <= 0){
+    if(o.sound === "scrape" || held) SFX.scrape(Math.min(1, vn/10 + 0.3)); else SFX.bump(vn*(glance ? 0.6 : 1));
+    if(!held) GAME.shake = Math.max(GAME.shake || 0, Math.min(glance ? 0.25 : 0.5, vn*(glance ? 0.03 : 0.05)));
+    GAME.bumpCool = 0.3;
+  }
+  return vn;
+}
+/* the boardwalk's rails: a car that runs out to the edge of the deck is held on it, and slides along */
 function swampStep(dt){
   if(!BOARDWALKS.length || pose.air) return;
   const n = nearest(pose.x, pose.z);
   if(n.path !== MAIN || !(MAIN.bwk[n.pi] > 0.6)) return;
   const i = n.pi, p = MAIN.pts[i], t = MAIN.tans[i], nx = -t.z, nz = t.x;
   const l = (pose.x - p.x)*nx + (pose.z - p.z)*nz, lim = MAIN.half[i] - 0.45;
-  if(Math.abs(l) <= lim) return;
-  const sd = Math.sign(l), over = Math.abs(l) - lim;
-  pose.x -= nx*sd*over; pose.z -= nz*sd*over;
-  const vn = (pose.vx*nx + pose.vz*nz)*sd;
-  if(vn > 0){
-    pose.vx -= nx*sd*vn*1.3; pose.vz -= nz*sd*vn*1.3;
-    if(vn > 2.5 && (GAME.bumpCool || 0) <= 0){ SFX.bump(vn*0.6); GAME.shake = Math.max(GAME.shake || 0, Math.min(0.3, vn*0.03)); GAME.bumpCool = 0.3; }
-  }
+  if(Math.abs(l) <= lim - 0.25) return;
+  const sd = Math.sign(l);
+  wallTouch(nx*sd, nz*sd, Math.abs(l) - lim);
 }
 
 /* what the road is made of where it is not the road: the Spring Cup's planks (a wooden bridge's deck) and
@@ -10025,16 +10064,9 @@ function railStep(dt){
   if(n.path !== MAIN || !(MAIN.rail[n.pi] > 0.5)) return;
   const i = n.pi, p = MAIN.pts[i], t = MAIN.tans[i], nx = -t.z, nz = t.x;
   const l = (pose.x - p.x)*nx + (pose.z - p.z)*nz, lim = MAIN.half[i] - 0.5;
-  if(Math.abs(l) <= lim) return;
-  const sd = Math.sign(l), over = Math.abs(l) - lim;
-  pose.x -= nx*sd*over; pose.z -= nz*sd*over;
-  const vn = (pose.vx*nx + pose.vz*nz)*sd;
-  if(vn > 0){
-    // (a glancing blow: the car is turned along the wall with only a little bounce, and scraping costs a little speed)
-    pose.vx -= nx*sd*vn*1.12; pose.vz -= nz*sd*vn*1.12;
-    const k = Math.max(0.94, 1 - vn*0.008); pose.vx *= k; pose.vz *= k;
-    if(vn > 2.5 && (GAME.bumpCool || 0) <= 0){ SFX.bump(vn*0.6); GAME.shake = Math.max(GAME.shake || 0, Math.min(0.3, vn*0.03)); GAME.bumpCool = 0.3; }
-  }
+  if(Math.abs(l) <= lim - 0.25) return;
+  const sd = Math.sign(l);
+  wallTouch(nx*sd, nz*sd, Math.abs(l) - lim, {sound:"scrape"});
 }
 
 /* ==== GATOR GULCH: the swamp theme park ==================================
@@ -19459,12 +19491,7 @@ function stepCarInner(dt){
       const nx2 = -tB.z, nz2 = tB.x;
       const lat = (pose.x - pB.x)*nx2 + (pose.z - pB.z)*nz2;
       const lim = nB.half + 0.95;
-      if(Math.abs(lat) > lim){
-        const push = (Math.abs(lat) - lim)*Math.sign(lat);
-        pose.x -= nx2*push; pose.z -= nz2*push;
-        const vn = pose.vx*nx2 + pose.vz*nz2;
-        pose.vx -= nx2*vn*1.35; pose.vz -= nz2*vn*1.35;   // scrub along the stone
-      }
+      if(Math.abs(lat) > lim - 0.25){ const sd = Math.sign(lat); wallTouch(nx2*sd, nz2*sd, Math.abs(lat) - lim, {sound:"scrape"}); }   // (along the stone)
     }
   }
 
@@ -19475,14 +19502,7 @@ function stepCarInner(dt){
     if(f && pose.y > pathY(f[0].P, f[1]) + BED - 2.5){
       const P = f[0].P, j = wrapIdx(P, Math.round(f[1])), pB = P.pts[j], tB = P.tans[j];
       const nx2 = -tB.z, nz2 = tB.x, lat = (pose.x - pB.x)*nx2 + (pose.z - pB.z)*nz2, lim = f[3] + (f[0].giant ? 0.2 : 0.55);   // (on the giant: the car's flank at the moss)
-      if(Math.abs(lat) > lim){
-        const push = (Math.abs(lat) - lim)*Math.sign(lat);
-        pose.x -= nx2*push; pose.z -= nz2*push;
-        const vn = pose.vx*nx2 + pose.vz*nz2;
-        if(vn*Math.sign(lat) > 0){ pose.vx -= nx2*vn*1.35; pose.vz -= nz2*vn*1.35; }
-        if(Math.abs(vn) > 4) GAME.shake = Math.max(GAME.shake || 0, 0.14);
-        if(Math.abs(vn) > 1.5 && (AUD.scrapeT || 0) < now0()){ SFX.bump(Math.abs(vn)*0.6); AUD.scrapeT = now0() + 0.3; }
-      }
+      if(Math.abs(lat) > lim - 0.25){ const sd = Math.sign(lat); wallTouch(nx2*sd, nz2*sd, Math.abs(lat) - lim); }
     }
   }
   /* The treetop decks have rails: ropes on the bridges, timber round the platforms. A glancing touch is
@@ -19495,37 +19515,30 @@ function stepCarInner(dt){
     const vr = pose.vx*ux + pose.vz*uz, rim = plat.R - 1.15;
     // (no rim across the plank way: it runs straight through, between the gateposts, onto the bridge)
     const way = skyAt(pose.x, pose.z, 2.5), onWay = !!way && Math.abs(way.lat) < way.half + 0.9;
-    if(d > rim && !onWay && (GAME.railGone || 0) <= 0){
-      if(vr > 13){ GAME.railGone = 1.2; GAME.shake = Math.max(GAME.shake || 0, 0.35); SFX.bump(vr*0.8); if(actx) burst(0.25, "bandpass", 900, 0.35, 2, 0, 400); }
-      else { pose.x = plat.x + ux*rim; pose.z = plat.z + uz*rim; if(vr > 0){ pose.vx -= ux*vr*1.3; pose.vz -= uz*vr*1.3; if(vr > 3){ SFX.bump(vr*0.6); GAME.shake = Math.max(GAME.shake || 0, Math.min(0.4, vr*0.04)); } } }
+    if(d > rim - 0.25 && !onWay && (GAME.railGone || 0) <= 0){
+      if(d > rim && vr > 13){ GAME.railGone = 1.2; GAME.shake = Math.max(GAME.shake || 0, 0.35); SFX.bump(vr*0.8); if(actx) burst(0.25, "bandpass", 900, 0.35, 2, 0, 400); }
+      else wallTouch(ux, uz, d - rim);
     }
     const solid = [[plat.x, plat.z, plat.rd + 1.25]].concat(plat.obst);
     for(const o of solid){
       const ex = pose.x - o[0], ez = pose.z - o[1], e = Math.hypot(ex, ez), lim = o[2];
-      if(e < lim && e > 0.01){ const qx = ex/e, qz = ez/e; pose.x = o[0] + qx*lim; pose.z = o[1] + qz*lim;
-        const vn = pose.vx*qx + pose.vz*qz; if(vn < 0){ pose.vx -= qx*vn*1.4; pose.vz -= qz*vn*1.4; if(-vn > 3){ SFX.bump(-vn); GAME.shake = Math.max(GAME.shake || 0, Math.min(0.5, -vn*0.05)); } } }
+      if(e < lim + 0.25 && e > 0.01) wallTouch(-ex/e, -ez/e, lim - e);
     }
   }
   if(CANOPY.length && !pose.air && !(plat && pose.y > plat.y - 1.6)){
     const k = skyAt(pose.x, pose.z, 3.2);
     if(k && MAIN.sky[k.i] && pose.y > k.y - 1.6 && !k.gap){
       const lim = k.half + 0.45, al = Math.abs(k.lat);
-      if(al > lim && (GAME.railGone || 0) <= 0){
+      if(al > lim - 0.25 && (GAME.railGone || 0) <= 0){
         const t = MAIN.tans[k.i], nx2 = -t.z, nz2 = t.x, sd = Math.sign(k.lat), vn = (pose.vx*nx2 + pose.vz*nz2)*sd;
         const give = MAIN.skyPlat[k.i] ? 13 : 9.5;
-        if(vn > give){
+        if(al > lim && vn > give){
           // through the rail: a crack of splintering wood, and nothing more to hold you
           GAME.railGone = 1.2; GAME.shake = Math.max(GAME.shake || 0, 0.35); SFX.bump(vn*0.8);
           if(actx){ burst(0.25, "bandpass", 900, 0.35, 2, 0, 400); burst(0.12, "highpass", 2400, 0.2, 1.4, 0.04); }
           for(let n=0;n<14;n++) spawnDust(pose.x + nx2*sd*1.2, pose.y + 0.6, pose.z + nz2*sd*1.2, [0.42, 0.3, 0.18], 0.5,
                                           pose.vx*0.3 + (Math.random() - 0.5)*4, pose.vz*0.3 + (Math.random() - 0.5)*4, 2 + Math.random()*4);
-        } else {
-          const push = (al - lim)*sd; pose.x -= nx2*push; pose.z -= nz2*push;
-          if(vn > 0){ pose.vx -= nx2*vn*sd*1.3; pose.vz -= nz2*vn*sd*1.3; }
-          pose.vx *= 0.996; pose.vz *= 0.996;
-          if(vn > 4) GAME.shake = Math.max(GAME.shake || 0, 0.14);
-          if(vn > 1.5 && (AUD.scrapeT || 0) < now0()){ SFX.bump(vn*0.6); AUD.scrapeT = now0() + 0.3; }
-        }
+        } else wallTouch(nx2*sd, nz2*sd, al - lim);
       }
     }
   }
@@ -19548,15 +19561,7 @@ function stepCarInner(dt){
         const lat = (pose.x - pW.x)*nx2 + (pose.z - pW.z)*nz2;
         let lim = nW.half + (inGal ? 1.0 : 1.7);
         if(inCan){ const uv = canyonUV(pose.x, pose.z); if(uv) lim = Math.min(lim, canyonFoot(uv[1]) - 1.9); }
-        if(Math.abs(lat) > lim){
-          const push = (Math.abs(lat) - lim)*Math.sign(lat);
-          pose.x -= nx2*push; pose.z -= nz2*push;
-          const vn = pose.vx*nx2 + pose.vz*nz2;
-          if(vn*Math.sign(lat) > 0){ pose.vx -= nx2*vn*1.3; pose.vz -= nz2*vn*1.3; }
-          pose.vx *= 0.995; pose.vz *= 0.995;
-          if(Math.abs(vn) > 4) GAME.shake = Math.max(GAME.shake || 0, 0.12);
-          if(Math.abs(vn) > 1.5 && (AUD.scrapeT || 0) < now0()){ SFX.scrape(Math.min(1, Math.abs(vn)/10 + 0.3)); AUD.scrapeT = now0() + 0.3; }
-        }
+        if(Math.abs(lat) > lim - 0.25){ const sd = Math.sign(lat); wallTouch(nx2*sd, nz2*sd, Math.abs(lat) - lim, {sound:"scrape"}); }
       }
     }
   }
@@ -19568,43 +19573,24 @@ function stepCarInner(dt){
       if(n.path !== MAIN || n.pi < T.a || n.pi > T.b) continue;
       const pB = MAIN.pts[n.pi], tB = MAIN.tans[n.pi], nx2 = -tB.z, nz2 = tB.x;
       const lat = (pose.x - pB.x)*nx2 + (pose.z - pB.z)*nz2, lim = MAIN.half[n.pi] + 1.6;
-      if(Math.abs(lat) > lim){
-        const push = (Math.abs(lat) - lim)*Math.sign(lat); pose.x -= nx2*push; pose.z -= nz2*push;
-        const vn = pose.vx*nx2 + pose.vz*nz2;
-        if(vn*Math.sign(lat) > 0){ pose.vx -= nx2*vn*1.3; pose.vz -= nz2*vn*1.3; }
-        if(Math.abs(vn) > 1.5 && (AUD.scrapeT || 0) < now0()){ SFX.scrape(Math.min(1, Math.abs(vn)/10 + 0.3)); AUD.scrapeT = now0() + 0.3; }
-      }
+      if(Math.abs(lat) > lim - 0.25){ const sd = Math.sign(lat); wallTouch(nx2*sd, nz2*sd, Math.abs(lat) - lim, {sound:"scrape"}); }
     }
   }
   // a divider between two routes is solid too
   for(const I of ISLANDS){
     const dx = pose.x - I.x, dz = pose.z - I.z, d = Math.hypot(dx, dz), lim = I.r + 1.2;
-    if(d < lim && d > 0.01){
-      const ux = dx/d, uz = dz/d; pose.x = I.x + ux*lim; pose.z = I.z + uz*lim;
-      const vn = pose.vx*ux + pose.vz*uz;
-      if(vn < 0){ pose.vx -= ux*vn*1.4; pose.vz -= uz*vn*1.4; if(-vn > 3){ SFX.bump(-vn); GAME.shake = Math.max(GAME.shake || 0, Math.min(0.5, -vn*0.05)); } }
-    }
+    if(d < lim + 0.25 && d > 0.01) wallTouch(-dx/d, -dz/d, lim - d);
   }
   // the rainforest giants' trunks, down on the ground: solid, flare and all
   if(JUNGLE_GIANTS.length) for(const G of JUNGLE_GIANTS){
     if(pose.y > G.y0 + 12) continue;
     const dx = pose.x - G.x, dz = pose.z - G.z, d = Math.hypot(dx, dz), lim = G.r*1.45 + 1.2;
-    if(d < lim && d > 0.01){
-      const ux = dx/d, uz = dz/d; pose.x = G.x + ux*lim; pose.z = G.z + uz*lim;
-      const vn = pose.vx*ux + pose.vz*uz;
-      if(vn < 0){ pose.vx -= ux*vn*1.4; pose.vz -= uz*vn*1.4; if(-vn > 3){ SFX.bump(-vn); GAME.shake = Math.max(GAME.shake || 0, Math.min(0.5, -vn*0.05)); } }
-    }
+    if(d < lim + 0.25 && d > 0.01) wallTouch(-dx/d, -dz/d, lim - d);
   }
   // the oak's trunk is solid: glance off it
   if(GIANT.on){
     const dx = pose.x - GIANT.x, dz = pose.z - GIANT.z, d = Math.hypot(dx, dz), lim = GIANT.trunk + 2.4;
-    if(d < lim && d > 0.01){
-      const ux = dx/d, uz = dz/d;
-      pose.x = GIANT.x + ux*lim; pose.z = GIANT.z + uz*lim;
-      const vn = pose.vx*ux + pose.vz*uz;
-      if(vn < 0){ pose.vx -= ux*vn*1.4; pose.vz -= uz*vn*1.4;
-        if(-vn > 3){ SFX.bump(-vn); GAME.shake = Math.max(GAME.shake || 0, Math.min(0.5, -vn*0.05)); } }
-    }
+    if(d < lim + 0.25 && d > 0.01) wallTouch(-dx/d, -dz/d, lim - d);
   }
   // vertical: integrate against the ground so crests actually launch the car
   const gy = surfaceY(pose.x, pose.z);
