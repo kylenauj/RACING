@@ -21207,7 +21207,13 @@ function showTouch(){
   const el = document.getElementById("touch");
   if(el) el.classList.toggle("on", TOUCH.on && !GAME.ui && state.phase !== "menu" && state.phase !== "done");
 }
-const PAD = { prev:[], navT:0, navDir:"" };
+const PAD = { prev:[], navT:0, navDir:"", stick:"", wasUi:false };
+/* where the mouse last really moved: a row only takes the selection from the mouse when the mouse moved
+   onto it, not when the screen was redrawn or scrolled under a pointer that is sitting still (which, with
+   a controller or the keys in hand, snatched the selection to wherever the pointer happened to be) */
+const MOUSE = { t:-1e9, x:0, y:0 };
+addEventListener("mousemove", e=>{ if(Math.abs(e.clientX - MOUSE.x) + Math.abs(e.clientY - MOUSE.y) > 2){ MOUSE.t = performance.now(); MOUSE.x = e.clientX; MOUSE.y = e.clientY; } }, {passive:true, capture:true});
+const mouseMoved = ()=> performance.now() - MOUSE.t < 150;
 function pollInput(dt){
   let thr = (held("KeyW")||held("ArrowUp")) ? 1 : 0;
   let brk = (held("KeyS")||held("ArrowDown")) ? 1 : 0;
@@ -21241,17 +21247,23 @@ function pollInput(dt){
       if(hit(5)) manualShift(+1);
       if(hit(4)) manualShift(-1);
     } else {
-      // menus: d-pad or stick, with key-repeat style timing
-      let dir = "";
-      if(down(12) || ay < -0.55) dir = "up";
-      else if(down(13) || ay > 0.55) dir = "down";
-      else if(down(14) || ax < -0.55) dir = "left";
-      else if(down(15) || ax > 0.55) dir = "right";
+      /* menus: the d-pad, or the stick read the way it's pushed (its stronger axis, and with a gap between
+         pushing in and letting go, so one held near the edge doesn't flicker into a run of presses); held,
+         it repeats after a pause at a pace you can follow */
+      let st = PAD.stick;
+      const mag = Math.max(Math.abs(ax), Math.abs(ay));
+      if(mag < 0.35) st = "";
+      else if(mag > 0.6 || st) st = Math.abs(ay) >= Math.abs(ax) ? (ay < 0 ? "up" : "down") : (ax < 0 ? "left" : "right");
+      PAD.stick = st;
+      let dir = down(12) ? "up" : down(13) ? "down" : down(14) ? "left" : down(15) ? "right" : st;
+      // (coming into a menu with the stick or pad still held from the race: nothing until it's let go)
+      if(!PAD.wasUi){ PAD.navDir = dir; PAD.navT = 1e9; }
       if(dir){
         PAD.navT -= dt;
         if(dir !== PAD.navDir || PAD.navT <= 0){
           menuNav(dir);
-          PAD.navT = dir === PAD.navDir ? 0.11 : 0.38;
+          const sideways = dir === "left" || dir === "right";
+          PAD.navT = dir === PAD.navDir ? (sideways ? 0.2 : 0.15) : 0.42;
         }
       }
       PAD.navDir = dir;
@@ -21261,6 +21273,7 @@ function pollInput(dt){
       if(MENU.id === "scGarage" && MENU.garage){ if(hit(4)) garageTab(-1); if(hit(5)) garageTab(1); }
     }
     PAD.prev = gp.buttons.map(x => x.value > 0.5);
+    PAD.wasUi = GAME.ui;
   }
   if(TOUCH.on && !GAME.ui){
     if(TOUCH.gas) thr = 1;
@@ -22115,7 +22128,8 @@ function openScreen(id, html, o){
   MENU.grid = !!o.grid; MENU.acts = o.acts || {};
   MENU.items = [...UIEL.querySelectorAll("[data-act],[data-opt],[data-track]")];
   MENU.items.forEach((el, i)=>{
-    el.addEventListener("mouseenter", ()=> select(i, true));
+    el.addEventListener("mouseenter", ()=>{ if(mouseMoved()) select(i, true); });
+    el.addEventListener("mousemove", ()=>{ if(mouseMoved() && MENU.sel !== i) select(i, true); });
     el.addEventListener("click", e=>{
       e.preventDefault(); el.blur(); startAudio();
       select(i, true);
