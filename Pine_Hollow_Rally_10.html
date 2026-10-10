@@ -15316,6 +15316,25 @@ if(GLOW){
       word(g, "GARAGE · WE FIX WHAT THE HILLS BREAK", 204, 124, 30, "#b9e08a");
     }}
   ];
+  // (out in the desert the north-woods businesses give way to local ones)
+  if(DESERT){
+    const at = n => SPONSORS.findIndex(S=> S.name === n);
+    SPONSORS[at("tackle")] = {name:"cantina", draw:(g, W, H)=>{
+      g.fillStyle = "#2a7a6e"; g.fillRect(0, 0, W, H);
+      g.fillStyle = "#e8b84a"; g.fillRect(0, 0, W, 10); g.fillRect(0, H - 10, W, 10);
+      // a saguaro
+      g.fillStyle = "#f4e2b8"; g.fillRect(88, 34, 22, 98); g.fillRect(60, 64, 14, 40); g.fillRect(60, 92, 36, 12); g.fillRect(122, 52, 14, 40); g.fillRect(104, 80, 32, 12);
+      word(g, "DRY GULCH", 214, 62, 74, cream);
+      word(g, "CANTINA \u00b7 COLD DRINKS, 40 MILES", 218, 124, 30, "#e8b84a");
+    }};
+    SPONSORS[at("garage")] = {name:"mesa", draw:(g, W, H)=>{
+      g.fillStyle = "#b8562a"; g.fillRect(0, 0, W, H);
+      g.fillStyle = "#f2d2a0"; g.beginPath(); g.moveTo(40, 132); g.lineTo(70, 60); g.lineTo(130, 60); g.lineTo(160, 132); g.closePath(); g.fill();
+      g.fillStyle = "#b8562a"; g.fillRect(40, 124, 120, 8);
+      word(g, "MESA MOTORS", 206, 62, 74, cream);
+      word(g, "TOWING ACROSS THE BADLANDS", 210, 124, 32, "#2a2a2a");
+    }};
+  }
   const banners = SPONSORS.map(S=>{
     const t = bannerTex(S.draw);
     if(S.logo && logoImgEl){
@@ -16278,7 +16297,9 @@ if(JUNGLE){
       b++;
     }
   });
-  scene.add(billboardField(grassTuftTex, 1.0, pos, scale, uv, tint, GLOW ? new THREE.Color(0.22, 0.62, 1.15) : null));
+  // (in the fall the tall grass has gone over to straw and russet; in the desert it is bleached)
+  scene.add(billboardField(grassTuftTex, 1.0, pos, scale, uv, tint, GLOW ? new THREE.Color(0.22, 0.62, 1.15)
+    : FALL ? new THREE.Color(1.12, 0.9, 0.56) : DESERT ? new THREE.Color(1.18, 1.0, 0.7) : null));
 }
 
 /* Glowcap Hollow, once everything is planted: every leaf, needle, bush and the ground itself
