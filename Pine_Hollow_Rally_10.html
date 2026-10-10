@@ -16472,6 +16472,21 @@ function patinate(mat, seed, amt){      // (amt: how far gone, 0 to 1; a whole b
   mat.customProgramCacheKey = ()=> prevKey() + "+patina";
   mat.needsUpdate = true;
 }
+/* a box with its edges rounded over (r), for bumpers, lamp housings and the like: the cars' low-poly look kept,
+   without the knife edges that sat so badly by the wheels. Cached by size, since the same parts repeat. */
+const RBOX_CACHE = new Map();
+function roundedBoxGeo(w, h, d, r){
+  r = Math.max(0.004, Math.min(r, w/2 - 0.002, h/2 - 0.002, d/2 - 0.002));
+  const key = [w, h, d, r].map(v=> v.toFixed(3)).join(",");
+  if(RBOX_CACHE.has(key)) return RBOX_CACHE.get(key);
+  const x = w/2 - r, y = h/2 - r, c = r*0.5, sh = new THREE.Shape();
+  sh.moveTo(-x + c, -y); sh.lineTo(x - c, -y); sh.quadraticCurveTo(x, -y, x, -y + c); sh.lineTo(x, y - c); sh.quadraticCurveTo(x, y, x - c, y);
+  sh.lineTo(-x + c, y); sh.quadraticCurveTo(-x, y, -x, y - c); sh.lineTo(-x, -y + c); sh.quadraticCurveTo(-x, -y, -x + c, -y);
+  const g = new THREE.ExtrudeGeometry(sh, {depth: Math.max(0.001, d - 2*r), bevelEnabled:true, bevelThickness:r, bevelSize:r, bevelSegments:3, curveSegments:3});
+  g.translate(0, 0, -(d - 2*r)/2);
+  RBOX_CACHE.set(key, g);
+  return g;
+}
 /* What you see through the glass: the floor, the dash with its binnacle, the wheel on its column, two
    front seats with headrests (or a pickup's bench) and a rear bench. c: {zDash, zSeat, zRear (or null),
    belt, half (inside half width), steer (the wheel's x), seat (colour), bench} */
@@ -16695,6 +16710,8 @@ function buildWagon(opts){
   };
   const box = (w, h, d, material, x, y, z, parent) =>
     add(new THREE.BoxGeometry(w, h, d), material, x, y, z, parent);
+  const rbox = (w, h, d, material, x, y, z, parent, r) =>
+    add(roundedBoxGeo(w, h, d, r === undefined ? Math.min(w, h, d)*0.3 : r), material, x, y, z, parent);
   const cyl = (r, len, seg, material, axis, x, y, z, parent) => {
     const geo = new THREE.CylinderGeometry(r, r, len, Math.max(12, seg * 2));
     if (axis === 'x') geo.rotateZ(Math.PI / 2);
@@ -16792,7 +16809,7 @@ function buildWagon(opts){
       const hb = box(0.4, 0.17, 0.03, M.plastic, s * 0.58, 0.63, L + 0.01); hb.rotation.set(-0.7, -s * 0.15, 0);
       box(0.1, 0.06, 0.04, M.amber, s * 0.82, 0.5, L + 0.07);
     }
-    box(1.84, 0.2, 0.16, M.plastic, 0, 0.36, L + 0.08);
+    rbox(1.84, 0.2, 0.16, M.plastic, 0, 0.36, L + 0.08);
     // the hood scoop, laid on the hood's slope
     box(0.5, 0.08, 0.5, M.paint, 0, hoodTop(1.62) + 0.02, 1.62).rotation.x = HOOD_TILT;
     box(0.42, 0.05, 0.03, M.plastic, 0, hoodTop(1.87) + 0.04, 1.875).rotation.x = HOOD_TILT;
@@ -16802,18 +16819,21 @@ function buildWagon(opts){
     box(1.7, 0.04, 0.22, M.plastic, 0, 0.25, L + 0.12);
   } else {
     if (!o.woodie) {
-      box(0.95, 0.2, 0.04, M.trim, 0, 0.62, 2.35);
+      rbox(0.97, 0.22, 0.05, M.trim, 0, 0.62, 2.35, undefined, 0.02);
       for (let i = 0; i < 4; i++) box(0.9, 0.015, 0.02, M.chrome, 0, 0.55 + i * 0.045, 2.37);
-      box(0.3, 0.16, 0.04, M.head, 0.6, 0.64, 2.35);
-      box(0.3, 0.16, 0.04, o.beater ? M.headDim : M.head, -0.6, 0.64, 2.35);
+      // (each lamp in a chrome surround, its lens set in it)
+      for (const sd of [1, -1]) {
+        rbox(0.34, 0.2, 0.05, M.chrome, sd * 0.6, 0.64, 2.34, undefined, 0.025);
+        rbox(0.29, 0.15, 0.04, sd < 0 && o.beater ? M.headDim : M.head, sd * 0.6, 0.64, 2.36, undefined, 0.02);
+      }
     }
     box(0.12, 0.08, 0.04, M.amber, 0.8, 0.5, 2.34);
     box(0.12, 0.08, 0.04, M.amber, -0.8, 0.5, 2.34);
     if(o.safari){
       // a black steel bumper, deep and square, with recovery eyes and a guard over each lamp
-      box(1.98, 0.22, 0.22, M.matte, 0, 0.36, 2.42);
+      rbox(1.98, 0.22, 0.22, M.matte, 0, 0.36, 2.42, undefined, 0.04);
       for (const s of [1, -1]) { cyl(0.05, 0.03, 8, M.decB, 'x', s * 0.5, 0.36, 2.55); for (let i = 0; i < 3; i++) box(0.02, 0.2, 0.02, M.matte, s * 0.6 + (i - 1)*0.1, 0.64, 2.4); }
-    } else box(1.86, 0.14, 0.14, M.chrome, 0, 0.36, 2.38);
+    } else rbox(1.86, 0.14, 0.14, M.chrome, 0, 0.36, 2.38, undefined, 0.05);
   }
   for (const s of [1, -1]) {
     if(!o.sport){
@@ -16890,7 +16910,7 @@ function buildWagon(opts){
 
   const rearBumper = new THREE.Group();
   car.add(rearBumper);
-  box(o.safari ? 1.98 : 1.86, o.safari ? 0.22 : 0.14, o.safari ? 0.22 : 0.14, o.sport ? M.plastic : o.safari ? M.matte : M.chrome, 0, 0.36, -2.38, rearBumper);
+  rbox(o.safari ? 1.98 : 1.86, o.safari ? 0.22 : 0.14, o.safari ? 0.22 : 0.14, o.sport ? M.plastic : o.safari ? M.matte : M.chrome, 0, 0.36, -2.38, rearBumper, o.safari ? 0.04 : 0.05);
   box(1.5, 0.025, 0.16, M.trim, 0, 0.44, -2.38, rearBumper);
   for (const s of [1, -1]) box(0.14, 0.14, 0.26, M.chrome, s * 0.86, 0.36, -2.25, rearBumper);
 
@@ -17300,17 +17320,16 @@ function buildWagon(opts){
   // ---- fenders ----
   if (o.fender > 0 || A.flaps) {
     const t = o.fender === 2 ? 0.2 : 0.12, out = o.fender === 2 ? 0.13 : 0.07;
+    // (each flare one smooth arch round the wheel, a little deeper at its crown, its edges rounded over)
     if (o.fender > 0) for (const cz of [AXLE_R, AXLE_F]) for (const s of [1, -1]) {
-      for (let i = 0; i < 7; i++) {
-        const a0 = Math.PI - (i/7)*Math.PI, a1 = Math.PI - ((i + 1)/7)*Math.PI;
-        const R = ARCH + 0.04;
-        const z0 = cz + R*Math.cos(a0), y0 = WR + R*Math.sin(a0)*0.95, z1 = cz + R*Math.cos(a1), y1 = WR + R*Math.sin(a1)*0.95;
-        const seg = box(t, 0.08, Math.hypot(z1 - z0, y1 - y0) + 0.03, M.plastic, s*(SIDE + out - t/2 + 0.02), (y0 + y1)/2, (z0 + z1)/2);
-        seg.rotation.x = -Math.atan2(y1 - y0, z1 - z0);
-      }
+      const Ri = ARCH + 0.02, N = 22, pts = [];
+      const Ro = a => Ri + 0.075 + 0.025*Math.sin(a);
+      for (let i = 0; i <= N; i++) { const a = Math.PI - (i/N)*Math.PI; pts.push([cz + Ro(a)*Math.cos(a)*1.02, WR + Ro(a)*Math.sin(a)*0.95]); }
+      for (let i = N; i >= 0; i--) { const a = Math.PI - (i/N)*Math.PI; pts.push([cz + Ri*Math.cos(a), WR + Ri*Math.sin(a)*0.95]); }
+      extrude(pts, t - 0.03, M.plastic, 0.015, s*(SIDE + out - t/2 + 0.02));
     }
     if (o.fender === 2 || A.flaps) for (const cz of [AXLE_R, AXLE_F]) for (const s of [1, -1])
-      box(0.32, 0.34, 0.025, M.plastic, s * (TRACK + 0.02), 0.26, cz - ARCH - 0.08);
+      rbox(0.32, 0.34, 0.03, M.plastic, s * (TRACK + 0.02), 0.26, cz - ARCH - 0.08, undefined, 0.012);
   }
   // ---- livery ----
   if (o.livery === 1) {
@@ -17571,7 +17590,7 @@ function buildRival(kind, opts){
     box(0.03, 0.03, 0.05, M.trim, x + 0.12, y, z + 0.02); } };
   const beltRubber = (x, y, z0, z1) => { for (const s of [1, -1]) box(0.025, 0.035, z0 - z1, M.rubber2, s * x, y, (z0 + z1) / 2); };
   const archLips = (zs, r, wr, x, m) => { for (const z of zs) for (const s of [1, -1]) {
-    const fl = add(new THREE.TorusGeometry(r, 0.03, 4, 12, Math.PI), m || M.paint, s * x, wr, z); fl.rotation.y = Math.PI / 2; } };
+    const fl = add(new THREE.TorusGeometry(r, 0.03, 6, 24, Math.PI), m || M.paint, s * x, wr, z); fl.rotation.y = Math.PI / 2; } };
   const mudflaps = (x, y, z) => { for (const s of [1, -1]) { box(0.24, 0.28, 0.02, M.rubber2, s * x, y, z); box(0.2, 0.02, 0.025, M.chrome, s * x, y + 0.12, z - 0.005); } };
   const exhaustTip = (x, z) => { cyl(0.045, 0.3, 8, M.chrome, 'z', x, 0.24, z + 0.1); cyl(0.032, 0.02, 8, M.rubber2, 'z', x, 0.24, z - 0.06); };
   const towHitch = (z) => { box(0.08, 0.07, 0.24, M.under, 0, 0.32, z - 0.08); add(new THREE.SphereGeometry(0.045, 8, 6), M.chrome, 0, 0.39, z - 0.17); };
@@ -17579,6 +17598,8 @@ function buildRival(kind, opts){
   const panelLine = (x, y, z, len, axis) => axis === 'z' ? box(0.012, 0.006, len, M.trim, x, y, z) : box(len, 0.006, 0.012, M.trim, x, y, z);
   const box = (w, h, d, material, x, y, z, parent) =>
     add(new THREE.BoxGeometry(w, h, d), material, x, y, z, parent);
+  const rbox = (w, h, d, material, x, y, z, parent, r) =>
+    add(roundedBoxGeo(w, h, d, r === undefined ? Math.min(w, h, d)*0.3 : r), material, x, y, z, parent);
   const cyl = (r, len, seg, material, axis, x, y, z, parent) => {
     const geo = new THREE.CylinderGeometry(r, r, len, Math.max(12, seg * 2));
     if (axis === 'x') geo.rotateZ(Math.PI / 2);
@@ -17650,8 +17671,8 @@ function buildRival(kind, opts){
       box(0.3, 0.2, 0.04, M.head, s * 0.64, 0.64, F + 0.045);
       box(0.1, 0.2, 0.04, M.amber, s * 0.83, 0.64, F);
     }
-    box(1.8, 0.16, 0.16, M.rubber, 0, 0.38, F + 0.08);                   // big safety bumpers
-    box(1.8, 0.16, 0.16, M.rubber, 0, 0.38, R - 0.08);
+    rbox(1.8, 0.16, 0.16, M.rubber, 0, 0.38, F + 0.08);                  // big safety bumpers
+    rbox(1.8, 0.16, 0.16, M.rubber, 0, 0.38, R - 0.08);
     // tall tail lamps up the D-pillars, the Swedish tell
     for (const s of [1, -1]) {
       box(0.16, 0.52, 0.03, M.tail, s * 0.74, 0.8, R - 0.045);
@@ -17706,7 +17727,7 @@ function buildRival(kind, opts){
     lower(R, F, SILL, BELT, 1.1, S.WR, S.AR, S.AF, 0.52, 1.8, M.paint, [0.93, 0.3]);
     // chunky black flares over the arches
     for (const z of [S.AF, S.AR]) for (const s of [1, -1]) {
-      const fl = add(new THREE.TorusGeometry(0.54, 0.06, 4, 10, Math.PI), M.rubber, s * 0.91, S.WR, z);
+      const fl = add(new THREE.TorusGeometry(0.54, 0.06, 8, 24, Math.PI), M.rubber, s * 0.91, S.WR, z);
       fl.rotation.y = Math.PI / 2;
     }
     box(1.84, 0.14, (S.AF - S.AR) - 1.1, M.under, 0, SILL + 0.06, (S.AF + S.AR)/2);   // rocker panels
@@ -17728,12 +17749,12 @@ function buildRival(kind, opts){
       cyl(0.09, 0.04, 10, M.head, 'z', s * 0.66, 0.98, F + 0.06);
       box(0.1, 0.07, 0.04, M.amber, s * 0.66, 0.78, F + 0.05);
     }
-    box(1.8, 0.14, 0.18, M.rubber, 0, 0.62, F + 0.1);
+    rbox(1.8, 0.14, 0.18, M.rubber, 0, 0.62, F + 0.1);
     for (const s of [1, -1]) cyl(0.035, 0.55, 6, M.rubber, 'y', s * 0.45, 0.93, F + 0.24);
     cyl(0.035, 0.9, 6, M.rubber, 'x', 0, 1.2, F + 0.24);
     // rear: small lamps, bumper, spare on a swing-away carrier
     for (const s of [1, -1]) box(0.14, 0.24, 0.03, M.tail, s * 0.76, 0.95, R - 0.045);
-    box(1.8, 0.14, 0.16, M.rubber, 0, 0.62, R - 0.08);
+    rbox(1.8, 0.14, 0.16, M.rubber, 0, 0.62, R - 0.08);
     box(0.4, 0.14, 0.012, M.plate, 0.45, 0.8, R - 0.05);
     { const spare = new THREE.Group(); spare.position.set(-0.2, 1.1, R - 0.2); spare.rotation.y = Math.PI / 2; car.add(spare);
       buildWheel(spare, { R: 0.4, TW: 0.26, rr: 0.4 * 0.56, out: 1, M, rim: M.rimW, style: "steel", knobby: true }); }
@@ -17814,8 +17835,8 @@ function buildRival(kind, opts){
     box(1.4, 0.36, 0.04, M.trim, 0, 0.72, F + 0.045);
     for (let i = 0; i < 3; i++) box(1.3, 0.02, 0.02, M.chrome, 0, 0.62 + i * 0.1, F + 0.055);
     for (const s of [1, -1]) for (const x of [0.45, 0.66]) box(0.17, 0.15, 0.04, M.head, s * x, 0.72, F + 0.05);
-    box(1.9, 0.16, 0.16, M.chrome, 0, 0.44, F + 0.08);
-    box(1.9, 0.14, 0.14, M.chrome, 0, 0.44, R - 0.08);
+    rbox(1.9, 0.16, 0.16, M.chrome, 0, 0.44, F + 0.08);
+    rbox(1.9, 0.14, 0.14, M.chrome, 0, 0.44, R - 0.08);
     for (const s of [1, -1]) box(0.14, 0.34, 0.03, M.tail, s * 0.8, 0.8, R - 0.045);
     box(0.4, 0.14, 0.012, M.plate, 0, 0.44, R - 0.16);
     // amber beacon on the cab roof
