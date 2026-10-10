@@ -9448,7 +9448,7 @@ if(CANYON.on){
   const P = MAIN, step = Math.max(1, Math.round(1.5/P.seg)), NJ = 18;
   const ext = Math.round(170/P.seg);
   const cc = new THREE.Color();
-  const lipY = [];
+  const lipY = [], slotWalls = [];
   [1, -1].forEach(side=>{
     const pos = [], col = [], idx = [];
     const ph = side > 0 ? 0.3 : 2.4;
@@ -9493,7 +9493,7 @@ if(CANYON.on){
     g.setIndex(idx); g.computeVertexNormals();
     const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide}));
     m.receiveShadow = true; m.castShadow = true;
-    scene.add(m);
+    scene.add(m); slotWalls.push(m);
   });
   const core = lipY.filter(q=> q[0] >= CANYON.a && q[0] <= CANYON.b && q[2] - q[1] > 9);
   if(core.length){
@@ -9509,12 +9509,21 @@ if(CANYON.on){
     cg.computeVertexNormals();
     const stoneMat = new THREE.MeshLambertMaterial({color:0x8e4a30, map:rockTex});
     const chock = new THREE.Mesh(cg, stoneMat);
-    chock.position.set(p.x, pinch[1] + hy, p.z);
-    chock.scale.set(pinch[3] - 0.2, 2.6, 3.2);
+    /* jammed: the walls lean, so how far apart they are is found at the stone's own height (a ray each way
+       to the rock), and it is made just wide enough to bite into both */
+    const nx = -t.z, nz = t.x, ray = new THREE.Raycaster();
+    slotWalls.forEach(w=> w.updateMatrixWorld());
+    const span = (y)=>{ const o = new THREE.Vector3(p.x, y, p.z), d = [];
+      for(const sd of [1, -1]){ ray.set(o, new THREE.Vector3(nx*sd, 0, nz*sd)); ray.far = 40; const h = ray.intersectObjects(slotWalls)[0]; d.push(h ? h.distance : pinch[3]); }
+      return d; };
+    const [dl, dr] = span(pinch[1] + hy), mid = (dl - dr)/2;
+    chock.position.set(p.x + nx*mid, pinch[1] + hy, p.z + nz*mid);
+    chock.scale.set((dl + dr)/2 + 0.7, 2.6, 3.2);
     chock.rotation.y = Math.atan2(t.x, t.z);
     chock.castShadow = true; scene.add(chock);
-    // a smaller one wedged under it, the way they pile up
-    const c2 = chock.clone(); c2.scale.set(2.2, 1.6, 2); c2.position.set(p.x - t.z*(pinch[3] - 2.8), pinch[1] + hy - 2.9, p.z + t.x*(pinch[3] - 2.8));
+    // a smaller one wedged under it against one wall, the way they pile up
+    const y2 = pinch[1] + hy - 2.9, el = span(y2)[0];
+    const c2 = chock.clone(); c2.scale.set(2.2, 1.6, 2); c2.position.set(p.x + nx*(el - 1.6), y2, p.z + nz*(el - 1.6));
     scene.add(c2);
 
     // fallen blocks along the foot of the walls
@@ -9560,50 +9569,49 @@ if(CANYON.on){
   roadSign(CANYON.a - Math.round(90/MAIN.seg), 1, ["SLOT CANYON", "no way out but through"], "#b4623e", "#f7e7c0");
 }
 
-/* ---- the oasis: date palms round the water ---- */
-function palmGeometry(h, lean){
-  const parts = [];
-  const trunk = new THREE.CylinderGeometry(0.22, 0.34, h, 7, 6);
-  const tp = trunk.attributes.position;
-  for(let v=0; v<tp.count; v++){ const y = tp.getY(v) + h/2, f = y/h; tp.setX(v, tp.getX(v) + lean*f*f*h*0.35); tp.setY(v, y); }
-  parts.push([trunk, 0x7a5a3a]);
-  const topX = lean*h*0.35;
-  for(let k=0;k<8;k++){
-    const a = k/8*Math.PI*2 + Math.random()*0.3, L = 2.6 + Math.random()*1.2;
-    const fr = new THREE.ConeGeometry(0.45, L, 4, 1);
-    fr.scale(1, 1, 0.18); fr.translate(0, L/2, 0); fr.rotateZ(-(1.15 + Math.random()*0.35)); fr.rotateY(a); fr.translate(topX, h, 0);
-    parts.push([fr, k % 2 ? 0x3f7a34 : 0x55913e]);
-  }
-  // merge with vertex colours
-  let n = 0; parts.forEach(pp=>{ pp[0] = pp[0].toNonIndexed(); n += pp[0].attributes.position.count; });
-  const pos = new Float32Array(n*3), col = new Float32Array(n*3), c = new THREE.Color(); let o = 0;
-  parts.forEach(([gg, hex])=>{ pos.set(gg.attributes.position.array, o*3); c.setHex(hex);
-    for(let v=0; v<gg.attributes.position.count; v++){ col[(o+v)*3] = c.r; col[(o+v)*3+1] = c.g; col[(o+v)*3+2] = c.b; }
-    o += gg.attributes.position.count; });
-  const out = new THREE.BufferGeometry();
-  out.setAttribute("position", new THREE.BufferAttribute(pos, 3)); out.setAttribute("color", new THREE.BufferAttribute(col, 3));
-  out.computeVertexNormals();
-  return out;
-}
+/* ---- the oasis: date palms round the water, reeds at its edge ----
+   (the palms are the same as the rainforest's: a ringed stem in a gentle curve and a crown of arching
+   fronds with their leaflets, unit height, so the instance scale is the tree's height. Three of them,
+   each planted a dozen times over.) */
 if(TRACK.oasis && LAKE.on){
-  const mat = new THREE.MeshLambertMaterial({vertexColors:true});
-  let made = 0;
-  for(let tries=0; tries<600 && made<34; tries++){
-    const a = Math.random()*Math.PI*2, e = 1.02 + Math.random()*0.7;
-    const x = LAKE.x + Math.cos(a)*LAKE.rx*e, z = LAKE.z + Math.sin(a)*LAKE.rz*e;
+  const mat = new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide});
+  const sets = [[], [], []], m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(), v = new THREE.Vector3();
+  for(let tries=0, made=0; tries<900 && made<40; tries++){
+    const a = Math.random()*Math.PI*2, r = 1.0 + Math.pow(Math.random(), 1.6)*0.75;
+    const x = LAKE.x + Math.cos(a)*LAKE.rx*r, z = LAKE.z + Math.sin(a)*LAKE.rz*r;
     if(!clearOf(x, z, 4)) continue;
-    const m = new THREE.Mesh(palmGeometry(7 + Math.random()*5, (Math.random() - 0.5)*0.6), mat);
-    m.position.set(x, gradedY(x, z) - 0.2, z); m.rotation.y = Math.random()*6.28; m.castShadow = true;
-    scene.add(m); made++;
+    const h = 7 + Math.random()*6;
+    e.set((Math.random() - 0.5)*0.12, Math.random()*6.28, (Math.random() - 0.5)*0.12); q.setFromEuler(e);
+    sc.set(h*(0.9 + Math.random()*0.25), h, h*(0.9 + Math.random()*0.25)); v.set(x, gradedY(x, z) - 0.15, z);
+    sets[made % 3].push(m4.compose(v, q, sc).clone()); made++;
+    NO_TREES.push([x, z, 3]);
   }
-  // a ring of green round the water
-  const reeds = new THREE.MeshLambertMaterial({color:0x6a8a3a});
-  for(let k=0;k<90;k++){
-    const a = Math.random()*Math.PI*2, e = 0.98 + Math.random()*0.12;
-    const x = LAKE.x + Math.cos(a)*LAKE.rx*e, z = LAKE.z + Math.sin(a)*LAKE.rz*e;
-    const r = new THREE.Mesh(new THREE.ConeGeometry(0.5 + Math.random()*0.5, 1.4 + Math.random(), 5), reeds);
-    r.position.set(x, gradedY(x, z) + 0.5, z); scene.add(r);
+  sets.forEach(list=>{ if(!list.length) return;
+    const im = new THREE.InstancedMesh(palmGeometry(), mat, list.length);
+    list.forEach((M, k)=> im.setMatrixAt(k, M)); im.castShadow = true; scene.add(im); });
+  // reeds: clumps of thin leaning blades, all round the water's edge, one instanced set
+  const blades = [];
+  for(let k=0;k<9;k++){
+    const a = k/9*Math.PI*2 + Math.random()*0.5, d = Math.random()*0.25, hgt = 1.1 + Math.random()*0.9;
+    const bl = new THREE.ConeGeometry(0.035, hgt, 3); bl.translate(0, hgt/2, 0); bl.rotateZ((Math.random() - 0.5)*0.5); bl.rotateX((Math.random() - 0.5)*0.4);
+    bl.translate(Math.cos(a)*d, 0, Math.sin(a)*d); blades.push(bl.toNonIndexed());
+    if(k % 3 === 0){ const head = new THREE.CylinderGeometry(0.05, 0.05, 0.28, 5); head.translate(Math.cos(a)*d, hgt*0.82, Math.sin(a)*d); blades.push(head.toNonIndexed()); }
   }
+  let n = 0; blades.forEach(g=> n += g.attributes.position.count);
+  const P = new Float32Array(n*3); let o = 0; blades.forEach(g=>{ P.set(g.attributes.position.array, o*3); o += g.attributes.position.count; });
+  const rg = new THREE.BufferGeometry(); rg.setAttribute("position", new THREE.Float32BufferAttribute(P, 3)); rg.computeVertexNormals();
+  const spots = [];
+  for(let k=0;k<160;k++){
+    const a = Math.random()*Math.PI*2, r = 0.97 + Math.random()*0.1;
+    const x = LAKE.x + Math.cos(a)*LAKE.rx*r, z = LAKE.z + Math.sin(a)*LAKE.rz*r;
+    if(!clearOf(x, z, 1.5)) continue;
+    spots.push([x, z]);
+  }
+  const reeds = new THREE.InstancedMesh(rg, new THREE.MeshLambertMaterial({color:0x7a9a44, side:THREE.DoubleSide}), Math.max(1, spots.length));
+  const tint = new THREE.Color();
+  spots.forEach((s, k)=>{ q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.random()*6.28); const k2 = 0.8 + Math.random()*0.6; sc.set(k2, k2, k2);
+    v.set(s[0], gradedY(s[0], s[1]) - 0.05, s[1]); reeds.setMatrixAt(k, m4.compose(v, q, sc)); reeds.setColorAt(k, tint.setHSL(0.2 + Math.random()*0.06, 0.45, 0.42 + Math.random()*0.12)); });
+  reeds.count = spots.length; reeds.castShadow = true; scene.add(reeds);
 }
 
 /* ---- the desert's buttes and mesas out on the horizon ---- */
@@ -11839,7 +11847,8 @@ if(LAKE.on){
   g.setAttribute("aDepth", new THREE.Float32BufferAttribute(dep,1));
   g.setIndex(idx);
   const wm = new THREE.Mesh(g, LAKE.lava ? lavaMaterial() : waterMaterial()); wm.renderOrder = 3; wm.frustumCulled = false; scene.add(wm);
-  if(!LAKE.frozen && !LAKE.lava && !GATOR && !SPRINGCUP){
+  // (not at the oasis: no north-woods boathouse in the desert)
+  if(!LAKE.frozen && !LAKE.lava && !GATOR && !SPRINGCUP && !DESERT){
   // riprap along the waterline of the causeway
   const rockMat = new THREE.MeshLambertMaterial({map:rockTex});
   const P = MAIN;
@@ -11858,43 +11867,110 @@ if(LAKE.on){
       }
     }
   }
-  // a dock on the north shore with rowboats tied up, and a few out on the water
+  /* rowboats: a clinker hull, full amidships, a flat transom aft and a sharp bow that rises, painted
+     outside and bare wood inside, a white gunwale, two thwarts and the oars shipped */
+  const hullGeo = (L, W, H)=>{
+    const NS = 14, NC = 8, pos = [], idx = [];
+    for(let i=0;i<=NS;i++){
+      const u = i/NS, z = (u - 0.42)*L;
+      const wk = u < 0.62 ? 0.82 + 0.18*Math.sin(u/0.62*Math.PI/2) : Math.cos((u - 0.62)/0.38*Math.PI/2);
+      const w = W/2*Math.max(0.03, wk), sheer = H + 0.28*Math.pow(Math.max(0, u - 0.55)/0.45, 2), keel = u > 0.85 ? (u - 0.85)/0.15*H*0.55 : 0;
+      for(let j=0;j<=NC;j++){ const t = j/NC*Math.PI;
+        pos.push(-Math.cos(t)*w, keel + (sheer - keel)*(1 - Math.sin(t)*0.92) - 0.0, z); }
+    }
+    for(let i=0;i<NS;i++) for(let j=0;j<NC;j++){ const a = i*(NC + 1) + j, b = a + NC + 1; idx.push(a, a + 1, b, a + 1, b + 1, b); }   // (faces outward)
+    // the transom
+    const c0 = pos.length/3; pos.push(0, H*0.7, (0 - 0.42)*L);
+    for(let j=0;j<NC;j++) idx.push(c0, j + 1, j, c0, j, j + 1);          // (both ways: seen from aft and from in the boat)
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+    return g;
+  };
+  const HULL = hullGeo(4.4, 1.5, 0.62), inner = HULL.clone(); inner.scale(0.94, 0.96, 0.97); inner.translate(0, 0.03, 0);
+  const woodM = PM(0x9a7652), trimM = PM(0xf2efe6);
   const boat = (c)=>{
     const b = new THREE.Group();
-    const hull = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 5, 0, Math.PI*2, Math.PI/2, Math.PI/2), PM(c));
-    hull.scale.set(0.8, 0.5, 2.3); hull.position.y = 0.35; b.add(hull);
-    pbox(b, 1.4, 0.1, 0.3, 0x8a6a44, 0, 0.3, 0.3);
-    pbox(b, 1.4, 0.1, 0.3, 0x8a6a44, 0, 0.3, -0.8);
+    const hull = new THREE.Mesh(HULL, new THREE.MeshLambertMaterial({color:c, side:THREE.FrontSide})); b.add(hull);
+    const hin = new THREE.Mesh(inner, new THREE.MeshLambertMaterial({color:0xa07a54, side:THREE.BackSide})); b.add(hin);
+    // the gunwale: a white rail along the sheer, both sides
+    for(const s of [-1, 1]){ const pts = [];
+      for(let i=0;i<=14;i++){ const u = i/14, wk = u < 0.62 ? 0.82 + 0.18*Math.sin(u/0.62*Math.PI/2) : Math.cos((u - 0.62)/0.38*Math.PI/2);
+        pts.push(new THREE.Vector3(s*0.75*Math.max(0.03, wk), 0.62 + 0.28*Math.pow(Math.max(0, u - 0.55)/0.45, 2), (u - 0.42)*4.4)); }
+      b.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 20, 0.045, 5), trimM)); }
+    for(const z of [-0.6, 0.55]) pbox(b, 1.3, 0.07, 0.3, woodM, 0, 0.42, z);                 // thwarts
+    pbox(b, 0.9, 0.07, 0.28, woodM, 0, 0.42, -1.45);                                           // stern seat
+    for(const s of [-1, 1]){ const oar = new THREE.Group(); pcyl(oar, 0.035, 0.035, 2.6, 6, woodM, 0, 0, 0); pbox(oar, 0.16, 0.6, 0.04, woodM, 0, 1.3, 0);
+      oar.rotation.x = Math.PI/2 - 0.05; oar.rotation.z = s*0.08; oar.position.set(s*0.45, 0.55, 0.1); b.add(oar); }
     return b;
   };
   for(let k=0, tries=0; k<6 && tries<200; tries++){
     const a = Math.random()*Math.PI*2, e = 0.35 + Math.random()*0.5;
     const x = LAKE.x + Math.cos(a)*LAKE.rx*e, z = LAKE.z + Math.sin(a)*LAKE.rz*e;
-    if(!clearOf(x, z, 16) || LAKE.level - surfaceY(x, z) < 0.8) continue;
-    const b = boat([0xc2382a, 0xf2efe6, 0x2f6fa8, 0x3f8a4a][k%4]);
-    b.position.set(x, LAKE.level - 0.15, z); b.rotation.y = Math.random()*6; scene.add(b);
-    const bob = Math.random()*6;
-    ANIMS.push(t=>{ b.position.y = LAKE.level - 0.15 + Math.sin(t*1.3 + bob)*0.06; b.rotation.z = Math.sin(t*0.9 + bob)*0.04; });
+    if(!clearOf(x, z, 16) || LAKE.level - surfaceY(x, z) < 0.4) continue;      // (the lake is half a metre deep: enough for a rowboat)
+    const b = boat([0xc2382a, 0x2f6fa8, 0x3f8a4a, 0xe0a21e, 0xf2efe6, 0x2a4a5a][k%6]);
+    b.position.set(x, LAKE.level - 0.2, z); b.rotation.y = Math.random()*6; scene.add(b);
+    const bob = Math.random()*6, r0 = b.rotation.y;
+    ANIMS.push(t=>{ b.position.y = LAKE.level - 0.2 + Math.sin(t*1.3 + bob)*0.05; b.rotation.z = Math.sin(t*0.9 + bob)*0.035; b.rotation.y = r0 + Math.sin(t*0.13 + bob)*0.2; });
     k++;
   }
-  // the dock: find the lake edge north of the causeway
-  for(let tries=0; tries<200; tries++){
-    const a = Math.PI*0.2 + Math.random()*Math.PI*0.6;
-    const x = LAKE.x + Math.cos(a)*LAKE.rx*0.98, z = LAKE.z + Math.sin(a)*LAKE.rz*0.98;
-    if(!clearOf(x, z, 20)) continue;
+  // the dock and boathouse: find the lake edge north of the causeway
+  // (all the way round, nearest the north first, wherever the shore is clear of the road and the water deep enough off the end)
+  for(let tries=0; tries<180; tries++){
+    const a = Math.PI*0.5 + (tries % 2 ? 1 : -1)*Math.floor(tries/2)*0.035;
+    // walk in from outside the basin to the waterline; the dock starts a step back up the bank from it
+    let e = 1.15; while(e > 0.2 && LAKE.level - surfaceY(LAKE.x + Math.cos(a)*LAKE.rx*e, LAKE.z + Math.sin(a)*LAKE.rz*e) < 0.12) e -= 0.01;
+    if(e <= 0.2) continue;
+    const wx = LAKE.x + Math.cos(a)*LAKE.rx*e, wz = LAKE.z + Math.sin(a)*LAKE.rz*e, tw0 = Math.atan2(LAKE.x - wx, LAKE.z - wz);
+    const x = wx - Math.sin(tw0)*2, z = wz - Math.cos(tw0)*2;
+    if(!clearOf(x, z, 13)) continue;
+    { const tw = tw0, ex = x + Math.sin(tw)*15, ez = z + Math.cos(tw)*15;
+      if(LAKE.level - surfaceY(ex, ez) < 0.4 || !clearOf(ex, ez, 6) || !clearOf(x - Math.sin(tw)*7, z - Math.cos(tw)*7, 7)) continue; }
     const g = new THREE.Group(), toward = Math.atan2(LAKE.x - x, LAKE.z - z);
     const y0 = LAKE.level + 0.5 - gradedY(x, z);
-    for(let k=0;k<7;k++){
-      pbox(g, 3, 0.2, 2.2, 0x8a6a44, 0, y0, k*2.2);
-      for(const s of [-1, 1]) pbox(g, 0.25, 3, 0.25, 0x5a4430, s*1.4, y0 - 1.2, k*2.2);
-    }
-    const shed = new THREE.Group();
-    pbox(shed, 6, 3.4, 5, 0xa04e3c, 0, 1.7, 0);
-    const rf = new THREE.Mesh(new THREE.ConeGeometry(4.6, 2.2, 4), PM(0x3b3b3e)); rf.rotation.y = Math.PI/4; rf.position.y = 4.5; rf.scale.set(1, 1, 0.8); shed.add(rf);
-    shed.position.set(0, 0, -6); g.add(shed);
+    const plank = [PM(0x8a6a44), PM(0x7e6040), PM(0x957552)];
+    // the deck: boards across it, on pilings, a bollard at each corner of the end, a ladder down
+    for(let k=0;k<44;k++) pbox(g, 3, 0.12, 0.31, plank[k % 3], 0, y0, -0.9 + k*0.35);
+    for(let k=0;k<8;k++) for(const s of [-1, 1]) pcyl(g, 0.16, 0.18, 3.2, 8, 0x5a4430, s*1.4, y0 - 1.3, k*2.2);
+    for(const s of [-1, 1]) pbox(g, 0.12, 0.2, 15.4, 0x6a5038, s*1.45, y0 - 0.12, 6.7);
+    for(const s of [-1, 1]){ pcyl(g, 0.16, 0.2, 0.5, 10, 0x3a3530, s*1.2, y0 + 0.3, 14.2); }
+    for(let k=0;k<5;k++) pbox(g, 0.8, 0.05, 0.05, 0xb8b4ac, 1.0, y0 - 0.2 - k*0.35, 14.55);
+    // a life ring on a post
+    pbox(g, 0.12, 1.4, 0.12, 0x5a4430, -1.3, y0 + 0.7, 9);
+    { const lr = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.09, 8, 20), PM(0xe8452a)); lr.position.set(-1.3, y0 + 1.1, 9.08); g.add(lr);
+      for(let k=0;k<4;k++){ const st = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.1, 6, 4, 0.35), PM(0xf2efe6)); st.rotation.z = k*Math.PI/2; st.position.copy(lr.position); st.position.z += 0.01; g.add(st); } }
+    // the boathouse: board-and-batten walls, a gable roof with deep eaves, the big door to the water, a window, a lamp
+    const shed = new THREE.Group(), red = PM(0x9a3e30), wht = PM(0xf2efe6), W = 6.4, D = 6, H = 3.4;
+    pbox(shed, W, H, D, red, 0, H/2, 0);
+    for(let k=0;k<=12;k++){ pbox(shed, 0.08, H, 0.06, PM(0x7e3226), -W/2 + k*W/12, H/2, D/2 + 0.03); pbox(shed, 0.08, H, 0.06, PM(0x7e3226), -W/2 + k*W/12, H/2, -D/2 - 0.03); }
+    const sh = new THREE.Shape([new THREE.Vector2(-W/2 - 0.5, 0), new THREE.Vector2(W/2 + 0.5, 0), new THREE.Vector2(0, 2.4)]);
+    const rg = new THREE.ExtrudeGeometry(sh, {depth:D + 1, bevelEnabled:false}); rg.translate(0, 0, -(D + 1)/2);
+    const roof = new THREE.Mesh(rg, PM(0x3b3b3e)); roof.position.y = H; shed.add(roof);
+    const gab = new THREE.Shape([new THREE.Vector2(-W/2, 0), new THREE.Vector2(W/2, 0), new THREE.Vector2(0, 2.2)]);
+    for(const sd of [1, -1]){ const m = new THREE.Mesh(new THREE.ShapeGeometry(gab), red); m.position.set(0, H, sd*(D/2 + 0.01)); if(sd < 0) m.rotation.y = Math.PI; shed.add(m); }
+    pbox(shed, 3.6, 2.8, 0.1, 0x5a2a20, 0, 1.4, D/2 + 0.08);                                   // the boat door
+    pbox(shed, 4.0, 0.18, 0.14, wht, 0, 2.9, D/2 + 0.1); for(const s of [-1, 1]) pbox(shed, 0.18, 2.9, 0.14, wht, s*1.9, 1.45, D/2 + 0.1);
+    pbox(shed, 1.0, 0.8, 0.08, 0x28343c, 0, H + 0.9, D/2 + 0.05); pbox(shed, 1.2, 1.0, 0.06, wht, 0, H + 0.9, D/2 + 0.03);
+    for(const sd of [-1, 1]){ pbox(shed, 0.1, 0.9, 1.1, 0x28343c, sd*(W/2 + 0.02), 1.9, 0); pbox(shed, 0.08, 1.1, 1.3, wht, sd*(W/2 + 0.01), 1.9, 0); }
+    pbox(shed, 0.3, 0.3, 0.3, 0xffe2a0, 2.3, 3.0, D/2 + 0.3);
+    // (out over the water beside the dock, on its own pilings, its floor at the deck's height, the door to the lake)
+    shed.position.set(-5.4, y0 - 0.1, 6.5); g.add(shed);
+    for(const px of [-W/2 + 0.3, 0, W/2 - 0.3]) for(const pz of [-D/2 + 0.3, 0, D/2 - 0.3]) pcyl(g, 0.18, 0.2, 3.4, 8, 0x5a4430, -5.4 + px, y0 - 1.8, 6.5 + pz);
+    pbox(g, W + 0.4, 0.2, D + 0.4, 0x6a5038, -5.4, y0 - 0.2, 6.5);
+    // a canoe upturned on a rack beside it, and a fisherman at the end of the dock
+    { const rk = new THREE.Group(); for(const s of [-1, 1]){ pbox(rk, 0.1, 1.1, 0.1, 0x5a4430, -0.6, 0.55, s*1.4); pbox(rk, 0.1, 1.1, 0.1, 0x5a4430, 0.6, 0.55, s*1.4); pbox(rk, 1.3, 0.1, 0.1, 0x5a4430, 0, 1.1, s*1.4); }
+      const cn = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 6, 0, Math.PI*2, 0, Math.PI/2), PM(0x2f7a5a)); cn.scale.set(0.42, 0.3, 2.4); cn.position.y = 1.15; rk.add(cn);
+      rk.scale.setScalar(0.85); rk.position.set(0.6, y0 + 0.06, 2.2); rk.rotation.y = Math.PI/2; g.add(rk); }
+    { const f = new THREE.Group(); pbox(f, 0.36, 0.5, 0.3, 0x3a3f4a, 0, 0.25, 0); pbox(f, 0.4, 0.6, 0.24, 0x7a4a2a, 0, 0.75, -0.02);
+      const hd = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), PM(0xe0b890)); hd.position.y = 1.2; f.add(hd);
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.17, 0.12, 10), PM(0xc2382a)); cap.position.y = 1.33; f.add(cap);
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.02, 3, 4), PM(0x2a2a2a)); rod.position.set(0.3, 1.5, 1.2); rod.rotation.x = 0.9; f.add(rod);
+      pcyl(f, 0.25, 0.25, 0.4, 10, 0x6a5a48, -0.6, 0.2, 0.2);
+      f.position.set(0.6, y0 + 0.06, 14.5); g.add(f); }
     setDown(g, x, z, toward);
-    const b = boat(0xf2efe6); b.position.set(x + Math.sin(toward)*12 + Math.cos(toward)*2.4, LAKE.level - 0.15, z + Math.cos(toward)*12 - Math.sin(toward)*2.4);
-    b.rotation.y = toward; scene.add(b);
+    for(const s of [-1, 1]){
+      const b = boat(s < 0 ? 0xf2efe6 : 0x2f6fa8), off = 2.6*s, along = 8 + s*2.5;
+      b.position.set(x + Math.sin(toward)*along + Math.cos(toward)*off, LAKE.level - 0.2, z + Math.cos(toward)*along - Math.sin(toward)*off);
+      b.rotation.y = toward + (s < 0 ? 0 : Math.PI); scene.add(b);
+    }
     break;
   }
   }
