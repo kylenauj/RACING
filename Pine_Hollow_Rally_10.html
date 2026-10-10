@@ -14914,9 +14914,9 @@ function cherryGeometry(kind, leafy){
     if(leafy) return c.setHSL(0.25 + Math.random()*0.03, 0.5 + Math.random()*0.1, 0.42 + k*0.1 + Math.random()*0.04);
     if(white) return c.setHSL(0.95, 0.6, 0.86 + k*0.05);
     return c.setHSL(0.935 + Math.random()*0.03, 0.78 + Math.random()*0.12, 0.66 + k*0.09 + Math.random()*0.04); };
-  const cluster = (x, y, z, r, sq, small)=>{ const b = small ? new THREE.OctahedronGeometry(r, 0) : new THREE.IcosahedronGeometry(r, 0);
-    b.rotateX(Math.random()*3); b.rotateY(Math.random()*3); b.scale(1, sq || 0.82, 1); b.translate(x, y, z);
-    put(b, bloom(!leafy && Math.random() < 0.12)); };
+  // (the clusters are noted down and drawn at the end, twice: rounded up close, the plain blobs further off)
+  const clusters = [];
+  const cluster = (x, y, z, r, sq, small)=> clusters.push([x, y, z, r, sq || 0.82, small, Math.random()*3, Math.random()*3, !leafy && Math.random() < 0.12, Math.random()*50]);
   const la = Math.random()*6.28, ln = 0.02 + Math.random()*0.04;
   if(kind === 4){
     // the poplar: a slim trunk up the middle, short limbs climbing it, and a narrow column of small clusters
@@ -14967,10 +14967,22 @@ function cherryGeometry(kind, leafy){
     for(let k=0;k<S.fill;k++){ const a = Math.random()*6.28, u = Math.sqrt(Math.random()), rr = u*S.fr;
       cluster(top.x + Math.cos(a)*rr, cy + 0.06 + (1 - u)*0.1*S.sq/0.82 + (Math.random() - 0.5)*0.05, top.z + Math.sin(a)*rr, S.cr*0.9 + Math.random()*0.04, S.sq); }
   }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
-  g.computeVertexNormals();
+  const P0 = pos.slice(), C0 = col.slice();                  // the limbs, the same in both
+  const build = (fine)=>{
+    pos.length = 0; col.length = 0; for(let i=0;i<P0.length;i++){ pos.push(P0[i]); col.push(C0[i]); }
+    for(const [x, y, z, r, sq, small, rx, ry, white, sd] of clusters){
+      const b = small ? new THREE.OctahedronGeometry(r, 0) : fine ? clumpGeometry(r, 0.12, sd) : new THREE.IcosahedronGeometry(r, 0);
+      b.rotateX(rx); b.rotateY(ry); b.scale(1, sq, 1); b.translate(x, y, z);
+      put(b, bloom(white));
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(pos.slice(), 3));
+    g.setAttribute("color", new THREE.Float32BufferAttribute(col.slice(), 3));
+    g.computeVertexNormals();
+    return g;
+  };
+  const g = build(true);
+  g.userData.mid = build(false);
   return g;
 }
 function hardwoodGeometry(kind){
