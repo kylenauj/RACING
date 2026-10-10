@@ -9144,8 +9144,9 @@ if(DROP.on && TRACK.skijump){
     for(const sd of [-1, 1]){
       const x = p.x + nx*sd*hw, z = p.z + nz*sd*hw, y = gradedY(x, z);
       const pole = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.6, 0.08), white); pole.position.set(x, y + 1.3, z); g.add(pole);
+      // (the flag flies out from its pole away from the road, square to you as you come down at it)
       const f = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.6, 0.9), (m/12)%2 ? red : blue);
-      f.position.set(x, y + 2.3, z + 0.45); g.add(f);
+      f.position.set(x + nx*sd*0.45, y + 2.3, z + nz*sd*0.45); f.rotation.y = Math.atan2(nx, nz); g.add(f);
     }
   }
   {
@@ -9163,15 +9164,33 @@ if(DROP.on && TRACK.skijump){
   {
     const i = at(55), p = P.pts[i], t = P.tans[i], nx = -t.z, nz = t.x, off = P.half[i] + 26;
     const x = p.x + nx*off, z = p.z + nz*off, tw = new THREE.Group();
-    for(const a of [0, 1, 2, 3]){ const ang = a*Math.PI/2 + Math.PI/4;
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.4, 12, 0.4), wood); leg.position.set(Math.cos(ang)*2.4, 6, Math.sin(ang)*2.4); tw.add(leg); }
-    const cab = new THREE.Mesh(new THREE.BoxGeometry(6.5, 3.2, 5), white); cab.position.y = 13.6; tw.add(cab);
-    const win = new THREE.Mesh(new THREE.BoxGeometry(6.6, 1.4, 5.1), glass); win.position.y = 13.9; tw.add(win);
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(7.4, 0.4, 5.8), red); roof.position.y = 15.4; tw.add(roof);
+    // a timber trestle: four legs splayed a little, braced in X on every face, a stair zigzagging up one side
+    const up = new THREE.Vector3(0, 1, 0), beam = (A, B, r, m)=>{ const d = new THREE.Vector3().subVectors(B, A), L = d.length(), c = new THREE.BoxGeometry(r, L, r);
+      c.translate(0, L/2, 0); c.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(up, d.normalize()))); c.translate(A.x, A.y, A.z); tw.add(new THREE.Mesh(c, m)); };
+    const V = (a, y, b)=> new THREE.Vector3(a, y, b), H = 12;
+    const leg = (sx, sz, y)=> V(sx*(2.9 - 0.5*y/H), y, sz*(2.9 - 0.5*y/H));
+    for(const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) beam(leg(sx, sz, 0), leg(sx, sz, H), 0.36, wood);
+    for(const [a0, a1] of [[[-1, -1], [1, -1]], [[1, -1], [1, 1]], [[1, 1], [-1, 1]], [[-1, 1], [-1, -1]]])
+      for(const [y0, y1] of [[0, 4], [4, 8], [8, 12]]){ beam(leg(a0[0], a0[1], y0), leg(a1[0], a1[1], y1), 0.16, wood); beam(leg(a1[0], a1[1], y0), leg(a0[0], a0[1], y1), 0.16, wood); beam(leg(a0[0], a0[1], y1), leg(a1[0], a1[1], y1), 0.2, wood); }
+    for(let k=0;k<6;k++){ const y = k*2, s0 = k % 2 ? 1 : -1;                                     // the stair, flight by flight
+      beam(V(-3.4, y, s0*2.4), V(-3.4, y + 2, -s0*2.4), 0.5, wood); beam(V(-3.9, y + 1, s0*2.4), V(-3.9, y + 3, -s0*2.4), 0.06, white); }
+    // the cab: a deck with a rail round it, walls with a band of glass all round, a pitched roof
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.3, 7), wood); deck.position.y = H + 0.15; tw.add(deck);
+    for(let k=0;k<=16;k++){ const u = -4 + k*0.5; for(const z0 of [-3.4, 3.4]){ const r = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1, 0.06), white); r.position.set(u, H + 0.8, z0); tw.add(r); } }
+    for(const z0 of [-3.4, 3.4]){ const r = new THREE.Mesh(new THREE.BoxGeometry(8.1, 0.08, 0.08), white); r.position.set(0, H + 1.3, z0); tw.add(r); }
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(6.2, 3.0, 4.6), white); cab.position.y = H + 1.8; tw.add(cab);
+    const win = new THREE.Mesh(new THREE.BoxGeometry(6.3, 1.3, 4.7), glass); win.position.y = H + 2.3; tw.add(win);
+    for(let k=0;k<6;k++){ const m = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.3, 4.75), white); m.position.set(-2.6 + k*1.04, H + 2.3, 0); tw.add(m); }
+    const sh = new THREE.Shape([new THREE.Vector2(-3.9, 0), new THREE.Vector2(3.9, 0), new THREE.Vector2(0, 1.8)]);
+    const rg = new THREE.ExtrudeGeometry(sh, {depth:5.6, bevelEnabled:false}); rg.translate(0, 0, -2.8);
+    const roof = new THREE.Mesh(rg, red); roof.position.y = H + 3.3; tw.add(roof);
     const sign = new THREE.Mesh(new THREE.BoxGeometry(6.4, 1.1, 0.12), new THREE.MeshLambertMaterial({map:boardTex([TRACK.name], "#c2382a", "#f2efe6", 512, 96)}));
-    sign.position.set(0, 16.3, 0); tw.add(sign);
+    sign.position.set(0, H + 3.85, 2.85); tw.add(sign);
+    // a flag on a staff off the roof
+    const st = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.6, 6), white); st.position.set(3.2, H + 5.2, 0); tw.add(st);
+    const fl = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.8), new THREE.MeshLambertMaterial({color:0xc2382a, side:THREE.DoubleSide})); fl.position.set(3.9, H + 6.0, 0); tw.add(fl);
     tw.position.set(x, gradedY(x, z), z); tw.rotation.y = Math.atan2(-nx, -nz);
-    tw.traverse(o=>{ if(o.isMesh) o.castShadow = true; }); scene.add(tw);
+    mergeStatic(tw); tw.traverse(o=>{ if(o.isMesh) o.castShadow = true; }); scene.add(tw); TRACK._judges = tw.position;
   }
   g.traverse(o=>{ if(o.isMesh) o.castShadow = true; });
   mergeStatic(g); scene.add(g);
@@ -9480,6 +9499,59 @@ if(TRACK.treeline){
   spots.forEach((p, i)=>{ e3.set(Math.random()*0.5, Math.random()*6, Math.random()*0.5); q4.setFromEuler(e3);
     v3.set(p[0], p[1] - p[3]*0.3, p[2]); s3.set(p[3]*(0.8 + Math.random()*0.5), p[3]*0.7, p[3]); m4.compose(v3, q4, s3); inst.setMatrixAt(i, m4); });
   inst.castShadow = true; scene.add(inst);
+
+  {
+  /* and close to the road, where you see it: the last of the trees gone small and wind bent just above
+     the treeline, cushions of alpine plants (a few in flower), scree, old snow lying in the hollows below
+     the snowline, and a cairn here and there */
+  const rnd = seeded(8821 + TRACK_ID), TL = TRACK.treeline, SL = TRACK.snowline || TL + 40;
+  const krum = [], cush = [], scree = [], drift = [], cairns = [], crag = [];
+  paths.forEach(P=>{
+    for(let n=0; n<P.N*3; n++){
+      const i = Math.floor(rnd()*P.N), p = P.pts[i], t = P.tans[i], sd = rnd() < 0.5 ? -1 : 1, off = P.half[i] + 4 + Math.pow(rnd(), 0.8)*60;
+      const x = p.x - t.z*sd*off + t.x*(rnd() - 0.5)*8, z = p.z + t.x*sd*off + t.z*(rnd() - 0.5)*8, y = gradedY(x, z);
+      if(y < TL - 6 || !clearOf(x, z, 2.5) || barren(x, z)) continue;
+      const h = y - TL, r = rnd();
+      if(h < 30 && r < 0.18*(1 - h/30) && krum.length < 260 && clearOf(x, z, 5)) krum.push([x, y, z, 1.2 + rnd()*2.4*(1 - Math.max(0, h)/40)]);
+      else if(y < SL + 4 && r < 0.55 && cush.length < 700) cush.push([x, y, z, 0.25 + rnd()*0.55]);
+      else if(y >= SL - 4 && r < 0.6 && crag.length < 240) crag.push([x, y, z, 0.8 + Math.pow(rnd(), 1.5)*2.6]);    // grey rock breaking through the snow
+      else if(r < 0.8 && scree.length < 600 && off < P.half[i] + 30) scree.push([x, y, z, 0.15 + Math.pow(rnd(), 2)*0.7]);
+      else if(y > SL - 30 && y < SL + 2 && drift.length < 160 && clearOf(x, z, 4)) drift.push([x, y, z, 1.5 + rnd()*4]);
+      if(cairns.length < 7 && rnd() < 0.004 && off < P.half[i] + 9) cairns.push([x, y, z]);
+    }
+  });
+  const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), e3 = new THREE.Euler(), tint = new THREE.Color();
+  const place = (geo, mat, list, fn, shadow)=>{ if(!list.length) return null;
+    const im = new THREE.InstancedMesh(geo, mat, list.length);
+    list.forEach((p, k)=>{ fn(p, tint); m4.compose(v3, q4, s3); im.setMatrixAt(k, m4); if(tint) im.setColorAt(k, tint); });
+    im.castShadow = !!shadow; scene.add(im); return im; };
+  // krummholz: the fat fir, squat and leaning away from the wind
+  place(WINTER ? snowify(coniferGeometry(1)) : coniferGeometry(1), new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide}), krum, (p, c)=>{
+    e3.set(0.12, rnd()*6.28, 0.05); q4.setFromEuler(e3); v3.set(p[0], p[1] - 0.15, p[2]); s3.set(p[3]*(1.1 + rnd()*0.4), p[3], p[3]*(1.1 + rnd()*0.4));
+    const k = 0.75 + rnd()*0.25; c.setRGB(k*0.95, k, k*0.9); }, true);
+  // cushions: low domes of moss-campion and heather, olive and rust, some pink or yellow with flowers
+  place(clumpGeometry(1, 0.22, 9.1), new THREE.MeshLambertMaterial({}), cush, (p, c)=>{
+    q4.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rnd()*6.28); v3.set(p[0], p[1] - p[3]*0.15, p[2]); s3.set(p[3]*(1 + rnd()*0.6), p[3]*0.38, p[3]*(1 + rnd()*0.6));
+    const r = rnd(); if(r < 0.12) c.setHSL(0.92 + rnd()*0.05, 0.45, 0.62); else if(r < 0.2) c.setHSL(0.14, 0.6, 0.6); else c.setHSL(0.16 + rnd()*0.12, 0.35 + rnd()*0.15, 0.28 + rnd()*0.12); });
+  // scree: small sharp stones
+  place(clumpGeometry(1, 0.3, 4.4), new THREE.MeshLambertMaterial({map:rockTex}), scree, (p, c)=>{
+    e3.set(rnd()*3, rnd()*6, rnd()*3); q4.setFromEuler(e3); v3.set(p[0], p[1] - p[3]*0.3, p[2]); s3.set(p[3]*(0.8 + rnd()*0.6), p[3]*0.6, p[3]);
+    const k = 0.75 + rnd()*0.35; c.setRGB(k, k*0.98, k*0.95); });
+  // crags: dark rock standing up out of the snow, a cap of snow on the bigger ones
+  place(clumpGeometry(1, 0.28, 7.7), new THREE.MeshLambertMaterial({map:rockTex, color:0x8a8680}), crag, (p, c)=>{
+    e3.set((rnd() - 0.5)*0.6, rnd()*6, (rnd() - 0.5)*0.6); q4.setFromEuler(e3); v3.set(p[0], p[1] - p[3]*0.25, p[2]); s3.set(p[3]*(0.8 + rnd()*0.7), p[3]*(0.6 + rnd()*0.5), p[3]);
+    const k = 0.6 + rnd()*0.3; c.setRGB(k, k, k*1.03); }, true);
+  place(clumpGeometry(1, 0.2, 5.5), new THREE.MeshLambertMaterial({color:0xf4f8fc}), crag.filter(p=> p[3] > 1.6), (p, c)=>{
+    q4.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rnd()*6.28); v3.set(p[0], p[1] + p[3]*0.32, p[2]); s3.set(p[3]*0.7, p[3]*0.18, p[3]*0.7); c.setRGB(1, 1, 1); });
+  // old snow: flat, lumpy patches lying in the ground
+  place(clumpGeometry(1, 0.25, 2.2), new THREE.MeshLambertMaterial({color:0xf2f6fa}), drift, (p, c)=>{
+    q4.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rnd()*6.28); v3.set(p[0], p[1] - 0.12, p[2]); s3.set(p[3]*(1 + rnd()), p[3]*0.06, p[3]); c.setRGB(1, 1, 1); });
+  // cairns: a stack of flat stones, biggest at the bottom
+  cairns.forEach(p=>{ const g = new THREE.Group(); let y = 0;
+    for(let k=0;k<6;k++){ const r = 0.55 - k*0.07, st = new THREE.Mesh(clumpGeometry(r, 0.2, k*3.1), new THREE.MeshLambertMaterial({map:rockTex, color:0xb8b2a8}));
+      st.scale.y = 0.45; st.position.set((rnd() - 0.5)*0.08, y + r*0.4, (rnd() - 0.5)*0.08); st.rotation.y = rnd()*6; g.add(st); y += r*0.8; }
+    setDown(g, p[0], p[2], 0); });
+  }
 }
 
 /* ---- the slot's walls: sculpted sandstone ----
@@ -10517,6 +10589,32 @@ if(SWAMPGP || JUNGLE){
     }
   }
 }
+/* ---- the bayou's ground mist: soft banks of it lying low over the black water and the hollows back
+   from the road, drifting very slowly, never on the road itself ---- */
+if(SWAMPGP){
+  const rnd = seeded(6113 + TRACK_ID), P = MAIN, pts = [], home = [];
+  for(let k=0, tries=0; k<240 && tries<3000; tries++){
+    const i = Math.floor(rnd()*P.N), p = P.pts[i], t = P.tans[i], sd = rnd() < 0.5 ? -1 : 1, off = P.half[i] + 4 + rnd()*22;   // (close enough to be seen through the trees)
+    const x = p.x - t.z*sd*off, z = p.z + t.x*sd*off;
+    if(!clearOf(x, z, 3)) continue;
+    // (it lies in the low places: over a pool, or below the road)
+    const y = gradedY(x, z), low = bwPool(x, z) > 0.02 || y < p.y - 0.6;
+    if(!low && rnd() < 0.6) continue;
+    pts.push(x, y + 1.2 + rnd()*1.8, z); home.push(x, z, rnd()*6.28); k++;
+  }
+  if(pts.length){
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+    const mist = new THREE.Points(g, new THREE.PointsMaterial({color:0xe6eee0, size:26, map:softDot(), transparent:true, opacity:0.26, depthWrite:false, fog:true}));
+    mist.frustumCulled = false; mist.renderOrder = 4; scene.add(mist);
+    const a = g.attributes.position;
+    ANIMS.push(t=>{
+      for(let k=0;k<a.count;k++){ const ph = home[k*3 + 2];
+        a.setX(k, home[k*3] + Math.sin(t*0.05 + ph)*3.5); a.setZ(k, home[k*3 + 1] + Math.cos(t*0.04 + ph*1.3)*3.5); }
+      a.needsUpdate = true;
+    });
+  }
+}
+
 /* ---- touching a wall: one way for every wall, rail, parapet and trunk in the game ----
    (nx, nz): the way into the wall, a unit vector; over: how far the car is into it. A glancing touch keeps
    the car going along the wall (a scrape that costs more the harder it went in, a small knock off it) and
