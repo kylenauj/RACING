@@ -5799,6 +5799,26 @@ const rockTex = new THREE.CanvasTexture(noiseCanvas(128, 128, (g,w,h)=>{
 }));
 rockTex.wrapS = rockTex.wrapT = THREE.RepeatWrapping;
 
+/* a steady pseudo-random 0..1 for a point of a mesh: the same for every copy of that point, so jittering
+   by it pushes a corner the faces share all one way and they stay joined (Math.random tears them apart) */
+function vertHash(x, y, z, s){
+  const h = Math.sin(Math.round(x*1000)*12.9898 + Math.round(y*1000)*78.233 + Math.round(z*1000)*37.719 + (s || 0)*4.137)*43758.5453;
+  return h - Math.floor(h);
+}
+/* a leafy clump or a boulder: a once-split icosahedron with its points pushed in and out by a smooth
+   noise (worked out from where each point is, so neighbouring faces still meet): rounder and lumpier than
+   a bare twenty-faced blob, and still faceted like everything else */
+function clumpGeometry(r, rough, seed){
+  const g = new THREE.IcosahedronGeometry(1, 1), p = g.attributes.position;
+  const s = seed === undefined ? Math.random()*50 : seed, k = rough === undefined ? 0.13 : rough;
+  for(let i=0;i<p.count;i++){
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const n = r*(1 + k*(Math.sin(x*3.3 + s) + Math.cos(y*2.9 + s*1.3) + Math.sin(z*3.1 + s*0.7))*0.5);
+    p.setXYZ(i, x*n, y*n, z*n);
+  }
+  g.computeVertexNormals();
+  return g;
+}
 function rockGeometry(seed){
   const g = new THREE.IcosahedronGeometry(1, 1);
   const p = g.attributes.position;
@@ -7900,7 +7920,7 @@ if(TRACK.geysers && LAKE.on && LAKE.lava){
     const mound = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 5.2, 2.6, 9, 1), rockM); mound.position.y = 0.9; g.add(mound);
     const lip = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 2.8, 0.7, 9, 1, true), crustM); lip.position.y = 2.4; g.add(lip);
     for(let r=0;r<7;r++){ const a = r/7*6.28 + Math.random(), d = 3.6 + Math.random()*1.6;
-      const rk = new THREE.Mesh(new THREE.DodecahedronGeometry(0.8 + Math.random()*0.9, 0), r % 3 ? rockM : crustM);
+      const rk = new THREE.Mesh(clumpGeometry(0.8 + Math.random()*0.9, 0.2), r % 3 ? rockM : crustM);
       rk.position.set(Math.cos(a)*d, 0.6 + Math.random()*0.6, Math.sin(a)*d); rk.rotation.set(Math.random()*3, Math.random()*3, 0); rk.scale.y = 0.7; g.add(rk); }
     const vent = new THREE.Mesh(new THREE.CircleGeometry(1.3, 9), ventM); vent.rotation.x = -Math.PI/2; vent.position.y = 2.35; g.add(vent);
     scene.add(g);
@@ -8933,8 +8953,8 @@ function stoneY(x, z){
     }
   });
   if(spots.length){
-    const rm = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0),
-      new THREE.MeshLambertMaterial({color: DESERT ? 0x9a6a4a : WINTER ? 0x8a8e96 : 0x7c776c}), spots.length);
+    const rm = new THREE.InstancedMesh(clumpGeometry(1, 0.2, 3.7),
+      new THREE.MeshLambertMaterial({map:rockTex, color: DESERT ? 0xb88060 : WINTER ? 0xa4a8b0 : 0x96908a}), spots.length);
     const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), e3 = new THREE.Euler();
     spots.forEach((sp, i)=>{
       const k = sp[2];
@@ -10628,7 +10648,7 @@ if(GATOR){
         addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.6, 0.35, 12), lam(0x8a6040)), x, y + 0.2, z);
         addTo(g, new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.5), basic(NEON[Math.floor(rnd()*NEON.length)])), x - f.nx*sd*2.4, y + 3.2, z - f.nz*sd*2.4);
         // a crown of feathery green, and moss hanging off it
-        for(let q=0;q<5;q++) addTo(g, new THREE.Mesh(new THREE.IcosahedronGeometry(5 + rnd()*3, 0), lam(0x3f7a4a)), x + (rnd() - 0.5)*9, g0 + H - 2 + rnd()*5, z + (rnd() - 0.5)*9).scale.y = 0.45;
+        for(let q=0;q<5;q++) addTo(g, new THREE.Mesh(clumpGeometry(5 + rnd()*3), lam(0x3f7a4a)), x + (rnd() - 0.5)*9, g0 + H - 2 + rnd()*5, z + (rnd() - 0.5)*9).scale.y = 0.45;
         for(let q=0;q<6;q++) addTo(g, new THREE.Mesh(new THREE.ConeGeometry(0.4, 4 + rnd()*4, 4), moss), x + (rnd() - 0.5)*10, g0 + H - 6, z + (rnd() - 0.5)*10).rotation.x = Math.PI;
       }
     }
@@ -10652,7 +10672,7 @@ if(GATOR){
     for(const sd of [-1, 1]){
       const x = f.p.x + f.nx*sd*(f.half + 9), z = f.p.z + f.nz*sd*(f.half + 9), g0 = gradedY(x, z);
       addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.8, top - g0 + 6, 10), bark), x, (top + g0)/2 + 3, z);
-      for(let q=0;q<5;q++) addTo(g, new THREE.Mesh(new THREE.IcosahedronGeometry(6 + rnd()*3, 0), lam(0x2f6a3a)), x + (rnd() - 0.5)*10, top + 6 + rnd()*4, z + (rnd() - 0.5)*10).scale.y = 0.5;
+      for(let q=0;q<5;q++) addTo(g, new THREE.Mesh(clumpGeometry(6 + rnd()*3), lam(0x2f6a3a)), x + (rnd() - 0.5)*10, top + 6 + rnd()*4, z + (rnd() - 0.5)*10).scale.y = 0.5;
     }
     const limb = addTo(g, new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, (f.half + 9)*2, 8), bark), f.p.x, top + 1, f.p.z);
     limb.rotation.z = Math.PI/2; limb.rotation.y = -Math.atan2(f.nz, f.nx);
@@ -11613,7 +11633,7 @@ if(PIT.on){
     pbox(body, 3.8, 1.9, 0.22, yellow, 0, 0.95, 2.7);
     pbox(body, 3.9, 0.22, 2.4, yellow, 0, 2.0, 3.9);                       // canopy over the cab
     for(const z of [-2, -0.6, 0.8, 2.1]) for(const x of [-1.95, 1.95]) pbox(body, 0.1, 1.7, 0.25, 0xc8901a, x, 0.9, z);
-    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1.9, 0), PM(0x7a6a5a));
+    const rock = new THREE.Mesh(clumpGeometry(1.9, 0.22), PM(0x7a6a5a));
     rock.scale.set(0.9, 0.45, 1.3); rock.position.set(0, 1.2, -0.3); body.add(rock);
     body.position.set(0, 2.25, -1.4); body.rotation.x = -0.04; g.add(body);
     for(const x of [-1.9, 1.9]){
@@ -11711,7 +11731,7 @@ if(PIT.on){
     for(let k=0;k<4;k++){
       const a = Math.random()*Math.PI*2, d = R*(0.8 + Math.random()*0.3), sc = 0.25 + Math.random()*0.35;
       const lx = Math.cos(a)*d, lz = Math.sin(a)*d;
-      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 0), PM(0x6a6258));
+      const rock = new THREE.Mesh(clumpGeometry(1, 0.22), PM(0x6a6258));
       rock.scale.set(sc, sc*0.7, sc); rock.position.set(lx, gradedY(x0 + lx, z0 + lz) - gc + sc*0.3, lz);
       rock.rotation.set(Math.random(), Math.random()*6, Math.random()); g.add(rock);
     }
@@ -12945,7 +12965,7 @@ if(SPRINGCUP){
         P.push(...b.attributes.position.array); }
       hg.setAttribute("position", new THREE.Float32BufferAttribute(P, 3)); hg.computeVertexNormals(); }
     instances(hg, lam(0xffffff, 0x1a0a2a), hang, c=> c.setHSL(0.74 + rnd()*0.06, 0.45 + rnd()*0.25, 0.62 + rnd()*0.14));
-    instances(new THREE.IcosahedronGeometry(1, 0), lam(0x5a8a3a), leaf, c=> c.setHSL(0.24 + rnd()*0.05, 0.45, 0.36 + rnd()*0.1));
+    instances(clumpGeometry(1, 0.1), lam(0x5a8a3a), leaf, c=> c.setHSL(0.24 + rnd()*0.05, 0.45, 0.36 + rnd()*0.1));
     for(let k=0;k<=S.n;k+=Math.round(5/seg)){ const f = frm(S.a + k); NO_TREES.push([f.p.x, f.p.z, f.half + 4]); }
     roadSign(byM(S.a, -80), 1, ["THE WISTERIA WALK", "headroom 5.5m"], "#6a4a8a", "#f4ecfa");
   }
@@ -13157,7 +13177,7 @@ if(SPRINGCUP){
       const a = k/28*Math.PI*2 + (rnd() - 0.5)*0.08, x = f.p.x + Math.cos(a)*R0, z = f.p.z + Math.sin(a)*R0;
       const n = nearest(x, z); if(n.dist < n.half + 4) continue;                  // (the road's way in and out)
       if(rnd() < 0.12) continue;                                                // (a few long gone)
-      const h = 2.4 + rnd()*2.6, w = 1.3 + rnd()*1.1, geo = new THREE.DodecahedronGeometry(1, 0);
+      const h = 2.4 + rnd()*2.6, w = 1.3 + rnd()*1.1, geo = clumpGeometry(1, 0.1);
       geo.scale(w*0.62, h*0.52, 0.5 + rnd()*0.3); geo.translate(0, h*0.42, 0);
       const m = new THREE.Mesh(geo, sarsen); m.position.set(x, gradedY(x, z) - 0.25, z);
       m.rotation.set((rnd() - 0.5)*0.16, a + Math.PI/2 + (rnd() - 0.5)*0.35, (rnd() - 0.5)*0.14); g.add(m);
@@ -14380,29 +14400,39 @@ function cherryGeometry(kind, leafy){
   return g;
 }
 function hardwoodGeometry(kind){
-  const pos = [], col = [], c = new THREE.Color();
-  const put = (geo, shade)=>{
-    const g = geo.index ? geo.toNonIndexed() : geo, a = g.attributes.position;
-    for(let i=0;i<a.count;i++){
-      pos.push(a.getX(i), a.getY(i), a.getZ(i));
-      shade(a.getY(i)); col.push(c.r, c.g, c.b);
-    }
-  };
+  // one layout, drawn twice: up close in rounded leafy clumps, and further off (geo.userData.mid) in the
+  // plain twenty-faced blobs, a quarter of the faces, which can't be told apart at that distance
   const tH = kind === 2 ? 0.40 : 0.26;
-  const trunk = new THREE.CylinderGeometry(0.012, 0.03, tH + 0.12, 6); trunk.translate(0, (tH + 0.12)/2, 0);
-  put(trunk, ()=> c.setHSL(0.07, 0.2, 0.10));
   const R = kind === 1 ? 0.33 : kind === 2 ? 0.24 : 0.28, n = kind === 1 ? 10 : kind === 2 ? 6 : 8;
+  const blobs = [];
   for(let k=0;k<n;k++){
     const a = k/n*Math.PI*2 + Math.random()*0.6, rr = k === 0 ? 0 : R*(0.45 + Math.random()*0.4);
-    const r = R*(0.55 + Math.random()*0.35);
-    const b = new THREE.IcosahedronGeometry(r, 0);
-    b.translate(Math.cos(a)*rr, tH + R*0.75 + (k === 0 ? R*0.55 : Math.random()*R*0.9), Math.sin(a)*rr);
-    put(b, y=> c.setHSL(0, 0, 0.66 + Math.random()*0.3));
+    blobs.push([R*(0.55 + Math.random()*0.35), Math.cos(a)*rr, tH + R*0.75 + (k === 0 ? R*0.55 : Math.random()*R*0.9), Math.sin(a)*rr, Math.random()*50]);
   }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
-  g.computeVertexNormals();
+  const build = (fine)=>{
+    const pos = [], col = [], c = new THREE.Color();
+    const put = (geo, shade)=>{
+      const g = geo.index ? geo.toNonIndexed() : geo, a = g.attributes.position;
+      for(let i=0;i<a.count;i++){
+        pos.push(a.getX(i), a.getY(i), a.getZ(i));
+        shade(a.getY(i)); col.push(c.r, c.g, c.b);
+      }
+    };
+    const trunk = new THREE.CylinderGeometry(0.012, 0.03, tH + 0.12, fine ? 8 : 6); trunk.translate(0, (tH + 0.12)/2, 0);
+    put(trunk, ()=> c.setHSL(0.07, 0.2, 0.10));
+    for(const [r, x, y, z, sd] of blobs){
+      const b = fine ? clumpGeometry(r, 0.13, sd) : new THREE.IcosahedronGeometry(r, 0);
+      b.translate(x, y, z);
+      put(b, y=> c.setHSL(0, 0, 0.66 + Math.random()*0.3));
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+    g.computeVertexNormals();
+    return g;
+  };
+  const g = build(true);
+  g.userData.mid = build(false);
   return g;
 }
 
@@ -14493,7 +14523,7 @@ function bushGeometry(seed){
     const pp = core.attributes.position, v = new THREE.Vector3();
     for(let i=0;i<pp.count;i++){
       v.fromBufferAttribute(pp, i);
-      v.multiplyScalar(0.9 + Math.random()*0.22);
+      v.multiplyScalar(0.9 + vertHash(v.x, v.y, v.z, seed)*0.22);     // (by where the point is: a corner shared by faces moves as one, so they stay joined)
       v.y = v.y*0.8 + 0.5;
       pp.setXYZ(i, v.x, Math.max(0.02, v.y), v.z);
     }
@@ -14511,7 +14541,7 @@ function bushGeometry(seed){
     const pp = s2.attributes.position, v = new THREE.Vector3();
     for(let i=0;i<pp.count;i++){
       v.fromBufferAttribute(pp, i);
-      v.multiplyScalar(0.85 + Math.random()*0.3);
+      v.multiplyScalar(0.85 + vertHash(v.x, v.y, v.z, seed*7 + b)*0.3);
       pp.setXYZ(i, v.x+ox, Math.max(0.02, v.y+oy), v.z+oz);
     }
     parts.push(s2);
@@ -15920,6 +15950,7 @@ function setFade(m, a){
 const FOREST_LOD = [];
 const LOD_KIND = { fern:{far:Infinity, cull:190}, prop:{far:Infinity, cull:520}, glow:{far:Infinity, cull:380}, tree:{far:260, cull:Infinity}, bush:{far:170, cull:620}, rock:{far:Infinity, cull:560}, stone:{far:Infinity, cull:230} };
 const LOD_SHADOW = 115;
+const LOD_MID = 90;                    // (a tree that has a middle version wears it from here to its far line)
 let LODK = 1;                          // (scaled down by Auto graphics on a slow machine)
 /* ---- everything else that stands still: drawn only when it can be seen ----
    The forest has its LOD cells; the rest (signs, banners, flags, fences, mushrooms, the props in
@@ -15983,18 +16014,23 @@ function updateForestLOD(){
     // (a little either way of each line so a cell sitting on it doesn't flicker)
     const wasFar = L.far ? L.far.visible : false, far = wasFar ? d > K.far*LODK - 12 : d > K.far*LODK + 12;
     const gone = d > Math.min(K.cull*(L.kind === "tree" ? 1 : LODK), scene.fog ? scene.fog.far : Infinity);
-    L.near.visible = !far && !gone;
+    let mid = false;
+    if(L.mid){ const was = L.mid.visible || L.far.visible; mid = !far && (was ? d > LOD_MID*LODK - 8 : d > LOD_MID*LODK + 8); }
+    L.near.visible = !far && !mid && !gone;
+    if(L.mid){ L.mid.visible = mid && !gone; L.mid.castShadow = L.mid.visible && Math.hypot(L.c.x - fx, L.c.z - fz) - L.R < LOD_SHADOW; }
     if(L.far) L.far.visible = far && !gone;
     L.near.castShadow = L.kind !== "glow" && (L.kind !== "fern" || L.near.userData.fernShadow) && L.near.visible && Math.hypot(L.c.x - fx, L.c.z - fz) - L.R < LOD_SHADOW;
   }
 }
 function chunkInstances(){
-  const CELL = 170;
+  const CELL0 = 170;
   const list = [];
   scene.children.forEach(o=>{ if(o.isInstancedMesh && o.count > 40 && !o.material.isShaderMaterial) list.push(o); });
   const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
   list.forEach(src=>{
     const geo = src.geometry;
+    // (a forest with a close-up version is cut finer, so the close-up trees are the ones that are close)
+    const CELL = geo.userData.mid ? 105 : CELL0;
     if(!geo.boundingSphere) geo.computeBoundingSphere();
     const r0 = geo.boundingSphere.radius, c0 = geo.boundingSphere.center;
     const buckets = new Map();
@@ -16051,7 +16087,20 @@ function chunkInstances(){
         fm.castShadow = false; fm.receiveShadow = false; fm.visible = false; fm.frustumCulled = true;
         fm.userData = {chunk:true, farTree:true}; fm.renderOrder = src.renderOrder;
         scene.add(fm);
-        FOREST_LOD.push({kind:lk, near:im, far:fm, c:g2.boundingSphere.center, R:g2.boundingSphere.radius});
+        let mm = null;
+        if(geo.userData.mid){
+          // (and a middle one, between the two)
+          const g4 = new THREE.BufferGeometry(), mg = geo.userData.mid;
+          for(const name in mg.attributes) g4.setAttribute(name, mg.attributes[name]);
+          g4.boundingSphere = g2.boundingSphere;
+          mm = new THREE.InstancedMesh(g4, src.material, ids.length);
+          mm.instanceMatrix.copy(im.instanceMatrix); mm.instanceMatrix.needsUpdate = true;
+          if(im.instanceColor){ mm.instanceColor = new THREE.InstancedBufferAttribute(im.instanceColor.array.slice(), 3); }
+          mm.castShadow = true; mm.receiveShadow = false; mm.visible = false; mm.frustumCulled = true;
+          mm.userData = {chunk:true, midTree:true}; mm.renderOrder = src.renderOrder;
+          scene.add(mm);
+        }
+        FOREST_LOD.push({kind:lk, near:im, mid:mm, far:fm, c:g2.boundingSphere.center, R:g2.boundingSphere.radius});
       } else FOREST_LOD.push({kind:lk || "prop", near:im, far:null, c:g2.boundingSphere.center, R:g2.boundingSphere.radius});
     });
     scene.remove(src);
