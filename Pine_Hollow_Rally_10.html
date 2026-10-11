@@ -9905,7 +9905,7 @@ if(BOWL.on && !GATOR){
     for(let k=0;k<NS;k++) cabs.setColorAt(k, cc.setHex(CABC[k % CABC.length]));
     cabs.castShadow = frames.castShadow = true;
     g.add(cabs); g.add(frames);
-    for(const m of [cabs, frames]){ m.userData.noMerge = true; m.frustumCulled = false; }
+    for(const m of [cabs, frames]){ m.userData.noMerge = true; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); }
     const rotY = 0.5;
     setDown(g, C.x, C.z, rotY);
     take(C.x, C.z, 10, 12); ISLANDS.push({x:C.x, z:C.z, r:5.4});
@@ -13075,7 +13075,7 @@ if(SPRINGCUP){
       const KC = [[0.07, 0.95, 0.55], [0, 0, 0.95], [0.0, 0.85, 0.5], [0.12, 0.9, 0.6], [0.05, 0.6, 0.85]];
       const im = new THREE.InstancedMesh(merged, new THREE.MeshLambertMaterial({emissive:0x220800}), fish.length), c = new THREE.Color(), m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
       fish.forEach((F, k)=> im.setColorAt(k, c.setHSL(...KC[F.c])));
-      im.frustumCulled = false; scene.add(im);
+      im.frustumCulled = false; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(im);
       ANIMS.push(t=>{
         fish.forEach((F, k)=>{ const a = F.ph + t*F.sp; v.set(F.x + Math.cos(a)*F.r, W.level - 0.06, F.z + Math.sin(a)*F.r);
           q4.setFromAxisAngle(up, -a + (F.sp > 0 ? 0 : Math.PI) + Math.sin(t*3 + k)*0.15); sc.set(F.s, F.s, F.s); m4.compose(v, q4, sc); im.setMatrixAt(k, m4); });
@@ -16685,7 +16685,7 @@ function staticCullScan(){
       const S = g.boundingSphere.clone().applyMatrix4(o.matrixWorld); c = S.center; r = S.radius;
     }
     if(!(r < 250) || !isFinite(c.x)) return;                              // the land, the road, the sky: always
-    L.push({o, c, r, mask:o.layers.mask, cast:o.castShadow, fc:o.frustumCulled, inst:!!o.isInstancedMesh,
+    L.push({o, c, r, mask:o.layers.mask, cast:o.castShadow, fc:o.frustumCulled, inst:!!o.isInstancedMesh, ver:o.isInstancedMesh ? o.instanceMatrix.version : 0,
             x:o.matrixWorld.elements[12], y:o.matrixWorld.elements[13], z:o.matrixWorld.elements[14], live:true});
   });
   STATIC_CULL.list = L; STATIC_CULL.n = scene.children.length;
@@ -16702,6 +16702,9 @@ function updateStaticCull(){
     if(!e.live) continue;
     const w = e.o.matrixWorld.elements;
     if(Math.abs(w[12] - e.x) + Math.abs(w[13] - e.y) + Math.abs(w[14] - e.z) > 0.01){ e.live = false; e.o.layers.mask = e.mask; e.o.castShadow = e.cast; continue; }   // it moves
+    // (or its pieces do: an instanced set rewritten as it plays, like the bits a tumbleweed blows apart into, or
+    //  fish going round a pond, whose sphere as first measured says nothing about where they are now)
+    if(e.inst && e.o.instanceMatrix.version !== e.ver){ e.live = false; e.o.layers.mask = e.mask; e.o.castShadow = e.cast; continue; }
     const d = Math.hypot(e.c.x - cp.x, e.c.y - cp.y, e.c.z - cp.z) - e.r;
     let out = racing && d > Math.min(far, (240 + e.r*10)*K);
     if(!out && e.inst && !e.fc){ SC.sph.center.copy(e.c); SC.sph.radius = e.r; out = !SC.frustum.intersectsSphere(SC.sph); }
@@ -25034,7 +25037,7 @@ const CRIT = { birds:[], weeds:[], wind:[0.8, 0.35] };
     // the bits they come apart into: short twigs, flung, tumbling, landing and lying a while
     const tg = new THREE.BoxGeometry(0.035, 0.035, 0.42); tg.translate(0, 0, 0.1);
     CRIT.twigs = new THREE.InstancedMesh(tg, new THREE.MeshLambertMaterial({}), 260);
-    CRIT.twigs.frustumCulled = false;
+    CRIT.twigs.frustumCulled = false; CRIT.twigs.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     CRIT.tw = []; const cc = new THREE.Color(), m0 = new THREE.Matrix4().makeScale(0, 0, 0);
     for(let i=0;i<260;i++){ CRIT.twigs.setMatrixAt(i, m0); CRIT.twigs.setColorAt(i, cc.setHSL(0.08 + Math.random()*0.04, 0.35 + Math.random()*0.2, 0.3 + Math.random()*0.25));
       CRIT.tw.push({life:0, x:0, y:0, z:0, vx:0, vy:0, vz:0, rx:0, ry:0, rz:0, sx:0, sy:0, sz:0, len:1}); }
