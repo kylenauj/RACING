@@ -18330,8 +18330,9 @@ function buildRival(kind, opts){
   const archLips = (zs, r, wr, x, m) => { for (const z of zs) for (const s of [1, -1]) {
     const fl = add(new THREE.TorusGeometry(r, 0.03, 6, 24, Math.PI), m || M.paint, s * x, wr, z); fl.rotation.y = Math.PI / 2; } };
   const mudflaps = (x, y, z) => { for (const s of [1, -1]) { box(0.24, 0.28, 0.02, M.rubber2, s * x, y, z); box(0.2, 0.02, 0.025, M.chrome, s * x, y + 0.12, z - 0.005); } };
-  const exhaustTip = (x, z) => { cyl(0.045, 0.3, 8, M.chrome, 'z', x, 0.24, z + 0.1); cyl(0.032, 0.02, 8, M.rubber2, 'z', x, 0.24, z - 0.06); };
-  const towHitch = (z) => { box(0.08, 0.07, 0.24, M.under, 0, 0.32, z - 0.08); add(new THREE.SphereGeometry(0.045, 8, 6), M.chrome, 0, 0.39, z - 0.17); };
+  // (both hung just under the body's own sill: on the lifted 4x4 that is a good deal higher)
+  const exhaustTip = (x, z, y = 0.24) => { cyl(0.045, 0.3, 8, M.chrome, 'z', x, y, z + 0.1); cyl(0.032, 0.02, 8, M.rubber2, 'z', x, y, z - 0.06); };
+  const towHitch = (z, y = 0.32) => { box(0.08, 0.07, 0.24, M.under, 0, y, z - 0.08); add(new THREE.SphereGeometry(0.045, 8, 6), M.chrome, 0, y + 0.07, z - 0.17); };
   const bezel = (r, x, y, z) => { const t = add(new THREE.TorusGeometry(r, 0.018, 4, 14), M.chrome, x, y, z); return t; };
   const panelLine = (x, y, z, len, axis) => axis === 'z' ? box(0.012, 0.006, len, M.trim, x, y, z) : box(len, 0.006, 0.012, M.trim, x, y, z);
   const box = (w, h, d, material, x, y, z, parent) =>
@@ -18540,10 +18541,10 @@ function buildRival(kind, opts){
     box(0.3, 0.05, 0.03, M.tail, 0, 1.78, R + 0.04);
     plateAt(0.45, 0.8, R - 0.058);
     mudflaps(0.78, 0.48, S.AR - 0.62);
-    towHitch(R - 0.1);
+    towHitch(R - 0.1, SILL - 0.02);
     numbers(SIDE + 0.04, 0.86, 0.55, 0.4);
     S.pipe = [-0.5, -2.1];
-    exhaustTip(-0.5, -2.05);
+    exhaustTip(-0.5, -2.05, SILL - 0.08); S.pipeY = SILL - 0.08;
     S.wheel = { style: "steel", rim: M.rimW, rr: 0.56, knobby: true };
     S.cabin = { zDash: 0.76, zSeat: 0.0, zRear: -1.0, belt: BELT, half: 0.75, steer: 0.38, seat: 0x4a3a2a };
     break;
@@ -18657,9 +18658,9 @@ function buildRival(kind, opts){
   const flameMat = c => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0,
                          blending: THREE.AdditiveBlending, depthWrite: false });
   const flame = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.5, 8), flameMat(0xffa32c));
-  flame.rotation.x = -Math.PI / 2; flame.position.set(S.pipe[0], 0.25, S.pipe[1] - 0.25); car.add(flame);
+  flame.rotation.x = -Math.PI / 2; flame.position.set(S.pipe[0], S.pipeY || 0.25, S.pipe[1] - 0.25); car.add(flame);
   const flameCore = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.3, 7), flameMat(0xfff0c0));
-  flameCore.rotation.x = -Math.PI / 2; flameCore.position.set(S.pipe[0], 0.25, S.pipe[1] - 0.15); car.add(flameCore);
+  flameCore.rotation.x = -Math.PI / 2; flameCore.position.set(S.pipe[0], S.pipeY || 0.25, S.pipe[1] - 0.15); car.add(flameCore);
 
   g.traverse(m => {
     if (!m.isMesh) return;
