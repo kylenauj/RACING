@@ -5955,14 +5955,17 @@ if(TRACK.special && !GATOR && !GLOW && !SPRING && (SPANS.length || CRATER.on)){
   }
 }
 function fissNear(x, z){ let d = 1e9; for(let n=0;n<FISS.length;n++){ const dx = x - FISS[n][0], dz = z - FISS[n][1]; if(Math.abs(dx) < 8 && Math.abs(dz) < 8) d = Math.min(d, Math.hypot(dx, dz)); } return d; }
+// (the weather's say in how the ground looks: see CONDITIONS)
+const COND_U = { uRain:{value:0}, uSnow:{value:0}, uSkyCol:{value:new THREE.Color(0x8a96a2)} };
 const TERRAIN_MAT = new THREE.MeshLambertMaterial({map:grassTex, vertexColors:true});
 const GROUND_MAT = TERRAIN_MAT;
 TERRAIN_MAT.onBeforeCompile = sh=>{
+  sh.uniforms.uRain = COND_U.uRain; sh.uniforms.uSnow = COND_U.uSnow; sh.uniforms.uSkyCol = COND_U.uSkyCol;
   sh.vertexShader = sh.vertexShader
     .replace("#include <common>", "#include <common>\nattribute vec4 aRoad;\nattribute vec4 aRoad2;\nattribute float aSoft;\nvarying vec4 vRoad;\nvarying vec4 vRoad2;\nvarying float vSoft;\nvarying vec2 vXZ;")
     .replace("#include <begin_vertex>", "#include <begin_vertex>\nvRoad = aRoad;\nvRoad2 = aRoad2;\nvSoft = aSoft;\nvXZ = position.xz;");
   sh.fragmentShader = sh.fragmentShader
-    .replace("#include <common>", "#include <common>\nvarying vec4 vRoad;\nvarying vec4 vRoad2;\nvarying float vSoft;\nvarying vec2 vXZ;\n" +
+    .replace("#include <common>", "#include <common>\nvarying vec4 vRoad;\nvarying vec4 vRoad2;\nvarying float vSoft;\nvarying vec2 vXZ;\nuniform float uRain, uSnow; uniform vec3 uSkyCol;\n" +
       "float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }\n" +
       "float vnz(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);\n" +
       "  return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }")
@@ -6035,6 +6038,17 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
               "float gSpore = step(0.94, h21(floor(vXZ*2.6)))*smoothstep(0.32, 0.12, length(fract(vXZ*2.6) - 0.5))*(1.0 - onRoad);",
               "totalEmissiveRadiance += vec3(0.03, 0.10, 0.24)*onRoad*(0.7 + 0.6*n3) + vec3(0.05, 0.38, 0.85)*gEdge*0.8",
               "  + vec3(0.03, 0.22, 0.5)*gMoss*0.55 + vec3(0.35, 0.85, 1.0)*gSpore*0.7;"].join("\n") : "",
+      // rain: everything darker and richer for being wet, the road most, and water standing in its dips and
+      // ruts, showing the sky; snow: a dusting over the road, swept off the wheel tracks
+      "if(uRain > 0.0){",
+      "  col *= 1.0 - uRain*(0.22 + 0.16*max(onRoad, verge*0.6));",
+      "  float pud = smoothstep(0.66, 0.72, vnz(vXZ*0.16) + 0.14*exp(-pow((abs(lat) - 1.65)/0.5, 2.0)) + (n1 - 0.5)*0.12)*onRoad*uRain;",
+      "  col = mix(col, col*0.55 + uSkyCol*0.22*(0.8 + 0.4*n3), pud*0.85);",
+      "}",
+      "if(uSnow > 0.0){",
+      "  float trk = exp(-pow((abs(lat) - 1.65)/0.45, 2.0));",
+      "  col = mix(col, vec3(0.86, 0.89, 0.93)*(0.9 + 0.12*n3), uSnow*(0.55 - 0.4*trk)*max(onRoad, verge));",
+      "}",
       "diffuseColor.rgb *= col;"
     ].join("\n"))
     .replace("#include <color_fragment>", "")
@@ -6797,6 +6811,252 @@ let skyDome = null;
   );
   skyDome.renderOrder = -1;
   scene.add(skyDome);
+}
+
+/* ==== CONDITIONS: the time of day and the weather ==========================================
+   Every circuit has its own season's light (the base, set above). On top of it go two choices, made
+   on the start screen and changed live there so you see what you're getting:
+     time:    Day (the circuit as it is), Dawn, Dusk, Night (the car's lamps on, a moon, stars)
+     weather: Clear, Rain (wet, darker road with water standing on it, spray off every wheel, less grip,
+              shorter sight), Snow (falling, on the winter circuits; on the others it rains instead)
+   Glowcap Hollow is already night: its time stays as it is, and only the weather changes. */
+const TODS = ["Day", "Dawn", "Dusk", "Night"], WXS = ["Clear", "Rain", "Snow"];
+const BASE_LOOK = {
+  fog: scene.fog.color.clone(), fogN: scene.fog.near, fogF: scene.fog.far, sky: SKY.clone(),
+  hemiC: hemi.color.clone(), hemiG: hemi.groundColor.clone(), hemiI: hemi.intensity,
+  sunC: sun.color.clone(), sunI: sun.intensity, sunDir: SUN_DIR.clone()
+};
+const CONDV = { tod:0, wx:0, dark:0, wet:0, snow:0, grip:1, pace:1, lamps:0 };
+/* what a choice means here: snow only falls on the winter circuits (rain anywhere else), and Glowcap keeps its night */
+function condFix(tod, wx){
+  if(GLOW) tod = 0;
+  if(wx === 2 && !WINTER) wx = 1;
+  if(wx === 1 && WINTER) wx = 2;
+  return [tod | 0, wx | 0];
+}
+const LAMP = { head:0.7, tail:0.22, brake:1.8 };
+let SKY_SUN = { u:0.0912, v:0.229 };
+/* repaint the sky for the conditions: the circuit's own sky, its sun moved, graded for the hour, and
+   overcast for rain or snow */
+function gradeSky(g, w, h){
+  const C = CONDV, hz = h*0.5;
+  const sx = SKY_SUN.u*w, sy = SKY_SUN.v*h;
+  g.save();
+  if(C.tod === 1 || C.tod === 2){
+    // low sun: everything warmer, the zenith deeper, a band of fire along the horizon under the sun
+    g.globalCompositeOperation = "multiply";
+    const gr = g.createLinearGradient(0, 0, 0, h);
+    const top = C.tod === 1 ? "#8a86c4" : "#7c6aa8", mid = C.tod === 1 ? "#f2c2c8" : "#f6a888", low = C.tod === 1 ? "#f8d8c0" : "#f0b090";
+    gr.addColorStop(0, top); gr.addColorStop(0.42, mid); gr.addColorStop(0.5, low); gr.addColorStop(1, low);
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    g.globalCompositeOperation = "screen";
+    for(const ox of [0, w]){
+      const rg = g.createRadialGradient(sx + ox, hz - 10, 4, sx + ox, hz - 10, w*0.3);
+      const c0 = C.tod === 1 ? "255,170,150" : "255,140,70";
+      rg.addColorStop(0, "rgba(" + c0 + ",0.85)"); rg.addColorStop(0.35, "rgba(" + c0 + ",0.3)"); rg.addColorStop(1, "rgba(" + c0 + ",0)");
+      g.fillStyle = rg; g.fillRect(0, 0, w, h);
+    }
+  }
+  if(C.tod === 3){
+    // night: the whole sky down to dark blue, the far ridges near black; stars, and a moon where the sun was
+    g.globalCompositeOperation = "multiply";
+    const gr = g.createLinearGradient(0, 0, 0, h);
+    gr.addColorStop(0, "#0b1230"); gr.addColorStop(0.45, "#1c2850"); gr.addColorStop(0.5, "#283458"); gr.addColorStop(1, "#141a30");
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    g.globalCompositeOperation = "source-over";
+    if(!C.wx) for(let i=0;i<2200;i++){
+      const x = Math.random()*w, y = Math.random()*hz*0.92, r = Math.random() < 0.05 ? 1.7 : 0.6 + Math.random()*0.8;
+      g.fillStyle = "rgba(" + (210 + Math.random()*45|0) + "," + (220 + Math.random()*35|0) + ",255," + (0.3 + Math.random()*0.6).toFixed(2) + ")"; g.fillRect(x, y, r, r);
+    }
+    g.globalCompositeOperation = "screen";
+    for(const ox of [0, w]){
+      const rg = g.createRadialGradient(sx + ox, sy, 2, sx + ox, sy, h*0.22);
+      rg.addColorStop(0, "rgba(200,215,255,0.55)"); rg.addColorStop(0.2, "rgba(140,165,230,0.18)"); rg.addColorStop(1, "rgba(120,150,220,0)");
+      g.fillStyle = rg; g.fillRect(0, 0, w, h);
+      g.globalCompositeOperation = "source-over";
+      g.fillStyle = "rgba(236,240,255,0.95)"; g.beginPath(); g.arc(sx + ox, sy, 15, 0, 7); g.fill();
+      g.fillStyle = "rgba(190,200,225,0.5)"; g.beginPath(); g.arc(sx + ox + 4, sy - 3, 4, 0, 7); g.arc(sx + ox - 5, sy + 4, 3, 0, 7); g.fill();
+      g.globalCompositeOperation = "screen";
+    }
+  }
+  if(C.wx){
+    // overcast: the colour drained out of it, a heavy grey deck of cloud low over everything
+    g.globalCompositeOperation = "saturation";
+    g.fillStyle = "rgba(128,128,128," + (C.wx === 2 ? 0.75 : 0.65) + ")"; g.fillRect(0, 0, w, h);
+    g.globalCompositeOperation = "multiply";
+    const k = C.tod === 3 ? "#56607a" : C.wx === 2 ? "#c4cad2" : "#9aa2ac";
+    g.fillStyle = k; g.fillRect(0, 0, w, h);
+    g.globalCompositeOperation = "source-over";
+    const lit = C.tod === 3 ? [40, 46, 60] : C.wx === 2 ? [214, 220, 228] : [150, 156, 166], dk = lit.map(v=> v*0.72|0);
+    for(let i=0;i<120;i++){
+      const cx = Math.random()*w, cy = Math.random()*hz*0.85, r = 40 + Math.random()*110;
+      const rg = g.createRadialGradient(cx, cy - r*0.3, r*0.1, cx, cy, r);
+      rg.addColorStop(0, "rgba(" + lit + ",0.75)"); rg.addColorStop(0.7, "rgba(" + dk + ",0.5)"); rg.addColorStop(1, "rgba(" + dk + ",0)");
+      g.fillStyle = rg; g.beginPath(); g.ellipse(cx, cy, r*1.8, r*0.7, 0, 0, 7); g.fill();
+    }
+  }
+  g.restore();
+}
+function repaintSky(){
+  const tex = skyDome.material.map, cv = tex.image, g = cv.getContext("2d");
+  paintSky(g, cv.width, cv.height); gradeSky(g, cv.width, cv.height);
+  tex.needsUpdate = true;
+}
+/* the reflections in the paint and the glass: a sky to match */
+function rebuildEnv(){
+  const C = CONDV, cv = document.createElement("canvas"); cv.width = 256; cv.height = 128;
+  const g = cv.getContext("2d"), grd = g.createLinearGradient(0, 0, 0, 128);
+  const k = C.tod === 3 ? 0.12 : C.wx ? 0.62 : C.tod ? 0.8 : 1;
+  const top = SKY.clone().multiplyScalar(k*0.8), hor = scene.fog.color.clone().multiplyScalar(Math.min(1, k*1.1)), grn = new THREE.Color(0x2c3a24).multiplyScalar(Math.max(0.2, k));
+  grd.addColorStop(0, "#" + top.getHexString()); grd.addColorStop(0.49, "#" + hor.getHexString()); grd.addColorStop(0.51, "#" + grn.getHexString()); grd.addColorStop(1, "#" + grn.clone().multiplyScalar(0.7).getHexString());
+  g.fillStyle = grd; g.fillRect(0, 0, 256, 128);
+  if(C.tod === 3 && !C.wx){ g.fillStyle = "rgba(220,230,255,0.9)"; g.beginPath(); g.arc(SKY_SUN.u*256, SKY_SUN.v*128, 3, 0, 7); g.fill(); }
+  const tex = new THREE.CanvasTexture(cv); tex.mapping = THREE.EquirectangularReflectionMapping;
+  let env = tex;
+  try{ const pm = new THREE.PMREMGenerator(renderer); env = pm.fromEquirectangular(tex).texture; pm.dispose(); }catch(e){}
+  const old = ENV; ENV = env;
+  scene.traverse(o=>{ if(!o.material) return; (Array.isArray(o.material) ? o.material : [o.material]).forEach(m=>{ if(m.envMap === old) m.envMap = env; }); });
+}
+/* the light for the conditions */
+function applyConditions(tod, wx, quiet){
+  [tod, wx] = condFix(tod, wx);
+  const C = CONDV, B = BASE_LOOK;
+  C.tod = tod; C.wx = wx;
+  C.wet = wx === 1 ? 1 : 0; C.snow = wx === 2 ? 1 : 0;
+  C.dark = tod === 3 ? 1 : 0;
+  C.grip = wx === 1 ? 0.84 : wx === 2 ? 0.76 : 1;
+  C.pace = wx === 1 ? 0.95 : wx === 2 ? 0.93 : 1;
+  C.lamps = tod === 3 ? 1 : tod === 2 || tod === 1 ? 0.45 : wx ? 0.35 : 0;
+  // where the sun (or the moon) is: the same bearing as by day, at its own height
+  const az = Math.atan2(B.sunDir.x, B.sunDir.z), el = [Math.asin(B.sunDir.y), 0.13, 0.12, 0.62][tod];
+  SUN_DIR.set(Math.sin(az)*Math.cos(el), Math.sin(el), Math.cos(az)*Math.cos(el)).normalize();
+  _lsX.crossVectors(new THREE.Vector3(0, 1, 0), SUN_DIR).normalize(); _lsY.crossVectors(SUN_DIR, _lsX).normalize();
+  if(typeof sunDir !== "undefined") sunDir.copy(SUN_DIR);
+  SKY_SUN = { u:0.0912, v: tod === 0 ? 0.229 : 0.5 - el*1.35/Math.PI };
+  // the light and the air, as the base, toward the hour's
+  const mix = (a, hex, t)=> a.clone().lerp(new THREE.Color(hex), t);
+  const T = [null,
+    {sunC:0xffa890, sunI:0.88, hemiC:0xd0b8e0, hemiG:0x3a3448, hemiI:0.78, fog:0xe8b8c0, sky:0xf0bcc4, t:0.7},
+    {sunC:0xff8a40, sunI:1.0, hemiC:0xffb890, hemiG:0x4a3028, hemiI:0.74, fog:0xf2a070, sky:0xf4a878, t:0.75},
+    {sunC:0xa4b8ff, sunI:0.42, hemiC:0x5a72b8, hemiG:0x141a2a, hemiI:0.55, fog:0x121c38, sky:0x18264a, t:1}][tod];
+  let fogC = B.fog.clone(), skyC = B.sky.clone(), hC = B.hemiC.clone(), hG = B.hemiG.clone(), hI = B.hemiI, sC = B.sunC.clone(), sI = B.sunI, fN = B.fogN, fF = B.fogF;
+  if(T){ fogC = mix(fogC, T.fog, T.t); skyC = mix(skyC, T.sky, T.t); hC = mix(hC, T.hemiC, T.t); hG = mix(hG, T.hemiG, T.t);
+         hI = hI*(1 - T.t) + T.hemiI*T.t; sC = mix(sC, T.sunC, T.t); sI = sI*(1 - T.t) + T.sunI*T.t;
+         if(tod === 3){ fN = Math.min(fN, 60); fF = Math.min(fF, 560); } }
+  if(wx){
+    const grey = tod === 3 ? 0x1a2030 : wx === 2 ? 0xdde3ea : 0x9ca6b0;
+    fogC = mix(fogC, grey, 0.7); skyC = mix(skyC, grey, 0.7); hC = mix(hC, tod === 3 ? 0x3a4660 : 0xc4ccd4, 0.6);
+    sI *= 0.35; hI *= tod === 3 ? 1 : 1.08; fN *= 0.35; fF *= wx === 2 ? 0.45 : 0.55;
+  }
+  scene.fog.color.copy(fogC); scene.fog.near = fN; scene.fog.far = fF; SKY.copy(skyC);
+  hemi.color.copy(hC); hemi.groundColor.copy(hG); hemi.intensity = hI;
+  sun.color.copy(sC); sun.intensity = sI;
+  // every shader that took its own copy of the fog
+  scene.traverse(o=>{ const m = o.material; if(!m) return; (Array.isArray(m) ? m : [m]).forEach(mm=>{ const u = mm.uniforms; if(!u) return;
+    if(u.fogColor && u.fogColor.value && u.fogColor.value.copy) u.fogColor.value.copy(fogC);
+    if(u.fogNear) u.fogNear.value = fN; if(u.fogFar) u.fogFar.value = fF; }); });
+  COND_U.uRain.value = C.wet; COND_U.uSnow.value = C.snow; COND_U.uSkyCol.value.copy(skyC).lerp(fogC, 0.5);
+  // the lamps: brighter the darker it is (and in the rain)
+  LAMP.head = 0.7 + C.lamps*2.4; LAMP.tail = 0.22 + C.lamps*0.9; LAMP.brake = 1.8 + C.lamps*0.8;
+  scene.traverse(o=>{ const m = o.material; if(!m) return; (Array.isArray(m) ? m : [m]).forEach(mm=>{ if(mm.userData && mm.userData.lamp === "head") mm.emissiveIntensity = mm.userData.base*LAMP.head/0.7; }); });
+  // the post: the sun's glare only by day, and the paper whiter or bluer
+  if(typeof postMat !== "undefined"){
+    postMat.uniforms.uRayCol.value.set(tod === 2 ? 1 : 1, tod === 2 ? 0.7 : tod === 1 ? 0.78 : 0.86, tod === 2 ? 0.45 : 0.62);
+    POST_K.sun = tod === 3 || wx ? 0 : 1;
+  }
+  { const k = unlitLevel(), warm = tod === 2 ? [1.08, 0.9, 0.78] : tod === 1 ? [1.04, 0.92, 0.94] : tod === 3 ? [0.8, 0.9, 1.25] : [1, 1, 1];
+    UNLIT.forEach(([c, c0])=> c.setRGB(c0.r*k*warm[0], c0.g*k*warm[1], c0.b*k*warm[2])); }
+  repaintSky(); rebuildEnv();
+  CARLAMPS.forEach(L=> L.dirty = true);
+  RAIN.on = wx > 0; RAIN.snow = wx === 2; RAIN.made || makeRain();
+  RAIN.pts.visible = RAIN.on;
+  if(!quiet) document.body.dataset.tod = TODS[tod].toLowerCase();
+}
+const POST_K = { sun:1 };
+/* things drawn without lights (the grass billboards): told how bright the light is, by hand */
+const UNLIT = [];
+function unlitLevel(){ const C = CONDV; return C.tod === 3 ? (C.wx ? 0.22 : 0.3) : (C.tod ? 0.82 : 1)*(C.wx ? 0.72 : 1); }
+/* ---- the car's lamps, at night: a beam of light on the road ahead of every car, and the player's real
+   headlight (a spot light) lighting the trees and the road as it goes ---- */
+const CARLAMPS = [];
+const BEAM_TEX = (()=>{ const cv = noiseCanvas(128, 256, (g, w, h)=>{
+    const gr = g.createRadialGradient(w/2, h*0.9, 4, w/2, h*0.6, h*0.62);
+    gr.addColorStop(0, "rgba(255,240,200,1)"); gr.addColorStop(0.35, "rgba(255,232,180,0.55)"); gr.addColorStop(1, "rgba(255,230,170,0)");
+    g.fillStyle = gr; g.fillRect(0, 0, w, h); });
+  return new THREE.CanvasTexture(cv); })();
+const BEAM_MAT = new THREE.MeshBasicMaterial({map:BEAM_TEX, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
+  polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4, opacity:0, fog:true});
+const BEAM_GEO = (()=>{ const g = new THREE.PlaneGeometry(7.5, 20); g.rotateX(-Math.PI/2); g.translate(0, 0.12, 12.5); return g; })();
+function lampKit(group, player){
+  let L = CARLAMPS.find(k=> k.g === group);
+  if(L) return L;
+  const beam = new THREE.Mesh(BEAM_GEO, BEAM_MAT); beam.renderOrder = 2; beam.frustumCulled = false; group.add(beam);
+  L = {g:group, beam, spot:null, player, dirty:true};
+  CARLAMPS.push(L);
+  return L;
+}
+let HEADSPOT = null;
+function stepLamps(){
+  const k = CONDV.lamps;
+  BEAM_MAT.opacity = CONDV.tod === 3 ? 0.55 : k*0.4;
+  const want = [car].concat(typeof rivals !== "undefined" ? rivals.map(r=> r.mesh) : []);
+  if(typeof NET !== "undefined" && NET.peers) NET.peers.forEach(p=>{ if(p.car && p.car.mesh) want.push(p.car.mesh); });
+  for(const g of want){ if(!g) continue; const L = lampKit(g, g === car); L.beam.visible = k > 0.3; }
+  // the player's own headlight: a real light, only when it's dark enough to want it
+  if(k >= 0.9 && car){
+    if(!HEADSPOT){
+      HEADSPOT = new THREE.SpotLight(0xfff0d0, 0, 90, 0.52, 0.55, 1.1); HEADSPOT.castShadow = false;
+      scene.add(HEADSPOT); scene.add(HEADSPOT.target);
+    }
+    const h = pose.h, fx = Math.sin(h), fz = Math.cos(h);
+    HEADSPOT.position.set(pose.x + fx*2.3, pose.y + 1.0, pose.z + fz*2.3);
+    HEADSPOT.target.position.set(pose.x + fx*22, pose.y - 1.5, pose.z + fz*22);
+    HEADSPOT.intensity = 2.6; HEADSPOT.visible = car.visible;
+  } else if(HEADSPOT) HEADSPOT.intensity = 0;
+}
+/* ---- rain and snow: streaks (or flakes) in a box that travels with the camera ---- */
+const RAIN = { on:false, snow:false, made:false, pts:null, n:2600, box:[60, 34, 60] };
+function makeRain(){
+  RAIN.made = true;
+  const n = RAIN.n, pos = new Float32Array(n*6), B = RAIN.box;
+  RAIN.seed = new Float32Array(n*3);
+  for(let i=0;i<n;i++){ RAIN.seed[i*3] = Math.random()*B[0]; RAIN.seed[i*3+1] = Math.random()*B[1]; RAIN.seed[i*3+2] = Math.random()*B[2]; }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+  RAIN.pts = new THREE.LineSegments(g, new THREE.LineBasicMaterial({color:0xc8d4e0, transparent:true, opacity:0.42, depthWrite:false, fog:true}));
+  RAIN.pts.frustumCulled = false; RAIN.pts.userData.noCull = true; RAIN.pts.renderOrder = 5; RAIN.pts.visible = false;
+  // snow is drawn as soft points instead
+  const sg = new THREE.BufferGeometry(); sg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(n*3), 3).setUsage(THREE.DynamicDrawUsage));
+  RAIN.flakes = new THREE.Points(sg, new THREE.PointsMaterial({color:0xffffff, size:0.42, map:softDot(), transparent:true, opacity:0.95, depthWrite:false, fog:true}));
+  RAIN.flakes.frustumCulled = false; RAIN.flakes.userData.noCull = true; RAIN.flakes.visible = false;
+  scene.add(RAIN.pts); scene.add(RAIN.flakes);
+  RAIN.t = 0;
+}
+function stepRain(dt){
+  if(!RAIN.made) return;
+  RAIN.pts.visible = RAIN.on && !RAIN.snow; RAIN.flakes.visible = RAIN.on && RAIN.snow;
+  if(!RAIN.on) return;
+  RAIN.t += dt;
+  const B = RAIN.box, c = camera.position, n = RAIN.n, S = RAIN.seed;
+  const fall = RAIN.snow ? 1.6 : 26, t = RAIN.t, wx = RAIN.snow ? 0.6 : 3.5, wz = RAIN.snow ? 0.3 : 1.6;
+  const ox = c.x - B[0]/2, oy = c.y - B[1]*0.45, oz = c.z - B[2]/2;
+  const wrap = (v, L)=> ((v % L) + L) % L;
+  if(RAIN.snow){
+    const a = RAIN.flakes.geometry.attributes.position, P = a.array;
+    for(let i=0;i<n;i++){
+      const sw = Math.sin(t*1.3 + i)*0.6;
+      P[i*3]   = ox + wrap(S[i*3] + wx*t + sw - ox, B[0]);
+      P[i*3+1] = oy + wrap(S[i*3+1] - fall*t - oy, B[1]);
+      P[i*3+2] = oz + wrap(S[i*3+2] + wz*t + Math.cos(t*1.1 + i)*0.6 - oz, B[2]);
+    }
+    a.needsUpdate = true;
+  } else {
+    const a = RAIN.pts.geometry.attributes.position, P = a.array, L = 0.9;
+    for(let i=0;i<n;i++){
+      const x = ox + wrap(S[i*3] + wx*t - ox, B[0]), y = oy + wrap(S[i*3+1] - fall*t - oy, B[1]), z = oz + wrap(S[i*3+2] + wz*t - oz, B[2]);
+      const j = i*6; P[j] = x; P[j+1] = y; P[j+2] = z; P[j+3] = x - wx*L/fall; P[j+4] = y + L; P[j+5] = z - wz*L/fall;
+    }
+    a.needsUpdate = true;
+  }
 }
 
 /* ---- corner boards ---------------------------------------------------
@@ -15158,7 +15418,7 @@ function billboardField(tex, cell, pos, scale, uv, tint, colour){
   geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 3000);
   const mat = new THREE.ShaderMaterial({
     uniforms: {
-      map:{value:tex}, uCell:{value:cell}, uCol:{value: colour || new THREE.Color(1, 1, 1)},
+      map:{value:tex}, uCell:{value:cell}, uCol:{value: (()=>{ const c0 = colour || new THREE.Color(1, 1, 1); const c = c0.clone(); UNLIT.push([c, c0.clone()]); return c; })()},
       fogColor:{value:new THREE.Color(scene.fog.color)},
       fogNear:{value:scene.fog.near}, fogFar:{value:scene.fog.far}
     },
@@ -17479,6 +17739,8 @@ function buildWagon(opts){
   M.flameO = mat(0xe0601e, { roughness: 0.6, side: THREE.DoubleSide }); M.flameY = mat(0xf2c23a, { roughness: 0.6, side: THREE.DoubleSide });
   if((opt.lamps | 0) === 1){ M.head.color.set(0xffd84a); M.head.emissive.set(0xffc020); }            // French yellow
   if((opt.lamps | 0) === 2){ M.head.color.set(0xdff0ff); M.head.emissive.set(0xa8d4ff); M.head.emissiveIntensity = 1.0; }   // cold white
+  // (the lamps burn brighter after dark and in the rain: see CONDITIONS)
+  M.head.userData = {lamp:"head", base:M.head.emissiveIntensity}; M.head.emissiveIntensity *= LAMP.head/0.7;
   /* Patina: fifty winters on the paint, worked out over the body itself so it lies across every panel the
      same way. Rust bubbling up from the sills and round the arches (and in patches anywhere), dark blistered
      paint round each patch, the roof and hood sun-bleached chalky, grey primer where someone sanded and gave
@@ -18349,6 +18611,8 @@ function buildRival(kind, opts){
     alu:    mat(0xc9ccc8, { roughness: 0.4, metalness: 0.7 }),
   };
   M.brake = M.tail;
+  // (the lamps burn brighter after dark and in the rain: see CONDITIONS)
+  M.head.userData = {lamp:"head", base:M.head.emissiveIntensity}; M.head.emissiveIntensity *= LAMP.head/0.7;
   // the paint's years: a light wear on most, a proper beater's rust and primer on the worst of them
   const wear = (opt.rust || 0) >= 50 ? 0.85 : 0;
   if(wear > 0){ patinate(M.paint, 1.7 + (opt.num || 0)*0.37, wear); if(kind === "trail") patinate(M.paint2, 5.2, wear*0.6); }
@@ -18840,6 +19104,11 @@ function spawnDust(x,y,z,sandy,force,vx,vz,lift){
     dustSize[i] = 0.6 + Math.random()*0.6; dustLife[i] = 0.5 + Math.random()*0.35;
     dustGrav[i] = 13; dustGrow[i] = 0.5;
   }
+  else if(CONDV.wet && sandy !== 5){                 // in the rain: not dust but a grey mist of spray off the wet road
+    const g2 = 0.74 + Math.random()*0.1;
+    dustCol[j]=g2; dustCol[j+1]=g2*1.03; dustCol[j+2]=g2*1.08;
+    dustSize[i]*=0.75; dustLife[i]*=0.55; dustGrow[i]=2.6; dustGrav[i]=1.2;
+  }
   else if(sandy){
     if(WINTER){ dustCol[j]=0.86; dustCol[j+1]=0.89; dustCol[j+2]=0.93; }
     else if(DESERT){ dustCol[j]=0.74; dustCol[j+1]=0.55; dustCol[j+2]=0.38; }
@@ -19181,7 +19450,7 @@ function updateSunGlow(){
   sunNdc.copy(sunWorld).project(camera);
   camera.getWorldDirection(camFwd);
   const facing = camFwd.dot(sunDir);
-  const vis = Math.max(0, facing);
+  const vis = Math.max(0, facing)*POST_K.sun;
   postMat.uniforms.uSunVis.value = vis*vis*0.9;
   postMat.uniforms.uSunPos.value.set(sunNdc.x*0.5 + 0.5, sunNdc.y*0.5 + 0.5);
 }
@@ -20259,6 +20528,7 @@ function stepCarInner(dt){
   let grip = (hand && !sliding) ? 1.9 : deepOff ? 3.4 : offRoad ? 5.0
            : 8.6 - mudAmt*3.5 - wetAmt*2.3;
   grip *= 1 - iceAmt*0.66;                          // on ice the tail keeps on going
+  grip *= CONDV.grip;                                // and in the wet, or on fresh snow
   grip *= 1 + tarAmt*0.18;                           // and on tar it bites
   if(pose.air) grip = 0.35;                          // barely any yaw authority mid air
   let nfx, nfz;
@@ -21624,7 +21894,7 @@ const SAVE_KEY = "pinehollow.save.v1";
 const BOOT_KEY = "pinehollow.boot";
 const SAVE = (()=>{
   const def = { settings:{ master:0.1, music:0.5, sfx:0.9, vol10:true, cam:0, auto:true, filter:true,
-                           res:1, hud:1, diff:1, units:1, gfx:2, gfxAuto:true, autoQ:0, fps:0, look:0, paint:0, notes:1,
+                           res:1, hud:1, diff:1, units:1, gfx:2, gfxAuto:true, autoQ:0, fps:0, look:0, paint:0, notes:1, tod:0, wx:0,
                            car:{ model:0, fender:0, rim:0, wheel:1, livery:0, beat:1,
                                  rack:1, spare:1, cans:1, shovel:0, lights:0, flaps:0, bull:0,
                                  stripe:0, tint:0, pod:0, tape:0, ride:1,
@@ -22120,7 +22390,7 @@ function stepRivals(dt){
   }
   const moving = state.phase === "racing" || state.phase === "done" || state.phase === "menu";
   const racing = state.phase === "racing";
-  const dk = DIFFS[SAVE.settings.diff].k;
+  const dk = DIFFS[SAVE.settings.diff].k*CONDV.pace;
   const myProg = progressOf(state.lap-1, state.idx);
   // where the player sits in the road's own frame
   const pT = tans[state.idx], pP = pts[state.idx];
@@ -22172,7 +22442,7 @@ function stepRivals(dt){
       }
       // being shoved along from behind: it goes with it instead of braking against you
       if(r.shoved > 0){ r.shoved -= dt; target = Math.max(target, r.v); }
-      r.mesh.userData.tail.emissiveIntensity = target < r.v - 1.0 ? 1.7 : 0.22;
+      r.mesh.userData.tail.emissiveIntensity = target < r.v - 1.0 ? LAMP.brake : LAMP.tail;
       r.v += Math.max(-17*dt, Math.min(7.2*dt, target - r.v));
       r.s += Math.max(0, r.v)*dt/segLen;
     }
@@ -23040,6 +23310,13 @@ const OPTS = [
    desc:"Auto watches the frame rate during a race and trades resolution, far detail and shadows for smoothness when the machine can't keep up (laptops, browsers on battery). Full always draws everything; Fast turns shadows and multisampling off at standard resolution."},
   {key:"fps",    label:"Frame rate", vals:["Hidden","Shown"], desc:"Shows frames a second at the top of the screen during a race."}
 ];
+/* the conditions, picked on the start screen: they change the world as you pick */
+const COPTS = [
+  {key:"c_tod", label:"Time of day", vals:TODS, get: ()=> condFix(SAVE.settings.tod | 0, 0)[0], set: v=>{ SAVE.settings.tod = v; applyConditions(SAVE.settings.tod, SAVE.settings.wx); },
+   desc:"Dawn and dusk: a low sun and long shadows. Night: the lamps on, a moon, and only as far as your lights reach."},
+  {key:"c_wx", label:"Weather", vals:["Clear", "Rain", "Snow"], get: ()=> condFix(0, SAVE.settings.wx | 0)[1], set: v=>{ SAVE.settings.wx = v; applyConditions(SAVE.settings.tod, SAVE.settings.wx); },
+   desc:"Rain: a wet road, spray, less grip and less to see by. Snow falls on the winter circuits (anywhere else it rains)."}
+];
 /* ---- the garage: what you drive, and what you bolt on it ---- */
 const onoff = ["Off", "On"];
 const carKey = (k, label, vals, desc)=> ({ key:"car_" + k, label, vals, desc,
@@ -23109,15 +23386,15 @@ function optValue(O){
   return '<i class="ar" data-d="-1" title="Previous">\u2039</i>' + sw + '<b>' + esc(O.vals[idx]) + '</b><i class="ar" data-d="1" title="Next">\u203A</i>';
 }
 function adjustOpt(el, d, wrap){
-  const O = OPTS.find(o => o.key === el.dataset.opt) || GOPTS.find(o => o.key === el.dataset.opt);
+  const O = OPTS.find(o => o.key === el.dataset.opt) || GOPTS.find(o => o.key === el.dataset.opt) || COPTS.find(o => o.key === el.dataset.opt);
   const S = SAVE.settings;
   if(O.get){
     const n = O.vals.length;
     let v = O.get() + d;
     v = wrap ? (v + n)%n : Math.max(0, Math.min(n - 1, v));
-    O.set(v); persist(); applySettings();
+    O.set(v); persist(); if(O.cat !== undefined) applySettings();
     el.querySelector(".val").innerHTML = optValue(O);
-    SFX.adjust(); garageNotes();
+    SFX.adjust(); if(O.cat !== undefined) garageNotes();
     return;
   }
   if(O.bar){
@@ -23447,6 +23724,7 @@ function showReady(mode){
   openScreen("scReady",
     '<div class="cols"><div class="left"><h2 class="head">' + esc(MODES[mode].label) + '</h2>' +
     '<div class="menu"><button class="item" data-act="go"><span>' + (mode === "expedition" ? 'SET OFF' : 'START RACE') + '</span></button>' +
+    COPTS.map(O=> '<button class="item opt" data-opt="' + O.key + '"><span>' + esc(O.label) + '</span><span class="val">' + optValue(O) + '</span></button>').join("") +
     '<button class="item back" data-act="back"><span>' + (mode === "expedition" ? 'CHOOSE ANOTHER MOUNTAIN' : 'CHOOSE ANOTHER CIRCUIT') + '</span></button></div></div>' +
     '<div class="right"><div class="detail">' + detailHTML(TRACK_ID) + '</div></div></div>',
     { back: ()=> showTracks(mode),
@@ -24184,7 +24462,10 @@ function netEvent(ev, d){
   if(ev === "track" && fromHost && typeof d.id === "number" && TRACKS[d.id] && d.id !== TRACK_ID){
     NET.wantTrack = d.id; travel(d.id, {mode:"online", room:NET.code, name:NET.name, at:NET.joinedAt});
   }
-  if(ev === "start" && fromHost && d.track === TRACK_ID && !(d.k && NET.raceK === d.k)) netBegin(d.grid || [], d.goAt, d.k);
+  if(ev === "start" && fromHost && d.track === TRACK_ID && !(d.k && NET.raceK === d.k)){
+    if(Array.isArray(d.cond) && (d.cond[0] !== CONDV.tod || d.cond[1] !== CONDV.wx)) applyConditions(d.cond[0] | 0, d.cond[1] | 0);   // (everyone races in the host's weather)
+    netBegin(d.grid || [], d.goAt, d.k);
+  }
   if(ev === "go" && fromHost && typeof d.track === "number" && TRACKS[d.track] && d.track !== TRACK_ID && !NET.wantTrack){
     NET.wantTrack = d.track; travel(d.track, {mode:"online", room:NET.code, name:NET.name, at:NET.joinedAt, starting:true, expect:d.n | 0});
   }
@@ -24267,7 +24548,7 @@ function netStart(){
   /* GO is at one moment on the host's clock, far enough ahead for the word to reach everyone: each of
      them counts down to that moment on their own clock (see netBegin), so the lights go out together */
   const goAt = netNow() + 3200 + 1400, k = netNewId();
-  const word = {from:NET.id, host:true, track:TRACK_ID, grid, goAt, k};
+  const word = {from:NET.id, host:true, track:TRACK_ID, grid, goAt, k, cond:[CONDV.tod, CONDV.wx]};
   NET.race = {k, grid, goAt};
   if(NET.tx) NET.tx.send("start", word);
   /* The word to start went out once, and a friend whose page was still settling into the room (just loaded
@@ -24748,6 +25029,7 @@ function showStandings(){
  * ------------------------------------------------------------------ */
 function boot(){
   applySettings();
+  applyConditions(SAVE.settings.tod | 0, SAVE.settings.wx | 0);
   enterMenuWorld();
   let b = null;
   try{ b = JSON.parse(sessionStorage.getItem(BOOT_KEY) || "null"); sessionStorage.removeItem(BOOT_KEY); }catch(e){}
@@ -25272,6 +25554,7 @@ function frame(now){
     stepNotes(info); stepTrace();
 
     stepDust(dt);
+    stepRain(dt); stepLamps();
 
     if(state.phase === "menu") (GAME.garage ? garageCam(dt) : attractCam(dt));
     else if(state.phase === "done" && EXP.on && GAME.doneT > 1.4) finishCam(dt);
@@ -25314,7 +25597,7 @@ function frame(now){
     else if(m.map) m.map.offset.y = (clock*0.09)%1;
   });
   car.userData.tail.emissiveIntensity =
-    (state.phase === "racing" && CTL.brk && alongNow > 0.5) ? 1.8 : 0.22;
+    (state.phase === "racing" && CTL.brk && alongNow > 0.5) ? LAMP.brake : LAMP.tail;
 
   skidMat.uniforms.uTime.value = state.t;
   const sp = state.phase === "menu" ? 0 : info.sp;
