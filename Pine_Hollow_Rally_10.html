@@ -24666,7 +24666,7 @@ function showStandings(){
     '<div class="cols"><div class="left">' +
     (final ? (metal ? trophySVG(CUP_KIND[ck], metal, "trophyBig") : '') + '<div class="big">' + (myPos === 1 ? "CHAMPION" : ordinal(myPos) + " OVERALL") + '</div>'
            : '<div class="big">STANDINGS</div>') +
-    '<h2 class="head" style="margin-top:6px">' + (final ? "Championship over" : "After round " + C.round + " of " + CHAMP_ROUNDS.length) + '</h2>' +
+    '<h2 class="head" style="margin-top:6px">' + (final ? esc((CUPS[ck] || {name:"The cup"}).name) : "After round " + C.round + " of " + CHAMP_ROUNDS.length) + '</h2>' +
     '<div class="menu">' +
     (final ? '' : '<button class="item" data-act="next"><span>NEXT ROUND</span><small>' + esc(next) + '</small></button>') +
     '<button class="item' + (final ? '' : ' back') + '" data-act="menu"><span>MAIN MENU</span></button></div></div>' +
