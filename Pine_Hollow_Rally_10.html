@@ -21578,6 +21578,26 @@ function stepCarInner(dt){
  * ------------------------------------------------------------------ */
 let camMode = 0;
 const camPos = new THREE.Vector3(), camAim = new THREE.Vector3();
+/* where the hood view's eye sits on a car, in the car's own frame (ground origin, +z forward): just ahead of
+   the foot of the windscreen, a little over the hood there. Found from the body itself: the front edge of the
+   glass, and the highest part of the body in a strip down the middle of the hood in front of it. */
+const _he = new THREE.Vector3(), _heE = new THREE.Euler();
+function hoodEye(G){
+  if(G.userData.hoodEye) return G.userData.hoodEye;
+  const body = carBody(G), v = new THREE.Vector3(), m = new THREE.Matrix4(), inv = new THREE.Matrix4();
+  body.updateMatrixWorld(true); inv.copy(body.matrixWorld).invert();
+  let zG = -1e9, belt = 0;
+  const each = (fn)=> body.traverse(o=>{ if(!o.isMesh || !o.geometry || o.material.isMeshBasicMaterial) return;
+    m.multiplyMatrices(inv, o.matrixWorld); const P = o.geometry.attributes.position;
+    for(let i = 0; i < P.count; i++){ v.fromBufferAttribute(P, i).applyMatrix4(m); fn(o, v); } });
+  // the screen's foot: the front-most glass, low down in the glasshouse
+  each((o, p)=>{ if(o.material.transparent && Math.abs(p.x) < 0.4 && p.z > zG && p.y > 0.6){ zG = p.z; belt = p.y; } });
+  if(zG < -1e8){ zG = 1.0; belt = 0.95; }
+  const z = zG + 0.32;
+  let top = belt;
+  each((o, p)=>{ if(!o.material.transparent && Math.abs(p.x) < 0.45 && p.z > zG + 0.05 && p.z < zG + 0.75 && p.y < belt + 0.5) top = Math.max(top, p.y); });
+  return (G.userData.hoodEye = { z, y: top + 0.3 });
+}
 let camH = 0;
 function stepCamera(dt, sp){
   // In a slide the car turns under you but the view stays behind your line of
@@ -21615,13 +21635,21 @@ function stepCamera(dt, sp){
       const h = Math.min(dt, 0.05);
       GAME[v] += (w*w*(target - GAME[key]) - 2*w*GAME[v])*h; GAME[key] += GAME[v]*h;
     };
-    spring("fpY", pose.y + 1.58, 7, 6);
+    /* the eye is fixed to the body, just ahead of the screen over the hood (measured off this car: a raised
+       one, bigger wheels or a scoop all put it where it should be), so it rides the springs with the car
+       and the hood stays put in the picture instead of bouncing up into it; only the aim is eased */
+    const E = hoodEye(car), sh = car.userData.shell;
+    sh.updateMatrix();
+    _he.set(0, E.y - RIDE, E.z).applyMatrix4(sh.matrix);
+    _heE.set(pose.pitch, pose.h + (pose.yawVis || 0), pose.roll, "YXZ");
+    _he.applyEuler(_heE).add(car.position);
+    GAME.fpY = _he.y;
     // the slope of the road you're on (main road or a branch), 18m on
     const nr = nearest(pose.x, pose.z), Pn = nr.path, step = Math.round(18/Pn.seg);
     const i0 = nr.pi, ia = Pn.closed ? wrapIdx(Pn, i0 + step) : Math.min(Pn.N - 1, i0 + step);
     const slope = Math.max(-0.35, Math.min(0.35, (Pn.pts[ia].y - Pn.pts[i0].y)/Math.max(1, (ia - i0 + (Pn.closed && ia < i0 ? Pn.N : 0))*Pn.seg)));
-    if(!pose.air) spring("fpAim", GAME.fpY - 0.12 + slope*16, 4.5, 8);
-    camPos.set(pose.x + fx*0.62, GAME.fpY, pose.z + fz*0.62);
+    if(!pose.air || GAME.fpAim === undefined || !isFinite(GAME.fpAim)) spring("fpAim", pose.y + E.y - 0.3 + slope*16, 4.5, 8);
+    camPos.copy(_he);
     camAim.set(pose.x + fx*16, GAME.fpAim, pose.z + fz*16);
     camera.position.set(camPos.x, camPos.y, camPos.z);
   }
@@ -21666,7 +21694,7 @@ function stepCamera(dt, sp){
   // never inside the hill: over a crest onto a steep drop the ground behind the car stands higher than the view
   if(camMode !== 1){ const gc = gradedY(camera.position.x, camera.position.z) + 1.2; if(camera.position.y < gc) camera.position.y = gc; }
   // rumble only where the surface is actually rough
-  if(nearest(pose.x, pose.z).dist > HALF && sp > 4){
+  if(camMode !== 1 && nearest(pose.x, pose.z).dist > HALF && sp > 4){
     const r = Math.min(0.045, sp*0.0011)*(camMode === 1 ? 0.35 : 1);
     camera.position.y += Math.sin(state.t*29)*r + Math.sin(state.t*53)*r*0.45;
   }
@@ -21690,9 +21718,10 @@ function stepCamera(dt, sp){
     const kick = (GAME.kick || 0)*Math.sin(state.t*63);
     const chase = camMode !== 1;
     // (first person: a share of it, enough to feel the road, not enough to shake the picture)
-    const bob = pose.bH*(chase ? 0.45 : 0.15) + kick*(chase ? 0.6 : 0.2);
+    // (the hood view's eye is on the body, so it has the body's motion already: only a little of its roll)
+    const bob = chase ? pose.bH*0.45 + kick*0.6 : 0;
     camera.position.y += bob; GAME.bobWas = bob;
-    if(!chase){ camera.rotateX(-pose.bP*0.12); camera.rotateZ(pose.bR*0.2); }
+    if(!chase) camera.rotateZ(pose.bR*0.12);
     else camera.rotateZ(pose.bR*0.25);
   }
   const fovT = 62 + Math.min(1, sp/MAXV)*11 + (GAME.over || 0)*14;      // the frame opens up with speed (and past top speed down the Sawtooth)
