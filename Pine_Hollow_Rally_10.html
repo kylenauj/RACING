@@ -229,6 +229,8 @@
   .cupcard .cr b{font-family:var(--display);font-size:13px;color:var(--ink);} .cupcard .cr small{font-size:12px;color:#6e6250;}
   .cupcard h3{display:flex;align-items:baseline;gap:14px;} .cupcard .rshape{font-family:var(--body);font-weight:700;font-size:13px;color:#7a5a1c;}
   .rtracks .tk em{display:block;margin-top:3px;font-style:normal;font-family:var(--body);font-weight:700;font-size:12px;color:var(--signal);}
+  .rtracks .tk > span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:100%;}
+  .rtracks .tk em:empty, .rtracks .tk:not(:has(em))::after{content:"\00a0";display:block;margin-top:3px;font-size:12px;}
   .rdetail{margin-top:14px;padding:12px 18px 14px;}
   .rdetail h3{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;}
   .rdetail .rshape{font-family:var(--body);font-weight:700;font-size:13px;letter-spacing:.04em;color:#7a5a1c;}
@@ -5673,6 +5675,21 @@ function surfaceY(x, z){
   const half = c >= 0 && GP[c] >= 0 ? GHW[c] : 5;
   return h + offRoadBump(x, z)*smoothstep(half - 0.5, half + 5.0, distAt(x, z));
 }
+/* Is there a deck here (a bridge, a boardwalk, a treetop platform): a built surface standing clear of the
+   land under it? Its height if so, else null. (Water a car wades through is not a deck.) Anything scattered
+   about the place (stones in the wheel tracks, boulders, leaves, sticks, ferns) keeps off one. */
+function deckAt(x, z){
+  const sy = surfaceY(x, z), h = gridH(x, z);
+  if(sy - h < 0.3) return null;
+  if(WATERS){ const wt = waterTop(x, z); if(wt !== null && (Math.abs(sy - wt) < 0.02 || Math.abs(sy - (wt - WADE_DEPTH)) < 0.02)) return null; }
+  return sy;
+}
+/* near one: anywhere within r metres of the point (a stone just off the end of a bridge still sits in its approach) */
+function nearDeck(x, z, r){
+  if(deckAt(x, z) !== null) return true;
+  for(let k=0;k<8;k++){ const a = k/8*Math.PI*2; if(deckAt(x + Math.cos(a)*r, z + Math.sin(a)*r) !== null) return true; }
+  return false;
+}
 /* The small stuff: ruts pressed into the wheel tracks and washboard
    chatter across the road. Felt through each wheel's suspension and drawn
    by the road shader, but kept off the chassis height, where a 30Hz
@@ -9065,6 +9082,8 @@ function stoneY(x, z){
       }
     }
   });
+  // (not on a bridge or a boardwalk, nor right by one)
+  for(let k=spots.length - 1; k>=0; k--) if(nearDeck(spots[k][0], spots[k][1], 2.5)) spots.splice(k, 1);
   if(spots.length){
     const rm = new THREE.InstancedMesh(clumpGeometry(1, 0.2, 3.7),
       new THREE.MeshLambertMaterial({map:rockTex, color: DESERT ? 0xb88060 : WINTER ? 0xa4a8b0 : 0x96908a}), spots.length);
@@ -16790,6 +16809,38 @@ function chunkInstances(){
     scene.remove(src);
   });
 }
+/* nothing scattered over the land (ferns, bushes, stones, trees) stands on a bridge or a boardwalk, or pokes up
+   through one where it runs low over the ground: whatever would is taken out of its set */
+function clearDecks(){
+  const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+  const KIND = {fern:1, bush:1, rock:1, stone:1, tree:1};
+  scene.children.forEach(o=>{
+    if(!o.isInstancedMesh || !KIND[o.userData.lod]) return;
+    const g = o.geometry; if(!g.boundingSphere) g.computeBoundingSphere();
+    const r0 = g.boundingSphere.radius, col = o.instanceColor ? o.instanceColor.array : null;
+    let w = 0;
+    for(let i=0;i<o.count;i++){
+      o.getMatrixAt(i, m); m.decompose(p, q, sc);
+      let gone = false;
+      const n = nearest(p.x, p.z);
+      if(n.dist < n.half + 3){
+        const r = Math.min(3, r0*Math.max(sc.x, sc.z));
+        for(const [dx, dz] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]]){
+          const dy = deckAt(p.x + dx, p.z + dz); if(dy === null) continue;
+          const top = p.y + r0*sc.y*1.6;
+          if(top > dy - 0.3 && p.y < dy + 1.5){ gone = true; break; }   // on it, or up through it
+        }
+      }
+      // (loose stones keep a little further off: nothing lying at the ends of the planks either)
+      if(!gone && (o.userData.lod === "stone" || o.userData.lod === "rock") && n.dist < n.half + 4 && nearDeck(p.x, p.z, 2.5)) gone = true;
+      if(gone) continue;
+      if(w !== i){ o.setMatrixAt(w, m); if(col){ col[w*3] = col[i*3]; col[w*3+1] = col[i*3+1]; col[w*3+2] = col[i*3+2]; } }
+      w++;
+    }
+    if(w !== o.count){ o.count = w; o.instanceMatrix.needsUpdate = true; if(o.instanceColor) o.instanceColor.needsUpdate = true; }
+  });
+}
+clearDecks();
 chunkInstances();
 
 /* shadows: the land and the road take them, anything standing casts */
@@ -23354,7 +23405,7 @@ function showTracks(mode, group, focusCup){
     '<div class="rcols' + (exped ? ' noc' : '') + '">' + cups +
     '<div class="rmain">' +
     '<div class="gpname">' + (exped ? 'Choose a mountain' : esc(GP_GROUPS[gi].name) + ' · choose a circuit') + '</div>' +
-    '<div class="tracks rtracks">' + ids.map(id =>{
+    '<div class="tracks rtracks" style="grid-template-columns:repeat(' + RT_COLS(exped) + ',minmax(0,1fr))">' + ids.map(id =>{
       const rec = SAVE.records[TRACKS[id].name] || {};
       const best = exped ? (rec.summit != null ? "summit " + fmt(rec.summit) : "") : (rec.bestLap != null ? "best " + fmt(rec.bestLap) : "");
       return '<button class="tk" style="--tkc:' + trackCol(TRACKS[id]) + '" data-track="' + id + '"><canvas width="132" height="132"></canvas><span>' +
@@ -23371,7 +23422,20 @@ function showTracks(mode, group, focusCup){
              back } });
   MENU.mode = mode; MENU.group = gi;
   UIEL.querySelectorAll(".tk canvas").forEach((cv, i)=> drawThumb(cv, ids[i]));
+  /* Nothing on this screen moves as you go through it: the detail card is held at the height of the tallest
+     circuit's (every circuit, not just this cup's, so changing cup doesn't move it either), and the cards
+     above it always sit in one row sized for the biggest cup */
+  { const d = document.getElementById("tkDetail");
+    if(d){ let mx = 0;
+      const all = TRACKS.map((t, i)=> i).filter(i=> exped ? TRACKS[i].expedition : !TRACKS[i].expedition);
+      for(const id of all){ d.innerHTML = raceDetailHTML(id); mx = Math.max(mx, d.offsetHeight); }
+      d.innerHTML = ""; d.style.minHeight = mx + "px"; d.style.boxSizing = "border-box"; } }
   MENU.onSel(MENU.items[MENU.sel]);
+}
+/* how many circuit cards across: room for the biggest cup, the same for every cup */
+function RT_COLS(exped){
+  if(exped) return Math.max(4, TRACKS.filter(t=> t.expedition).length);
+  return Math.max(4, ...GP_GROUPS.map(g=> g.ids.length));
 }
 
 /* after a reload onto a new circuit: one press to go, which also
@@ -24778,8 +24842,10 @@ const LITTER = { items:[], leaf:null, stick:null, home:[] };
       if(Math.random() < pr && clearHere(P, i)) scatter(P, i, tar > 0.5 ? 3 + Math.floor(Math.random()*3) : 2, 1, 6);
     }
   });
-  // (none on a clean floor: a wooden deck or the manor's marble)
+  // (none on a clean floor: a wooden deck or the manor's marble; nor on any bridge, boardwalk or platform, where
+  //  they lay down at the level of the land and were hidden in the planks until a car flung them up)
   if(MAIN.floor) for(let k=items.length - 1; k>=0; k--) if(floorAt(items[k].x, items[k].z)) items.splice(k, 1);
+  for(let k=items.length - 1; k>=0; k--) if(nearDeck(items[k].x, items[k].z, 1.5)) items.splice(k, 1);
   items.forEach(o=> LITTER.home.push([o.x, o.y, o.z, o.yaw]));
   // a leaf: a little pointed oval, double sided; a stick: a thin crooked rod
   const lg = new THREE.BufferGeometry();
