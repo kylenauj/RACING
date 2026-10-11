@@ -5964,15 +5964,22 @@ if(TRACK.special && !GATOR && !GLOW && !SPRING && (SPANS.length || CRATER.on)){
 function fissNear(x, z){ let d = 1e9; for(let n=0;n<FISS.length;n++){ const dx = x - FISS[n][0], dz = z - FISS[n][1]; if(Math.abs(dx) < 8 && Math.abs(dz) < 8) d = Math.min(d, Math.hypot(dx, dz)); } return d; }
 // (the weather's say in how the ground looks: see CONDITIONS)
 const COND_U = { uRain:{value:0}, uSnow:{value:0}, uSkyCol:{value:new THREE.Color(0x8a96a2)} };
+/* at night: the cars' headlights (where each is and which way it points: x, z, dx, dz; then its height and strength)
+   and the pools under the nearest road lamps (x, y, z, strength), lit on the ground in its own shader */
+const NIGHT_N = 12;
+const NIGHT_U = { uNight:{value:0}, uHeadA:{value:[0, 1, 2, 3].map(()=> new THREE.Vector4(0, 0, 0, 1))}, uHeadB:{value:[0, 1, 2, 3].map(()=> new THREE.Vector4(0, 0, 0, 0))},
+                  uLampP:{value:Array.from({length:NIGHT_N}, ()=> new THREE.Vector4(0, -999, 0, 0))} };
 const TERRAIN_MAT = new THREE.MeshLambertMaterial({map:grassTex, vertexColors:true});
 const GROUND_MAT = TERRAIN_MAT;
 TERRAIN_MAT.onBeforeCompile = sh=>{
   sh.uniforms.uRain = COND_U.uRain; sh.uniforms.uSnow = COND_U.uSnow; sh.uniforms.uSkyCol = COND_U.uSkyCol;
+  Object.assign(sh.uniforms, NIGHT_U);
   sh.vertexShader = sh.vertexShader
-    .replace("#include <common>", "#include <common>\nattribute vec4 aRoad;\nattribute vec4 aRoad2;\nattribute float aSoft;\nvarying vec4 vRoad;\nvarying vec4 vRoad2;\nvarying float vSoft;\nvarying vec2 vXZ;")
-    .replace("#include <begin_vertex>", "#include <begin_vertex>\nvRoad = aRoad;\nvRoad2 = aRoad2;\nvSoft = aSoft;\nvXZ = position.xz;");
+    .replace("#include <common>", "#include <common>\nattribute vec4 aRoad;\nattribute vec4 aRoad2;\nattribute float aSoft;\nvarying vec4 vRoad;\nvarying vec4 vRoad2;\nvarying float vSoft;\nvarying vec2 vXZ;\nvarying vec3 vWP;")
+    .replace("#include <begin_vertex>", "#include <begin_vertex>\nvRoad = aRoad;\nvRoad2 = aRoad2;\nvSoft = aSoft;\nvXZ = position.xz;\nvWP = (modelMatrix*vec4(transformed, 1.0)).xyz;");
   sh.fragmentShader = sh.fragmentShader
-    .replace("#include <common>", "#include <common>\nvarying vec4 vRoad;\nvarying vec4 vRoad2;\nvarying float vSoft;\nvarying vec2 vXZ;\nuniform float uRain, uSnow; uniform vec3 uSkyCol;\n" +
+    .replace("#include <common>", "#include <common>\nvarying vec4 vRoad;\nvarying vec4 vRoad2;\nvarying float vSoft;\nvarying vec2 vXZ;\nvarying vec3 vWP;\nuniform float uRain, uSnow; uniform vec3 uSkyCol;\n" +
+      "uniform float uNight; uniform vec4 uHeadA[4]; uniform vec4 uHeadB[4]; uniform vec4 uLampP[" + NIGHT_N + "];\n" +
       "float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }\n" +
       "float vnz(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);\n" +
       "  return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }")
@@ -6059,6 +6066,27 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
       "diffuseColor.rgb *= col;"
     ].join("\n"))
     .replace("#include <color_fragment>", "")
+    /* at night, the light the cars and the road lamps throw on the ground: each headlight a soft fan that
+       widens and fades down the road ahead, each lamp a warm pool under it */
+    .replace("#include <emissivemap_fragment>", ["#include <emissivemap_fragment>",
+      "if(uNight > 0.0){",
+      "  vec3 nl = vec3(0.0);",
+      "  for(int i = 0; i < 4; i++){",
+      "    vec4 A = uHeadA[i], B = uHeadB[i]; if(B.y <= 0.0) continue;",
+      "    vec2 rel = vWP.xz - A.xy; float al = dot(rel, A.zw), lt = abs(dot(rel, vec2(-A.w, A.z)));",
+      "    if(al <= 0.0 || al > 75.0) continue;",
+      "    float sp = 1.0 + al*0.34;",
+      "    float k = smoothstep(0.3, 3.5, al)*(1.0 - smoothstep(34.0, 72.0, al))*exp(-lt*lt/(sp*sp))/(1.0 + al*0.03);",
+      "    k *= 1.0 - smoothstep(5.0, 12.0, abs(vWP.y - B.x));",
+      "    nl += vec3(1.0, 0.93, 0.8)*k*B.y;",
+      "  }",
+      "  for(int i = 0; i < " + NIGHT_N + "; i++){",
+      "    vec4 L = uLampP[i]; if(L.w <= 0.0) continue;",
+      "    vec3 d = vWP - L.xyz; float r2 = dot(d.xz, d.xz) + d.y*d.y*0.35;",
+      "    nl += vec3(1.0, 0.76, 0.45)*L.w*(1.0 - smoothstep(30.0, 230.0, r2))*(0.8/(1.0 + r2*0.035));",
+      "  }",
+      "  totalEmissiveRadiance += diffuseColor.rgb*nl*uNight;",
+      "}"].join("\n"))
     /* the ground is marked in the frame's alpha (0.5) so the Print ink draws no crease lines on it:
        every sag, crest and rut facet of the heightfield inked a stray stroke across the road that
        began and ended nowhere. Its outline against the sky or a farther hill is still inked. */
@@ -6974,7 +7002,6 @@ function applyConditions(tod, wx, quiet){
   { const k = unlitLevel(), warm = tod === 2 ? [1.08, 0.9, 0.78] : tod === 1 ? [1.04, 0.92, 0.94] : tod === 3 ? [0.8, 0.9, 1.25] : [1, 1, 1];
     UNLIT.forEach(([c, c0])=> c.setRGB(c0.r*k*warm[0], c0.g*k*warm[1], c0.b*k*warm[2])); }
   repaintSky(); rebuildEnv();
-  CARLAMPS.forEach(L=> L.dirty = true);
   RAIN.on = wx > 0; RAIN.snow = wx === 2; RAIN.made || makeRain();
   RAIN.pts.visible = RAIN.on;
   if(!quiet) document.body.dataset.tod = TODS[tod].toLowerCase();
@@ -6983,43 +7010,78 @@ const POST_K = { sun:1 };
 /* things drawn without lights (the grass billboards): told how bright the light is, by hand */
 const UNLIT = [];
 function unlitLevel(){ const C = CONDV; return C.tod === 3 ? (C.wx ? 0.22 : 0.3) : (C.tod ? 0.82 : 1)*(C.wx ? 0.72 : 1); }
-/* ---- the car's lamps, at night: a beam of light on the road ahead of every car, and the player's real
-   headlight (a spot light) lighting the trees and the road as it goes ---- */
-const CARLAMPS = [];
-const BEAM_TEX = (()=>{ const cv = noiseCanvas(128, 256, (g, w, h)=>{
-    const gr = g.createRadialGradient(w/2, h*0.9, 4, w/2, h*0.6, h*0.62);
-    gr.addColorStop(0, "rgba(255,240,200,1)"); gr.addColorStop(0.35, "rgba(255,232,180,0.55)"); gr.addColorStop(1, "rgba(255,230,170,0)");
-    g.fillStyle = gr; g.fillRect(0, 0, w, h); });
-  return new THREE.CanvasTexture(cv); })();
-const BEAM_MAT = new THREE.MeshBasicMaterial({map:BEAM_TEX, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
-  polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4, opacity:0, fog:true});
-const BEAM_GEO = (()=>{ const g = new THREE.PlaneGeometry(7.5, 20); g.rotateX(-Math.PI/2); g.translate(0, 0.12, 12.5); return g; })();
-function lampKit(group, player){
-  let L = CARLAMPS.find(k=> k.g === group);
-  if(L) return L;
-  const beam = new THREE.Mesh(BEAM_GEO, BEAM_MAT); beam.renderOrder = 2; beam.frustumCulled = false; group.add(beam);
-  L = {g:group, beam, spot:null, player, dirty:true};
-  CARLAMPS.push(L);
-  return L;
+/* ---- the lamps at night ----
+   Every car's headlights light the ground ahead of it (a soft fan worked out in the ground's own shader, so
+   it lies on the road over every crest and dip), and the player's is a real light too, on the trees and
+   whatever else it sweeps. The stage itself is lit: lamp posts down the road, alternating sides, each
+   throwing a warm pool on the ground, the two nearest lighting the cars as they pass under. (The lights are
+   made up front, unlit by day, so turning night on doesn't rebuild every shader in the game.) */
+const HEADSPOT = new THREE.SpotLight(0xfff0d0, 0, 75, 0.6, 0.65, 1.2);
+HEADSPOT.castShadow = false; scene.add(HEADSPOT); scene.add(HEADSPOT.target);
+const NLAMP = { made:false, list:[], group:null, lights:[0, 1].map(()=>{ const l = new THREE.PointLight(0xffc27a, 0, 20, 1.8); scene.add(l); return l; }) };
+function makeNightLamps(){
+  NLAMP.made = true;
+  const P = MAIN, step = Math.max(1, Math.round(42/P.seg)), L = NLAMP.list;
+  let side = 1;
+  for(let i = 0; i < P.N; i += step){
+    side = -side;
+    const p = P.pts[i], t = P.tans[i], off = P.half[i] + 2.6;
+    const x = p.x - t.z*side*off, z = p.z + t.x*side*off;
+    // not in water, on a bridge, or standing in another stretch of the road; and on ground near the road's own height
+    if(inWaterway(x, z, true) || waterTop(x, z) !== null || nearDeck(x, z, 6) || nearDeck(p.x, p.z, 5)) continue;
+    if(nearest(x, z).dist < P.half[i] + 1.4) continue;
+    const y = surfaceY(x, z), ry = surfaceY(p.x, p.z);
+    if(!isFinite(y) || Math.abs(y - ry) > 3) continue;
+    const ax = t.z*side, az = -t.x*side;                       // (toward the road)
+    L.push({x, y, z, ax, az, hx:x + ax*1.75, hy:y + 6.35, hz:z + az*1.75});
+  }
+  const n = L.length; if(!n) return;
+  const g = NLAMP.group = new THREE.Group(); g.userData.noCull = true; scene.add(g);
+  const dark = new THREE.MeshLambertMaterial({color:0x2c2f33}), lensM = new THREE.MeshBasicMaterial({color:0xffe2a8});
+  const parts = [[new THREE.CylinderGeometry(0.075, 0.11, 6.9, 7).translate(0, 3.15, 0), dark],
+                 [new THREE.BoxGeometry(1.9, 0.08, 0.08).translate(0.9, 6.5, 0), dark],
+                 [new THREE.BoxGeometry(0.4, 0.06, 0.06).translate(0.25, 6.25, 0).rotateZ(0), dark],
+                 [new THREE.BoxGeometry(0.72, 0.17, 0.34).translate(1.78, 6.44, 0), dark],
+                 [new THREE.BoxGeometry(0.58, 0.04, 0.26).translate(1.78, 6.34, 0), lensM]];
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
+  parts.forEach(([geo, mat])=>{
+    const im = new THREE.InstancedMesh(geo, mat, n); im.frustumCulled = false; im.castShadow = mat === dark;
+    L.forEach((l, k)=>{ q.setFromAxisAngle(up, Math.atan2(-l.az, l.ax)); m4.compose(new THREE.Vector3(l.x, l.y - 0.25, l.z), q, one); im.setMatrixAt(k, m4); });
+    g.add(im);
+  });
+  // a soft glow round each lamp, seen from down the road
+  const pg = new THREE.BufferGeometry(); pg.setAttribute("position", new THREE.Float32BufferAttribute(L.flatMap(l=> [l.hx, l.hy - 0.15, l.hz]), 3));
+  const glow = new THREE.Points(pg, new THREE.PointsMaterial({color:0xffc890, size:3.6, map:softDot(), transparent:true, opacity:0.75, depthWrite:false, blending:THREE.AdditiveBlending, fog:true}));
+  glow.frustumCulled = false; g.add(glow);
 }
-let HEADSPOT = null;
 function stepLamps(){
-  const k = CONDV.lamps;
-  BEAM_MAT.opacity = CONDV.tod === 3 ? 0.55 : k*0.4;
-  const want = [car].concat(typeof rivals !== "undefined" ? rivals.map(r=> r.mesh) : []);
-  if(typeof NET !== "undefined" && NET.peers) NET.peers.forEach(p=>{ if(p.car && p.car.mesh) want.push(p.car.mesh); });
-  for(const g of want){ if(!g) continue; const L = lampKit(g, g === car); L.beam.visible = k > 0.3; }
-  // the player's own headlight: a real light, only when it's dark enough to want it
-  if(k >= 0.9 && car){
-    if(!HEADSPOT){
-      HEADSPOT = new THREE.SpotLight(0xfff0d0, 0, 90, 0.52, 0.55, 1.1); HEADSPOT.castShadow = false;
-      scene.add(HEADSPOT); scene.add(HEADSPOT.target);
-    }
+  const C = CONDV, night = C.tod === 3;
+  NIGHT_U.uNight.value = night ? 1 : C.lamps*0.3;
+  const A = NIGHT_U.uHeadA.value, B = NIGHT_U.uHeadB.value;
+  // the headlights: yours first, then the rivals'
+  const heads = [];
+  if(car && car.visible) heads.push([pose.x, pose.z, pose.h, pose.y, 0.85*(1 - 0.45*(DMG.front || 0))]);
+  if(typeof rivals !== "undefined") rivals.forEach(r=>{ if(r.mesh.visible && heads.length < 4) heads.push([r.mesh.position.x, r.mesh.position.z, r.mesh.rotation.y, r.mesh.position.y, 0.7]); });
+  for(let i = 0; i < 4; i++){ const h = heads[i];
+    if(!h || NIGHT_U.uNight.value <= 0){ B[i].y = 0; continue; }
+    const fx = Math.sin(h[2]), fz = Math.cos(h[2]); A[i].set(h[0] + fx*1.6, h[1] + fz*1.6, fx, fz); B[i].set(h[3] + 0.5, h[4], 0, 0); }
+  // the player's own headlight on everything else
+  if(night && car){
     const h = pose.h, fx = Math.sin(h), fz = Math.cos(h);
-    HEADSPOT.position.set(pose.x + fx*2.3, pose.y + 1.0, pose.z + fz*2.3);
-    HEADSPOT.target.position.set(pose.x + fx*22, pose.y - 1.5, pose.z + fz*22);
-    HEADSPOT.intensity = 2.6*(1 - 0.45*(DMG.front || 0)); HEADSPOT.visible = car.visible;
-  } else if(HEADSPOT) HEADSPOT.intensity = 0;
+    HEADSPOT.position.set(pose.x + fx*2.3, pose.y + 1.1, pose.z + fz*2.3);
+    HEADSPOT.target.position.set(pose.x + fx*24, pose.y - 1.0, pose.z + fz*24);
+    HEADSPOT.intensity = car.visible ? 1.6*(1 - 0.45*(DMG.front || 0)) : 0;
+  } else HEADSPOT.intensity = 0;
+  // the road lamps: on at night, the dozen nearest lighting the ground, the two nearest lighting everything
+  if(night && !NLAMP.made) makeNightLamps();
+  if(NLAMP.group) NLAMP.group.visible = night;
+  const LP = NIGHT_U.uLampP.value;
+  if(night && NLAMP.list.length){
+    const cx = state.phase === "menu" ? camera.position.x : pose.x, cz = state.phase === "menu" ? camera.position.z : pose.z;
+    const near = NLAMP.list.map(l=> [(l.hx - cx)*(l.hx - cx) + (l.hz - cz)*(l.hz - cz), l]).sort((a, b)=> a[0] - b[0]);
+    for(let i = 0; i < NIGHT_N; i++){ const e = near[i]; if(e) LP[i].set(e[1].hx, e[1].hy, e[1].hz, 1); else LP[i].w = 0; }
+    NLAMP.lights.forEach((pl, i)=>{ const e = near[i]; if(e){ pl.position.set(e[1].hx, e[1].hy - 1.2, e[1].hz); pl.intensity = 0.8; } else pl.intensity = 0; });
+  } else { LP.forEach(v=> v.w = 0); NLAMP.lights.forEach(pl=> pl.intensity = 0); }
 }
 /* ---- rain and snow: streaks (or flakes) in a box that travels with the camera ---- */
 const RAIN = { on:false, snow:false, made:false, pts:null, n:2600, box:[60, 34, 60] };
