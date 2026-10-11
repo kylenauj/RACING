@@ -10577,18 +10577,18 @@ if(SWAMPGP || JUNGLE){
    from the road, drifting very slowly, never on the road itself ---- */
 if(SWAMPGP){
   const rnd = seeded(6113 + TRACK_ID), P = MAIN, pts = [], home = [];
-  for(let k=0, tries=0; k<240 && tries<3000; tries++){
-    const i = Math.floor(rnd()*P.N), p = P.pts[i], t = P.tans[i], sd = rnd() < 0.5 ? -1 : 1, off = P.half[i] + 4 + rnd()*22;   // (close enough to be seen through the trees)
+  for(let k=0, tries=0; k<420 && tries<5000; tries++){
+    const i = Math.floor(rnd()*P.N), p = P.pts[i], t = P.tans[i], sd = rnd() < 0.5 ? -1 : 1, off = P.half[i] + 2.5 + rnd()*11;   // (on the verge and the pools by it, in front of the trees, where you see it)
     const x = p.x - t.z*sd*off, z = p.z + t.x*sd*off;
-    if(!clearOf(x, z, 3)) continue;
+    if(!clearOf(x, z, 1.5)) continue;
     // (it lies in the low places: over a pool, or below the road)
     const y = gradedY(x, z), low = bwPool(x, z) > 0.02 || y < p.y - 0.6;
     if(!low && rnd() < 0.6) continue;
-    pts.push(x, y + 1.2 + rnd()*1.8, z); home.push(x, z, rnd()*6.28); k++;
+    pts.push(x, y + 0.7 + rnd()*1.0, z); home.push(x, z, rnd()*6.28); k++;
   }
   if(pts.length){
     const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
-    const mist = new THREE.Points(g, new THREE.PointsMaterial({color:0xe6eee0, size:26, map:softDot(), transparent:true, opacity:0.26, depthWrite:false, fog:true}));
+    const mist = new THREE.Points(g, new THREE.PointsMaterial({color:0xdce6d4, size:16, map:softDot(), transparent:true, opacity:0.3, depthWrite:false, fog:true}));
     mist.frustumCulled = false; mist.renderOrder = 4; scene.add(mist);
     const a = g.attributes.position;
     ANIMS.push(t=>{
