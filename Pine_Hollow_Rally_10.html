@@ -10217,23 +10217,7 @@ if(BOWL.on && !GATOR){
     for(const s of [-1, 1]) for(let k=0;k<8;k++) bulbs.push([p.x + rx*s*(hw + 0.5*Math.sign(s)), y0 + 0.8 + k*0.9, p.z + rz*s*(hw + 0.5*Math.sign(s)), BULB[(k + 2) % BULB.length]]);
   }
 
-  /* ---- everyone at the fair (two instanced sets: clothes and faces) ---- */
-  if(people.length){
-    const legs = new THREE.BoxGeometry(0.34, 0.8, 0.2); legs.translate(0, 0.4, 0);
-    const torso = new THREE.CylinderGeometry(0.2, 0.25, 0.68, 8); torso.translate(0, 1.14, 0);
-    const arms = new THREE.BoxGeometry(0.62, 0.55, 0.14); arms.translate(0, 1.18, 0);
-    const shade = (geo, k)=>{ const g2 = geo.index ? geo.toNonIndexed() : geo, n = g2.attributes.position.count, a = new Float32Array(n*3).fill(k); g2.setAttribute("color", new THREE.Float32BufferAttribute(a, 3)); return g2; };
-    const bodyG = mergeGeos([shade(legs, 0.32), shade(torso, 1), shade(arms, 0.92)]);
-    const headG = new THREE.SphereGeometry(0.15, 10, 8); headG.translate(0, 1.66, 0);
-    const bodies = new THREE.InstancedMesh(bodyG, new THREE.MeshLambertMaterial({vertexColors:true}), people.length);
-    const heads = new THREE.InstancedMesh(headG, new THREE.MeshLambertMaterial({}), people.length);
-    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new V3(), c = new THREE.Color();
-    const SKIN = [0xf0c8a0, 0xd8a47a, 0xa8744a, 0x7a4a2a, 0xe8b890];
-    people.forEach((h, k)=>{ const s = 0.88 + rnd()*0.24; sc.set(s, s, s); q.setFromAxisAngle(up, h[3] + (rnd() - 0.5)*0.6);
-      m4.compose(new V3(h[0], h[1], h[2]), q, sc); bodies.setMatrixAt(k, m4); heads.setMatrixAt(k, m4);
-      bodies.setColorAt(k, c.setHex(h[4])); heads.setColorAt(k, c.setHex(SKIN[Math.floor(rnd()*SKIN.length)])); });
-    bodies.castShadow = true; scene.add(bodies); scene.add(heads);
-  }
+  /* (no figures at the fair: the spots noted for them above are left empty, so the rest of the layout doesn't move) */
   // the bulbs, and the wires they hang from
   if(bulbs.length){
     const bi = new THREE.InstancedMesh(new THREE.SphereGeometry(0.13, 6, 4), basic(0xffffff), bulbs.length);
@@ -12098,16 +12082,11 @@ if(LAKE.on){
     shed.position.set(-5.4, y0 - 0.1, 6.5); g.add(shed);
     for(const px of [-W/2 + 0.3, 0, W/2 - 0.3]) for(const pz of [-D/2 + 0.3, 0, D/2 - 0.3]) pcyl(g, 0.18, 0.2, 3.4, 8, 0x5a4430, -5.4 + px, y0 - 1.8, 6.5 + pz);
     pbox(g, W + 0.4, 0.2, D + 0.4, 0x6a5038, -5.4, y0 - 0.2, 6.5);
-    // a canoe upturned on a rack beside it, and a fisherman at the end of the dock
+    // a canoe upturned on a rack beside it
     { const rk = new THREE.Group(); for(const s of [-1, 1]){ pbox(rk, 0.1, 1.1, 0.1, 0x5a4430, -0.6, 0.55, s*1.4); pbox(rk, 0.1, 1.1, 0.1, 0x5a4430, 0.6, 0.55, s*1.4); pbox(rk, 1.3, 0.1, 0.1, 0x5a4430, 0, 1.1, s*1.4); }
       const cn = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 6, 0, Math.PI*2, 0, Math.PI/2), PM(0x2f7a5a)); cn.scale.set(0.42, 0.3, 2.4); cn.position.y = 1.15; rk.add(cn);
       rk.scale.setScalar(0.85); rk.position.set(0.6, y0 + 0.06, 2.2); rk.rotation.y = Math.PI/2; g.add(rk); }
-    { const f = new THREE.Group(); pbox(f, 0.36, 0.5, 0.3, 0x3a3f4a, 0, 0.25, 0); pbox(f, 0.4, 0.6, 0.24, 0x7a4a2a, 0, 0.75, -0.02);
-      const hd = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), PM(0xe0b890)); hd.position.y = 1.2; f.add(hd);
-      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.17, 0.12, 10), PM(0xc2382a)); cap.position.y = 1.33; f.add(cap);
-      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.02, 3, 4), PM(0x2a2a2a)); rod.position.set(0.3, 1.5, 1.2); rod.rotation.x = 0.9; f.add(rod);
-      pcyl(f, 0.25, 0.25, 0.4, 10, 0x6a5a48, -0.6, 0.2, 0.2);
-      f.position.set(0.6, y0 + 0.06, 14.5); g.add(f); }
+    pcyl(g, 0.25, 0.25, 0.4, 10, 0x6a5a48, 0.0, y0 + 0.26, 14.7);                 // a bait bucket left at the end
     setDown(g, x, z, toward);
     for(const s of [-1, 1]){
       const b = boat(s < 0 ? 0xf2efe6 : 0x2f6fa8), off = 2.6*s, along = 8 + s*2.5;
