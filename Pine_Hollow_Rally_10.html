@@ -17451,13 +17451,16 @@ function buildWagon(opts){
     if (axis === 'z') geo.rotateX(Math.PI / 2);
     return add(geo, material, x, y, z, parent);
   };
-  const extrude = (pts, width, material, bevel = 0, x = 0) => {
+  /* round: how far across the car the edges roll over (the shell's own corners, side into nose, tail and
+     waist); its outline grows only by bevel, and the width it ends up is the same */
+  const extrude = (pts, width, material, bevel = 0, x = 0, round = bevel) => {
     const shape = new THREE.Shape(pts.map(p => new THREE.Vector2(p[0], p[1])));
+    const depth = width - 2*(round - bevel);
     const geo = new THREE.ExtrudeGeometry(shape, {
-      depth: width, bevelEnabled: bevel > 0,
-      bevelThickness: bevel, bevelSize: bevel, bevelSegments: 3, curveSegments: 8,
+      depth, bevelEnabled: bevel > 0,
+      bevelThickness: round, bevelSize: bevel, bevelSegments: round > bevel ? 5 : 3, curveSegments: 8,
     });
-    geo.translate(0, 0, -width / 2);
+    geo.translate(0, 0, -depth / 2);
     geo.rotateY(-Math.PI / 2);
     return add(geo, material, x, 0, 0);
   };
@@ -17503,8 +17506,8 @@ function buildWagon(opts){
   /* hollow where you can see in: solid ahead of the screen and behind the tailgate, and between them two
      side walls on a sunken floor, door cards and wheel tubs inside (no painted lid at the waist) */
   const CAB_A = WSB - 0.02, CAB_B = -L + 0.14, FLOOR = BELT - 0.55, BW = 1.72;
-  extrude(clipZ(body, CAB_A, true), BW, M.paint, 0.04);
-  extrude(clipZ(body, CAB_B, false), BW, M.paint, 0.04);
+  extrude(clipZ(body, CAB_A, true), BW, M.paint, 0.04, 0, 0.11);
+  extrude(clipZ(body, CAB_B, false), BW, M.paint, 0.04, 0, 0.11);
   const midBody = clipZ(clipZ(body, CAB_A, false), CAB_B, true);
   for (const s of [1, -1]) extrude(midBody, 0.1, M.paint, 0.04, s * (BW/2 - 0.05));
   box(1.16, FLOOR - SILL + 0.04, CAB_A - CAB_B, M.under, 0, (FLOOR + SILL)/2, (CAB_A + CAB_B)/2);
@@ -17540,7 +17543,7 @@ function buildWagon(opts){
     for (const s of [1, -1]) {
       const hl = box(0.36, 0.13, 0.05, s < 0 && o.beater ? M.headDim : M.head, s * 0.58, 0.63, L + 0.035); hl.rotation.set(-0.7, -s * 0.15, 0);
       const hb = box(0.4, 0.17, 0.03, M.plastic, s * 0.58, 0.63, L + 0.01); hb.rotation.set(-0.7, -s * 0.15, 0);
-      box(0.1, 0.06, 0.04, M.amber, s * 0.82, 0.5, L + 0.07);
+      box(0.1, 0.06, 0.04, M.amber, s * 0.74, 0.5, L + 0.07);
     }
     rbox(1.84, 0.2, 0.16, M.plastic, 0, 0.36, L + 0.08);
     // the hood scoop, laid on the hood's slope
@@ -17560,8 +17563,8 @@ function buildWagon(opts){
         rbox(0.29, 0.15, 0.04, sd < 0 && o.beater ? M.headDim : M.head, sd * 0.6, 0.64, 2.36, undefined, 0.02);
       }
     }
-    box(0.12, 0.08, 0.04, M.amber, 0.8, 0.5, 2.34);
-    box(0.12, 0.08, 0.04, M.amber, -0.8, 0.5, 2.34);
+    box(0.12, 0.08, 0.04, M.amber, 0.71, 0.5, 2.34);
+    box(0.12, 0.08, 0.04, M.amber, -0.71, 0.5, 2.34);
     if(o.safari){
       // a black steel bumper, deep and square, with recovery eyes and a guard over each lamp
       rbox(1.98, 0.22, 0.22, M.matte, 0, 0.36, 2.42, undefined, 0.04);
@@ -17608,17 +17611,18 @@ function buildWagon(opts){
   box(0.07, 0.05, 0.015, M.chrome, 0, 0.83, REAR);
   for (const s of [1, -1]) box(0.2, 0.035, 0.012, M.chrome, s * 0.4, 0.8, REAR);
   for (const s of [1, -1]) {
-    const x = s * 0.785;
-    box(0.22, 0.4, 0.015, M.chrome, x, 0.67, REAR);
-    box(0.19, 0.24, 0.03, M.tail, x, 0.74, REAR - 0.01);
-    box(0.19, 0.065, 0.03, M.amber, x, 0.585, REAR - 0.01);
-    box(0.19, 0.065, 0.03, M.reverse, x, 0.515, REAR - 0.01);
-    box(0.012, 0.36, 0.1, M.tail, s * SIDE, 0.68, -2.27);
+    const x = s * 0.7;                       // (on the flat of the tail, inboard of where its corners roll round)
+    box(0.2, 0.4, 0.015, M.chrome, x, 0.67, REAR);
+    box(0.17, 0.24, 0.03, M.tail, x, 0.74, REAR - 0.01);
+    box(0.17, 0.065, 0.03, M.amber, x, 0.585, REAR - 0.01);
+    box(0.17, 0.065, 0.03, M.reverse, x, 0.515, REAR - 0.01);
+    box(0.012, 0.3, 0.08, M.tail, s * SIDE, 0.68, -2.245);
   }
-  box(0.48, 0.2, 0.012, M.trim, 0, 0.58, REAR);
-  box(0.4, 0.14, 0.012, M.plate, 0, 0.575, REAR - 0.006);
-  for (let i = 0; i < 6; i++) box(0.035, 0.06, 0.005, M.plateInk, -0.14 + i * 0.056, 0.57, REAR - 0.013);
-  box(0.1, 0.02, 0.02, M.reverse, 0, 0.665, REAR - 0.01);
+  const PZ = o.woodie ? REAR - 0.03 : REAR;          // (stood off the woodie's tailgate panel, in front of the wood)
+  box(0.48, 0.2, 0.012, M.trim, 0, 0.58, PZ);
+  box(0.4, 0.14, 0.012, M.plate, 0, 0.575, PZ - 0.006);
+  for (let i = 0; i < 6; i++) box(0.035, 0.06, 0.005, M.plateInk, -0.14 + i * 0.056, 0.57, PZ - 0.013);
+  box(0.1, 0.02, 0.02, M.reverse, 0, 0.665, PZ - 0.01);
 
   const RG = Math.hypot(RB - RT, ROOF - BELT);
   const hatch = new THREE.Group();
@@ -17834,9 +17838,10 @@ function buildWagon(opts){
       for (const z of [-0.1, -1.28]) box(0.03, 0.03, 0.13, M.chrome, s * (SIDE + 0.035), 0.8, z);
     }
     // the tailgate: framed mahogany, the ash up both edges and across
-    box(1.3, Y1 - 0.42, 0.014, M.woodP, 0, (Y1 + 0.42)/2, REAR - 0.006);
-    for (const y of [0.44, (Y1 + 0.44)/2, Y1 - 0.02]) box(1.36, 0.045, 0.022, M.ash, 0, y, REAR - 0.014);
-    for (const xx of [-0.67, -0.22, 0.22, 0.67]) box(0.05, Y1 - 0.42, 0.022, M.ash, xx, (Y1 + 0.42)/2, REAR - 0.014);
+    // (between the tail lights)
+    box(1.06, Y1 - 0.42, 0.014, M.woodP, 0, (Y1 + 0.42)/2, REAR - 0.006);
+    for (const y of [0.44, (Y1 + 0.44)/2, Y1 - 0.02]) box(1.12, 0.045, 0.022, M.ash, 0, y, REAR - 0.014);
+    for (const xx of [-0.55, -0.18, 0.18, 0.55]) box(0.05, Y1 - 0.42, 0.022, M.ash, xx, (Y1 + 0.42)/2, REAR - 0.014);
     // the front: a chrome waterfall grille and round lamps in chrome bezels, a mascot on the hood
     box(0.92, 0.34, 0.03, M.trim, 0, 0.63, L + 0.07);
     for (let k = 0; k < 11; k++) box(0.022, 0.32, 0.03, M.chrome, -0.4 + k*0.08, 0.63, L + 0.09);
