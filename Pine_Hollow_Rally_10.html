@@ -7018,7 +7018,7 @@ function stepLamps(){
     const h = pose.h, fx = Math.sin(h), fz = Math.cos(h);
     HEADSPOT.position.set(pose.x + fx*2.3, pose.y + 1.0, pose.z + fz*2.3);
     HEADSPOT.target.position.set(pose.x + fx*22, pose.y - 1.5, pose.z + fz*22);
-    HEADSPOT.intensity = 2.6; HEADSPOT.visible = car.visible;
+    HEADSPOT.intensity = 2.6*(1 - 0.45*(DMG.front || 0)); HEADSPOT.visible = car.visible;
   } else if(HEADSPOT) HEADSPOT.intensity = 0;
 }
 /* ---- rain and snow: streaks (or flakes) in a box that travels with the camera ---- */
@@ -10922,6 +10922,9 @@ function wallTouch(nx, nz, over, o){
     pose.vx -= nx*vn*1.25; pose.vz -= nz*vn*1.25;
     pose.vx *= 0.85; pose.vz *= 0.85;
   }
+  // the knock's mark on the car (a hit's dent, or the paint a slide along it takes off)
+  if(!held && vn > 2.5 && (GAME.bumpCool || 0) <= 0) carDamage(nx, nz, vn*(glance ? 0.75 : 1), false);
+  else if(held && (DMG.scrT -= 1/60) <= 0){ DMG.scrT = 0.12; carDamage(nx, nz, vn, true); }
   if(vn > 1.5 && (GAME.bumpCool || 0) <= 0){
     if(o.sound === "scrape" || held) SFX.scrape(Math.min(1, vn/10 + 0.3)); else SFX.bump(vn*(glance ? 0.6 : 1));
     if(!held) GAME.shake = Math.max(GAME.shake || 0, Math.min(glance ? 0.25 : 0.5, vn*(glance ? 0.03 : 0.05)));
@@ -11907,6 +11910,7 @@ if(GATOR){
     if(vn < 0){ pose.vx -= nx*vn*1.6; pose.vz -= nz*vn*1.6; }
     pose.vx *= 0.72; pose.vz *= 0.72; pose.vy = Math.max(pose.vy || 0, 3.0); pose.air = true; pose.airT = 0;
     GAME.shake = Math.max(GAME.shake || 0, 0.35);
+    carDamage(-nx, -nz, hard ? 11 : 7, false);
     if(actx) SFX.bump(hard ? 9 : 6);
     GG.hit(hard ? 2 : 1);
   }
@@ -17388,19 +17392,38 @@ function mergeStatic(root, keep){
    its springs or climbs a hill. (Wheels and axle keep their own local
    heights, all low, so they stay caked.) */
 const CAR_DIRT = { uDirt:{value:0}, uSnow:{value:0}, uDirtCol:{value:new THREE.Color(0x4a3524)} };
+/* (and the knocks it takes: see DAMAGE below) */
+const DMG_N = 16;
+const CAR_DMG = { uScr:{value:[]}, uScrD:{value:[]} };
+for(let i = 0; i < DMG_N; i++){ CAR_DMG.uScr.value.push(new THREE.Vector4(0, -99, 0, 0)); CAR_DMG.uScrD.value.push(new THREE.Vector4(0, 0, 1, 0)); }
 function dirtify(m){
   // the car's lamps and chrome take the muck too: mud dims a lamp, and a
   // mucky bumper stops shining (a metal's own colour barely shows, so its
   // shine is what has to go)
   m.onBeforeCompile = sh=>{
-    Object.assign(sh.uniforms, CAR_DIRT);
+    Object.assign(sh.uniforms, CAR_DIRT, CAR_DMG);
     sh.vertexShader = sh.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec3 vDL;")
       .replace("#include <begin_vertex>", "#include <begin_vertex>\nvDL = transformed;");
     sh.fragmentShader = sh.fragmentShader
-      .replace("#include <common>", "#include <common>\nvarying vec3 vDL; uniform float uDirt, uSnow; uniform vec3 uDirtCol;")
+      .replace("#include <common>", "#include <common>\nvarying vec3 vDL; uniform float uDirt, uSnow; uniform vec3 uDirtCol; uniform vec4 uScr[" + DMG_N + "]; uniform vec4 uScrD[" + DMG_N + "];")
       .replace("#include <color_fragment>", [
         "#include <color_fragment>",
+        // the knocks: paint scraped through to the metal in streaks along the way it slid, darker where the panel is creased
+        "float scrK = 0.0, crushK = 0.0;",
+        "for(int i = 0; i < " + DMG_N + "; i++){",
+        "  vec4 S = uScr[i]; if(S.w <= 0.0) continue;",
+        "  vec3 d = vDL - S.xyz; float r = length(d)/S.w; if(r >= 1.0) continue;",
+        "  vec3 D = uScrD[i].xyz, side = cross(D, vec3(0.0, 1.0, 0.0));",
+        "  float across = d.y + 0.12*dot(d, side);",
+        "  float ln = fract(sin(floor(across*70.0 + float(i)*7.0)*91.7)*4375.5);",
+        "  float edge = 1.0 - smoothstep(0.45, 1.0, r + 0.3*(ln - 0.5));",
+        "  scrK = max(scrK, edge*(0.12 + 0.8*step(0.5, ln)));",
+        "  crushK = max(crushK, uScrD[i].w*(1.0 - smoothstep(0.3, 0.85, r)));",
+        "}",
+        "scrK = clamp(scrK, 0.0, 0.9);",
+        "diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.6, 0.6, 0.62)*(0.8 + 0.4*fract(sin(dot(floor(vDL.xz*40.0), vec2(3.1, 7.7)))*921.3)), scrK);",
+        "diffuseColor.rgb *= 1.0 - crushK*0.4;",
         "float dirtK = 0.0;",
         "{",
         "  float hgt = vDL.y;",
@@ -17416,11 +17439,206 @@ function dirtify(m){
         "  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.95, 0.99), snowK);",
         "  dirtK = max(dirtK, snowK);",
         "}"].join("\n"))
-      .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 1.0, dirtK);")
+      .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = mix(mix(roughnessFactor, 0.45, scrK*0.7), 1.0, dirtK);")
       .replace("#include <metalnessmap_fragment>", "#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, 0.0, dirtK*0.9);")
-      .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\ntotalEmissiveRadiance *= 1.0 - dirtK*0.75;");
+      .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\ntotalEmissiveRadiance *= (1.0 - dirtK*0.75)*(1.0 - smoothstep(0.25, 0.5, crushK));");
   };
   m.customProgramCacheKey = ()=> "dirt";
+}
+/* ---- DAMAGE: what the knocks leave on a car ----
+   A hit crumples the body where it landed: every vertex near the spot is pushed in along the blow, more at
+   the middle, each by its own amount (so a corner folds rather than shrinking smooth), and never further than
+   DENT_MAX from where it was built. The player's paint is scraped through to the metal in streaks along the
+   way the car slid, darker where the panel is creased, and a lamp in a hard hit goes out. Bits fly off a big
+   one: shards of paint, black trim, glass. A restart puts it all back. */
+const DENT_MAX = 0.24;
+const DMG = { next:0, scrT:0, total:0 };
+const _dv = new THREE.Vector3(), _dm = new THREE.Matrix4(), _di = new THREE.Matrix4(), _dp = new THREE.Vector3();
+const dHash = x => { const s = Math.sin(x*12.9898)*43758.5453; return s - Math.floor(s); };
+function carBody(G){ return G && G.userData.shell && G.userData.shell.children[0]; }
+/* the body's size, measured once off its own geometry */
+function carBox(G){
+  if(G.userData.dmgBox) return G.userData.dmgBox;
+  const body = carBody(G), b = new THREE.Box3();
+  body.children.forEach(o=>{ if(o.isMesh && o.geometry && !o.material.isMeshBasicMaterial && !o.material.transparent){ o.geometry.computeBoundingBox(); b.union(o.geometry.boundingBox); } });
+  if(b.isEmpty()) b.set(new THREE.Vector3(-0.9, 0.2, -2.3), new THREE.Vector3(0.9, 1.6, 2.3));
+  return (G.userData.dmgBox = b);
+}
+/* a non-indexed geometry cut finer until no edge is longer than L, so a dent has something to fold: each edge is
+   split (or not) by its own length alone, so the two faces either side of it agree and nothing cracks open */
+function finerGeo(geo, L){
+  for(let pass = 0; pass < 4; pass++){
+    const P = geo.attributes.position.array, U = geo.attributes.uv ? geo.attributes.uv.array : null, n = P.length/9;
+    const outP = [], outU = [], L2 = L*L;
+    let split = false;
+    const V = (i)=> [P[i*3], P[i*3 + 1], P[i*3 + 2], U ? U[i*2] : 0, U ? U[i*2 + 1] : 0];
+    const mid = (a, b)=> a.map((x, k)=> (x + b[k])/2);
+    const long = (a, b)=> { const dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2]; return dx*dx + dy*dy + dz*dz > L2; };
+    const tri = (a, b, c)=>{ outP.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]); if(U) outU.push(a[3], a[4], b[3], b[4], c[3], c[4]); };
+    for(let t = 0; t < n; t++){
+      let a = V(t*3), b = V(t*3 + 1), c = V(t*3 + 2);
+      let s0 = long(a, b), s1 = long(b, c), s2 = long(c, a);
+      const k = (s0 ? 1 : 0) + (s1 ? 1 : 0) + (s2 ? 1 : 0);
+      if(!k){ tri(a, b, c); continue; }
+      split = true;
+      if(k === 3){ const m0 = mid(a, b), m1 = mid(b, c), m2 = mid(c, a); tri(a, m0, m2); tri(m0, b, m1); tri(m2, m1, c); tri(m0, m1, m2); continue; }
+      // turn it round so the split edges come first: (a b) always split, (b c) split too when two are
+      while(!(s0 && (k === 1 || s1))){ [a, b, c] = [b, c, a]; [s0, s1, s2] = [s1, s2, s0]; }
+      const m0 = mid(a, b);
+      if(k === 1){ tri(a, m0, c); tri(m0, b, c); }
+      else { const m1 = mid(b, c); tri(m0, b, m1); tri(a, m0, m1); tri(a, m1, c); }
+    }
+    if(!split) break;
+    const g2 = new THREE.BufferGeometry();
+    g2.setAttribute("position", new THREE.Float32BufferAttribute(outP, 3));
+    if(U) g2.setAttribute("uv", new THREE.Float32BufferAttribute(outU, 2));
+    g2.computeVertexNormals();
+    geo = g2;
+  }
+  return geo;
+}
+/* each of the car's meshes made its own and cut finer, once (the rivals coarser: they're further off) */
+function prepDent(G){
+  const body = carBody(G); if(!body || G.userData.dentReady) return;
+  const L = G === car ? 0.3 : 0.45;
+  body.traverse(o=>{
+    if(!o.isMesh || !o.geometry || o.material.isMeshBasicMaterial || o.userData.noMerge || o.geometry.userData.dentOwn) return;
+    let geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+    // (the big panels are cut finer; small parts are left as they are)
+    if(geo.attributes.position.count > 60 && geo.attributes.position.count < 60000) geo = finerGeo(geo, L);
+    o.geometry = geo; geo.userData.dentOwn = true; geo.userData.base = geo.attributes.position.array.slice();
+  });
+  G.userData.dentReady = true;
+}
+/* done ahead, a car a frame through the countdown, so the first knock doesn't stall a frame */
+function prepDamageSoon(){
+  const list = [car].concat(typeof rivals !== "undefined" ? rivals.map(r=> r.mesh) : []);
+  // (and the shards, made up front and hidden)
+  if(!DEBRIS.length && car && car.userData.materials) for(let i = 0; i < 36; i++){
+    const m = new THREE.Mesh(new THREE.TetrahedronGeometry(1, 0), car.userData.materials.paint); m.castShadow = true; m.visible = false; scene.add(m);
+    DEBRIS.push({ m, v:new THREE.Vector3(), s:new THREE.Vector3(), life:0 }); }
+  let k = 0; const next = ()=>{ if(k >= list.length) return; prepDent(list[k++]); setTimeout(next, 30); };
+  setTimeout(next, 30);
+}
+function dentCar(G, p, dir, depth, rad){
+  const body = carBody(G); if(!body) return;
+  prepDent(G);
+  body.updateMatrixWorld(true);
+  const bodyInv = new THREE.Matrix4().copy(body.matrixWorld).invert();
+  body.traverse(o=>{
+    if(!o.isMesh || !o.geometry || o.material.isMeshBasicMaterial || o.userData.noMerge) return;
+    const geo = o.geometry; if(!geo.userData.dentOwn) return;
+    _dm.multiplyMatrices(bodyInv, o.matrixWorld); _di.copy(_dm).invert();
+    const pos = geo.attributes.position, A = pos.array, B = geo.userData.base, r2 = rad*rad;
+    let moved = false;
+    for(let i = 0; i < pos.count; i++){
+      _dv.set(A[i*3], A[i*3 + 1], A[i*3 + 2]).applyMatrix4(_dm);
+      const dx = _dv.x - p.x, dy = _dv.y - p.y, dz = _dv.z - p.z, d2 = dx*dx + dy*dy + dz*dz;
+      if(d2 >= r2) continue;
+      const f = 1 - Math.sqrt(d2)/rad, h = dHash(B[i*3]*13.1 + B[i*3 + 1]*7.7 + B[i*3 + 2]*3.3), h2 = dHash(B[i*3]*5.3 - B[i*3 + 2]*11.9);
+      const k = depth*f*(0.55 + 0.9*h);
+      _dv.x += dir.x*k + (h2 - 0.5)*k*0.5; _dv.y += dir.y*k + (h - 0.5)*k*0.6; _dv.z += dir.z*k + (h2 - 0.5)*k*0.3;
+      _dv.applyMatrix4(_di);
+      let ex = _dv.x - B[i*3], ey = _dv.y - B[i*3 + 1], ez = _dv.z - B[i*3 + 2];
+      const e = Math.hypot(ex, ey, ez); if(e > DENT_MAX){ const c = DENT_MAX/e; ex *= c; ey *= c; ez *= c; }
+      A[i*3] = B[i*3] + ex; A[i*3 + 1] = B[i*3 + 1] + ey; A[i*3 + 2] = B[i*3 + 2] + ez; moved = true;
+    }
+    if(moved){ pos.needsUpdate = true; geo.computeBoundingSphere(); }
+  });
+}
+function undentCar(G){
+  const body = carBody(G); if(!body) return;
+  body.traverse(o=>{ const geo = o.isMesh && o.geometry; if(geo && geo.userData.dentOwn){ geo.attributes.position.array.set(geo.userData.base); geo.attributes.position.needsUpdate = true; } });
+}
+/* where on the body a blow from world direction (nx, nz) lands, and which way it pushes, in the car's own frame */
+function hitPoint(G, yaw, nx, nz, yK){
+  const lx = nx*Math.cos(yaw) - nz*Math.sin(yaw), lz = nx*Math.sin(yaw) + nz*Math.cos(yaw), b = carBox(G);
+  const hx = Math.max(Math.abs(b.min.x), b.max.x)*0.96, hz = (lz >= 0 ? b.max.z : -b.min.z)*0.96;
+  const t = Math.min(Math.abs(lx) > 1e-3 ? hx/Math.abs(lx) : 99, Math.abs(lz) > 1e-3 ? hz/Math.abs(lz) : 99);
+  const y = b.min.y + (b.max.y - b.min.y)*(yK === undefined ? 0.25 + Math.random()*0.3 : yK);
+  return { p:new THREE.Vector3(lx*t, y, lz*t), dir:new THREE.Vector3(-lx, 0, -lz).normalize(), lx, lz };
+}
+/* a scrape mark on the player's paint: one close to an old one grows it instead (a long slide is one long scrape) */
+function addScrape(p, r, D, sev){
+  const U = CAR_DMG.uScr.value, V = CAR_DMG.uScrD.value;
+  for(let i = 0; i < DMG_N; i++){ const u = U[i]; if(u.w <= 0) continue;
+    const d = Math.hypot(u.x - p.x, u.y - p.y, u.z - p.z);
+    if(d < u.w*0.75 && u.w < 1.3){ const nr = Math.min(1.3, Math.max(u.w, (d + r + u.w)/2)), k = (nr - u.w)/(d || 1)*0.5;
+      u.x += (p.x - u.x)*Math.min(1, k); u.y += (p.y - u.y)*Math.min(1, k); u.z += (p.z - u.z)*Math.min(1, k); u.w = nr;
+      V[i].w = Math.max(V[i].w, sev); return; } }
+  const i = DMG.next; DMG.next = (DMG.next + 1) % DMG_N;
+  U[i].set(p.x, p.y, p.z, r); V[i].set(D.x, D.y, D.z, sev);
+}
+/* bits off the car: a few shards, tumbling, that bounce, settle and go */
+const DEBRIS = [];
+function debrisBurst(G, p, nx, nz, n, sev){
+  const body = carBody(G), M = G.userData.materials || {};
+  const mats = [M.paint, M.trim || M.paint, M.paint, M.glassD || M.trim || M.paint].filter(Boolean);
+  _dp.copy(p); body.localToWorld(_dp);
+  for(let k = 0; k < n; k++){
+    let d = DEBRIS.find(x => x.life <= 0);
+    if(!d){ if(DEBRIS.length >= 36) d = DEBRIS[k % DEBRIS.length];
+      else { const m = new THREE.Mesh(new THREE.TetrahedronGeometry(1, 0), mats[0]); m.castShadow = true; scene.add(m); d = { m, v:new THREE.Vector3(), s:new THREE.Vector3(), life:0 }; DEBRIS.push(d); } }
+    d.m.material = mats[k % mats.length];
+    const sz = 0.05 + Math.random()*0.09*(0.6 + sev); d.m.scale.set(sz*(1 + Math.random()), sz*0.35, sz*(0.8 + Math.random())); d.sz = d.m.scale.clone();
+    d.m.position.copy(_dp).add(new THREE.Vector3((Math.random() - 0.5)*0.4, Math.random()*0.3, (Math.random() - 0.5)*0.4));
+    // (off the car the way it was going, thrown back out of the hit and up)
+    d.v.set(pose.vx*0.6 - nx*(1.5 + Math.random()*3) + (Math.random() - 0.5)*3, 1.5 + Math.random()*3.5, pose.vz*0.6 - nz*(1.5 + Math.random()*3) + (Math.random() - 0.5)*3);
+    d.s.set((Math.random() - 0.5)*18, (Math.random() - 0.5)*18, (Math.random() - 0.5)*18);
+    d.life = 7 + Math.random()*3; d.m.visible = true;
+  }
+}
+function stepDebris(dt){
+  for(const d of DEBRIS){
+    if(d.life <= 0) continue;
+    d.life -= dt;
+    if(d.life <= 0){ d.m.visible = false; continue; }
+    const m = d.m, g = surfaceY(m.position.x, m.position.z) + 0.02;
+    if(m.position.y > g + 0.01 || d.v.y > 0.1){
+      d.v.y -= 9.8*dt; m.position.addScaledVector(d.v, dt);
+      m.rotation.x += d.s.x*dt; m.rotation.y += d.s.y*dt; m.rotation.z += d.s.z*dt;
+      if(m.position.y < g){ m.position.y = g; d.v.y *= -0.28; d.v.x *= 0.55; d.v.z *= 0.55; d.s.multiplyScalar(0.45); if(Math.abs(d.v.y) < 0.6) d.v.y = 0; }
+    }
+    if(d.life < 1) m.scale.copy(d.sz).multiplyScalar(Math.max(0.01, d.life));
+  }
+}
+/* the player hits something: (nx, nz) the way into it, vn how hard; slide: still against it, sliding along */
+function carDamage(nx, nz, vn, slide){
+  if(!car || !carBody(car) || state.phase === "menu") return;
+  const yaw = pose.h + (pose.yawVis || 0), H = hitPoint(car, yaw, nx, nz, slide ? 0.22 + Math.random()*0.15 : undefined);
+  // which way it slid along the thing, in the car's frame (the scrape's streaks run that way)
+  const tx = -nz, tz = nx, vt = pose.vx*tx + pose.vz*tz, sg = vt >= 0 ? 1 : -1;
+  const D = new THREE.Vector3((tx*Math.cos(yaw) - tz*Math.sin(yaw))*sg, 0, (tx*Math.sin(yaw) + tz*Math.cos(yaw))*sg);
+  if(slide){
+    if(Math.abs(vt) < 3) return;
+    addScrape(H.p, 0.4, D, 0);
+    dentCar(car, H.p, H.dir, 0.012, 0.35);
+    if(Math.random() < 0.5){ _dp.copy(H.p); carBody(car).localToWorld(_dp); spawnDust(_dp.x, _dp.y, _dp.z, {tint:[0.72, 0.7, 0.66]}, 0, pose.vx*0.4, pose.vz*0.4, 0.5); }
+    return;
+  }
+  const sev = Math.max(0, Math.min(1, (vn - 2.5)/11));
+  if(sev <= 0) return;
+  DMG.total += sev;
+  dentCar(car, H.p, H.dir, 0.04 + sev*0.17, 0.5 + sev*0.45);
+  addScrape(H.p, 0.35 + sev*0.45, D, sev > 0.4 ? sev : 0);
+  if(sev > 0.3) debrisBurst(car, H.p, nx, nz, Math.round(2 + sev*6), sev);
+  // a lamp in the way of a hard one is out (the shader puts the glow out; the beam goes with the last of the front pair)
+  if(sev > 0.4 && H.lz > 0.6) DMG.front = Math.min(2, (DMG.front || 0) + 1);
+}
+/* a rival knocked by you: its body dents too (no scraped paint: that's only for your own car) */
+function rivalDamage(r, nx, nz, vn){
+  const sev = Math.max(0, Math.min(1, (vn - 2.5)/11)); if(sev <= 0 || !carBody(r.mesh)) return;
+  const H = hitPoint(r.mesh, r.mesh.rotation.y, nx, nz);
+  dentCar(r.mesh, H.p, H.dir, 0.04 + sev*0.15, 0.5 + sev*0.4);
+  if(sev > 0.4) debrisBurst(r.mesh, H.p, nx, nz, Math.round(1 + sev*4), sev);
+}
+function resetDamage(){
+  if(car) undentCar(car);
+  if(typeof rivals !== "undefined") rivals.forEach(r=> undentCar(r.mesh));
+  CAR_DMG.uScr.value.forEach(u=> u.set(0, -99, 0, 0)); CAR_DMG.uScrD.value.forEach(u=> u.set(0, 0, 1, 0));
+  DMG.next = 0; DMG.total = 0; DMG.front = 0;
+  DEBRIS.forEach(d=>{ d.life = 0; d.m.visible = false; });
+  prepDamageSoon();
 }
 /* Logo decals: the game's own pixel logo (and the pine badge off the tab icon) as stickers,
    rasterised four times over so the pixels stay square and crisp, and recoloured per style.
@@ -18565,12 +18783,8 @@ function paintCar(hex){
 scene.add(car);
 
 /* ------------------------------------------------------------------ *
- *  The rivals' own cars. Each regular turns up in something different,
- *  so you can tell them apart by shape as well as colour, and each has
- *  their own load on the roof.
- *    box     Dale's silver Swedish box wagon, canoe on the roof
- *    trail   Rhonda's lifted two-door 4x4, roof basket with a light bar
- *    pickup  Gus's slate pickup, ladder rack over a bed of firewood
+ *  The rivals' cars: rally machines, a different one for each Grand
+ *  Prix (see rallyKind), the three regulars each in their own colours.
  *  Same contract as buildWagon: origin at the ground, +Z forward, a
  *  shell on its springs, wheel pivots, a tail material the game lights.
  * ------------------------------------------------------------------ */
@@ -22531,6 +22745,7 @@ function collideRival(r, t, nx, nz){
     }
     if(!r.net) r.push = Math.max(-6, Math.min(6, (r.push || 0) - (ix*nx + iz*nz)*j));   // shoved over
     if(j > 1.0 && (GAME.bumpCool||0) <= 0){
+      if(j > 2.5){ carDamage(-ix, -iz, j*1.1, false); rivalDamage(r, ix, iz, j*1.1); }
       SFX.bump(j); GAME.shake = Math.max(GAME.shake, Math.min(0.35, j*0.035));
       GAME.bumpCool = 0.25;
     }
@@ -23093,7 +23308,7 @@ function resetRace(){
   GAME.paused = false; GAME.doneT = 0; GAME.resultsShown = false; GAME.goT = 0;
   GAME.startAt = null; GAME.stallT = 0; GAME.launchFx = 0;
   GG.reset(); pose.surge = 0; pose.over = 0;
-  CAR_DIRT.uDirt.value = 0; CAR_DIRT.uSnow.value = 0;
+  CAR_DIRT.uDirt.value = 0; CAR_DIRT.uSnow.value = 0; resetDamage();
   CAR_DIRT.uDirtCol.value.set(DESERT ? 0x9a7650 : WINTER ? 0x6a6a70 : FALL ? 0x4e3622 : 0x4a3524);
   GAME.wrongT = 0; GAME.stuckT = 0; GAME.placePrev = 0; GAME.placeT = 0; CONFETTI.length = 0; GAME.lbAsked = false;
   GAME.lapRecord = false; GAME.raceRecord = false; GAME.orbitA = 0;
@@ -23850,7 +24065,7 @@ function showOptions(back){
    switching tabs, so left and right keep flicking through them) */
 function showGarage(next, back, cat, sel){
   if(!GAME.garage){
-    GAME.garage = true; GCAM.a = null;
+    GAME.garage = true; GCAM.a = null; resetDamage();          // (back from the stage: straightened out)
     // park it down the road, clear of the start gate, for the photographs
     const i = wrapIdx(MAIN, Math.round(45/MAIN.seg)), p = MAIN.pts[i], t = MAIN.tans[i];
     pose.x = p.x; pose.z = p.z; pose.h = Math.atan2(t.x, t.z); pose.vx = pose.vz = 0;
@@ -25617,7 +25832,7 @@ function frame(now){
     stepGhost();
     stepNotes(info); stepTrace();
 
-    stepDust(dt);
+    stepDust(dt); stepDebris(dt);
     stepRain(dt); stepLamps();
 
     if(state.phase === "menu") (GAME.garage ? garageCam(dt) : attractCam(dt));
