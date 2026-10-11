@@ -13786,9 +13786,11 @@ if(SPRINGCUP){
     shade(G2); mergeStatic(G2); scene.add(G2);
     const tr = new THREE.Group();
     trees.forEach(([x, z])=>{ const y = gradedY(x, z);
-      pcyl(tr, 0.28, 0.4, 4.5, 6, 0x5a4030, x, y + 2.25, z);
-      const c = new THREE.Mesh(new THREE.BoxGeometry(5.5, 4.2, 5.5), PM(0x4f7a2e)); c.position.set(x, y + 6.3, z); tr.add(c);
-      const c2 = new THREE.Mesh(new THREE.IcosahedronGeometry(2.9, 1), PM(0x5a8a34)); c2.scale.set(1.05, 0.8, 1.05); c2.position.set(x, y + 8.2, z); tr.add(c2); });
+      // (a lime: a clean stem, and a full rounded crown of leafy clumps, kept trim but not cut square)
+      pcyl(tr, 0.24, 0.38, 5.2, 8, 0x5a4030, x, y + 2.6, z);
+      const crown = [[0, 7.2, 0, 2.9], [1.7, 6.4, 0.6, 2.0], [-1.6, 6.5, -0.7, 2.1], [0.5, 6.2, -1.8, 1.9], [-0.6, 6.3, 1.8, 1.9], [0.2, 8.6, 0.2, 2.0]];
+      crown.forEach(([cx, cy, cz, r], k)=>{ const c = new THREE.Mesh(clumpGeometry(r, 0.14, x*0.1 + k), PM(k % 2 ? 0x4f7a2e : 0x5a8a34));
+        c.scale.y = 0.85; c.position.set(x + cx, y + cy, z + cz); tr.add(c); }); });
     shade(tr); mergeStatic(tr); scene.add(tr);
   }
   /* the front steps: the drive comes out of the Long Gallery's door and across the steps between stone
@@ -15327,7 +15329,8 @@ function cherryGeometry(kind, leafy){
   const build = (fine)=>{
     pos.length = 0; col.length = 0; for(let i=0;i<P0.length;i++){ pos.push(P0[i]); col.push(C0[i]); }
     for(const [x, y, z, r, sq, small, rx, ry, white, sd] of clusters){
-      const b = small ? new THREE.OctahedronGeometry(r, 0) : fine ? clumpGeometry(r, 0.12, sd) : new THREE.IcosahedronGeometry(r, 0);
+      // (the little clusters too: rounded up close, the eight-faced shards only far off)
+      const b = small ? (fine ? new THREE.IcosahedronGeometry(r, 0) : new THREE.OctahedronGeometry(r, 0)) : fine ? clumpGeometry(r, 0.12, sd) : new THREE.IcosahedronGeometry(r, 0);
       b.rotateX(rx); b.rotateY(ry); b.scale(1, sq, 1); b.translate(x, y, z);
       put(b, bloom(white));
     }
