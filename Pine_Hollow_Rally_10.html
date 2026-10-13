@@ -739,7 +739,7 @@ const TRACKS = [
           [500,-160],[420,-230],[360,-330],[270,-390],[150,-400],[60,-360]],
     hills:[[330,-190,200,-9],[80,120,160,10],[560,30,170,8],[30,-170,90,-4],[55,150,110,6]],
     jumps:[], fords:[[165,110],[310,-80],[648,55],[270,-390]],
-    river:{from:[27,-98], to:[39,68], pools:5, down:70, up:62, downDir:[0.55,-1], upDir:[0.45,1], cascade:2},
+    river:{from:[27,-98], to:[39,68], pools:5, down:70, up:62, downDir:[0.55,-1], upDir:[0.45,1], flow:{seed:31, drops:0.75}},
     mud:[[[440,-205],[380,-290]]],
     branches:[
       // over the top of the dip
@@ -3803,6 +3803,63 @@ const RIVER_WADE = TRACK.season === "spring" ? 0.45 : 0.30;     // water over th
 const RIVER_BED  = 10;       // half width of the channel floor
 const RIVER_BANK = 18;       // where the bank reaches the top
 const RIVER_FREE = 0.55;     // bank over the water
+/* ---- a river that flows: the shape of a real stream's bed and water, for any creek that asks for it (def.flow) ----
+   Walking up it from the bottom, the stream is a chain of reaches: a POOL (deep, still, barely sloping), a RUN
+   (steady, a little faster), a RIFFLE (shallow, fast, broken water over a gravel bar) and now and then a DROP (a
+   rock ledge the whole stream pours over, with a plunge pool scoured out at its foot). The water surface only
+   ever falls downstream, and never sits flat: every sample is a little lower than the one above it. The bed under
+   it rises and dips: deep in the pools, up on the bars. From the grade and the depth comes the speed of the water
+   (fast and shallow over the riffles, lazy in the pools), and from those its foam: white over the drops and riffles,
+   boiling at the foot of a fall. Everything that draws or feels the water reads these: the sheet, its streaks and
+   foam, the flecks floating down, the rocks, the spray, the roar, and the shove the current gives the car.
+   m samples above the first (index 0 at the bottom); the surface climbs `rise` metres over them. */
+const FLOW_KIND = { pool:0, run:1, riffle:2, drop:3 };
+function flowProfile(m, rise, seg, rnd, opt){
+  opt = opt || {};
+  const wild = opt.drops === undefined ? 0.6 : opt.drops;          // how often a riffle steps up into a drop
+  const W = [0.4, 1.0, 2.2, 5.5], D = [0.62, 0.4, 0.2, 0.26];       // relative grade and depth of each kind
+  const LEN = [[6, 11], [5, 11], [5, 9], [2.6, 4.4]];
+  const kind = new Uint8Array(m + 1), gw = new Float32Array(m + 1);
+  let k = 0, prev = opt.start === undefined ? -1 : opt.start;
+  while(k <= m){
+    const t = prev === 0 ? (rnd() < wild*0.7 ? 3 : rnd() < 0.65 ? 2 : 1)       // above a pool: the fall that feeds it, or a riffle, or a run
+            : prev === 3 ? (rnd() < 0.5 ? 1 : 2)                               // above a drop: the shelf it pours off
+            : prev === 2 ? (rnd() < wild*0.6 ? 3 : rnd() < 0.55 ? 0 : 1)
+            : prev === 1 ? (rnd() < 0.5 ? 2 : 0) : 0;
+    const len = Math.max(2, Math.round((LEN[t][0] + rnd()*(LEN[t][1] - LEN[t][0]))/seg)), g = W[t]*(0.8 + rnd()*0.4);
+    for(let q = 0; q < len && k <= m; q++, k++){ kind[k] = t; gw[k] = g; }
+    prev = t;
+  }
+  // the grade: eased between reaches (a drop keeps its edge), scaled to the climb, no step steeper than a car can take
+  const g = new Float32Array(m + 1);
+  for(let i = 0; i <= m; i++){ if(kind[i] === 3){ g[i] = gw[i]; continue; }
+    let s0 = 0, c = 0; for(let d = -2; d <= 2; d++){ const j = i + d; if(j < 0 || j > m) continue; s0 += kind[j] === 3 ? W[2] : gw[j]; c++; } g[i] = s0/c; }
+  const MAXG = opt.maxGrade || 0.3;
+  for(let it = 0; it < 6; it++){
+    let sum = 0, free = 0; for(let i = 1; i <= m; i++){ sum += g[i]*seg; if(g[i] < MAXG) free += g[i]*seg; }
+    const want = rise - (sum - free), sc = free > 0 ? want/free : 1;
+    for(let i = 1; i <= m; i++) if(g[i] < MAXG) g[i] = Math.min(MAXG, g[i]*sc);
+  }
+  for(let i = 0; i <= m; i++) g[i] = Math.max(g[i], 0.004);          // (never flat)
+  const lev = new Float32Array(m + 1);
+  for(let i = 1; i <= m; i++) lev[i] = lev[i-1] + g[i]*seg;
+  const fix = rise/(lev[m] || 1); for(let i = 0; i <= m; i++) lev[i] *= fix;
+  for(let i = 0; i <= m; i++) g[i] *= fix;
+  // the depth: deep pools, shallow bars, a plunge pool scoured out under each fall, and the bed humped and hollowed
+  const dep = new Float32Array(m + 1);
+  for(let i = 0; i <= m; i++){ let s0 = 0, c = 0; for(let d = -3; d <= 3; d++){ const j = Math.max(0, Math.min(m, i + d)); s0 += D[kind[j]]; c++; } dep[i] = s0/c; }
+  for(let i = 0; i < m; i++) if(kind[i] !== 3 && kind[i+1] === 3) for(let d = 0; d < Math.round(6/seg); d++){ const j = i - d; if(j < 0) break; dep[j] += 0.28*(1 - d/Math.round(6/seg)); }
+  const ph = rnd()*6.3, ph2 = rnd()*6.3;
+  for(let i = 0; i <= m; i++){ const x = i*seg;
+    dep[i] = Math.max(0.13, dep[i] + (Math.sin(x*0.55 + ph)*0.05 + Math.sin(x*1.3 + ph2)*0.03)*(kind[i] >= 2 ? 1.4 : 0.6)); }
+  // the water's speed (m/s): Manning, roughly: steeper and shallower is faster
+  const vel = new Float32Array(m + 1), foam = new Float32Array(m + 1);
+  for(let i = 0; i <= m; i++) vel[i] = 0.5 + 9*Math.sqrt(g[i])*Math.pow(0.32/dep[i], 0.35);
+  // foam: white wherever it is steep and fast, boiling where a fall lands and the water slows all at once
+  for(let i = 0; i <= m; i++) foam[i] = Math.min(1, Math.max((g[i] - 0.03)*5, smoothstep(2.3, 5, vel[i])*0.5));
+  for(let i = 0; i < m; i++) if(kind[i] !== 3 && kind[i+1] === 3) for(let d = 0; d < Math.round(5/seg); d++){ const j = i - d; if(j < 0) break; foam[j] = Math.max(foam[j], 0.85*(1 - d/Math.round(5/seg))); }
+  return {lev, dep, vel, foam, grade:g, kind};
+}
 function addRiver(P, def){
   const seg = P.seg;
   const a = snapTo(P, def.from);
@@ -3820,21 +3877,20 @@ function addRiver(P, def){
   // even steps from the bottom pool to the top one, never downhill
   const lo = levels[0], hi = Math.max(levels[K-1], levels[0] + 0.6*(K-1));
   for(let j=0;j<K;j++) levels[j] = lo + (hi - lo)*(K > 1 ? j/(K-1) : 0);
-  const RAP = Math.round((def.cascade ? 20 : 14)/seg);   // rapids length
-  /* a cascade: the rapid is a staircase of rock ledges, each a short steep step with a flat shelf above it
-     the water pools on before it pours over the next lip (STEPS of them between each pair of pools) */
-  const STEPS = def.cascade || 0;
-  const stairs = u=>{ const q = u*STEPS, i = Math.min(STEPS - 1, Math.floor(q)), f = q - i; return (i + smoothstep(0.3, 0.85, f))/STEPS; };
+  const RAP = Math.round(14/seg);                        // rapids length
+  // a flowing river: the run's own profile, from the bottom of it to the top
+  const FL = def.flow ? (def.flow === true ? {} : def.flow) : null, frnd = seeded(FL && FL.seed || 9137);
+  const FP = FL ? flowProfile(n, hi - lo, seg, frnd, Object.assign({start:-1}, FL)) : null;
   /* a rushing creek: one long climb, eased in and out, with no level pools
      whose rapids would throw a fast car off every crest */
   const ease = u=> u < 0.2 ? 2.5*u*u : u > 0.8 ? 1 - 2.5*(1-u)*(1-u) : 0.1 + (u - 0.2)*(0.8/0.6);
-  const levelAt = def.rush ? (k=> lo + (hi - lo)*ease(Math.max(0, Math.min(1, k/n)))) : k=>{
+  const levelAt = FP ? (k=> lo + FP.lev[Math.max(0, Math.min(n, Math.round(k)))]) : def.rush ? (k=> lo + (hi - lo)*ease(Math.max(0, Math.min(1, k/n)))) : k=>{
     const j = Math.max(0, Math.min(K-1, Math.floor(k/n*K)));
     const kb = cut(j+1);
-    if(j < K-1 && k > kb - RAP){ const u = (k - (kb - RAP))/RAP; return levels[j] + (levels[j+1] - levels[j])*(STEPS ? stairs(u) : smoothstep(0, 1, u)); }
+    if(j < K-1 && k > kb - RAP) return levels[j] + (levels[j+1] - levels[j])*smoothstep(0, 1, (k - (kb - RAP))/RAP);
     return levels[j];
   };
-  const bedY = k => levelAt(k) - BED - RIVER_WADE;
+  const bedY = FP ? (k=> levelAt(k) - FP.dep[Math.max(0, Math.min(n, Math.round(k)))] - BED) : (k=> levelAt(k) - BED - RIVER_WADE);
   // the run itself
   for(let k=0;k<=n;k++){
     const i = wrapIdx(P, a+k);
@@ -3844,7 +3900,7 @@ function addRiver(P, def){
   /* in and out: down off a bank that stands clear of the water, and up the
      far one. Where the land beyond is low, it is built up into a causeway so
      the road never runs under the water outside the creek. */
-  const ends = [[a, -1, levels[0], bedY(0)], [a+n, 1, levels[K-1], bedY(n)]];
+  const ends = [[a, -1, levelAt(0), bedY(0)], [a+n, 1, levelAt(n), bedY(n)]];
   ends.forEach(([at, dir, lev, yIn])=>{
     const top = lev + RIVER_FREE - BED + 0.1;
     for(let k=1; k<=Math.round(70/seg); k++){
@@ -3858,7 +3914,8 @@ function addRiver(P, def){
   });
   // the centreline of the whole creek, downstream end first
   const S = [];
-  const push = (x, z, lev)=> S.push([x, z, lev]);
+  // (each sample: x, z, water level, and for a flowing river its depth, speed and foam)
+  const push = (x, z, lev, dep, vel, fm, kd)=> S.push(dep === undefined ? [x, z, lev] : [x, z, lev, dep, vel, fm, kd]);
   const dirAt = (k0, k1)=>{
     const A = P.pts[wrapIdx(P, a+k0)], B = P.pts[wrapIdx(P, a+k1)];
     const dx = B.x - A.x, dz = B.z - A.z, L = Math.hypot(dx, dz) || 1;
@@ -3903,22 +3960,39 @@ function addRiver(P, def){
   const p0 = P.pts[wrapIdx(P, a)], p1 = P.pts[wrapIdx(P, a+n)];
   const dn = def.downPts ? course(p0, dirAt(Math.round(8/seg), 0), def.downPts)
                          : trail(p0, dirAt(Math.round(8/seg), 0), def.downDir || dirAt(Math.round(18/seg), 0), def.down || 60);
+  if(FP){
+    /* past either end of the road's run the stream carries on the same way: falling away downstream, climbing
+       on upstream, a gentler grade off the road (it is scenery there, not the course) */
+    const M = dn.length, dP = flowProfile(M, M*seg*(FL.away || 0.035), seg, frnd, FL);
+    for(let i = 0; i < M; i++){ const q = dn[M - 1 - i]; push(q[0], q[1], lo - dP.lev[M] + dP.lev[i], dP.dep[i], dP.vel[i], dP.foam[i], dP.kind[i]); }
+    for(let k=0;k<=n;k++){ const p = P.pts[wrapIdx(P, a+k)]; push(p.x, p.z, levelAt(k), FP.dep[k], FP.vel[k], FP.foam[k], FP.kind[k]); }
+  } else {
   const dnL = def.downPts ? follow(dn, levels[0], true) : dn.map(()=> levels[0]);
   dn.map((q, k)=> [q[0], q[1], dnL[k]]).reverse().forEach(q=> push(q[0], q[1], q[2]));
   for(let k=0;k<=n;k++){ const p = P.pts[wrapIdx(P, a+k)]; push(p.x, p.z, levelAt(k)); }
+  }
   const up = def.upPts ? course(p1, dirAt(n - Math.round(8/seg), n), def.upPts)
                        : trail(p1, dirAt(n - Math.round(8/seg), n), def.upDir || dirAt(n - Math.round(18/seg), n), def.up || 70);
+  if(FP){ const U = up.length, uP = flowProfile(U, U*seg*(FL.away || 0.035), seg, frnd, FL);
+    up.forEach((q, k)=> push(q[0], q[1], hi + uP.lev[k + 1], uP.dep[k + 1], uP.vel[k + 1], uP.foam[k + 1], uP.kind[k + 1])); }
+  else {
   const upL = def.upPts ? follow(up, levels[K-1], false) : up.map(()=> levels[K-1]);
   up.forEach((q, k)=> push(q[0], q[1], upL[k]));
+  }
   let x0=Infinity, x1=-Infinity, z0=Infinity, z1=-Infinity;
   S.forEach(q=>{ x0=Math.min(x0,q[0]); x1=Math.max(x1,q[0]); z0=Math.min(z0,q[1]); z1=Math.max(z1,q[1]); });
   const pad = RIVER_BANK + 16;
-  /* the ledges of a cascade, as samples of S: where each step starts up from the shelf below (foot) and its lip */
-  const ledges = [];
-  if(STEPS) for(let j=0;j<K-1;j++){ const kb = cut(j+1);
-    for(let q=0;q<STEPS;q++){ const k0 = kb - RAP + RAP*(q + 0.3)/STEPS, k1 = kb - RAP + RAP*(q + 0.85)/STEPS;
-      ledges.push({foot:dn.length + k0, lip:dn.length + k1, lo:levelAt(Math.floor(k0)), hi:levelAt(Math.ceil(k1)), j, q}); } }
-  Object.assign(RIVER, {on:true, S, a, n, levels, ledges, box:[x0-pad, x1+pad, z0-pad, z1+pad],
+  /* a flowing river's drops (where the water pours over a ledge) and riffles, as stretches of S: foot (the
+     bottom of it, downstream) to lip (the top), with the water level at each */
+  const ledges = [], riffles = [];
+  if(FP){
+    const kindAt = j=> S[j][6];
+    for(let j = 0; j < S.length; j++){ const t = kindAt(j); if(t !== 3 && t !== 2) continue;
+      let e = j; while(e + 1 < S.length && kindAt(e + 1) === t) e++;
+      (t === 3 ? ledges : riffles).push({foot:Math.max(0, j - 0.5), lip:Math.min(S.length - 1, e + 0.5), lo:S[Math.max(0, j - 1)][2], hi:S[Math.min(S.length - 1, e + 1)][2]});
+      j = e; }
+  }
+  Object.assign(RIVER, {on:true, S, a, n, levels, ledges, riffles, flow:!!FP, box:[x0-pad, x1+pad, z0-pad, z1+pad],
                         ends:[S.length ? 0 : 0, S.length-1], headFall:!!(def.toFalls && CUT), rush:!!def.rush});
   /* the head of the creek: a rock step it falls over, frozen in the winter */
   if(def.icefall){
@@ -4597,7 +4671,9 @@ function carveWater(y, x, z){
       if(w > 0 && CUT) w *= 1 - Math.min(1, cutAt(x, z)/(CUT.h*0.4));      // (the creek's head is in the cutting: its walls stand)
       if(w > 0){
         const wander = Math.sin(x*0.07 + z*0.05)*1.2;
-        const shape = lev - 1.1 + (1.1 + RIVER_FREE)*smoothstep(RIVER_BED*0.7, RIVER_BANK, d + wander);
+        // (a flowing river's channel is as deep as its water there, a little deeper down the middle)
+        const deepC = RIVER.flow ? RIVER.S[r[3]][3] + 0.35*(1 - smoothstep(0, RIVER_BED*0.8, d)) : 1.1;
+        const shape = lev - deepC + (deepC + RIVER_FREE)*smoothstep(RIVER_BED*0.7, RIVER_BANK, d + wander);
         y = y*(1 - w) + shape*w;
       }
     }
@@ -7373,8 +7449,8 @@ function waterMaterial(){
       "void main(){",
       "  if(vDepth <= 0.0) discard;",
       "  vec2 p = vWorld.xz;",
-      "  float r1 = texture2D(tRipple, p*0.09 + vec2(0.0, uTime*0.11)).r;",
-      "  float r2 = texture2D(tRipple, p*0.16 + vec2(uTime*0.05, -uTime*0.07)).r;",
+      "  float r1 = uCasc > 0.0 ? texture2D(tRipple, vec2(vUv.x*0.09, vUv.y*0.2 + uTime*0.2)).r : texture2D(tRipple, p*0.09 + vec2(0.0, uTime*0.11)).r;",
+      "  float r2 = uCasc > 0.0 ? texture2D(tRipple, vec2(vUv.x*0.16 + 0.3, vUv.y*0.34 + uTime*0.34)).r : texture2D(tRipple, p*0.16 + vec2(uTime*0.05, -uTime*0.07)).r;",
       "  float rip = (r1 + r2)*0.5;",
       "  vec3 N = normalize(vec3((r1 - 0.5)*0.35, 1.0, (r2 - 0.5)*0.35));",
       "  vec3 V = normalize(cameraPosition - vWorld);",
@@ -7426,9 +7502,12 @@ function waterMaterial(){
       "  float st = 0.0;",
       "  if(uRush > 0.0 || uCasc > 0.0){",
       // (a cascade: only where it pours over the ledges, and faster there)
-      "    float rk = max(uRush, uCasc*smoothstep(0.1, 0.6, vFoam)), sp = 1.0 + uCasc*vFoam*1.6;",
-      "    float s1 = texture2D(tRipple, vec2(vUv.x*0.11, vUv.y*0.018 + uTime*0.55*sp)).r;",
-      "    float s2 = texture2D(tRipple, vec2(vUv.x*0.23 + 0.4, vUv.y*0.035 + uTime*0.95*sp)).r;",
+      "    float rk = max(uRush, uCasc*smoothstep(0.1, 0.6, vFoam));",
+      // (down a flowing river vUv.y is travel time: the streaks run at the water's own speed)
+      "    vec2 c1 = uCasc > 0.0 ? vec2(vUv.x*0.11, vUv.y*0.32 + uTime*0.5) : vec2(vUv.x*0.11, vUv.y*0.018 + uTime*0.55);",
+      "    vec2 c2 = uCasc > 0.0 ? vec2(vUv.x*0.23 + 0.4, vUv.y*0.55 + uTime*0.86) : vec2(vUv.x*0.23 + 0.4, vUv.y*0.035 + uTime*0.95);",
+      "    float s1 = texture2D(tRipple, c1).r;",
+      "    float s2 = texture2D(tRipple, c2).r;",
       "    st = smoothstep(0.56, 0.70, s1)*0.55 + smoothstep(0.60, 0.72, s2)*0.45;",
       "    st *= 0.55 + vFoam*0.9;",
       "    vec3 rc = uRush > 0.0 ? mix(vec3(0.30, 0.66, 0.66), vec3(0.06, 0.36, 0.46), deep) : mix(vec3(0.30, 0.50, 0.42), vec3(0.08, 0.27, 0.28), deep);",
@@ -7439,7 +7518,7 @@ function waterMaterial(){
       // (between the threads the water slides over the rock dark and glassy, so the white of the fall stands out)
       "    float face = uCasc*smoothstep(0.5, 0.95, vFoam);",
       "    col = mix(col, vec3(0.05, 0.16, 0.15) + vec3(0.6, 0.72, 0.78)*fres*0.5 + vec3(1.0, 0.95, 0.85)*spec, face*0.7);",
-      "    float th = smoothstep(0.64, 0.8, texture2D(tRipple, vec2(vUv.x*0.42, vUv.y*0.07 + uTime*2.6)).r) + smoothstep(0.66, 0.82, texture2D(tRipple, vec2(vUv.x*0.9 + 0.3, vUv.y*0.12 + uTime*3.4)).r);",
+      "    float th = smoothstep(0.64, 0.8, texture2D(tRipple, vec2(vUv.x*0.42, vUv.y*1.1 + uTime*1.6)).r) + smoothstep(0.66, 0.82, texture2D(tRipple, vec2(vUv.x*0.9 + 0.3, vUv.y*1.8 + uTime*2.4)).r);",
       "    float pour = face*max(th, smoothstep(0.2, 0.0, abs(vFoam - 0.8))*0.9);",
       "    wh = mix(wh, pour, face);",
       "    col = mix(col, vec3(0.93, 0.97, 0.98), wh*0.85*rk);",
@@ -9152,10 +9231,15 @@ if(GORGE.depth > 0.5){
 /* the creek: one sheet laid along its whole line, each row at the water
    level there, so the rapids slope from pool to pool and foam as they go */
 if(RIVER.on){
-  const S = RIVER.S, ACROSS = RIVER_BANK + 5, STEP = 1.1, CASC = !!RIVER.ledges.length, JS = CASC ? 1 : 2;   // (a cascade's ledges need every sample)
+  const S = RIVER.S, ACROSS = RIVER_BANK + 5, STEP = 1.1, CASC = RIVER.flow, JS = CASC ? 1 : 2;   // (a flowing river's falls need every sample)
   const cols = Math.ceil(ACROSS*2/STEP) + 1;
   const pos=[], uv=[], dep=[], foam=[], idx=[];
   let rows = 0;
+  /* down a flowing river the sheet's v is the water's travel time (seconds) from the bottom, not distance:
+     the streaks and ripples scroll through it at a steady rate, so on the water they go at its own speed,
+     racing over the riffles and drifting in the pools, and draw out long where it is fast */
+  const TT = new Float32Array(S.length);
+  if(CASC) for(let j=1;j<S.length;j++) TT[j] = TT[j-1] + Math.hypot(S[j][0] - S[j-1][0], S[j][1] - S[j-1][1])/Math.max(0.3, (S[j][4] + S[j-1][4])*0.5);
   for(let j=0;j<S.length;j+=JS){
     const A = S[Math.max(0, j-JS)], B = S[Math.min(S.length-1, j+JS)];
     let tx = B[0]-A[0], tz = B[1]-A[1]; const tl = Math.hypot(tx, tz) || 1; tx/=tl; tz/=tl;
@@ -9164,14 +9248,12 @@ if(RIVER.on){
     for(let c=0;c<cols;c++){
       const u = -ACROSS + c*STEP;
       const x = S[j][0] + nx*u, z = S[j][1] + nz*u;
-      pos.push(x, lev, z); uv.push(u, j*MAIN.seg);
+      pos.push(x, lev, z); uv.push(u, CASC ? TT[j] : j*MAIN.seg);
       let dr = lev - surfaceY(x, z);
       if(Math.abs(u) > RIVER_BANK*0.8 || dr > 3.2) dr = Math.min(dr, -0.5);       // out of the bed, or hanging over a drop: dry
       dep.push(Math.max(-1, Math.min(3, dr)));
-      // (over a ledge the whole sheet is white water, and a little past its foot where it boils)
-      let fm = Math.min(1, grad*(TRACK.river.rush ? 14 : 9));
-      if(CASC) for(const L of RIVER.ledges){ if(j > L.foot - 1.6 && j < L.lip + 0.3) fm = Math.max(fm, j > L.foot ? 0.8 + 0.2*(j - L.foot)/(L.lip - L.foot) : 0.8*(1 - (L.foot - j)/1.6)); }
-      foam.push(fm);
+      // (a flowing river carries its own foam; it is whitest mid-stream, where the water is fastest)
+      foam.push(CASC ? S[j][5]*(1 - 0.45*smoothstep(RIVER_BED*0.5, RIVER_BED*1.1, Math.abs(u))) : Math.min(1, grad*(TRACK.river.rush ? 14 : 9)));
     }
     rows++;
   }
@@ -9238,6 +9320,22 @@ if(RIVER.on){
     const at = (j)=>{ const j0 = Math.max(0, Math.min(S.length - 2, Math.floor(j))), f = j - j0, A = S[j0], B = S[j0 + 1];
       return [A[0] + (B[0] - A[0])*f, A[1] + (B[1] - A[1])*f]; };
     const add = (x, z, y, yaw, pitch, roll, sx, sy, sz)=> rk[Math.floor(rnd()*3)].push([x, y, z, yaw, pitch, roll, sx, sy, sz]);
+    const onRoad = (x, z)=> nearest(x, z).dist < 6.3;
+    /* a riffle: the stream runs shallow over a bar of cobbles, laid flat where the road crosses them and
+       breaking the surface either side, with the odd boulder out in it that the water piles up against */
+    RIVER.riffles.forEach(L=>{
+      const F = at(L.foot), T = at(L.lip);
+      let tx = T[0] - F[0], tz = T[1] - F[1]; const len = Math.hypot(tx, tz) || 1; tx /= len; tz /= len;
+      const nx = -tz, nz = tx, yaw = Math.atan2(tx, tz);
+      const cnt = Math.round(len*1.6);
+      for(let k = 0; k < cnt; k++){
+        const f = rnd(), u = (rnd()*2 - 1)*(RIVER_BED + 1.5), x = F[0] + tx*len*f + nx*u, z = F[1] + tz*len*f + nz*u, y = gradedY(x, z);
+        if(onRoad(x, z)) add(x, z, y - 0.09, yaw + rnd()*6.3, 0, 0, 0.35 + rnd()*0.4, 0.13, 0.3 + rnd()*0.35);
+        else { const sc = 0.3 + rnd()*0.45; add(x, z, y + sc*0.12, rnd()*6.3, rnd()*0.4, rnd()*0.4, sc*(1 + rnd()*0.3), sc*0.7, sc); }
+      }
+      for(let k = 0; k < 2; k++){ const sd = rnd() < 0.5 ? -1 : 1, u = sd*(7 + rnd()*(RIVER_BED - 6)), f = rnd(), x = F[0] + tx*len*f + nx*u, z = F[1] + tz*len*f + nz*u;
+        if(onRoad(x, z)) continue; const sc = 0.8 + rnd()*0.9; add(x, z, gradedY(x, z) + sc*0.1, rnd()*6.3, rnd()*0.3, rnd()*0.3, sc*1.2, sc*0.8, sc); }
+    });
     RIVER.ledges.forEach(L=>{
       const F = at(L.foot), T = at(L.lip);
       let tx = T[0] - F[0], tz = T[1] - F[1]; const len = Math.hypot(tx, tz) || 1; tx /= len; tz /= len;
@@ -9246,13 +9344,13 @@ if(RIVER.on){
       const W = RIVER_BED + 2;
       // the face: two or three rows of slabs up it
       for(const f of [0.2, 0.5, 0.8]) for(let u = -W + rnd()*0.8; u < W; u += 1.1 + rnd()*0.7){
-        const q = pt(f + (rnd() - 0.5)*0.12, u), y = gradedY(q[0], q[1]), road = Math.abs(u) < 6.3;
+        const q = pt(f + (rnd() - 0.5)*0.12, u), y = gradedY(q[0], q[1]), road = onRoad(q[0], q[1]);
         if(road) add(q[0], q[1], y - 0.13, yaw + (rnd() - 0.5)*0.5, -slope*0.9, (rnd() - 0.5)*0.08, 0.8 + rnd()*0.5, 0.22, 0.75 + rnd()*0.45);
         else { const sc = 0.5 + rnd()*0.7; add(q[0], q[1], y + sc*0.12, rnd()*6.3, rnd()*0.4, rnd()*0.4, sc*(1 + rnd()*0.4), sc*0.75, sc); }
       }
       // the lip: stones along the top, low across the road, standing up either side of it
       for(let u = -W - 1 + rnd(); u < W + 1; u += 0.9 + rnd()*0.8){
-        const q = pt(1.0 + rnd()*0.1, u), y = gradedY(q[0], q[1]), road = Math.abs(u) < 6.3;
+        const q = pt(1.0 + rnd()*0.1, u), y = gradedY(q[0], q[1]), road = onRoad(q[0], q[1]);
         if(road){ if(rnd() < 0.55) add(q[0], q[1], y - 0.1, yaw + (rnd() - 0.5)*0.6, 0, 0, 0.6 + rnd()*0.4, 0.18, 0.5 + rnd()*0.3); }
         else { const sc = 0.45 + rnd()*0.65; add(q[0], q[1], y + sc*0.2, rnd()*6.3, rnd()*0.5, rnd()*0.5, sc, sc*(0.7 + rnd()*0.4), sc); }
       }
@@ -14645,7 +14743,8 @@ if(SPRINGCUP){
       for(let k=0;k<NF;k++){
         const j = Math.floor(fs[k]), A = S[j], B = S[Math.min(S.length - 1, j + 1)], f = fs[k] - j;
         const L = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1, drop = Math.max(0, B[2] - A[2]);
-        fs[k] -= dt*fv[k]*(1 + drop*2.5)/L;                                     // (downstream is down the samples, and faster over a step)
+        // (downstream is down the samples; a flowing river carries them at its own speed, slow in the pools, racing over the riffles)
+        fs[k] -= dt*(A.length > 4 ? (A[4]*(1 - f) + B[4]*f)*fv[k]/6.5 : fv[k]*(1 + drop*2.5))/L;
         if(fs[k] < 0) fs[k] += S.length - 1.001;
         const nx = -(B[1] - A[1])/L, nz = (B[0] - A[0])/L;
         fp[k*3] = A[0] + (B[0] - A[0])*f + nx*fl[k]; fp[k*3 + 2] = A[1] + (B[1] - A[1])*f + nz*fl[k];
@@ -20999,7 +21098,9 @@ function stepCarInner(dt){
   if(offRoad && poolIn > 0) a -= along*0.1*poolIn;          // out in the water off the road it drags hard: no short cut across a lake
   /* and the faster you push through water the harder it pushes back: the car is shoving a bow wave
      along in front of it, so it is a thing you feel, not a slightly slower bit of road */
-  if(!pose.air) a -= sgn*wetAmt*wetK*0.0005*along*along;
+  // (deeper water, more of it to push: a pool drags at the car, a riffle over the gravel hardly does)
+  const depK = pose.riverDep ? Math.max(0.45, Math.min(1.9, pose.riverDep/0.34)) : 1;
+  if(!pose.air) a -= sgn*wetAmt*wetK*0.0005*depK*along*along;
   /* The mountain's mud is thick. It holds the car harder the faster it tries
      to go (the tyres and the body are pushing a bow wave of it), so in a
      bog you plough along with the engine screaming and the wheels flinging
@@ -21099,11 +21200,13 @@ function stepCarInner(dt){
     if(r && r[0] < RIVER_BED + 1){
       const S = RIVER.S, j = r[3], A = S[Math.max(0, j - 2)], B = S[Math.min(S.length - 1, j + 2)];
       let dx = A[0] - B[0], dz = A[1] - B[1]; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;     // (downstream is down the samples)
-      const fall = Math.max(0, B[2] - A[2])/L;
-      const push = (1.0 + Math.min(1, fall*3.5)*3.2)*(1 - smoothstep(RIVER_BED - 2, RIVER_BED + 1, r[0]))*smoothstep(0, 12, r[2]);
+      const fall = Math.max(0, B[2] - A[2])/L, Sj = S[j];
+      // (a flowing river pushes with its own speed: a nudge in the pools, a shove over the riffles and falls)
+      const push = (RIVER.flow ? Sj[4]*0.8 : 1.0 + Math.min(1, fall*3.5)*3.2)*(1 - smoothstep(RIVER_BED - 2, RIVER_BED + 1, r[0]))*smoothstep(0, 12, r[2]);
+      pose.riverDep = RIVER.flow ? Sj[3] : 0;
       pose.vx += dx*push*dt; pose.vz += dz*push*dt;
       pose.current = push;
-    } else pose.current = 0;
+    } else { pose.current = 0; pose.riverDep = 0; }
   }
   /* Hitting water fast: it grabs the car (a jolt, some of your speed gone at once) and goes up in a sheet
      off both front wheels; landing in it off a jump the same, harder */
