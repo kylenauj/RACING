@@ -739,7 +739,7 @@ const TRACKS = [
           [500,-160],[420,-230],[360,-330],[270,-390],[150,-400],[60,-360]],
     hills:[[330,-190,200,-9],[80,120,160,10],[560,30,170,8],[30,-170,90,-4],[55,150,110,6]],
     jumps:[], fords:[[165,110],[310,-80],[648,55],[270,-390]],
-    river:{from:[27,-98], to:[39,68], pools:5, down:70, up:62, downDir:[0.55,-1], upDir:[0.45,1]},
+    river:{from:[27,-98], to:[39,68], pools:5, down:70, up:62, downDir:[0.55,-1], upDir:[0.45,1], cascade:2},
     mud:[[[440,-205],[380,-290]]],
     branches:[
       // over the top of the dip
@@ -3820,14 +3820,18 @@ function addRiver(P, def){
   // even steps from the bottom pool to the top one, never downhill
   const lo = levels[0], hi = Math.max(levels[K-1], levels[0] + 0.6*(K-1));
   for(let j=0;j<K;j++) levels[j] = lo + (hi - lo)*(K > 1 ? j/(K-1) : 0);
-  const RAP = Math.round(14/seg);                        // rapids length
+  const RAP = Math.round((def.cascade ? 20 : 14)/seg);   // rapids length
+  /* a cascade: the rapid is a staircase of rock ledges, each a short steep step with a flat shelf above it
+     the water pools on before it pours over the next lip (STEPS of them between each pair of pools) */
+  const STEPS = def.cascade || 0;
+  const stairs = u=>{ const q = u*STEPS, i = Math.min(STEPS - 1, Math.floor(q)), f = q - i; return (i + smoothstep(0.3, 0.85, f))/STEPS; };
   /* a rushing creek: one long climb, eased in and out, with no level pools
      whose rapids would throw a fast car off every crest */
   const ease = u=> u < 0.2 ? 2.5*u*u : u > 0.8 ? 1 - 2.5*(1-u)*(1-u) : 0.1 + (u - 0.2)*(0.8/0.6);
   const levelAt = def.rush ? (k=> lo + (hi - lo)*ease(Math.max(0, Math.min(1, k/n)))) : k=>{
     const j = Math.max(0, Math.min(K-1, Math.floor(k/n*K)));
     const kb = cut(j+1);
-    if(j < K-1 && k > kb - RAP) return levels[j] + (levels[j+1] - levels[j])*smoothstep(0, 1, (k - (kb - RAP))/RAP);
+    if(j < K-1 && k > kb - RAP){ const u = (k - (kb - RAP))/RAP; return levels[j] + (levels[j+1] - levels[j])*(STEPS ? stairs(u) : smoothstep(0, 1, u)); }
     return levels[j];
   };
   const bedY = k => levelAt(k) - BED - RIVER_WADE;
@@ -3909,7 +3913,12 @@ function addRiver(P, def){
   let x0=Infinity, x1=-Infinity, z0=Infinity, z1=-Infinity;
   S.forEach(q=>{ x0=Math.min(x0,q[0]); x1=Math.max(x1,q[0]); z0=Math.min(z0,q[1]); z1=Math.max(z1,q[1]); });
   const pad = RIVER_BANK + 16;
-  Object.assign(RIVER, {on:true, S, a, n, levels, box:[x0-pad, x1+pad, z0-pad, z1+pad],
+  /* the ledges of a cascade, as samples of S: where each step starts up from the shelf below (foot) and its lip */
+  const ledges = [];
+  if(STEPS) for(let j=0;j<K-1;j++){ const kb = cut(j+1);
+    for(let q=0;q<STEPS;q++){ const k0 = kb - RAP + RAP*(q + 0.3)/STEPS, k1 = kb - RAP + RAP*(q + 0.85)/STEPS;
+      ledges.push({foot:dn.length + k0, lip:dn.length + k1, lo:levelAt(Math.floor(k0)), hi:levelAt(Math.ceil(k1)), j, q}); } }
+  Object.assign(RIVER, {on:true, S, a, n, levels, ledges, box:[x0-pad, x1+pad, z0-pad, z1+pad],
                         ends:[S.length ? 0 : 0, S.length-1], headFall:!!(def.toFalls && CUT), rush:!!def.rush});
   /* the head of the creek: a rock step it falls over, frozen in the winter */
   if(def.icefall){
@@ -3935,7 +3944,7 @@ function riverAt(x, z){
     if(d < best){ best = d; bj = j; }
   }
   const endM = (RIVER.fall || RIVER.headFall ? bj : Math.min(bj, S.length - 1 - bj))*MAIN.seg;   // no fading out under the falls
-  return [Math.sqrt(best), S[bj][2], endM];
+  return [Math.sqrt(best), S[bj][2], endM, bj];
 }
 if(TRACK.river) addRiver(MAIN, TRACK.river);
 /* The finished road, once more: every set piece is in, so round off the
@@ -7334,7 +7343,7 @@ function lavaMaterial(flow){
 function waterMaterial(){
   const m = new THREE.ShaderMaterial({
     uniforms:{
-      uTime:{value:0}, tRipple:{value:waterTex}, uMurk:{value:0}, uRush:{value:0},
+      uTime:{value:0}, tRipple:{value:waterTex}, uMurk:{value:0}, uRush:{value:0}, uCasc:{value:0},
       uSun:{value:SUN_DIR.clone()},
       fogColor:{value:new THREE.Color(scene.fog.color)},
       fogNear:{value:scene.fog.near}, fogFar:{value:scene.fog.far}
@@ -7348,7 +7357,7 @@ function waterMaterial(){
       "  gl_Position = projectionMatrix*viewMatrix*w;",
       "}"].join("\n"),
     fragmentShader:[
-      "uniform float uTime, fogNear, fogFar, uMurk, uRush; uniform sampler2D tRipple; uniform vec3 uSun, fogColor;",
+      "uniform float uTime, fogNear, fogFar, uMurk, uRush, uCasc; uniform sampler2D tRipple; uniform vec3 uSun, fogColor;",
       "varying float vDepth; varying vec3 vWorld; varying vec2 vUv; varying float vFoam; varying float vEdge;",
       FROZEN ? [
       // the ice sheet breaks into plates: distance to the nearest plate edge
@@ -7411,23 +7420,32 @@ function waterMaterial(){
       "  gl_FragColor = vec4(ice, smoothstep(0.0, 0.07, vDepth)*0.94);",
       "  return;"].join("\n") : "",
       "  float foam = (1.0 - smoothstep(0.0, 0.10, vDepth))*smoothstep(0.45, 0.62, rip);",
-      "  foam = max(foam, vFoam*smoothstep(0.30, 0.55, rip + vFoam*0.2));",
+      "  foam = max(foam, vFoam*(1.0 - uCasc*0.8)*smoothstep(0.30, 0.55, rip + vFoam*0.2));",
       "  col = mix(col, vec3(0.86, 0.88, 0.84), foam*0.7);",
       // a rushing mountain creek (Rainbow Downs): clear glacier green, white streaks racing down it, white water on the steeps
       "  float st = 0.0;",
-      "  if(uRush > 0.0){",
-      "    float s1 = texture2D(tRipple, vec2(vUv.x*0.11, vUv.y*0.018 + uTime*0.55)).r;",
-      "    float s2 = texture2D(tRipple, vec2(vUv.x*0.23 + 0.4, vUv.y*0.035 + uTime*0.95)).r;",
+      "  if(uRush > 0.0 || uCasc > 0.0){",
+      // (a cascade: only where it pours over the ledges, and faster there)
+      "    float rk = max(uRush, uCasc*smoothstep(0.1, 0.6, vFoam)), sp = 1.0 + uCasc*vFoam*1.6;",
+      "    float s1 = texture2D(tRipple, vec2(vUv.x*0.11, vUv.y*0.018 + uTime*0.55*sp)).r;",
+      "    float s2 = texture2D(tRipple, vec2(vUv.x*0.23 + 0.4, vUv.y*0.035 + uTime*0.95*sp)).r;",
       "    st = smoothstep(0.56, 0.70, s1)*0.55 + smoothstep(0.60, 0.72, s2)*0.45;",
       "    st *= 0.55 + vFoam*0.9;",
-      "    vec3 rc = mix(vec3(0.30, 0.66, 0.66), vec3(0.06, 0.36, 0.46), deep);",
+      "    vec3 rc = uRush > 0.0 ? mix(vec3(0.30, 0.66, 0.66), vec3(0.06, 0.36, 0.46), deep) : mix(vec3(0.30, 0.50, 0.42), vec3(0.08, 0.27, 0.28), deep);",
       "    rc = mix(rc, vec3(0.70, 0.86, 0.92), fres*0.6) + vec3(1.0, 0.95, 0.85)*spec*1.2;",
-      "    col = mix(col, rc, uRush);",
+      "    col = mix(col, rc, max(uRush, uCasc*0.8));",
       "    float wh = max(st, vFoam*smoothstep(0.38, 0.6, rip + s2*0.3));",
-      "    col = mix(col, vec3(0.93, 0.97, 0.98), wh*0.85*uRush);",
-      "    foam = max(foam, wh*uRush);",
+      // (the water tumbling over a lip: a churn of white, threads of it pouring down the face)
+      // (between the threads the water slides over the rock dark and glassy, so the white of the fall stands out)
+      "    float face = uCasc*smoothstep(0.5, 0.95, vFoam);",
+      "    col = mix(col, vec3(0.05, 0.16, 0.15) + vec3(0.6, 0.72, 0.78)*fres*0.5 + vec3(1.0, 0.95, 0.85)*spec, face*0.7);",
+      "    float th = smoothstep(0.64, 0.8, texture2D(tRipple, vec2(vUv.x*0.42, vUv.y*0.07 + uTime*2.6)).r) + smoothstep(0.66, 0.82, texture2D(tRipple, vec2(vUv.x*0.9 + 0.3, vUv.y*0.12 + uTime*3.4)).r);",
+      "    float pour = face*max(th, smoothstep(0.2, 0.0, abs(vFoam - 0.8))*0.9);",
+      "    wh = mix(wh, pour, face);",
+      "    col = mix(col, vec3(0.93, 0.97, 0.98), wh*0.85*rk);",
+      "    foam = max(foam, wh*rk);",
       "  }",
-      "  float a = smoothstep(0.0, 0.06, vDepth)*mix(uRush > 0.0 ? 0.74 : 0.42, 0.9, deep);",
+      "  float a = smoothstep(0.0, 0.06, vDepth)*mix(uRush > 0.0 ? 0.74 : uCasc > 0.0 ? 0.5 : 0.42, 0.9, deep);",
       "  a = max(a, fres*0.6*smoothstep(0.0, 0.05, vDepth));",
       "  a = max(a, foam*0.8);",
       // swamp water: black tea, the sky only in it at a glance, never clear
@@ -9134,12 +9152,12 @@ if(GORGE.depth > 0.5){
 /* the creek: one sheet laid along its whole line, each row at the water
    level there, so the rapids slope from pool to pool and foam as they go */
 if(RIVER.on){
-  const S = RIVER.S, ACROSS = RIVER_BANK + 5, STEP = 1.1;
+  const S = RIVER.S, ACROSS = RIVER_BANK + 5, STEP = 1.1, CASC = !!RIVER.ledges.length, JS = CASC ? 1 : 2;   // (a cascade's ledges need every sample)
   const cols = Math.ceil(ACROSS*2/STEP) + 1;
   const pos=[], uv=[], dep=[], foam=[], idx=[];
   let rows = 0;
-  for(let j=0;j<S.length;j+=2){
-    const A = S[Math.max(0, j-2)], B = S[Math.min(S.length-1, j+2)];
+  for(let j=0;j<S.length;j+=JS){
+    const A = S[Math.max(0, j-JS)], B = S[Math.min(S.length-1, j+JS)];
     let tx = B[0]-A[0], tz = B[1]-A[1]; const tl = Math.hypot(tx, tz) || 1; tx/=tl; tz/=tl;
     const nx = -tz, nz = tx, lev = S[j][2];
     const grad = Math.abs(B[2] - A[2])/tl;                  // how fast the water is falling here
@@ -9150,7 +9168,10 @@ if(RIVER.on){
       let dr = lev - surfaceY(x, z);
       if(Math.abs(u) > RIVER_BANK*0.8 || dr > 3.2) dr = Math.min(dr, -0.5);       // out of the bed, or hanging over a drop: dry
       dep.push(Math.max(-1, Math.min(3, dr)));
-      foam.push(Math.min(1, grad*(TRACK.river.rush ? 14 : 9)));
+      // (over a ledge the whole sheet is white water, and a little past its foot where it boils)
+      let fm = Math.min(1, grad*(TRACK.river.rush ? 14 : 9));
+      if(CASC) for(const L of RIVER.ledges){ if(j > L.foot - 1.6 && j < L.lip + 0.3) fm = Math.max(fm, j > L.foot ? 0.8 + 0.2*(j - L.foot)/(L.lip - L.foot) : 0.8*(1 - (L.foot - j)/1.6)); }
+      foam.push(fm);
     }
     rows++;
   }
@@ -9167,6 +9188,7 @@ if(RIVER.on){
   g.setIndex(idx);
   const m = new THREE.Mesh(g, waterMaterial());
   if(TRACK.river.rush) m.material.uniforms.uRush.value = 1;
+  if(CASC) m.material.uniforms.uCasc.value = 1;
   m.renderOrder = 3; m.frustumCulled = false;
   scene.add(m);
   /* The icefall at the head of the creek: the water comes over a rock step
@@ -9207,6 +9229,53 @@ if(RIVER.on){
     }
     g.traverse(o=>{ if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
     mergeStatic(g); scene.add(g);
+  }
+  /* A cascade's ledges, in rock: slabs laid down each step's face (flat where the road climbs it, so the
+     wheels ride them, proud and broken either side where the water pours between them), a lip of
+     stones along the top, flat stones sunk in the shelves, and big boulders hemming each step in. */
+  if(CASC){
+    const rk = [[], [], []], rnd = seeded(4410);
+    const at = (j)=>{ const j0 = Math.max(0, Math.min(S.length - 2, Math.floor(j))), f = j - j0, A = S[j0], B = S[j0 + 1];
+      return [A[0] + (B[0] - A[0])*f, A[1] + (B[1] - A[1])*f]; };
+    const add = (x, z, y, yaw, pitch, roll, sx, sy, sz)=> rk[Math.floor(rnd()*3)].push([x, y, z, yaw, pitch, roll, sx, sy, sz]);
+    RIVER.ledges.forEach(L=>{
+      const F = at(L.foot), T = at(L.lip);
+      let tx = T[0] - F[0], tz = T[1] - F[1]; const len = Math.hypot(tx, tz) || 1; tx /= len; tz /= len;
+      const nx = -tz, nz = tx, yaw = Math.atan2(tx, tz), slope = Math.atan2(L.hi - L.lo, len);
+      const pt = (f, u)=> [F[0] + tx*len*f + nx*u, F[1] + tz*len*f + nz*u];
+      const W = RIVER_BED + 2;
+      // the face: two or three rows of slabs up it
+      for(const f of [0.2, 0.5, 0.8]) for(let u = -W + rnd()*0.8; u < W; u += 1.1 + rnd()*0.7){
+        const q = pt(f + (rnd() - 0.5)*0.12, u), y = gradedY(q[0], q[1]), road = Math.abs(u) < 6.3;
+        if(road) add(q[0], q[1], y - 0.13, yaw + (rnd() - 0.5)*0.5, -slope*0.9, (rnd() - 0.5)*0.08, 0.8 + rnd()*0.5, 0.22, 0.75 + rnd()*0.45);
+        else { const sc = 0.5 + rnd()*0.7; add(q[0], q[1], y + sc*0.12, rnd()*6.3, rnd()*0.4, rnd()*0.4, sc*(1 + rnd()*0.4), sc*0.75, sc); }
+      }
+      // the lip: stones along the top, low across the road, standing up either side of it
+      for(let u = -W - 1 + rnd(); u < W + 1; u += 0.9 + rnd()*0.8){
+        const q = pt(1.0 + rnd()*0.1, u), y = gradedY(q[0], q[1]), road = Math.abs(u) < 6.3;
+        if(road){ if(rnd() < 0.55) add(q[0], q[1], y - 0.1, yaw + (rnd() - 0.5)*0.6, 0, 0, 0.6 + rnd()*0.4, 0.18, 0.5 + rnd()*0.3); }
+        else { const sc = 0.45 + rnd()*0.65; add(q[0], q[1], y + sc*0.2, rnd()*6.3, rnd()*0.5, rnd()*0.5, sc, sc*(0.7 + rnd()*0.4), sc); }
+      }
+      // the shelf above: flat stones sunk in the bed
+      for(let k = 0; k < 7; k++){ const u = (rnd() - 0.5)*2*RIVER_BED, q = pt(1.25 + rnd()*1.3, u), y = gradedY(q[0], q[1]);
+        add(q[0], q[1], y - 0.1, rnd()*6.3, 0, 0, 0.5 + rnd()*0.6, 0.15, 0.5 + rnd()*0.6); }
+      // and the step's sides: big rock either bank, stepping up with it
+      for(const sd of [-1, 1]) for(let k = 0; k < 3; k++){
+        const u = sd*(RIVER_BED + 0.5 + rnd()*7), q = pt(0.1 + rnd()*1.2, u);
+        if(nearest(q[0], q[1]).dist < 7) continue;
+        const sc = 1.3 + rnd()*1.9;
+        add(q[0], q[1], gradedY(q[0], q[1]) + sc*0.05, rnd()*6.3, (rnd() - 0.5)*0.4, (rnd() - 0.5)*0.4, sc*(1 + rnd()*0.3), sc*(0.8 + rnd()*0.5), sc);
+      }
+    });
+    const wetRock = new THREE.MeshLambertMaterial({map:rockTex, color:0x9a9890});
+    const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sv = new THREE.Vector3(), c = new THREE.Color();
+    rk.forEach((list, gi)=>{ if(!list.length) return;
+      const im = new THREE.InstancedMesh(rockGeometry(gi + 7), wetRock, list.length);
+      list.forEach((L, k)=>{ e.set(L[4], L[3], L[5], "YXZ"); q4.setFromEuler(e); v.set(L[0], L[1], L[2]); sv.set(L[6], L[7], L[8]);
+        m4.compose(v, q4, sv); im.setMatrixAt(k, m4); im.setColorAt(k, c.setHSL(0.09 + rnd()*0.05, 0.08 + rnd()*0.08, 0.36 + rnd()*0.22)); });
+      im.instanceMatrix.needsUpdate = true; im.instanceColor.needsUpdate = true;
+      im.frustumCulled = false; im.castShadow = true; im.receiveShadow = true; im.renderOrder = 0; scene.add(im);
+    });
   }
   // boulders along the banks and a few sitting out in the stream
   const rockMat = new THREE.MeshLambertMaterial({map:rockTex});
@@ -20099,6 +20168,8 @@ function startAudio(){
   AUD.wind = loop("lowpass", 500, 0.4, AUD.brown);
   // the rain itself, all round, drumming on the roof
   AUD.rain = loop("bandpass", 5200, 0.4);
+  // a cascade: the low tumble of the water pouring over the ledges and the hiss of its white water
+  AUD.falls = { low:loop("lowpass", 260, 0.6, AUD.brown), hiss:loop("bandpass", 1700, 0.45) };
   // a tyre squealing on tar or a polished floor: a tone, not a hiss, that wavers as it grips and lets go
   { const o = actx.createOscillator(); o.type = "sawtooth"; const lfo = actx.createOscillator(); lfo.frequency.value = 9; const lg = actx.createGain(); lg.gain.value = 35;
     lfo.connect(lg); lg.connect(o.frequency); const bp = actx.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 6; bp.frequency.value = 1300;
@@ -20643,6 +20714,13 @@ function stepAudio(info, dt){
   }
   // the rain falling, wherever it's raining (the menus too, since you can see it), louder on the roof from the hood view
   AUD.rain.g.gain.setTargetAtTime(muted || !CONDV.wet ? 0 : (GAME.paused ? 0.02 : 0.045 + (live && camMode === 1 ? 0.03 : 0)), now, 0.4);
+  // a cascade near by: its roar, from the nearest ledge, louder the closer you are
+  { let g = 0;
+    if(!muted && !GAME.paused && RIVER.on && RIVER.ledges && RIVER.ledges.length && !FROZEN){
+      const S = RIVER.S; let d = Infinity;
+      for(const L of RIVER.ledges){ const q = S[Math.round(L.foot)]; d = Math.min(d, Math.hypot(q[0] - camera.position.x, q[1] - camera.position.z)); }
+      g = 1 - smoothstep(6, 120, d); g *= g; }
+    AUD.falls.low.g.gain.setTargetAtTime(g*0.16, now, 0.3); AUD.falls.hiss.g.gain.setTargetAtTime(g*0.07, now, 0.3); }
   // the room: echo off the canyon walls and the snow shed's roof
   let room = 0.06;
   if(live && CANYON.on) room = Math.max(room, 0.06 + canyonAt(pose.x, pose.z)*0.5);
@@ -20919,6 +20997,9 @@ function stepCarInner(dt){
   a -= sgn * (0.0006*along*along*GG.dragK() + (deepOff ? 1.9 : offRoad ? 1.0 : 0.30 + wetAmt*0.34*wetK));
   a -= along * (deepOff ? 0.15 : offRoad ? 0.09 : 0.02 + wetAmt*0.035*wetK - tarAmt*0.006);
   if(offRoad && poolIn > 0) a -= along*0.1*poolIn;          // out in the water off the road it drags hard: no short cut across a lake
+  /* and the faster you push through water the harder it pushes back: the car is shoving a bow wave
+     along in front of it, so it is a thing you feel, not a slightly slower bit of road */
+  if(!pose.air) a -= sgn*wetAmt*wetK*0.0005*along*along;
   /* The mountain's mud is thick. It holds the car harder the faster it tries
      to go (the tyres and the body are pushing a bow wave of it), so in a
      bog you plough along with the engine screaming and the wheels flinging
@@ -21009,6 +21090,35 @@ function stepCarInner(dt){
     nfx = Math.sin(pose.h); nfz = Math.cos(pose.h);
     pose.vx = nfx*newAlong + latx*k;
     pose.vz = nfz*newAlong + latz*k;
+  }
+  /* The creek runs downhill, and it shoves the car down it as it goes: gently along the pools, hard where
+     it pours over a ledge, so climbing a cascade is a fight with the water and coming down one it carries
+     you. Across the stream it nudges you sideways, which you steer against. */
+  if(RIVER.on && !FROZEN && !pose.air){
+    const r = riverAt(pose.x, pose.z);
+    if(r && r[0] < RIVER_BED + 1){
+      const S = RIVER.S, j = r[3], A = S[Math.max(0, j - 2)], B = S[Math.min(S.length - 1, j + 2)];
+      let dx = A[0] - B[0], dz = A[1] - B[1]; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;     // (downstream is down the samples)
+      const fall = Math.max(0, B[2] - A[2])/L;
+      const push = (1.0 + Math.min(1, fall*3.5)*3.2)*(1 - smoothstep(RIVER_BED - 2, RIVER_BED + 1, r[0]))*smoothstep(0, 12, r[2]);
+      pose.vx += dx*push*dt; pose.vz += dz*push*dt;
+      pose.current = push;
+    } else pose.current = 0;
+  }
+  /* Hitting water fast: it grabs the car (a jolt, some of your speed gone at once) and goes up in a sheet
+     off both front wheels; landing in it off a jump the same, harder */
+  {
+    const spN = Math.hypot(pose.vx, pose.vz), landed = !pose.air && (pose.airW || 0) > 0.25;
+    if(!pose.air && wetAmt > 0.45 && spN > 12 && (!pose.inW || landed) && LIFE.ok){
+      const k0 = Math.min(1, (spN - 12)/22), lose = (landed ? 0.025 : 0.04)*k0;
+      pose.vx *= 1 - lose; pose.vz *= 1 - lose;
+      GAME.shake = Math.max(GAME.shake || 0, 0.12 + 0.18*k0);
+      const fx = pose.vx/spN, fz = pose.vz/spN, rx = fz, rz = -fx;
+      for(const sd of [1, -1]) wheelSplash(pose.x + fx*1.6 + rx*sd*0.85, pose.y, pose.z + fz*1.6 + rz*sd*0.85, pose.vx, pose.vz, spN*(1 + 0.4*k0), rx*sd, rz*sd, sd > 0);
+      splash.water = 1;
+    }
+    if(!pose.air){ if(wetAmt > 0.45) pose.inW = true; else if(wetAmt < 0.2) pose.inW = false; }
+    pose.airW = pose.air ? (pose.airW || 0) + dt : 0;
   }
 
   pose.x += pose.vx*dt;
@@ -26484,13 +26594,39 @@ function wheelFx(c, kind, k, front){
   }
 }
 
+/* ---- the cascades: where each ledge pours into the shelf below it the water is thrown back up in spray,
+   and a fine mist hangs over the foot of the step and drifts off downstream ---- */
+function stepCascades(dt){
+  const Ls = RIVER.on && RIVER.ledges; if(!Ls || !Ls.length || FROZEN) return;
+  const S = RIVER.S, cx = camera.position.x, cz = camera.position.z;
+  for(const L of Ls){
+    const j = Math.round(L.foot), A = S[Math.max(0, j - 1)], B = S[Math.min(S.length - 1, j + 1)];
+    if((A[0] - cx)**2 + (A[1] - cz)**2 > 170*170) continue;
+    let tx = B[0] - A[0], tz = B[1] - A[1]; const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl;
+    const nx = -tz, nz = tx, x0 = S[j][0], z0 = S[j][1], y0 = L.lo + 0.05, drop = L.hi - L.lo;
+    // the spray: drops and streaks thrown up and out downstream, all along the foot of the fall
+    for(let q = dt*(26 + drop*14) + Math.random(); q >= 1; q--){
+      const u = (Math.random()*2 - 1)*(RIVER_BED + 1), x = x0 + nx*u - tx*Math.random()*0.8, z = z0 + nz*u - tz*Math.random()*0.8, out = lr(1.2, 3.2);
+      spawnFx(x, y0, z, -tx*out + nx*lr(-0.6, 0.6), lr(1.4, 2.6 + drop), -tz*out + nz*lr(-0.6, 0.6), Math.random() < 0.7 ? 3 : 2,
+              lr(0.35, 0.8), lr(0.45, 0.8), 9, 0.4, ROOST_W, 0, 0.75);
+    }
+    // the mist: big soft puffs rising slowly off the white water and drifting downstream
+    for(let q = dt*(4 + drop*3) + Math.random(); q >= 1; q--){
+      const u = (Math.random()*2 - 1)*RIVER_BED, x = x0 + nx*u - tx*lr(0.5, 3), z = z0 + nz*u - tz*lr(0.5, 3);
+      spawnFx(x, y0 + 0.3, z, -tx*lr(0.6, 1.6), lr(0.3, 0.8), -tz*lr(0.6, 1.6), 7, lr(2.2, 3.6), lr(1.4, 2.4), -0.15, 1.6, [0.9, 0.94, 0.96], 0, 0.32);
+    }
+    // a lip of white boiling up at the top of the fall, now and then
+    if(Math.random() < dt*8){ const u = (Math.random()*2 - 1)*RIVER_BED, k = Math.round(L.lip), T = S[Math.min(S.length - 1, k)];
+      spawnFx(T[0] + nx*u, L.hi + 0.1, T[1] + nz*u, -tx*lr(2, 3.5), lr(0.8, 1.6), -tz*lr(2, 3.5), 3, lr(0.4, 0.7), lr(0.35, 0.5), 9, 0.3, ROOST_W, 0, 0.7); }
+  }
+}
 /* ---- every frame ---- */
 const LIFE_PUSH = { hist:[], t:0 };
 function stepLife(dt){
   if(!LIFE.ok) return;
   LIFE.t += dt;
   const cars = lifeCars(), racing = state.phase === "racing" || state.phase === "done" || state.phase === "countdown";
-  stepRipples(dt); stepSheets(dt);
+  stepRipples(dt); stepSheets(dt); stepCascades(dt);
   COND_U.uTime.value = LIFE.t;
   // the grass: pushed by each car, and where yours was in the last half second
   { const P = GRASS_PUSH.value; LIFE_PUSH.t -= dt;
