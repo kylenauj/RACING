@@ -5982,7 +5982,11 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
       "uniform float uNight; uniform vec4 uHeadA[4]; uniform vec4 uHeadB[4]; uniform vec4 uLampP[" + NIGHT_N + "];\n" +
       "float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }\n" +
       "float vnz(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);\n" +
-      "  return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }")
+      "  return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }\n" +
+      // (the puddles' noise, on a hash with no sine in it, so the game can work out exactly the same puddles: see puddleAt)
+      "float hp2(vec2 p){ vec3 p3 = fract(vec3(p.xyx)*0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y)*p3.z); }\n" +
+      "float pnz(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);\n" +
+      "  return mix(mix(hp2(i), hp2(i + vec2(1.0, 0.0)), f.x), mix(hp2(i + vec2(0.0, 1.0)), hp2(i + vec2(1.0, 1.0)), f.x), f.y); }")
     .replace("#include <map_fragment>", [
       (WINTER || DESERT) ? "vec3 grd = vec3(0.55 + 0.9*dot(texture2D(map, vUv).rgb, vec3(0.3, 0.59, 0.11))) * vColor;"
                          : "vec3 grd = texture2D(map, vUv).rgb * vColor;",
@@ -6056,7 +6060,7 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
       // ruts, showing the sky; snow: a dusting over the road, swept off the wheel tracks
       "if(uRain > 0.0){",
       "  col *= 1.0 - uRain*(0.22 + 0.16*max(onRoad, verge*0.6));",
-      "  float pud = smoothstep(0.66, 0.72, vnz(vXZ*0.16) + 0.14*exp(-pow((abs(lat) - 1.65)/0.5, 2.0)) + (n1 - 0.5)*0.12)*onRoad*uRain;",
+      "  float pud = smoothstep(0.66, 0.72, pnz(vXZ*0.16) + 0.14*exp(-pow((abs(lat) - 1.65)/0.5, 2.0)) + (pnz(vXZ*0.9 + 3.0) - 0.5)*0.12)*onRoad*uRain;",
       "  col = mix(col, col*0.55 + uSkyCol*0.22*(0.8 + 0.4*n3), pud*0.85);",
       "}",
       "if(uSnow > 0.0){",
@@ -15478,6 +15482,9 @@ const grassTuftTex = new THREE.CanvasTexture(noiseCanvas(256, 256, (g)=>{
 }));
 
 
+/* what pushes the grass over: the cars where they are now, and where yours was a moment ago (fainter the
+   longer ago, so the grass springs back up behind you): x, z, strength, reach */
+const GRASS_PUSH = { value: Array.from({length:8}, ()=> new THREE.Vector4(0, 0, 0, 1)) };
 function billboardField(tex, cell, pos, scale, uv, tint, colour){
   const base = new THREE.PlaneGeometry(1, 1);
   base.translate(0, 0.5, 0);
@@ -15494,17 +15501,25 @@ function billboardField(tex, cell, pos, scale, uv, tint, colour){
   geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 3000);
   const mat = new THREE.ShaderMaterial({
     uniforms: {
+      uPush: GRASS_PUSH,
       map:{value:tex}, uCell:{value:cell}, uCol:{value: (()=>{ const c0 = colour || new THREE.Color(1, 1, 1); const c = c0.clone(); UNLIT.push([c, c0.clone()]); return c; })()},
       fogColor:{value:new THREE.Color(scene.fog.color)},
       fogNear:{value:scene.fog.near}, fogFar:{value:scene.fog.far}
     },
     vertexShader: [
       "attribute vec3 iPos; attribute vec2 iScale; attribute vec2 iUv; attribute float iTint;",
-      "uniform float uCell;",
+      "uniform float uCell; uniform vec4 uPush[8];",
       "varying vec2 vUv; varying float vTint; varying float vDepth;",
       "void main(){",
       "  vec3 right = normalize(vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]));",
       "  vec3 world = iPos + right*(position.x*iScale.x) + vec3(0.0,1.0,0.0)*(position.y*iScale.y);",
+      // laid over away from whatever is pushing it, the tips most, and flattened down
+      "  vec2 bend = vec2(0.0);",
+      "  for(int i = 0; i < 8; i++){ vec4 P = uPush[i]; if(P.z <= 0.0) continue;",
+      "    vec2 d = iPos.xz - P.xy; float r = length(d); if(r > P.w) continue;",
+      "    bend += d/max(r, 0.2)*P.z*(1.0 - smoothstep(P.w*0.45, P.w, r)); }",
+      "  float bl = min(1.0, length(bend)), tip = position.y*position.y;",
+      "  if(bl > 0.0){ world.xz += normalize(bend)*bl*tip*iScale.y*0.85; world.y -= bl*tip*iScale.y*0.6; }",
       "  vec4 mv = viewMatrix * vec4(world, 1.0);",
       "  vDepth = -mv.z; vUv = iUv + uv*uCell; vTint = iTint;",
       "  gl_Position = projectionMatrix * mv;",
@@ -19291,7 +19306,7 @@ const rivals = (TRACK.test ? [] : rivalDefs).map((d,i)=>{
 });
 
 /* dust */
-const DUST = 1800;                 // a held drift alone burns through several hundred
+const DUST = 2600;                 // a held drift alone burns through several hundred (and the haze hangs about)
 const dustPos = new Float32Array(DUST*3);
 const dustVel = new Float32Array(DUST*3);
 const dustLife = new Float32Array(DUST);
@@ -19303,6 +19318,8 @@ const dustSize  = new Float32Array(DUST);
 const dustCol   = new Float32Array(DUST*3);
 const dustGrav  = new Float32Array(DUST).fill(5.2);   // water falls, smoke and dust hang
 const dustGrow  = new Float32Array(DUST).fill(2.2);
+const dustAK    = new Float32Array(DUST).fill(1);     // how thick (the haze is thin)
+const dustHaze  = new Uint8Array(DUST);               // hangs in the air and drifts with the wind instead of settling
 dustGeo.setAttribute("aAlpha", new THREE.BufferAttribute(dustAlpha,1).setUsage(THREE.DynamicDrawUsage));
 dustGeo.setAttribute("aSize",  new THREE.BufferAttribute(dustSize,1).setUsage(THREE.DynamicDrawUsage));
 dustGeo.setAttribute("aCol",   new THREE.BufferAttribute(dustCol,3).setUsage(THREE.DynamicDrawUsage));
@@ -19335,6 +19352,16 @@ dust.renderOrder = 5;             // after the water, so spray and clods show ov
 dustGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 4000);
 scene.add(dust);
 let dustHead = 0;
+/* dust that hangs: a thin, wide cloud left in the air behind a car on dry dirt, that drifts off on the breeze
+   over a few seconds (so the cars ahead leave a haze you drive into) */
+function spawnHaze(x, y, z, vx, vz, k, col){
+  const i = dustHead = (dustHead + 1)%DUST;
+  dustPos[i*3] = x + (Math.random() - 0.5)*1.2; dustPos[i*3+1] = y; dustPos[i*3+2] = z + (Math.random() - 0.5)*1.2;
+  dustVel[i*3] = vx*0.18 + (Math.random() - 0.5)*1.2; dustVel[i*3+1] = 0.5 + Math.random()*0.6; dustVel[i*3+2] = vz*0.18 + (Math.random() - 0.5)*1.2;
+  dustLife[i] = 3.5 + Math.random()*2.5; dustSize[i] = 6 + Math.random()*4; dustGrav[i] = 0; dustGrow[i] = 3.2;
+  dustAK[i] = k; dustHaze[i] = 1;
+  const g2 = 0.9 + Math.random()*0.15; dustCol[i*3] = col[0]*g2; dustCol[i*3+1] = col[1]*g2; dustCol[i*3+2] = col[2]*g2;
+}
 function spawnDust(x,y,z,sandy,force,vx,vz,lift){
   const i = dustHead = (dustHead+1)%DUST;
   dustPos[i*3]=x; dustPos[i*3+1]=y; dustPos[i*3+2]=z;
@@ -19343,7 +19370,7 @@ function spawnDust(x,y,z,sandy,force,vx,vz,lift){
   dustVel[i*3+2]=(vz||0) + (Math.random()-0.5)*2.6;
   dustLife[i]=0.8+Math.random()*0.7 + force*0.4;
   dustSize[i]=0.8+Math.random()*1.3 + force*0.6;
-  dustGrav[i]=5.2; dustGrow[i]=2.2;
+  dustGrav[i]=5.2; dustGrow[i]=2.2; dustAK[i]=1; dustHaze[i]=0;
   const j=i*3;
   if(Array.isArray(sandy)){                       // drift sparks carry their tier colour
     dustCol[j]=sandy[0]; dustCol[j+1]=sandy[1]; dustCol[j+2]=sandy[2];
@@ -25710,14 +25737,14 @@ const inCanyon = (x, z)=>{ if(!CANYON.on) return false; const uv = canyonUV(x, z
 const CRIT = { birds:[], weeds:[], wind:[0.8, 0.35] };
 {
   const wl = Math.hypot(CRIT.wind[0], CRIT.wind[1]); CRIT.wind = [CRIT.wind[0]/wl, CRIT.wind[1]/wl];
-  if(!DESERT && !TRACK.test && !EXP.on){
-    const col = WINTER ? 0x17171a : FALL ? 0x5a3a24 : JUNGLE ? 0x1f8a3a : 0x6a4a30, belly = WINTER ? 0x2a2a30 : JUNGLE ? 0xf2c230 : 0xb99a72;
+  if(!TRACK.test && !EXP.on){
+    const col = WINTER || DESERT ? 0x17171a : FALL ? 0x5a3a24 : JUNGLE ? 0x1f8a3a : 0x6a4a30, belly = WINTER || DESERT ? 0x2a2a30 : JUNGLE ? 0xf2c230 : 0xb99a72;
     const bodyM = new THREE.MeshLambertMaterial({color:col}), bellyM = new THREE.MeshLambertMaterial({color:belly});
     const wingM = new THREE.MeshLambertMaterial({color:col, side:THREE.DoubleSide});
     const bodyG = new THREE.BoxGeometry(0.13, 0.11, 0.24), headG = new THREE.BoxGeometry(0.1, 0.1, 0.1);
     const wingG = new THREE.PlaneGeometry(0.26, 0.13); wingG.translate(0.13, 0, 0);
-    const sc = WINTER ? 1.9 : 1.45;
-    const flocks = 6, rnd = seeded(515 + TRACK_ID*31);
+    const sc = WINTER || DESERT ? 1.9 : 1.45;
+    const flocks = 9, rnd = seeded(515 + TRACK_ID*31);
     for(let f=0; f<flocks; f++){
       const at = Math.floor((f + 0.3 + rnd()*0.4)/flocks*MAIN.N), p = MAIN.pts[at], t = MAIN.tans[at];
       const lat = (rnd() - 0.5)*MAIN.half[at]*1.6;
@@ -25794,19 +25821,26 @@ function stepCritters(dt){
       }
     } else {
       if(o.t < 0) continue;
-      o.vy = Math.max(1.2, o.vy - dt*0.8);
+      /* up and out of the way first, then the flock wheels round over the spot, high, until the cars have gone
+         by, and then they spiral down and settle where they were */
+      const gy = surfaceY(o.home[0], o.home[1]), ph = o.home[0]*0.37 + o.home[1]*0.11;
+      let near = false;
+      for(const c of cars) if((o.home[0] - c[0])**2 + (o.home[1] - c[1])**2 < 45*45) near = true;
+      if(o.t < 1.3){ o.vy = Math.max(1.2, o.vy - dt*0.8); }
+      else {
+        if(near) o.land = 0; else o.land = (o.land || 0) + dt;
+        const a = o.t*0.55 + ph, R = 9 + (ph*7 % 6), H = o.land > 1.5 ? Math.max(0.1, 11 - (o.land - 1.5)*4) : 10 + (ph*3 % 4);
+        const tx = o.home[0] + Math.cos(a)*R*(o.land > 1.5 ? Math.max(0, 1 - (o.land - 1.5)*0.35) : 1), tz = o.home[1] + Math.sin(a)*R*(o.land > 1.5 ? Math.max(0, 1 - (o.land - 1.5)*0.35) : 1);
+        o.vx += ((tx - o.x)*1.2 - o.vx)*Math.min(1, dt*1.8); o.vz += ((tz - o.z)*1.2 - o.vz)*Math.min(1, dt*1.8); o.vy += ((gy + H - o.y)*1.2 - o.vy)*Math.min(1, dt*1.8);
+        o.g.rotation.y = Math.atan2(o.vx, o.vz);
+        if(o.land > 1.5 && Math.hypot(o.x - o.home[0], o.z - o.home[1]) < 0.6 && o.y - gy < 0.4){
+          o.fly = false; o.land = 0; o.x = o.home[0]; o.z = o.home[1]; o.y = gy + 0.06*o.g.scale.x; o.wl.rotation.z = o.wr.rotation.z = 0; o.g.position.set(o.x, o.y, o.z); continue; }
+      }
       o.x += o.vx*dt; o.z += o.vz*dt; o.y += o.vy*dt;
-      const flap = Math.sin(o.t*34 + o.home[0])*0.9;
+      // flapping hard on the way up, gliding as they wheel
+      const glide = o.t > 2 && Math.sin(o.t*0.9 + ph) > 0.2, flap = glide ? 0.25 : Math.sin(o.t*34 + o.home[0])*0.9;
       o.wl.rotation.z = flap; o.wr.rotation.z = -flap;
       o.g.position.set(o.x, o.y, o.z);
-      // gone: come back to the same spot once the cars are well away
-      if(o.t > 7){
-        let near = false;
-        for(const c of cars) if((o.home[0] - c[0])**2 + (o.home[1] - c[1])**2 < 90*90) near = true;
-        if(!near){ o.fly = false; o.x = o.home[0]; o.z = o.home[1]; o.y = surfaceY(o.x, o.z) + 0.06*o.g.scale.x;
-          o.wl.rotation.z = o.wr.rotation.z = 0; o.g.position.set(o.x, o.y, o.z); }
-        else o.g.position.y = -500;
-      }
     }
   }
   if(scattered && actx){
@@ -25894,6 +25928,437 @@ function resetCritters(){
     o.wl.rotation.z = o.wr.rotation.z = 0; o.g.position.set(o.x, o.y, o.z); });
   CRIT.weeds.forEach(w=>{ w.live = false; w.g.visible = false; });
   if(CRIT.tw) CRIT.tw.forEach(t=>{ t.life = 0; });
+  if(typeof resetLife === "function") resetLife();
+}
+/* ==== LIFE: the world answering the car ====
+   Things that notice you going by: puddles that throw a sheet of water and ring out behind you, grass laid
+   over and springing back, rabbits, deer and ducks that bolt, fireflies stirred into spirals in your wake at
+   night, dragonflies pacing you over the water, fish jumping, the tracks every car leaves in the ground lap
+   after lap, and the dust hanging in the air behind them on a dry day. */
+const LIFE = { t:0, ok:!TRACK.test };
+const lr = (a, b)=> a + Math.random()*(b - a);
+const lifeMat = c => new THREE.MeshLambertMaterial({color:c});
+/* every car on the stage: x, z, y, vx, vz, speed, heading, is it you, in the air */
+function lifeCars(){
+  const out = [[pose.x, pose.z, pose.y, pose.vx, pose.vz, Math.hypot(pose.vx, pose.vz), pose.h, true, !!pose.air]];
+  if(typeof FIELD !== "undefined") FIELD.forEach(r=>{ const m = r.mesh; if(!m || !m.visible) return; const h = m.rotation.y, v = Math.max(0, r.v || 0);
+    out.push([m.position.x, m.position.z, m.position.y, Math.sin(h)*v, Math.cos(h)*v, v, h, false, !!r.air]); });
+  return out;
+}
+/* a spot on dry ground off the road, d metres along from the player and off to one side by between o0 and o1 */
+function lifeSpot(d, o0, o1){
+  const i = wrapIdx(MAIN, state.idx + Math.round(d/MAIN.seg)), p = MAIN.pts[i], t = MAIN.tans[i], sd = Math.random() < 0.5 ? -1 : 1;
+  const off = MAIN.half[i] + lr(o0, o1), x = p.x - t.z*sd*off, z = p.z + t.x*sd*off;
+  if(waterTop(x, z) !== null || inWaterway(x, z, true) || deckAt(x, z) !== null) return null;
+  const n = nearest(x, z); if(n.dist < n.half + 1.5) return null;
+  const y = surfaceY(x, z); if(!isFinite(y) || Math.abs(y - surfaceY(p.x, p.z)) > 6) return null;
+  return {x, y, z, sd, nx:-t.z*sd, nz:t.x*sd};
+}
+
+/* ---- ripples: rings spreading on the water ---- */
+const RIPPLE = [];
+{
+  const geo = new THREE.RingGeometry(0.86, 1, 28); geo.rotateX(-Math.PI/2);
+  for(let i = 0; i < 36; i++){
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color:0xe8f0f4, transparent:true, opacity:0, depthWrite:false, fog:true}));
+    m.visible = false; m.renderOrder = 3; scene.add(m); RIPPLE.push({m, t:0, life:0, r0:0, grow:0, a:0});
+  }
+}
+let rippleHead = 0;
+function ripple(x, y, z, r0, grow, a, life){
+  const R = RIPPLE[rippleHead = (rippleHead + 1)%RIPPLE.length];
+  R.t = 0; R.life = life || 1.6; R.r0 = r0; R.grow = grow; R.a = a; R.m.position.set(x, y + 0.03, z); R.m.visible = true;
+}
+function stepRipples(dt){
+  for(const R of RIPPLE){ if(!R.m.visible) continue; R.t += dt;
+    if(R.t >= R.life){ R.m.visible = false; continue; }
+    const k = R.t/R.life, r = R.r0 + R.grow*R.t; R.m.scale.set(r, 1, r); R.m.material.opacity = R.a*(1 - k)*(1 - k); }
+}
+
+/* ---- puddles in the rain: the same ones the road's shader draws (see pnz in it) ---- */
+function hp2(x, y){ let a = x*0.1031, b = y*0.1031, c = x*0.1031; a -= Math.floor(a); b -= Math.floor(b); c -= Math.floor(c);
+  const d = a*(b + 33.33) + b*(c + 33.33) + c*(a + 33.33); a += d; b += d; c += d; const v = (a + b)*c; return v - Math.floor(v); }
+function pnz(x, y){ const ix = Math.floor(x), iy = Math.floor(y); let fx = x - ix, fy = y - iy; fx = fx*fx*(3 - 2*fx); fy = fy*fy*(3 - 2*fy);
+  const a = hp2(ix, iy), b = hp2(ix + 1, iy), c = hp2(ix, iy + 1), d = hp2(ix + 1, iy + 1); return (a + (b - a)*fx)*(1 - fy) + (c + (d - c)*fx)*fy; }
+function puddleAt(x, z){
+  if(!CONDV.wet) return 0;
+  const n = nearest(x, z); if(n.dist > n.half - 0.2) return 0;
+  const v = pnz(x*0.16, z*0.16) + 0.14*Math.exp(-Math.pow((n.dist - 1.65)/0.5, 2)) + (pnz(x*0.9 + 3, z*0.9 + 3) - 0.5)*0.12;
+  return Math.max(0, Math.min(1, (v - 0.66)/0.06));
+}
+/* a wheel through standing water: a sheet thrown up and out to the side, and rings behind */
+function wheelSplash(x, y, z, vx, vz, sp, sideX, sideZ, loud){
+  const n = Math.min(14, 4 + Math.round(sp*0.35));
+  for(let k = 0; k < n; k++){ const out = lr(1.5, 4.5);
+    spawnDust(x, y + 0.15, z, 2, Math.min(2.5, sp*0.05), vx*0.3 + sideX*out, vz*0.3 + sideZ*out, lr(2.5, 5.5)); }
+  ripple(x, y, z, 0.3, 2.2 + sp*0.05, 0.55, 1.4);
+  if(loud && actx){ burst(0.3, "bandpass", 1500, 0.1*Math.min(1, sp/20), 0.7, 0, 500); burst(0.15, "highpass", 3500, 0.05, 0.6, 0.02); }
+}
+
+/* ---- tyre tracks: two lines behind every car, lasting the race, darkening as the laps go over them ---- */
+const TRACKS_N = 16000;
+const TYRE = { head:0, last:new Map(), strong:null, faint:null, lo:Infinity, hi:-1 };
+if(LIFE.ok){
+  const geo = new THREE.PlaneGeometry(0.24, 1); geo.rotateX(-Math.PI/2);
+  const mk = (op)=>{ const m = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:op, depthWrite:false, fog:true,
+      polygonOffset:true, polygonOffsetFactor:-3, polygonOffsetUnits:-3}), TRACKS_N);
+    m.frustumCulled = false; m.userData.noCull = true; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.renderOrder = 1;
+    const z = new THREE.Matrix4().makeScale(0, 0, 0); for(let i = 0; i < TRACKS_N; i++) m.setMatrixAt(i, z);
+    m.setColorAt(0, new THREE.Color(0)); scene.add(m); return m; };
+  TYRE.strong = mk(0.34); TYRE.faint = mk(0.13);
+}
+const _tm = new THREE.Matrix4(), _tq = new THREE.Quaternion(), _te = new THREE.Euler(0, 0, 0, "YXZ"), _tp = new THREE.Vector3(), _ts = new THREE.Vector3(), _tc = new THREE.Color();
+/* what the ground takes a track in: a deep one in mud, snow, sand and the wet, a faint one on dry gravel */
+function trackKind(x, z){
+  const n = nearest(x, z), off = n.dist > n.half - 0.2;
+  if(deckAt(x, z) !== null || waterTop(x, z) !== null) return null;
+  if(WINTER) return [true, 0x5a6478];
+  if(DESERT) return [true, 0x6a4c30];
+  if(!off && pavedAt(x, z) > 0.4) return CONDV.wet ? [false, 0x101010] : null;
+  if(n.surf === SURF.MUD || SWAMPGP || JUNGLE || CONDV.wet) return [true, 0x2a1c10];
+  return off ? [true, FALL ? 0x3a2a18 : 0x2c3a1c] : [false, 0x3a2c20];
+}
+function layTrack(key, x, z, y){
+  const L = TYRE.last.get(key);
+  if(!L){ TYRE.last.set(key, [x, z, y]); return; }
+  const dx = x - L[0], dz = z - L[1], d = Math.hypot(dx, dz);
+  if(d < 0.75) return;
+  TYRE.last.set(key, [x, z, y]);
+  if(d > 3) return;                                                 // (a jump or a reset: no line across the gap)
+  const mx = (x + L[0])/2, mz = (z + L[1])/2, K = trackKind(mx, mz); if(!K) return;
+  const y0 = surfaceY(L[0], L[1]), y1 = surfaceY(x, z);
+  if(Math.abs(y1 - y) > 0.8) return;                                // (in the air)
+  const i = TYRE.head = (TYRE.head + 1)%TRACKS_N, M = K[0] ? TYRE.strong : TYRE.faint, O = K[0] ? TYRE.faint : TYRE.strong;
+  _te.set(-Math.atan2(y1 - y0, d), Math.atan2(dx, dz), 0); _tq.setFromEuler(_te);
+  _tp.set(mx, (y0 + y1)/2 + 0.03, mz); _ts.set(1, 1, d + 0.05); _tm.compose(_tp, _tq, _ts);
+  M.setMatrixAt(i, _tm); M.setColorAt(i, _tc.setHex(K[1]));
+  O.setMatrixAt(i, _tm.makeScale(0, 0, 0));                         // (the slot's old line, in the other set, is gone)
+  TYRE.lo = Math.min(TYRE.lo, i); TYRE.hi = Math.max(TYRE.hi, i);
+}
+function flushTracks(){
+  if(TYRE.hi < 0) return;
+  for(const M of [TYRE.strong, TYRE.faint]){
+    M.instanceMatrix.updateRange.offset = TYRE.lo*16; M.instanceMatrix.updateRange.count = (TYRE.hi - TYRE.lo + 1)*16; M.instanceMatrix.needsUpdate = true;
+    if(M.instanceColor){ M.instanceColor.updateRange.offset = TYRE.lo*3; M.instanceColor.updateRange.count = (TYRE.hi - TYRE.lo + 1)*3; M.instanceColor.needsUpdate = true; }
+  }
+  TYRE.lo = Infinity; TYRE.hi = -1;
+}
+
+/* ---- the animals: rabbits that zigzag off, deer that bound away into the trees, ducks that paddle off or take off ---- */
+const ANIM = { list:[], spawnT:2 };
+function rabbitMesh(){
+  const g = new THREE.Group(), col = WINTER ? 0xe8ecef : DESERT ? 0xb08a5a : 0x8a7058, M = lifeMat(col), W = lifeMat(0xf2efe8), D = lifeMat(0x2a2420);
+  const b = new THREE.Mesh(new THREE.SphereGeometry(0.2, 7, 5), M); b.scale.set(0.8, 0.75, 1.15); b.position.set(0, 0.17, 0); g.add(b);
+  const h = new THREE.Mesh(new THREE.SphereGeometry(0.11, 7, 5), M); h.position.set(0, 0.3, 0.2); g.add(h);
+  for(const s of [1, -1]){ const e = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.2, 0.06), M); e.position.set(s*0.045, 0.45, 0.17); e.rotation.x = -0.25; e.rotation.z = s*0.12; g.add(e);
+    const ey = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.025, 0.025), D); ey.position.set(s*0.075, 0.32, 0.27); g.add(ey); }
+  const t = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 4), W); t.position.set(0, 0.2, -0.24); g.add(t);
+  return g;
+}
+function deerMesh(){
+  const g = new THREE.Group(), M = lifeMat(WINTER ? 0x6a5444 : 0x8a5a34), L = lifeMat(0x5a3a22), W = lifeMat(0xf0ebe0), D = lifeMat(0x1e1814);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.48, 1.15), M); body.position.y = 1.0; g.add(body);
+  const neck = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.55, 0.22), M); neck.position.set(0, 1.38, 0.5); neck.rotation.x = 0.45; g.add(neck);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.22, 0.4), M); head.position.set(0, 1.62, 0.66); g.add(head);
+  const nose = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.08), D); nose.position.set(0, 1.58, 0.88); g.add(nose);
+  for(const s of [1, -1]){ const e = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.16, 0.12), M); e.position.set(s*0.14, 1.78, 0.56); e.rotation.z = -s*0.6; g.add(e); }
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.18, 0.06), W); tail.position.set(0, 1.14, -0.6); g.add(tail);
+  const legs = [];
+  for(const [x, z] of [[0.15, 0.45], [-0.15, 0.45], [0.15, -0.45], [-0.15, -0.45]]){
+    const p = new THREE.Group(); p.position.set(x, 0.9, z); g.add(p);
+    const l = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.9, 0.08), L); l.position.y = -0.45; p.add(l); legs.push(p); }
+  g.userData.legs = legs; g.userData.tail = tail;
+  return g;
+}
+function duckMesh(){
+  const g = new THREE.Group(), drake = Math.random() < 0.5;
+  const B = lifeMat(drake ? 0x8a8478 : 0x7a5a3a), H = lifeMat(drake ? 0x1e5a2e : 0x6a4a2c), O = lifeMat(0xe0901e);
+  const b = new THREE.Mesh(new THREE.SphereGeometry(0.17, 7, 5), B); b.scale.set(0.8, 0.6, 1.25); b.position.y = 0.05; g.add(b);
+  const h = new THREE.Mesh(new THREE.SphereGeometry(0.08, 7, 5), H); h.position.set(0, 0.2, 0.17); g.add(h);
+  const k = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.025, 0.09), O); k.position.set(0, 0.18, 0.27); g.add(k);
+  const wM = new THREE.MeshLambertMaterial({color:drake ? 0x6a6a64 : 0x6a4a2c, side:THREE.DoubleSide});
+  const wg = new THREE.PlaneGeometry(0.34, 0.14); wg.translate(0.17, 0, 0); wg.rotateX(-Math.PI/2);
+  const wl = new THREE.Mesh(wg, wM), wr = new THREE.Mesh(wg, wM); wr.rotation.y = Math.PI; wl.position.y = wr.position.y = 0.1; wl.visible = wr.visible = false; g.add(wl); g.add(wr);
+  g.userData.wl = wl; g.userData.wr = wr;
+  return g;
+}
+function spawnAnimal(kind){
+  let at = null;
+  if(kind === "duck"){
+    // on open water near the road ahead
+    for(let tries = 0; tries < 8 && !at; tries++){
+      const i = wrapIdx(MAIN, state.idx + Math.round(lr(60, 140)/MAIN.seg)), p = MAIN.pts[i], t = MAIN.tans[i], sd = Math.random() < 0.5 ? -1 : 1, off = MAIN.half[i] + lr(4, 22);
+      const x = p.x - t.z*sd*off, z = p.z + t.x*sd*off, w = waterTop(x, z);
+      if(w !== null && w - gridH(x, z) > 0.25 && deckAt(x, z) === null && nearest(x, z).dist > MAIN.half[i] + 2) at = {x, y:w, z, nx:-t.z*sd, nz:t.x*sd};
+    }
+    if(!at) return;
+    const n = 3 + Math.floor(Math.random()*3);
+    for(let k = 0; k < n; k++){ const g = duckMesh(), x = at.x + lr(-2.5, 2.5), z = at.z + lr(-2.5, 2.5);
+      if(waterTop(x, z) === null) continue;
+      g.position.set(x, at.y, z); g.rotation.y = Math.random()*6.28; scene.add(g);
+      ANIM.list.push({kind, g, x, z, y:at.y, w:at.y, vx:0, vz:0, vy:0, flee:false, t:0, ph:Math.random()*6, fly:Math.random() < 0.45, nx:at.nx, nz:at.nz}); }
+    return;
+  }
+  at = kind === "deer" ? lifeSpot(lr(70, 150), 12, 30) : lifeSpot(lr(60, 130), 3, 14);
+  if(!at) return;
+  const n = kind === "deer" ? 1 + Math.floor(Math.random()*2) : 1;
+  for(let k = 0; k < n; k++){
+    const g = kind === "deer" ? deerMesh() : rabbitMesh(), x = at.x + (k ? lr(-3, 3) : 0), z = at.z + (k ? lr(-3, 3) : 0), y = surfaceY(x, z);
+    g.position.set(x, y, z); g.rotation.y = Math.random()*6.28; scene.add(g);
+    ANIM.list.push({kind, g, x, z, y, vx:0, vz:0, vy:0, flee:false, t:0, ph:Math.random()*6, nx:at.nx, nz:at.nz, zig:0});
+  }
+}
+function stepAnimals(dt, cars){
+  if(state.phase === "menu") return;
+  const water = WATERS, ducks = water && !WINTER, rabbits = !GATOR, deer = !DESERT && !JUNGLE && !SWAMPGP && !GATOR;
+  ANIM.spawnT -= dt;
+  if(ANIM.spawnT <= 0){
+    ANIM.spawnT = lr(2.5, 5);
+    const have = k => ANIM.list.filter(a=> a.kind === k).length;
+    const r = Math.random();
+    if(ducks && r < 0.3 && have("duck") < 8) spawnAnimal("duck");
+    else if(deer && r < 0.55 && have("deer") < 3) spawnAnimal("deer");
+    else if(rabbits && have("rabbit") < 5) spawnAnimal("rabbit");
+  }
+  for(let i = ANIM.list.length - 1; i >= 0; i--){
+    const a = ANIM.list[i], g = a.g; a.t += dt; a.ph += dt;
+    const pd = Math.hypot(a.x - pose.x, a.z - pose.z);
+    // gone once well behind you, or a while after it ran
+    const ahead = (a.x - pose.x)*Math.sin(pose.h) + (a.z - pose.z)*Math.cos(pose.h);
+    if((ahead < -45 && pd > 45) || pd > 260 || (a.flee && a.t > (a.kind === "deer" ? 6 : 4.5) && pd > 30)){ scene.remove(g); ANIM.list.splice(i, 1); continue; }
+    if(!a.flee){
+      const reach = a.kind === "deer" ? 42 : a.kind === "duck" ? 20 : 15;
+      for(const c of cars){ const dx = a.x - c[0], dz = a.z - c[1], d = Math.hypot(dx, dz);
+        if(c[5] > 3 && d < reach){
+          a.flee = true; a.t = 0;
+          // away from the car, and away from the road
+          let fx = dx/(d || 1) + a.nx*1.4, fz = dz/(d || 1) + a.nz*1.4; const fl = Math.hypot(fx, fz) || 1; fx /= fl; fz /= fl;
+          const sp = a.kind === "deer" ? lr(10, 13) : a.kind === "duck" ? (a.fly ? 5 : 1.8) : lr(7, 9);
+          a.vx = fx*sp; a.vz = fz*sp; g.rotation.y = Math.atan2(fx, fz);
+          if(a.kind === "duck" && actx && c[7] && Math.random() < 0.5) for(let k = 0; k < 3; k++){ tone(lr(520, 640), 0.09, "sawtooth", 0.02, 380, k*0.14); }
+          if(a.kind === "duck" && a.fly){ g.userData.wl.visible = g.userData.wr.visible = true; a.vy = 2.4; }
+          break; } }
+      // idle: a rabbit sits and twitches, a deer grazes and lifts its head, a duck bobs
+      if(a.kind === "duck"){ g.position.y = a.w + Math.sin(a.ph*2)*0.02; g.rotation.y += Math.sin(a.ph*0.5)*dt*0.3; }
+      else if(a.kind === "deer"){ const up = Math.sin(a.ph*0.4) > 0.3; g.children[1].rotation.x = up ? 0.45 : 1.6; g.children[2].position.y = up ? 1.62 : 1.0; g.children[3].position.y = up ? 1.58 : 0.94; }
+      continue;
+    }
+    // running
+    if(a.kind === "rabbit"){
+      a.zig -= dt;
+      if(a.zig <= 0){ a.zig = lr(0.25, 0.6); const ang = Math.atan2(a.vx, a.vz) + lr(-0.7, 0.7), sp = Math.hypot(a.vx, a.vz); a.vx = Math.sin(ang)*sp; a.vz = Math.cos(ang)*sp; g.rotation.y = ang; }
+      a.x += a.vx*dt; a.z += a.vz*dt;
+      const hop = Math.abs(Math.sin(a.t*11)); a.y = surfaceY(a.x, a.z); g.position.set(a.x, a.y + hop*0.35, a.z); g.rotation.x = Math.cos(a.t*11)*0.3*Math.sign(Math.sin(a.t*11));
+    } else if(a.kind === "deer"){
+      a.x += a.vx*dt; a.z += a.vz*dt; a.y = surfaceY(a.x, a.z);
+      const ph = a.t*3.4, bound = Math.max(0, Math.sin(ph*Math.PI));
+      g.position.set(a.x, a.y + bound*0.9, a.z); g.rotation.x = Math.cos(ph*Math.PI)*0.2;
+      const L = g.userData.legs; L[0].rotation.x = L[1].rotation.x = -0.9*(1 - bound); L[2].rotation.x = L[3].rotation.x = 0.9*(1 - bound);
+      g.children[1].rotation.x = 0.3; g.children[2].position.y = 1.66; g.children[3].position.y = 1.62;
+      g.userData.tail.rotation.x = -1.2;                                      // the white flag up
+    } else {
+      if(a.fly){ a.vy = Math.max(0.6, a.vy - dt*0.5); a.y += a.vy*dt; const f = Math.sin(a.t*26)*0.9; g.userData.wl.rotation.z = f; g.userData.wr.rotation.z = -f; }
+      else if(Math.random() < dt*6) ripple(a.x, a.w, a.z, 0.15, 0.9, 0.35, 1.2);
+      a.x += a.vx*dt; a.z += a.vz*dt;
+      if(!a.fly && waterTop(a.x, a.z) === null){ a.x -= a.vx*dt; a.z -= a.vz*dt; a.vx *= -0.5; a.vz *= -0.5; }
+      g.position.set(a.x, a.fly ? a.y : a.w + Math.sin(a.ph*6)*0.02, a.z);
+      if(a.fly && a.t < 0.3 && Math.random() < 0.5) ripple(a.x, a.w, a.z, 0.2, 1.5, 0.5, 1.2);
+    }
+  }
+}
+
+/* ---- fireflies: at night, drifting and blinking over the verges, stirred into spirals as a car goes through ---- */
+const FIRE = { pts:null, n:520, p:null };
+function makeFireflies(){
+  const n = FIRE.n, geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(n*3), 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(n*3), 3).setUsage(THREE.DynamicDrawUsage));
+  FIRE.pts = new THREE.Points(geo, new THREE.PointsMaterial({size:0.8, map:softDot(), vertexColors:true, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, fog:true}));
+  FIRE.pts.frustumCulled = false; FIRE.pts.userData.noCull = true; scene.add(FIRE.pts);
+  FIRE.p = Array.from({length:n}, ()=> ({hx:0, hy:-999, hz:0, dx:0, dy:0, dz:0, vx:0, vy:0, vz:0, ph:Math.random()*20, sp:lr(0.6, 1.4), blink:lr(0.3, 0.9)}));
+}
+function homeFirefly(f){
+  for(let k = 0; k < 6; k++){
+    const i = wrapIdx(MAIN, state.idx + Math.round(lr(-30, 110)/MAIN.seg)), p = MAIN.pts[i], t = MAIN.tans[i], sd = Math.random() < 0.5 ? -1 : 1;
+    const off = MAIN.half[i] + lr(-1, 18), x = p.x - t.z*sd*off, z = p.z + t.x*sd*off;
+    if(deckAt(x, z) !== null) continue;
+    const w = waterTop(x, z); f.hx = x; f.hz = z; f.hy = (w !== null ? w : surfaceY(x, z)) + lr(0.4, 2.6); f.dx = f.dy = f.dz = f.vx = f.vy = f.vz = 0; return;
+  }
+}
+function stepFireflies(dt, cars){
+  const on = CONDV.tod === 3 && !WINTER && !DESERT && LIFE.ok;
+  if(!on){ if(FIRE.pts) FIRE.pts.visible = false; return; }
+  if(!FIRE.pts) makeFireflies();
+  FIRE.pts.visible = true;
+  const P = FIRE.pts.geometry.attributes.position.array, C = FIRE.pts.geometry.attributes.color.array, t = LIFE.t;
+  for(let i = 0; i < FIRE.n; i++){
+    const f = FIRE.p[i];
+    if(f.hy < -900 || (f.hx - pose.x)**2 + (f.hz - pose.z)**2 > 140*140) homeFirefly(f);
+    // the wake: pushed out of the car's way and round, so they spiral off its sides and settle again
+    for(const c of cars){ const ex = f.hx + f.dx - c[0], ez = f.hz + f.dz - c[1], d2 = ex*ex + ez*ez;
+      if(d2 < 49 && c[5] > 2){ const d = Math.sqrt(d2) || 1, k = (1 - d/7)*Math.min(1.5, c[5]/12)*dt*26, sv = c[5] ? 1/c[5] : 0;
+        const side = Math.sign(ex*c[4]*sv - ez*c[3]*sv) || 1;
+        f.vx += (ex/d*0.8 + c[3]*sv*0.6 + (-ez/d)*side*0.9)*k; f.vz += (ez/d*0.8 + c[4]*sv*0.6 + (ex/d)*side*0.9)*k; f.vy += k*0.7; } }
+    f.vx += -f.dx*dt*1.4; f.vy += -f.dy*dt*1.4; f.vz += -f.dz*dt*1.4;
+    const damp = 1 - Math.min(1, dt*1.6); f.vx *= damp; f.vy *= damp; f.vz *= damp;
+    f.dx += f.vx*dt; f.dy += f.vy*dt; f.dz += f.vz*dt;
+    const w = t*f.sp + f.ph;
+    P[i*3] = f.hx + f.dx + Math.sin(w*0.7)*1.2; P[i*3 + 1] = f.hy + f.dy + Math.sin(w*1.3)*0.35; P[i*3 + 2] = f.hz + f.dz + Math.cos(w*0.6)*1.2;
+    const b = Math.max(0, Math.sin(w*2.2*f.blink + f.ph))**3;
+    C[i*3] = 0.75*b; C[i*3 + 1] = 1.0*b; C[i*3 + 2] = 0.3*b;
+  }
+  FIRE.pts.geometry.attributes.position.needsUpdate = true; FIRE.pts.geometry.attributes.color.needsUpdate = true;
+}
+
+/* ---- dragonflies: over the water they come and keep pace beside you, darting about ---- */
+const DRAG = { list:[], near:0 };
+if(LIFE.ok && WATERS && !WINTER){
+  const wM = new THREE.MeshBasicMaterial({color:0xd8f0ff, transparent:true, opacity:0.45, side:THREE.DoubleSide, depthWrite:false, fog:true});
+  for(let k = 0; k < 5; k++){
+    const g = new THREE.Group(), body = lifeMat([0x2a6ad0, 0x2aa060, 0xc03a2a, 0x3a9ad0, 0x2a6ad0][k]);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.035, 0.42), body); g.add(b);
+    const h = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 4), body); h.position.z = 0.22; g.add(h);
+    const wings = [];
+    for(const [z, w] of [[0.08, 0.3], [-0.02, 0.27]]) for(const s of [1, -1]){ const wg = new THREE.PlaneGeometry(w, 0.06); wg.translate(w/2, 0, 0); wg.rotateX(-Math.PI/2);
+      const m = new THREE.Mesh(wg, wM); m.position.z = z; if(s < 0) m.rotation.y = Math.PI; g.add(m); wings.push(m); }
+    g.visible = false; scene.add(g);
+    DRAG.list.push({g, wings, x:0, y:-99, z:0, vx:0, vy:0, vz:0, ox:0, oy:0, oz:0, retarget:0, on:false, k});
+  }
+}
+function overWaterNear(x, z, h){
+  const s = Math.sin(h), c = Math.cos(h);
+  for(const o of [-7, -3.5, 0, 3.5, 7]){ const w = waterTop(x + c*o, z - s*o); if(w !== null) return w; }
+  return null;
+}
+function stepDragonflies(dt){
+  if(!DRAG.list.length) return;
+  const sp = Math.hypot(pose.vx, pose.vz), w = state.phase === "menu" ? null : overWaterNear(pose.x, pose.z, pose.h);
+  DRAG.near = w !== null ? Math.min(1, DRAG.near + dt*0.8) : Math.max(0, DRAG.near - dt*0.35);
+  const fx = Math.sin(pose.h), fz = Math.cos(pose.h), rx = Math.cos(pose.h), rz = -Math.sin(pose.h);
+  DRAG.list.forEach((d, i)=>{
+    const want = DRAG.near > i*0.18 && sp < 48;
+    if(want && !d.on){ d.on = true; d.g.visible = true; d.x = pose.x + rx*lr(-8, 8) + fx*lr(4, 10); d.z = pose.z + rz*lr(-8, 8) + fz*lr(4, 10); d.y = pose.y + 2; d.vx = pose.vx; d.vz = pose.vz; d.vy = 0; }
+    if(!d.on) return;
+    d.retarget -= dt;
+    if(d.retarget <= 0){ d.retarget = lr(0.25, 0.8); const sd = i % 2 ? 1 : -1; d.ox = sd*lr(1.6, 3.4); d.oy = lr(0.6, 1.9); d.oz = lr(-1.5, 2.5); }
+    let tx, ty, tz;
+    if(want){ tx = pose.x + rx*d.ox + fx*d.oz; tz = pose.z + rz*d.ox + fz*d.oz; ty = pose.y + d.oy; }
+    else { tx = d.x + d.vx; tz = d.z + d.vz; ty = d.y + 3; }                       // peeling off, up and away
+    // darting: hard acceleration toward the spot, then a hover
+    const k = want ? 9 : 2;
+    d.vx += ((tx - d.x)*k + (want ? pose.vx : 0) - d.vx)*Math.min(1, dt*6); d.vz += ((tz - d.z)*k + (want ? pose.vz : 0) - d.vz)*Math.min(1, dt*6); d.vy += ((ty - d.y)*4 - d.vy)*Math.min(1, dt*5);
+    d.x += d.vx*dt; d.y += d.vy*dt; d.z += d.vz*dt;
+    d.g.position.set(d.x, d.y, d.z); d.g.rotation.y = Math.atan2(d.vx - pose.vx*(want ? 0.7 : 0) + fx*0.5, d.vz - pose.vz*(want ? 0.7 : 0) + fz*0.5);
+    const fl = Math.sin(LIFE.t*90 + i)*0.5; d.wings.forEach((m, j)=> m.rotation.z = (j % 2 ? -1 : 1)*fl*(j < 2 ? 1 : 0.8));
+    if(!want && (d.y > pose.y + 14 || Math.hypot(d.x - pose.x, d.z - pose.z) > 60)){ d.on = false; d.g.visible = false; }
+  });
+}
+
+/* ---- fish: a jump now and then wherever there's water deep enough, and a scatter of them out of your splash ---- */
+const FISH = { spots:[], list:[], t:2 };
+if(LIFE.ok && WATERS && !WINTER){
+  for(let i = 0; i < MAIN.N; i += Math.max(1, Math.round(9/MAIN.seg))){
+    const p = MAIN.pts[i], t = MAIN.tans[i];
+    for(const sd of [1, -1]) for(let off = MAIN.half[i] + 3; off < MAIN.half[i] + 46; off += 7){
+      const x = p.x - t.z*sd*off, z = p.z + t.x*sd*off, w = waterTop(x, z);
+      if(w !== null && w - gridH(x, z) > 0.55 && deckAt(x, z) === null) FISH.spots.push([x, w, z]);
+    }
+  }
+  const koi = SPRINGCUP || BLOOM, C = koi ? [0xf07a1e, 0xf2efe6, 0xe04a1a, 0xf0c030] : SWAMPGP || JUNGLE ? [0x4a4a3a, 0x5a5440] : [0x9aa4a8, 0x8a8a6a, 0xa8b0b4];
+  for(let k = 0; k < 6; k++){
+    const g = new THREE.Group(), M = lifeMat(C[k % C.length]);
+    const b = new THREE.Mesh(new THREE.SphereGeometry(0.12, 7, 5), M); b.scale.set(0.75, 0.9, 2.4); g.add(b);
+    const tg = new THREE.BufferGeometry(); tg.setAttribute("position", new THREE.Float32BufferAttribute([0, 0, -0.26, 0, 0.13, -0.44, 0, -0.13, -0.44], 3)); tg.computeVertexNormals();
+    const tail = new THREE.Mesh(tg, new THREE.MeshLambertMaterial({color:C[k % C.length], side:THREE.DoubleSide})); g.add(tail);
+    g.scale.setScalar(koi ? 1.4 : 1.1); g.visible = false; scene.add(g);
+    FISH.list.push({g, tail, x:0, y:0, z:0, vx:0, vy:0, vz:0, w:0, on:false, t:0});
+  }
+}
+function fishJump(s, away){
+  const f = FISH.list.find(q=> !q.on); if(!f) return;
+  const a = away !== undefined ? away + lr(-0.6, 0.6) : Math.random()*6.28, h = lr(1.5, 3.5);
+  f.on = true; f.t = 0; f.x = s[0]; f.z = s[2]; f.w = s[1]; f.y = s[1] - 0.1;
+  f.vx = Math.sin(a)*h; f.vz = Math.cos(a)*h; f.vy = lr(3.2, 5.2); f.g.visible = true;
+  ripple(f.x, f.w, f.z, 0.15, 1.6, 0.5, 1.3);
+  for(let k = 0; k < 5; k++) spawnDust(f.x, f.w + 0.05, f.z, 2, 0.2, f.vx*0.3, f.vz*0.3, lr(1.5, 3));
+}
+function stepFish(dt, splashing){
+  if(!FISH.list.length || !FISH.spots.length || state.phase === "menu") return;
+  FISH.t -= dt;
+  const near = r => FISH.spots.filter(s=> { const d = Math.hypot(s[0] - pose.x, s[2] - pose.z); return d > r[0] && d < r[1]; });
+  if(FISH.t <= 0){ FISH.t = lr(0.6, 2.2); const L = near([12, 75]); if(L.length) fishJump(L[Math.floor(Math.random()*L.length)]); }
+  // your splash: the fish nearby shoot off out of it
+  if(splashing && Math.random() < dt*3){ const L = near([2, 14]); if(L.length){ const s = L[Math.floor(Math.random()*L.length)]; fishJump(s, Math.atan2(s[0] - pose.x, s[2] - pose.z)); } }
+  for(const f of FISH.list){
+    if(!f.on) continue;
+    f.t += dt; f.vy -= 9.8*dt; f.x += f.vx*dt; f.y += f.vy*dt; f.z += f.vz*dt;
+    f.g.position.set(f.x, f.y, f.z); f.g.rotation.order = "YXZ"; f.g.rotation.set(-Math.atan2(f.vy, Math.hypot(f.vx, f.vz)), Math.atan2(f.vx, f.vz), 0);
+    f.tail.rotation.y = Math.sin(f.t*30)*0.5;
+    if(f.y < f.w - 0.15 && f.vy < 0){
+      f.on = false; f.g.visible = false; ripple(f.x, f.w, f.z, 0.2, 1.8, 0.6, 1.5);
+      for(let k = 0; k < 6; k++) spawnDust(f.x, f.w + 0.05, f.z, 2, 0.3, 0, 0, lr(1.5, 3.5));
+      if(actx && Math.hypot(f.x - pose.x, f.z - pose.z) < 40) burst(0.18, "bandpass", 1400, 0.05, 1.2, 0, 600);
+    }
+  }
+}
+
+/* ---- every frame ---- */
+const LIFE_PUSH = { hist:[], t:0 };
+function stepLife(dt){
+  if(!LIFE.ok) return;
+  LIFE.t += dt;
+  const cars = lifeCars(), racing = state.phase === "racing" || state.phase === "done" || state.phase === "countdown";
+  stepRipples(dt);
+  // the grass: pushed by each car, and where yours was in the last half second
+  { const P = GRASS_PUSH.value; LIFE_PUSH.t -= dt;
+    if(LIFE_PUSH.t <= 0){ LIFE_PUSH.t = 0.12; LIFE_PUSH.hist.unshift([pose.x, pose.z]); LIFE_PUSH.hist.length = Math.min(LIFE_PUSH.hist.length, 4); }
+    for(let i = 0; i < 8; i++) P[i].z = 0;
+    let k = 0;
+    cars.forEach(c=>{ if(k < 4 && !c[8]) P[k++].set(c[0], c[1], 1.15, 3.1); });
+    LIFE_PUSH.hist.forEach((h, j)=>{ if(k < 8 && !pose.air) P[k++].set(h[0], h[1], 0.9 - j*0.2, 3.0); }); }
+  if(racing){
+    // the wheels: tracks, splashes and the dust they leave hanging
+    cars.forEach((c, ci)=>{
+      const s = Math.sin(c[6]), co = Math.cos(c[6]), rx = co, rz = -s;
+      if(!c[8]) for(const sd of [1, -1]){ const wx = c[0] + rx*sd*0.78 - s*1.3, wz = c[1] + rz*sd*0.78 - co*1.3; layTrack(ci*2 + (sd > 0 ? 0 : 1), wx, wz, c[2]); }
+      else TYRE.last.delete(ci*2), TYRE.last.delete(ci*2 + 1);
+      if(c[8] || c[5] < 6) return;
+      // a puddle in the rain
+      if(CONDV.wet){
+        const key = "spl" + ci; LIFE[key] = (LIFE[key] || 0) - dt;
+        if(LIFE[key] <= 0){ for(const sd of [1, -1]){ const wx = c[0] + rx*sd*0.8, wz = c[1] + rz*sd*0.8;
+            if(puddleAt(wx, wz) > 0.4){ wheelSplash(wx, surfaceY(wx, wz), wz, c[3], c[4], c[5], rx*sd, rz*sd, c[7]); LIFE[key] = 0.18; } } }
+      }
+      // standing water, wading: rings spreading behind
+      const wt = waterTop(c[0], c[1]);
+      if(wt !== null && Math.abs(wt - c[2]) < 1.2 && Math.random() < dt*10) ripple(c[0] - s*1.6, wt, c[1] - co*1.6, 0.6, 3 + c[5]*0.08, 0.45, 1.8);
+      // dust hanging in the air on a dry day: from dirt and sand, not mud, snow, tar or the wet
+      if(!CONDV.wet && !WINTER && !SWAMPGP && !JUNGLE && wt === null && c[5] > 11){
+        const hk = "hz" + ci; LIFE[hk] = (LIFE[hk] || 0) - dt;
+        if(LIFE[hk] <= 0){ LIFE[hk] = 0.055;
+          const n = nearest(c[0], c[1]);
+          if(n.surf !== SURF.MUD && n.surf !== SURF.WATER && pavedAt(c[0], c[1]) < 0.3 && deckAt(c[0], c[1]) === null){
+            // (dust isn't lit by anything: it takes the light of the hour by hand, or at night it would glow)
+            const L = unlitLevel(), col = (DESERT ? [0.86, 0.72, 0.52] : FALL ? [0.72, 0.62, 0.48] : [0.78, 0.72, 0.6]).map(v=> v*L);
+            spawnHaze(c[0] - s*2.4, c[2] + 0.6, c[1] - co*2.4, c[3], c[4], (DESERT ? 0.36 : 0.24)*Math.min(1, (c[5] - 9)/18)*(CONDV.tod === 3 ? 0.5 : 1), col); } }
+      }
+    });
+    flushTracks();
+  }
+  stepAnimals(dt, cars);
+  stepFireflies(dt, cars);
+  stepDragonflies(dt);
+  const wt = waterTop(pose.x, pose.z);
+  stepFish(dt, wt !== null && Math.abs(wt - pose.y) < 1.2 && Math.hypot(pose.vx, pose.vz) > 6);
+}
+function resetLife(){
+  TYRE.last.clear(); TYRE.head = 0;
+  for(const M of [TYRE.strong, TYRE.faint]){ if(!M) continue; const z = new THREE.Matrix4().makeScale(0, 0, 0); for(let i = 0; i < TRACKS_N; i++) M.setMatrixAt(i, z); M.instanceMatrix.updateRange.offset = 0; M.instanceMatrix.updateRange.count = -1; M.instanceMatrix.needsUpdate = true; }
+  ANIM.list.forEach(a=> scene.remove(a.g)); ANIM.list.length = 0; ANIM.spawnT = 1.5;
+  FISH.list.forEach(f=>{ f.on = false; f.g.visible = false; });
+  DRAG.list.forEach(d=>{ d.on = false; d.g.visible = false; }); DRAG.near = 0;
+  RIPPLE.forEach(R=> R.m.visible = false);
+  if(FIRE.p) FIRE.p.forEach(f=> f.hy = -999);
 }
 function stepDust(dt){
   for(let i=0;i<DUST;i++){
@@ -25902,11 +26367,20 @@ function stepDust(dt){
       dustPos[i*3]   += dustVel[i*3]*dt;
       dustPos[i*3+1] += dustVel[i*3+1]*dt;
       dustPos[i*3+2] += dustVel[i*3+2]*dt;
+      if(dustHaze[i]){
+        // haze: eases to the breeze's drift and hangs there, rising a little, thinning out as it goes
+        const k = Math.min(1, dt*0.7);
+        dustVel[i*3] += (CRIT.wind[0]*0.8 - dustVel[i*3])*k; dustVel[i*3+2] += (CRIT.wind[1]*0.8 - dustVel[i*3+2])*k;
+        dustVel[i*3+1] += (0.12 - dustVel[i*3+1])*k;
+        dustSize[i] += dt*dustGrow[i];
+        dustAlpha[i] = Math.max(0, Math.min(1, dustLife[i]/1.8))*0.85*dustAK[i];
+      } else {
       dustVel[i*3]   *= (1 - dt*1.9);
       dustVel[i*3+2] *= (1 - dt*1.9);
       dustVel[i*3+1] -= dustGrav[i]*dt;
       dustSize[i]    += dt*dustGrow[i];
-      dustAlpha[i]    = Math.max(0, Math.min(1, dustLife[i]))*0.85;
+      dustAlpha[i]    = Math.max(0, Math.min(1, dustLife[i]))*0.85*dustAK[i];
+      }
       if(dustLife[i] <= 0){ dustPos[i*3+1] = -999; dustAlpha[i] = 0; }
     }
   }
@@ -25982,7 +26456,7 @@ function frame(now){
     stepRivals(dt);
     netFrame(simDt);
     stepLeafPiles(dt);
-    stepCritters(dt);
+    stepCritters(dt); stepLife(dt);
     stepLava(dt);
     if(state.phase === "racing" || state.phase === "done") state.place = computePlace();
     else if(state.phase === "countdown" && MODE === "online") state.place = (NET.slot |0) + 1;     // on the grid: your slot
