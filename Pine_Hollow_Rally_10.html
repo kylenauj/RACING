@@ -564,6 +564,8 @@ const scene = new THREE.Scene();
    back up behind you): x, z, strength, reach; and one circle round all of them, outside which a blade skips it */
 const GRASS_PUSH = { value: Array.from({length:8}, ()=> new THREE.Vector4(0, 0, 0, 1)) };
 const GRASS_PUSHB = { value: new THREE.Vector4(0, 0, 0, 0) };
+// (the light of the hour on the dust, smoke and spray: set with the conditions, see dust below)
+const FX_LIGHT = { value: new THREE.Color(1, 1, 1) };
 const SKY = new THREE.Color(0xa9d6f2);          // horizon haze, matched by the dome
 scene.background = SKY;
 scene.fog = new THREE.Fog(0xb4d8ee, 220, 1100); // linear, so the range stays readable
@@ -7014,7 +7016,8 @@ function applyConditions(tod, wx, quiet){
     POST_K.sun = tod === 3 || wx ? 0 : 1;
   }
   { const k = unlitLevel(), warm = tod === 2 ? [1.08, 0.9, 0.78] : tod === 1 ? [1.04, 0.92, 0.94] : tod === 3 ? [0.8, 0.9, 1.25] : [1, 1, 1];
-    UNLIT.forEach(([c, c0])=> c.setRGB(c0.r*k*warm[0], c0.g*k*warm[1], c0.b*k*warm[2])); }
+    UNLIT.forEach(([c, c0])=> c.setRGB(c0.r*k*warm[0], c0.g*k*warm[1], c0.b*k*warm[2]));
+    FX_LIGHT.value.setRGB(k*warm[0], k*warm[1], k*warm[2]); }
   repaintSky(); rebuildEnv();
   RAIN.on = wx > 0; RAIN.snow = wx === 2; RAIN.made || makeRain();
   RAIN.pts.visible = RAIN.on;
@@ -19320,13 +19323,11 @@ const rivals = (TRACK.test ? [] : rivalDefs).map((d,i)=>{
 });
 
 /* dust */
-const DUST = 2600;                 // a held drift alone burns through several hundred (and the haze hangs about)
+const DUST = 4200;                 // a held drift alone burns through several hundred (and the haze hangs about, and every car throws spray)
 const dustPos = new Float32Array(DUST*3);
 const dustVel = new Float32Array(DUST*3);
 const dustLife = new Float32Array(DUST);
 for(let i=0;i<DUST;i++){ dustPos[i*3+1] = -999; }
-const dustGeo = new THREE.BufferGeometry();
-dustGeo.setAttribute("position", new THREE.BufferAttribute(dustPos,3));
 const dustAlpha = new Float32Array(DUST);
 const dustSize  = new Float32Array(DUST);
 const dustCol   = new Float32Array(DUST*3);
@@ -19334,26 +19335,91 @@ const dustGrav  = new Float32Array(DUST).fill(5.2);   // water falls, smoke and 
 const dustGrow  = new Float32Array(DUST).fill(2.2);
 const dustAK    = new Float32Array(DUST).fill(1);     // how thick (the haze is thin)
 const dustHaze  = new Uint8Array(DUST);               // hangs in the air and drifts with the wind instead of settling
-dustGeo.setAttribute("aAlpha", new THREE.BufferAttribute(dustAlpha,1).setUsage(THREE.DynamicDrawUsage));
-dustGeo.setAttribute("aSize",  new THREE.BufferAttribute(dustSize,1).setUsage(THREE.DynamicDrawUsage));
-dustGeo.setAttribute("aCol",   new THREE.BufferAttribute(dustCol,3).setUsage(THREE.DynamicDrawUsage));
-const dust = new THREE.Points(dustGeo, new THREE.ShaderMaterial({
+/* ---- how the dust, smoke, spray and the rest are drawn ----
+   Each particle a little card turned to face the camera, cut from a sheet of eight hand-drawn kinds: a smoke
+   puff, a grainy dust puff, a water drop, a streak of spray, a mud clod, a spark, a puff of snow, a wisp of mist.
+   The puffs and clods turn as they go; the spray and the sparks are drawn as streaks stretched along the way
+   they're flying, longer the faster. They take the light of the hour (a puff of dust at dusk is dusk-coloured,
+   at night it's dark) and the fog; the sparks burn on their own. */
+const dustTile = new Float32Array(DUST).fill(1), dustRot = new Float32Array(DUST), dustSpin = new Float32Array(DUST);
+const dustDrag = new Float32Array(DUST).fill(1.9);     // (spray and clods fly; dust and smoke are held by the air)
+const FXTEX = (()=>{
+  const cv = document.createElement("canvas"); cv.width = 256; cv.height = 128; const g = cv.getContext("2d");
+  const tile = (k, draw)=>{ g.save(); g.translate((k % 4)*64, Math.floor(k/4)*64); g.beginPath(); g.rect(0, 0, 64, 64); g.clip(); draw(g); g.restore(); };
+  const blob = (x, y, r, a, light)=>{ const gr = g.createRadialGradient(x - r*0.25, y - r*0.3, r*0.1, x, y, r);
+    gr.addColorStop(0, "rgba(" + light + "," + light + "," + light + "," + a + ")"); gr.addColorStop(0.6, "rgba(" + (light*0.8|0) + "," + (light*0.8|0) + "," + (light*0.8|0) + "," + a*0.7 + ")");
+    gr.addColorStop(1, "rgba(150,150,150,0)"); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); };
+  // 0 smoke: a puff built of overlapping soft lobes, lit from above
+  tile(0, ()=>{ for(let i = 0; i < 9; i++){ const a = Math.random()*6.28, d = Math.random()*13; blob(32 + Math.cos(a)*d, 33 + Math.sin(a)*d*0.8, 13 + Math.random()*8, 0.55, 235 + Math.random()*20 | 0); } });
+  // 1 dust: a ragged, grainy puff
+  tile(1, ()=>{ for(let i = 0; i < 6; i++){ const a = Math.random()*6.28, d = Math.random()*12; blob(32 + Math.cos(a)*d, 33 + Math.sin(a)*d, 12 + Math.random()*8, 0.5, 225); }
+    const im = g.getImageData(0, 0, 64, 64); for(let p = 3; p < im.data.length; p += 4) im.data[p] *= 0.55 + Math.random()*0.6; g.putImageData(im, 0, 0); });
+  // 2 a water drop: a bright bead with a glint
+  tile(2, ()=>{ const gr = g.createRadialGradient(32, 32, 2, 32, 32, 16); gr.addColorStop(0, "rgba(255,255,255,0.95)"); gr.addColorStop(0.5, "rgba(225,235,245,0.7)"); gr.addColorStop(1, "rgba(200,215,230,0)");
+    g.fillStyle = gr; g.beginPath(); g.arc(32, 32, 16, 0, 7); g.fill(); g.fillStyle = "rgba(255,255,255,1)"; g.beginPath(); g.arc(27, 26, 3, 0, 7); g.fill(); });
+  // 3 a streak of spray: a long soft bar with a bright core and a few beads trailing off it
+  tile(3, ()=>{ const gr = g.createLinearGradient(20, 0, 44, 0); gr.addColorStop(0, "rgba(220,230,240,0)"); gr.addColorStop(0.5, "rgba(250,252,255,0.85)"); gr.addColorStop(1, "rgba(220,230,240,0)");
+    g.fillStyle = gr; g.beginPath(); g.ellipse(32, 32, 9, 28, 0, 0, 7); g.fill();
+    for(let i = 0; i < 6; i++){ g.fillStyle = "rgba(255,255,255,0.8)"; g.beginPath(); g.arc(32 + (Math.random() - 0.5)*14, 10 + Math.random()*44, 1.5 + Math.random()*1.5, 0, 7); g.fill(); } });
+  // 4 a mud clod: a lumpy dark blob with a wet glint
+  tile(4, ()=>{ g.fillStyle = "rgba(170,170,170,1)"; g.beginPath(); for(let i = 0; i <= 10; i++){ const a = i/10*6.28, r = 15 + Math.random()*7; g.lineTo(32 + Math.cos(a)*r, 32 + Math.sin(a)*r); } g.fill();
+    const gr = g.createRadialGradient(26, 24, 1, 32, 32, 22); gr.addColorStop(0, "rgba(255,255,255,0.5)"); gr.addColorStop(1, "rgba(0,0,0,0.35)"); g.globalCompositeOperation = "source-atop"; g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    g.fillStyle = "rgba(255,255,255,0.9)"; g.beginPath(); g.arc(25, 23, 2.5, 0, 7); g.fill(); });
+  // 5 a spark: a thin white-hot line
+  tile(5, ()=>{ const gr = g.createLinearGradient(26, 0, 38, 0); gr.addColorStop(0, "rgba(255,255,255,0)"); gr.addColorStop(0.5, "rgba(255,255,255,1)"); gr.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = gr; g.beginPath(); g.ellipse(32, 32, 4, 29, 0, 0, 7); g.fill(); });
+  // 6 snow: a soft round puff with crystals glinting in it
+  tile(6, ()=>{ for(let i = 0; i < 6; i++){ const a = Math.random()*6.28, d = Math.random()*10; blob(32 + Math.cos(a)*d, 32 + Math.sin(a)*d, 13 + Math.random()*6, 0.6, 250); }
+    for(let i = 0; i < 14; i++){ g.fillStyle = "rgba(255,255,255,0.95)"; g.fillRect(14 + Math.random()*36, 14 + Math.random()*36, 1.5, 1.5); } });
+  // 7 mist: the softest thing there is
+  tile(7, ()=>{ const gr = g.createRadialGradient(32, 32, 0, 32, 32, 31); gr.addColorStop(0, "rgba(240,240,240,0.55)"); gr.addColorStop(1, "rgba(240,240,240,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); });
+  const t = new THREE.CanvasTexture(cv); t.anisotropy = 2; return t;
+})();
+const dustQuad = new THREE.PlaneGeometry(1, 1);
+const dustIG = new THREE.InstancedBufferGeometry();
+dustIG.index = dustQuad.index; dustIG.setAttribute("position", dustQuad.attributes.position);
+dustIG.setAttribute("iPos",  new THREE.InstancedBufferAttribute(dustPos, 3).setUsage(THREE.DynamicDrawUsage));
+dustIG.setAttribute("iVel",  new THREE.InstancedBufferAttribute(dustVel, 3).setUsage(THREE.DynamicDrawUsage));
+dustIG.setAttribute("aAlpha", new THREE.InstancedBufferAttribute(dustAlpha, 1).setUsage(THREE.DynamicDrawUsage));
+dustIG.setAttribute("aSize",  new THREE.InstancedBufferAttribute(dustSize, 1).setUsage(THREE.DynamicDrawUsage));
+dustIG.setAttribute("aCol",   new THREE.InstancedBufferAttribute(dustCol, 3).setUsage(THREE.DynamicDrawUsage));
+dustIG.setAttribute("aTile",  new THREE.InstancedBufferAttribute(dustTile, 1).setUsage(THREE.DynamicDrawUsage));
+dustIG.setAttribute("aRot",   new THREE.InstancedBufferAttribute(dustRot, 1).setUsage(THREE.DynamicDrawUsage));
+dustIG.instanceCount = DUST;
+const dust = new THREE.Mesh(dustIG, new THREE.ShaderMaterial({
+  uniforms: { uTex:{value:FXTEX}, uLight:FX_LIGHT, fogColor:{value:scene.fog.color}, fogNear:{value:scene.fog.near}, fogFar:{value:scene.fog.far} },
   vertexShader: [
-    "attribute float aAlpha; attribute float aSize; attribute vec3 aCol;",
-    "varying float vA; varying vec3 vC;",
+    "attribute vec3 iPos, iVel, aCol; attribute float aSize, aAlpha, aTile, aRot;",
+    "varying vec2 vUv; varying float vA, vTile, vD; varying vec3 vC;",
     "void main(){",
-    "  vA = aAlpha; vC = aCol;",
-    "  vec4 mv = modelViewMatrix * vec4(position, 1.0);",
-    "  gl_PointSize = aSize * (120.0 / max(1.0, -mv.z));",
-    "  gl_Position = projectionMatrix * mv;",
+    "  vA = aAlpha; vC = aCol; vTile = floor(aTile + 0.5);",
+    "  vec4 mv = viewMatrix*vec4(iPos, 1.0);",
+    "  float s = aSize*0.24; vec2 q = position.xy, off;",
+    // the spray and the sparks: stretched along the way they're going, as it looks from here
+    "  if(vTile == 3.0 || vTile == 5.0){",
+    "    vec2 d = (viewMatrix*vec4(iVel, 0.0)).xy; float L = length(d);",
+    "    vec2 dir = L > 0.05 ? d/L : vec2(0.0, 1.0), nrm = vec2(-dir.y, dir.x);",
+    "    float st = 1.0 + min(L*0.16, 5.0);",
+    "    off = (dir*q.y*st + nrm*q.x*(vTile == 5.0 ? 0.25 : 0.4))*s;",
+    "  } else { float c = cos(aRot), sn = sin(aRot); off = vec2(q.x*c - q.y*sn, q.x*sn + q.y*c)*s; }",
+    "  mv.xy += off; vD = -mv.z;",
+    "  vUv = vec2((mod(vTile, 4.0) + q.x + 0.5)*0.25, 1.0 - (floor(vTile/4.0) + 0.5 - q.y)*0.5);",
+    "  gl_Position = projectionMatrix*mv;",
     "}"
   ].join("\n"),
   fragmentShader: [
-    "varying float vA; varying vec3 vC;",
+    "uniform sampler2D uTex; uniform vec3 uLight, fogColor; uniform float fogNear, fogFar;",
+    "varying vec2 vUv; varying float vA, vTile, vD; varying vec3 vC;",
     "void main(){",
-    "  float d = length(gl_PointCoord - 0.5);",
-    "  if(d > 0.5 || vA <= 0.01) discard;",
-    "  gl_FragColor = vec4(vC, vA * (1.0 - d*2.0) * 0.42);",
+    "  if(vA <= 0.01) discard;",
+    "  vec4 t = texture2D(uTex, vUv);",
+    "  float a = t.a*vA*0.78; if(a < 0.008) discard;",
+    "  vec3 col;",
+    "  if(vTile == 5.0) col = vC*1.6;",                                                   // sparks burn by themselves
+    "  else if(vTile == 2.0 || vTile == 3.0) col = vC*mix(uLight, vec3(1.0), 0.25) + t.rgb*0.25*uLight;",   // water: catches what light there is
+    "  else col = vC*t.rgb*uLight*1.15;",
+    "  col = mix(col, fogColor, smoothstep(fogNear, fogFar, vD)*(vTile == 5.0 ? 0.4 : 1.0));",
+    "  gl_FragColor = vec4(col, a);",
     "}"
   ].join("\n"),
   transparent:true, depthWrite:false
@@ -19363,7 +19429,7 @@ const dust = new THREE.Points(dustGeo, new THREE.ShaderMaterial({
 // the whole system every frame. This is why no smoke or spray ever appeared.
 dust.frustumCulled = false;
 dust.renderOrder = 5;             // after the water, so spray and clods show over it
-dustGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 4000);
+dustIG.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 4000);
 scene.add(dust);
 let dustHead = 0;
 /* dust that hangs: a thin, wide cloud left in the air behind a car on dry dirt, that drifts off on the breeze
@@ -19373,7 +19439,7 @@ function spawnHaze(x, y, z, vx, vz, k, col){
   dustPos[i*3] = x + (Math.random() - 0.5)*1.2; dustPos[i*3+1] = y; dustPos[i*3+2] = z + (Math.random() - 0.5)*1.2;
   dustVel[i*3] = vx*0.18 + (Math.random() - 0.5)*1.2; dustVel[i*3+1] = 0.5 + Math.random()*0.6; dustVel[i*3+2] = vz*0.18 + (Math.random() - 0.5)*1.2;
   dustLife[i] = 3.5 + Math.random()*2.5; dustSize[i] = 6 + Math.random()*4; dustGrav[i] = 0; dustGrow[i] = 3.2;
-  dustAK[i] = k; dustHaze[i] = 1;
+  dustAK[i] = k; dustHaze[i] = 1; dustDrag[i] = 1.9; dustTile[i] = Math.random() < 0.5 ? 7 : 1; dustRot[i] = Math.random()*6.28; dustSpin[i] = (Math.random() - 0.5)*0.3;
   const g2 = 0.9 + Math.random()*0.15; dustCol[i*3] = col[0]*g2; dustCol[i*3+1] = col[1]*g2; dustCol[i*3+2] = col[2]*g2;
 }
 function spawnDust(x,y,z,sandy,force,vx,vz,lift){
@@ -19385,10 +19451,11 @@ function spawnDust(x,y,z,sandy,force,vx,vz,lift){
   dustLife[i]=0.8+Math.random()*0.7 + force*0.4;
   dustSize[i]=0.8+Math.random()*1.3 + force*0.6;
   dustGrav[i]=5.2; dustGrow[i]=2.2; dustAK[i]=1; dustHaze[i]=0;
+  dustTile[i]=1; dustRot[i]=Math.random()*6.28; dustSpin[i]=(Math.random()-0.5)*1.2; dustDrag[i]=1.9;
   const j=i*3;
   if(Array.isArray(sandy)){                       // drift sparks carry their tier colour
     dustCol[j]=sandy[0]; dustCol[j+1]=sandy[1]; dustCol[j+2]=sandy[2];
-    dustSize[i]*=0.5; dustLife[i]*=0.5;
+    dustSize[i]*=0.5; dustLife[i]*=0.5; dustTile[i]=5;
   }
   else if(sandy && sandy.tint){                   // coloured drift smoke
     // the level's own colour, strongly: blue, then orange, then violet
@@ -19396,31 +19463,31 @@ function spawnDust(x,y,z,sandy,force,vx,vz,lift){
     dustCol[j]   = Math.min(1, (g2*(1-m) + c[0]*m)*b);
     dustCol[j+1] = Math.min(1, (g2*(1-m) + c[1]*m)*b);
     dustCol[j+2] = Math.min(1, (g2*(1-m) + c[2]*m)*b);
-    dustSize[i]*=1.7; dustLife[i]*=1.3;
+    dustSize[i]*=1.7; dustLife[i]*=1.3; dustTile[i]=0;
   }
   else if(sandy === 5){                           // clods of thick mud
     const g2 = 0.8 + Math.random()*0.3;
     dustCol[j]=0.40*g2; dustCol[j+1]=0.29*g2; dustCol[j+2]=0.17*g2;
     dustSize[i] = 1.2 + Math.random()*1.0 + force*0.8; dustLife[i] = 0.8 + Math.random()*0.5;
-    dustGrav[i] = 16; dustGrow[i] = 0.1;
+    dustGrav[i] = 16; dustGrow[i] = 0.1; dustTile[i] = 4; dustSpin[i] = (Math.random()-0.5)*14; dustSize[i] *= 0.7;
     dustVel[i*3+1] = (lift === undefined ? 3 : lift)*(0.6 + Math.random()*0.7);
   }
   else if(sandy === 4){                           // powder snow
     const g2 = 0.9 + Math.random()*0.1;
     dustCol[j]=g2*0.95; dustCol[j+1]=g2*0.97; dustCol[j+2]=g2;
-    dustSize[i]*=0.9; dustLife[i]*=0.9; dustGrav[i]=2.2;
+    dustSize[i]*=0.9; dustLife[i]*=0.9; dustGrav[i]=2.2; dustTile[i]=6;
   }
   else if(sandy === 3){                           // tyre smoke
     const g2 = 0.72 + Math.random()*0.16;
     dustCol[j]=g2; dustCol[j+1]=g2; dustCol[j+2]=g2*0.98;
-    dustSize[i]*=1.45; dustLife[i]*=1.05;
+    dustSize[i]*=1.45; dustLife[i]*=1.05; dustTile[i]=0;
   }
   else if(sandy === 6){                           // a sheet of water off a puddle: big drops thrown high and wide
     const g2 = 0.9 + Math.random()*0.1;
     dustCol[j]=0.82*g2; dustCol[j+1]=0.9*g2; dustCol[j+2]=0.97*g2;
     dustVel[i*3+1] = (lift===undefined?4:lift)*(0.7+Math.random()*0.6);
     dustSize[i] = 1.3 + Math.random()*1.3; dustLife[i] = 0.7 + Math.random()*0.5;
-    dustGrav[i] = 11; dustGrow[i] = 1.4;
+    dustGrav[i] = 11; dustGrow[i] = 1.4; dustTile[i] = Math.random() < 0.6 ? 3 : 2;
   }
   else if(sandy === 2){
     /* water: a spray of drops thrown back off the tyre that falls again,
@@ -19428,12 +19495,12 @@ function spawnDust(x,y,z,sandy,force,vx,vz,lift){
     dustCol[j]=0.80; dustCol[j+1]=0.89; dustCol[j+2]=0.95;
     dustVel[i*3+1] = (lift===undefined?0.8:lift)*(0.6+Math.random()*0.8) + force*0.12;
     dustSize[i] = 0.6 + Math.random()*0.6; dustLife[i] = 0.5 + Math.random()*0.35;
-    dustGrav[i] = 13; dustGrow[i] = 0.5;
+    dustGrav[i] = 13; dustGrow[i] = 0.5; dustTile[i] = Math.random() < 0.7 ? 3 : 2;
   }
   else if(CONDV.wet && sandy !== 5){                 // in the rain: not dust but a grey mist of spray off the wet road
     const g2 = 0.74 + Math.random()*0.1;
     dustCol[j]=g2; dustCol[j+1]=g2*1.03; dustCol[j+2]=g2*1.08;
-    dustSize[i]*=0.75; dustLife[i]*=0.55; dustGrow[i]=2.6; dustGrav[i]=1.2;
+    dustSize[i]*=0.75; dustLife[i]*=0.55; dustGrow[i]=2.6; dustGrav[i]=1.2; dustTile[i]=7;
   }
   else if(sandy){
     if(WINTER){ dustCol[j]=0.86; dustCol[j+1]=0.89; dustCol[j+2]=0.93; }
@@ -21584,7 +21651,14 @@ function stepCarInner(dt){
   const latAcc = yawRate * sp;
   const hardTurn = !onFloor && !pose.air && latAcc > 5.0 && sp > 6;
   const wading = (inWater || inMud) && sp > 3;
-  if(working || wading){
+  // through water or mud: a proper rooster tail off each back wheel (and a bow wave off the front in water)
+  const roosting = !pose.air && sp > 3 && (inWater || (inMud && !WINTER && !DESERT));
+  if(roosting){
+    wheelFx([pose.x, pose.z, pose.y, pose.vx, pose.vz, sp, pose.h, true, false], inWater ? "water" : "mud", 1, inWater);
+    if(inWater) splash.water = Math.min(1, splash.water + sp*dt*0.10);
+    if(inMud)   splash.mud   = Math.min(1, splash.mud   + sp*dt*0.05);
+  }
+  if((working || wading) && !roosting){
     const force = Math.min(3.0, slid*0.22 + sp*0.03 + (inWater ? sp*0.11 : wading ? sp*0.05 : 0));
     // mud comes off in clods (slush in the snow, sand in the desert)
     const kind = inWater ? 2 : inMud ? (WINTER ? 4 : DESERT ? 1 : 5) : offRoad ? 1 : 0;
@@ -26027,7 +26101,7 @@ const SHEETS = [];
     gr.addColorStop(0, "rgba(255,255,255,0.9)"); gr.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = gr; g.fillRect(x, 64 - h, 1 + Math.random()*2.5, h); }
   const tex = new THREE.CanvasTexture(cv);
   const geo = new THREE.CylinderGeometry(1, 0.08, 1, 9, 1, true, -0.85, 1.7); geo.translate(0, 0.5, 0);
-  for(let i = 0; i < 10; i++){
+  for(let i = 0; i < 28; i++){
     const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({map:tex, color:0xdfeaf2, transparent:true, opacity:0, side:THREE.DoubleSide, depthWrite:false, fog:true}));
     m.visible = false; m.renderOrder = 4; scene.add(m); SHEETS.push({m, t:0, life:0, k:1, vx:0, vz:0});
   }
@@ -26356,6 +26430,60 @@ function stepFish(dt, splashing){
   }
 }
 
+/* ---- what the wheels throw: a rooster tail of water off each back tyre when a car charges through water,
+   drops and streaks flung up and back, a cloud of fine spray hanging over it and a bow wave off the front
+   wheels; in mud, clods tumbling off the tread and a brown spray with them. Every car, not only yours. ---- */
+function spawnFx(x, y, z, vx, vy, vz, tile, size, life, grav, grow, col, spin, ak){
+  const i = dustHead = (dustHead + 1)%DUST, j = i*3;
+  dustPos[j] = x; dustPos[j+1] = y; dustPos[j+2] = z; dustVel[j] = vx; dustVel[j+1] = vy; dustVel[j+2] = vz;
+  dustLife[i] = life; dustSize[i] = size; dustGrav[i] = grav; dustGrow[i] = grow; dustAK[i] = ak === undefined ? 1 : ak; dustHaze[i] = 0;
+  dustTile[i] = tile; dustRot[i] = Math.random()*6.28; dustSpin[i] = spin || 0; dustDrag[i] = tile === 3 || tile === 2 || tile === 4 ? 0.35 : 1.9;
+  dustCol[j] = col[0]; dustCol[j+1] = col[1]; dustCol[j+2] = col[2];
+}
+const ROOST_W = [0.82, 0.9, 0.96], ROOST_M = [0.34, 0.24, 0.14], ROOST_MS = [0.46, 0.35, 0.22];
+/* one back wheel: (x, y, z) where the tyre meets the ground, (fx, fz) the car's heading, (sx, sz) out from the
+   car on this wheel's side, the car's own velocity, how fast, and how much (1 for yours, less for theirs) */
+function roost(kind, x, y, z, fx, fz, sx, sz, cvx, cvz, sp, k){
+  const n = Math.round(Math.min(9, 1.5 + sp*0.26)*k + Math.random()*0.6);
+  const water = kind === "water";
+  // and a curtain of it standing up behind the wheel, a fresh one every few frames
+  if(water && sp > 6 && Math.random() < 0.35*k) splashSheet(x - fx*0.4, y, z - fz*0.4, -fx*0.85 + sx*0.5, -fz*0.85 + sz*0.5, cvx*0.6, cvz*0.6, 0.55 + Math.min(1, sp/30)*0.7);
+  for(let q = 0; q < n; q++){
+    const keep = lr(0.12, 0.42), out = lr(-0.3, 1.6), up = (water ? lr(2.6, 5.2) + sp*0.11 : lr(1.6, 3.4) + sp*0.07), back = sp*lr(0.05, 0.25);
+    const vx = cvx*keep - fx*back + sx*out, vz = cvz*keep - fz*back + sz*out;
+    const px = x + lr(-0.25, 0.25), pz = z + lr(-0.25, 0.25);
+    if(water){ spawnFx(px, y + 0.25, pz, vx, up, vz, 3, lr(0.6, 1.2), lr(0.6, 1.0), 11, 0.5, ROOST_W, 0, 0.95);
+      if(Math.random() < 0.3) spawnFx(px, y + 0.25, pz, vx*1.1, up*1.15, vz*1.1, 2, lr(0.22, 0.38), lr(0.6, 0.9), 11, 0.05, ROOST_W, 0, 1); }
+    else if(Math.random() < 0.6){ const g = lr(0.7, 1.15); spawnFx(px, y + 0.25, pz, vx, up, vz, 4, lr(0.9, 1.7), lr(0.75, 1.1), 15, 0.05, [ROOST_M[0]*g, ROOST_M[1]*g, ROOST_M[2]*g], lr(-12, 12), 1); }
+    else spawnFx(px, y + 0.25, pz, vx*0.8, up*0.8, vz*0.8, 3, lr(0.8, 1.4), lr(0.4, 0.6), 12, 0.6, ROOST_MS, 0, 0.8);
+  }
+  // the fine spray that hangs over the tail
+  if(Math.random() < (water ? 0.6 : 0.25)*k) spawnFx(x - fx*0.8, y + 0.9, z - fz*0.8, cvx*0.3 + sx*0.5, lr(0.4, 1.2), cvz*0.3 + sz*0.5, 7, water ? lr(2.6, 4) : lr(1.6, 2.4), lr(0.5, 0.8), -0.2, water ? 3.2 : 2,
+    water ? [0.86, 0.9, 0.94] : [0.5, 0.4, 0.3], 0, water ? 0.55 : 0.12);
+}
+/* a front wheel ploughing in: water pushed out sideways in a low curling wave */
+function bowWave(x, y, z, fx, fz, sx, sz, cvx, cvz, sp, k){
+  const n = Math.round(Math.min(4, sp*0.12)*k + Math.random()*0.5);
+  for(let q = 0; q < n; q++){ const out = lr(2, 4.5), fw = lr(0.25, 0.55);
+    spawnFx(x + lr(-0.2, 0.2), y + 0.15, z + lr(-0.2, 0.2), cvx*fw + sx*out, lr(1, 2.6), cvz*fw + sz*out, 3, lr(0.8, 1.4), lr(0.45, 0.7), 11, 0.9, ROOST_W, 0, 0.85); }
+}
+/* what a car's wheels are in, for the ones the game doesn't already know: water, mud, or nothing to throw */
+function wheelsIn(x, z, y){
+  const w = waterTop(x, z); if(w !== null && Math.abs(w - y) < 1.0) return "water";
+  if(RIVER.on){ const r = riverAt(x, z); if(r && r[0] < RIVER_BED) return "water"; }
+  const n = nearest(x, z);
+  if(n.dist < n.half + 0.5){ if(n.surf === SURF.WATER) return "water"; if(n.surf === SURF.MUD && !WINTER && !DESERT) return "mud"; }
+  return null;
+}
+function wheelFx(c, kind, k, front){
+  const s = Math.sin(c[6]), co = Math.cos(c[6]), rx = co, rz = -s;
+  for(const sd of [1, -1]){
+    const wx = c[0] - s*1.25 + rx*sd*0.8, wz = c[1] - co*1.25 + rz*sd*0.8;
+    roost(kind, wx, c[2], wz, s, co, rx*sd, rz*sd, c[3], c[4], c[5], k);
+    if(front && kind === "water"){ const bx = c[0] + s*1.7 + rx*sd*0.8, bz = c[1] + co*1.7 + rz*sd*0.8; bowWave(bx, c[2], bz, s, co, rx*sd, rz*sd, c[3], c[4], c[5], k); }
+  }
+}
+
 /* ---- every frame ---- */
 const LIFE_PUSH = { hist:[], t:0 };
 function stepLife(dt){
@@ -26383,6 +26511,12 @@ function stepLife(dt){
       if(!c[8]) for(const sd of [1, -1]){ const wx = c[0] + rx*sd*0.78 - s*1.3, wz = c[1] + rz*sd*0.78 - co*1.3; layTrack(ci*2 + (sd > 0 ? 0 : 1), wx, wz, c[2]); }
       else TYRE.last.delete(ci*2), TYRE.last.delete(ci*2 + 1);
       if(c[8] || c[5] < 6) return;
+      if(!c[7]){
+        const kind = wheelsIn(c[0], c[1], c[2]);
+        if(kind) wheelFx(c, kind, 0.55, true);
+        else if(c[5] > 14 && !CONDV.wet && !WINTER && Math.random() < 0.5){ const sd = Math.random() < 0.5 ? 1 : -1;
+          spawnDust(c[0] - s*1.3 + rx*sd*0.8, c[2] + 0.15, c[1] - co*1.3 + rz*sd*0.8, DESERT ? 1 : 0, 0.5, -s*c[5]*0.2, -co*c[5]*0.2, 0.7); }
+      }
       // a puddle in the rain
       if(CONDV.wet){
         const key = "spl" + ci; LIFE[key] = (LIFE[key] || 0) - dt;
@@ -26399,7 +26533,7 @@ function stepLife(dt){
           const n = nearest(c[0], c[1]);
           if(n.surf !== SURF.MUD && n.surf !== SURF.WATER && pavedAt(c[0], c[1]) < 0.3 && deckAt(c[0], c[1]) === null){
             // (dust isn't lit by anything: it takes the light of the hour by hand, or at night it would glow)
-            const L = unlitLevel(), col = (DESERT ? [0.86, 0.72, 0.52] : FALL ? [0.72, 0.62, 0.48] : [0.78, 0.72, 0.6]).map(v=> v*L);
+            const col = DESERT ? [0.86, 0.72, 0.52] : FALL ? [0.72, 0.62, 0.48] : [0.78, 0.72, 0.6];
             spawnHaze(c[0] - s*2.4, c[2] + 0.6, c[1] - co*2.4, c[3], c[4], (DESERT ? 0.36 : 0.24)*Math.min(1, (c[5] - 9)/18)*(CONDV.tod === 3 ? 0.5 : 1), col); } }
       }
     });
@@ -26435,19 +26569,17 @@ function stepDust(dt){
         dustSize[i] += dt*dustGrow[i];
         dustAlpha[i] = Math.max(0, Math.min(1, dustLife[i]/1.8))*0.85*dustAK[i];
       } else {
-      dustVel[i*3]   *= (1 - dt*1.9);
-      dustVel[i*3+2] *= (1 - dt*1.9);
+      dustVel[i*3]   *= (1 - dt*dustDrag[i]);
+      dustVel[i*3+2] *= (1 - dt*dustDrag[i]);
       dustVel[i*3+1] -= dustGrav[i]*dt;
       dustSize[i]    += dt*dustGrow[i];
       dustAlpha[i]    = Math.max(0, Math.min(1, dustLife[i]))*0.85*dustAK[i];
       }
+      dustRot[i] += dustSpin[i]*dt;
       if(dustLife[i] <= 0){ dustPos[i*3+1] = -999; dustAlpha[i] = 0; }
     }
   }
-  dustGeo.attributes.position.needsUpdate = true;
-  dustGeo.attributes.aAlpha.needsUpdate = true;
-  dustGeo.attributes.aSize.needsUpdate = true;
-  dustGeo.attributes.aCol.needsUpdate = true;
+  const A = dustIG.attributes; A.iPos.needsUpdate = A.iVel.needsUpdate = A.aAlpha.needsUpdate = A.aSize.needsUpdate = A.aCol.needsUpdate = A.aTile.needsUpdate = A.aRot.needsUpdate = true;
 }
 
 let FRAME_T0 = 0;
