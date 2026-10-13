@@ -5968,7 +5968,7 @@ if(TRACK.special && !GATOR && !GLOW && !SPRING && (SPANS.length || CRATER.on)){
 }
 function fissNear(x, z){ let d = 1e9; for(let n=0;n<FISS.length;n++){ const dx = x - FISS[n][0], dz = z - FISS[n][1]; if(Math.abs(dx) < 8 && Math.abs(dz) < 8) d = Math.min(d, Math.hypot(dx, dz)); } return d; }
 // (the weather's say in how the ground looks: see CONDITIONS)
-const COND_U = { uRain:{value:0}, uSnow:{value:0}, uSkyCol:{value:new THREE.Color(0x8a96a2)} };
+const COND_U = { uRain:{value:0}, uSnow:{value:0}, uSkyCol:{value:new THREE.Color(0x8a96a2)}, uTime:{value:0} };
 /* at night: the cars' headlights (where each is and which way it points: x, z, dx, dz; then its height and strength)
    and the pools under the nearest road lamps (x, y, z, strength), lit on the ground in its own shader */
 const NIGHT_N = 12;
@@ -5977,13 +5977,13 @@ const NIGHT_U = { uNight:{value:0}, uHeadA:{value:[0, 1, 2, 3].map(()=> new THRE
 const TERRAIN_MAT = new THREE.MeshLambertMaterial({map:grassTex, vertexColors:true});
 const GROUND_MAT = TERRAIN_MAT;
 TERRAIN_MAT.onBeforeCompile = sh=>{
-  sh.uniforms.uRain = COND_U.uRain; sh.uniforms.uSnow = COND_U.uSnow; sh.uniforms.uSkyCol = COND_U.uSkyCol;
+  sh.uniforms.uRain = COND_U.uRain; sh.uniforms.uSnow = COND_U.uSnow; sh.uniforms.uSkyCol = COND_U.uSkyCol; sh.uniforms.uTime = COND_U.uTime;
   Object.assign(sh.uniforms, NIGHT_U);
   sh.vertexShader = sh.vertexShader
     .replace("#include <common>", "#include <common>\nattribute vec4 aRoad;\nattribute vec4 aRoad2;\nattribute float aSoft;\nvarying vec4 vRoad;\nvarying vec4 vRoad2;\nvarying float vSoft;\nvarying vec2 vXZ;\nvarying vec3 vWP;")
     .replace("#include <begin_vertex>", "#include <begin_vertex>\nvRoad = aRoad;\nvRoad2 = aRoad2;\nvSoft = aSoft;\nvXZ = position.xz;\nvWP = (modelMatrix*vec4(transformed, 1.0)).xyz;");
   sh.fragmentShader = sh.fragmentShader
-    .replace("#include <common>", "#include <common>\nvarying vec4 vRoad;\nvarying vec4 vRoad2;\nvarying float vSoft;\nvarying vec2 vXZ;\nvarying vec3 vWP;\nuniform float uRain, uSnow; uniform vec3 uSkyCol;\n" +
+    .replace("#include <common>", "#include <common>\nvarying vec4 vRoad;\nvarying vec4 vRoad2;\nvarying float vSoft;\nvarying vec2 vXZ;\nvarying vec3 vWP;\nuniform float uRain, uSnow, uTime; uniform vec3 uSkyCol;\n" +
       "uniform float uNight; uniform vec4 uHeadA[4]; uniform vec4 uHeadB[4]; uniform vec4 uLampP[" + NIGHT_N + "];\n" +
       "float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }\n" +
       "float vnz(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);\n" +
@@ -6066,7 +6066,12 @@ TERRAIN_MAT.onBeforeCompile = sh=>{
       "if(uRain > 0.0){",
       "  col *= 1.0 - uRain*(0.22 + 0.16*max(onRoad, verge*0.6));",
       "  float pud = smoothstep(0.66, 0.72, pnz(vXZ*0.16) + 0.14*exp(-pow((abs(lat) - 1.65)/0.5, 2.0)) + (pnz(vXZ*0.9 + 3.0) - 0.5)*0.12)*onRoad*uRain;",
-      "  col = mix(col, col*0.55 + uSkyCol*0.22*(0.8 + 0.4*n3), pud*0.85);",
+      "  col = mix(col, col*0.5 + uSkyCol*0.3*(0.8 + 0.4*n3), pud*0.9);",
+      // the rain landing in them: rings spreading from every drop
+      "  if(pud > 0.01){ vec2 rc = vXZ*1.6, ci = floor(rc), cf = fract(rc) - 0.5;",
+      "    float rt = fract(uTime*0.9 + hp2(ci + 7.0)); vec2 ro = vec2(hp2(ci + 3.1), hp2(ci + 9.7)) - 0.5;",
+      "    float rd = length(cf - ro*0.5), ring = (1.0 - smoothstep(0.0, 0.05, abs(rd - rt*0.45)))*(1.0 - rt);",
+      "    col += vec3(0.5, 0.55, 0.6)*ring*pud*0.7; }",
       "}",
       "if(uSnow > 0.0){",
       "  float trk = exp(-pow((abs(lat) - 1.65)/0.45, 2.0));",
@@ -14033,9 +14038,14 @@ if(SPRINGCUP){
       } else if(R.kind === "skim"){
         // a floating torii at either end of the skim, standing in the water, and paper lanterns down both sides
         const red = lam(0xd23a22, 0x2a0602), ink = PM(0x1c1414), lantM = new THREE.MeshBasicMaterial({color:0xffe2a0});
-        const toriiAt = (k)=>{ const f = frm(S.a + k), g = new THREE.Group(), w = f.half + 3.4, y0 = LAKE.level - 1.6;
+        /* (its beams are set from the road under them, not the lake: at the skim's far end the road is already up
+            the bank, and a gate measured from the water hung its tie beam a metre and a half over the road; the
+            posts still go down into the water) */
+        const toriiAt = (k)=>{ const f = frm(S.a + k), g = new THREE.Group(), w = f.half + 3.4;
+          let road = LAKE.level; for(const l of [-f.half, -f.half*0.5, 0, f.half*0.5, f.half]) road = Math.max(road, surfaceY(f.p.x + f.nx*l, f.p.z + f.nz*l));
+          const y0 = road - 1.6, foot = LAKE.level - 1.6, ph = y0 + 11.6 - foot;
           for(const sd of [-1, 1]){ const x = f.p.x + f.nx*sd*w, z = f.p.z + f.nz*sd*w;
-            const c = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, 11.6, 12), red); c.position.set(x, y0 + 5.8, z); g.add(c);
+            const c = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, ph, 12), red); c.position.set(x, foot + ph/2, z); g.add(c);
             const b = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 1.2, 12), ink); b.position.set(x, LAKE.level + 0.2, z); g.add(b); }
           const yaw = Math.atan2(f.t.x, f.t.z);                 // (a beam's length is its own x: across the road)
           const kas = new THREE.Mesh(new THREE.BoxGeometry(w*2 + 5, 0.9, 1.1), ink); kas.position.set(f.p.x, y0 + 11.9, f.p.z); kas.rotation.y = yaw; g.add(kas);
@@ -19404,6 +19414,13 @@ function spawnDust(x,y,z,sandy,force,vx,vz,lift){
     const g2 = 0.72 + Math.random()*0.16;
     dustCol[j]=g2; dustCol[j+1]=g2; dustCol[j+2]=g2*0.98;
     dustSize[i]*=1.45; dustLife[i]*=1.05;
+  }
+  else if(sandy === 6){                           // a sheet of water off a puddle: big drops thrown high and wide
+    const g2 = 0.9 + Math.random()*0.1;
+    dustCol[j]=0.82*g2; dustCol[j+1]=0.9*g2; dustCol[j+2]=0.97*g2;
+    dustVel[i*3+1] = (lift===undefined?4:lift)*(0.7+Math.random()*0.6);
+    dustSize[i] = 1.3 + Math.random()*1.3; dustLife[i] = 0.7 + Math.random()*0.5;
+    dustGrav[i] = 11; dustGrow[i] = 1.4;
   }
   else if(sandy === 2){
     /* water: a spray of drops thrown back off the tyre that falls again,
@@ -25992,11 +26009,41 @@ function puddleAt(x, z){
 }
 /* a wheel through standing water: a sheet thrown up and out to the side, and rings behind */
 function wheelSplash(x, y, z, vx, vz, sp, sideX, sideZ, loud){
-  const n = Math.min(14, 4 + Math.round(sp*0.35));
-  for(let k = 0; k < n; k++){ const out = lr(1.5, 4.5);
-    spawnDust(x, y + 0.15, z, 2, Math.min(2.5, sp*0.05), vx*0.3 + sideX*out, vz*0.3 + sideZ*out, lr(2.5, 5.5)); }
-  ripple(x, y, z, 0.3, 2.2 + sp*0.05, 0.55, 1.4);
-  if(loud && actx){ burst(0.3, "bandpass", 1500, 0.1*Math.min(1, sp/20), 0.7, 0, 500); burst(0.15, "highpass", 3500, 0.05, 0.6, 0.02); }
+  const k0 = Math.min(1, sp/30), n = Math.round(14 + k0*18);
+  // the drops: thrown out to the side and up in a fan, more and higher the faster you hit it
+  for(let k = 0; k < n; k++){ const out = lr(2, 5 + k0*4), f = lr(0.15, 0.5);
+    spawnDust(x, y + 0.2, z, 6, 0, vx*f + sideX*out, vz*f + sideZ*out, lr(2.5, 4 + k0*5)); }
+  // and the sheet: a curtain of spray standing up off the wheel for a moment
+  splashSheet(x, y, z, sideX, sideZ, vx, vz, 0.95 + k0*1.25);
+  ripple(x, y, z, 0.4, 3 + sp*0.08, 0.6, 1.6);
+  ripple(x - vx*0.04, y, z - vz*0.04, 0.2, 1.8, 0.45, 1.2);
+  if(loud && actx){ const v = 0.6 + k0*0.6;
+    burst(0.45, "bandpass", 1300, 0.22*v, 0.7, 0, 420); burst(0.25, "highpass", 3200, 0.1*v, 0.6, 0.02); burst(0.18, "lowpass", 300, 0.18*v, 0.8, 0); }
+}
+const SHEETS = [];
+{
+  const cv = document.createElement("canvas"); cv.width = 64; cv.height = 64; const g = cv.getContext("2d");
+  for(let i = 0; i < 90; i++){ const x = Math.random()*64, h = 20 + Math.random()*44; const gr = g.createLinearGradient(0, 64, 0, 64 - h);
+    gr.addColorStop(0, "rgba(255,255,255,0.9)"); gr.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = gr; g.fillRect(x, 64 - h, 1 + Math.random()*2.5, h); }
+  const tex = new THREE.CanvasTexture(cv);
+  const geo = new THREE.CylinderGeometry(1, 0.08, 1, 9, 1, true, -0.85, 1.7); geo.translate(0, 0.5, 0);
+  for(let i = 0; i < 10; i++){
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({map:tex, color:0xdfeaf2, transparent:true, opacity:0, side:THREE.DoubleSide, depthWrite:false, fog:true}));
+    m.visible = false; m.renderOrder = 4; scene.add(m); SHEETS.push({m, t:0, life:0, k:1, vx:0, vz:0});
+  }
+}
+let sheetHead = 0;
+function splashSheet(x, y, z, sx, sz, vx, vz, k){
+  const S = SHEETS[sheetHead = (sheetHead + 1)%SHEETS.length];
+  S.t = 0; S.life = 0.45 + k*0.15; S.k = k; S.vx = vx*0.25; S.vz = vz*0.25;
+  S.m.position.set(x, y, z); S.m.rotation.set(0, Math.atan2(sx, sz), 0); S.m.visible = true;          // (the fan opens out to that side)
+}
+function stepSheets(dt){
+  for(const S of SHEETS){ if(!S.m.visible) continue; S.t += dt;
+    if(S.t >= S.life){ S.m.visible = false; continue; }
+    const f = S.t/S.life, r = (0.5 + f*1.6)*S.k, h = (0.6 + Math.sin(Math.min(1, f*1.6)*Math.PI*0.5)*1.4)*S.k*(1 - f*0.35);
+    S.m.scale.set(r, h, r); S.m.position.x += S.vx*dt; S.m.position.z += S.vz*dt;
+    S.m.material.opacity = 0.75*(1 - f)*Math.min(1, f*8); }
 }
 
 /* ---- tyre tracks: two lines behind every car, lasting the race, darkening as the laps go over them ---- */
@@ -26219,7 +26266,7 @@ const DRAG = { list:[], near:0 };
 if(LIFE.ok && WATERS && !WINTER){
   const wM = new THREE.MeshBasicMaterial({color:0xd8f0ff, transparent:true, opacity:0.45, side:THREE.DoubleSide, depthWrite:false, fog:true});
   for(let k = 0; k < 5; k++){
-    const g = new THREE.Group(), body = lifeMat([0x2a6ad0, 0x2aa060, 0xc03a2a, 0x3a9ad0, 0x2a6ad0][k]);
+    const g = new THREE.Group(), body = lifeMat([0x2a6ad0, 0x2aa060, 0x1a8a8a, 0x3a9ad0, 0x2a6ad0][k]);
     const b = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.035, 0.42), body); g.add(b);
     const h = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 4), body); h.position.z = 0.22; g.add(h);
     const wings = [];
@@ -26244,7 +26291,7 @@ function stepDragonflies(dt){
     if(want && !d.on){ d.on = true; d.g.visible = true; d.x = pose.x + rx*lr(-8, 8) + fx*lr(4, 10); d.z = pose.z + rz*lr(-8, 8) + fz*lr(4, 10); d.y = pose.y + 2; d.vx = pose.vx; d.vz = pose.vz; d.vy = 0; }
     if(!d.on) return;
     d.retarget -= dt;
-    if(d.retarget <= 0){ d.retarget = lr(0.25, 0.8); const sd = i % 2 ? 1 : -1; d.ox = sd*lr(1.6, 3.4); d.oy = lr(0.6, 1.9); d.oz = lr(-1.5, 2.5); }
+    if(d.retarget <= 0){ d.retarget = lr(0.25, 0.8); const sd = i % 2 ? 1 : -1; d.ox = sd*lr(2.6, 4.2); d.oy = lr(0.7, 2.0); d.oz = lr(-1.8, 0.8); }
     let tx, ty, tz;
     if(want){ tx = pose.x + rx*d.ox + fx*d.oz; tz = pose.z + rz*d.ox + fz*d.oz; ty = pose.y + d.oy; }
     else { tx = d.x + d.vx; tz = d.z + d.vz; ty = d.y + 3; }                       // peeling off, up and away
@@ -26252,6 +26299,9 @@ function stepDragonflies(dt){
     const k = want ? 9 : 2;
     d.vx += ((tx - d.x)*k + (want ? pose.vx : 0) - d.vx)*Math.min(1, dt*6); d.vz += ((tz - d.z)*k + (want ? pose.vz : 0) - d.vz)*Math.min(1, dt*6); d.vy += ((ty - d.y)*4 - d.vy)*Math.min(1, dt*5);
     d.x += d.vx*dt; d.y += d.vy*dt; d.z += d.vz*dt;
+    // never in the car's way: anything drifting in front of it, or over it, is moved out to the side
+    { const ex = d.x - pose.x, ez = d.z - pose.z, al = ex*fx + ez*fz, lt = ex*rx + ez*rz;
+      if(al > -2.6 && al < 10 && Math.abs(lt) < 2.2){ const sd = lt >= 0 ? 1 : -1, push = 2.2 - Math.abs(lt); d.x += rx*sd*push; d.z += rz*sd*push; } }
     d.g.position.set(d.x, d.y, d.z); d.g.rotation.y = Math.atan2(d.vx - pose.vx*(want ? 0.7 : 0) + fx*0.5, d.vz - pose.vz*(want ? 0.7 : 0) + fz*0.5);
     const fl = Math.sin(LIFE.t*90 + i)*0.5; d.wings.forEach((m, j)=> m.rotation.z = (j % 2 ? -1 : 1)*fl*(j < 2 ? 1 : 0.8));
     if(!want && (d.y > pose.y + 14 || Math.hypot(d.x - pose.x, d.z - pose.z) > 60)){ d.on = false; d.g.visible = false; }
@@ -26265,7 +26315,7 @@ if(LIFE.ok && WATERS && !WINTER){
     const p = MAIN.pts[i], t = MAIN.tans[i];
     for(const sd of [1, -1]) for(let off = MAIN.half[i] + 3; off < MAIN.half[i] + 46; off += 7){
       const x = p.x - t.z*sd*off, z = p.z + t.x*sd*off, w = waterTop(x, z);
-      if(w !== null && w - gridH(x, z) > 0.55 && deckAt(x, z) === null) FISH.spots.push([x, w, z]);
+      if(w !== null && w - gridH(x, z) > 0.55 && deckAt(x, z) === null){ const nr = nearest(x, z); if(nr.dist > nr.half + 6) FISH.spots.push([x, w, z]); }
     }
   }
   const koi = SPRINGCUP || BLOOM, C = koi ? [0xf07a1e, 0xf2efe6, 0xe04a1a, 0xf0c030] : SWAMPGP || JUNGLE ? [0x4a4a3a, 0x5a5440] : [0x9aa4a8, 0x8a8a6a, 0xa8b0b4];
@@ -26280,7 +26330,7 @@ if(LIFE.ok && WATERS && !WINTER){
 }
 function fishJump(s, away){
   const f = FISH.list.find(q=> !q.on); if(!f) return;
-  const a = away !== undefined ? away + lr(-0.6, 0.6) : Math.random()*6.28, h = lr(1.5, 3.5);
+  const a = away !== undefined ? away + lr(-0.6, 0.6) : Math.random()*6.28, h = lr(1.0, 2.2);
   f.on = true; f.t = 0; f.x = s[0]; f.z = s[2]; f.w = s[1]; f.y = s[1] - 0.1;
   f.vx = Math.sin(a)*h; f.vz = Math.cos(a)*h; f.vy = lr(3.2, 5.2); f.g.visible = true;
   ripple(f.x, f.w, f.z, 0.15, 1.6, 0.5, 1.3);
@@ -26312,7 +26362,8 @@ function stepLife(dt){
   if(!LIFE.ok) return;
   LIFE.t += dt;
   const cars = lifeCars(), racing = state.phase === "racing" || state.phase === "done" || state.phase === "countdown";
-  stepRipples(dt);
+  stepRipples(dt); stepSheets(dt);
+  COND_U.uTime.value = LIFE.t;
   // the grass: pushed by each car, and where yours was in the last half second
   { const P = GRASS_PUSH.value; LIFE_PUSH.t -= dt;
     if(LIFE_PUSH.t <= 0){ LIFE_PUSH.t = 0.12; LIFE_PUSH.hist.unshift([pose.x, pose.z]); LIFE_PUSH.hist.length = Math.min(LIFE_PUSH.hist.length, 4); }
