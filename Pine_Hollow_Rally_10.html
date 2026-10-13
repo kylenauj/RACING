@@ -559,6 +559,11 @@ renderer.shadowMap.autoUpdate = true;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
+/* what pushes the grass over (see billboardField; up here because some circuits plant their fields early):
+   the cars where they are now, and where yours was a moment ago (fainter the longer ago, so the grass springs
+   back up behind you): x, z, strength, reach; and one circle round all of them, outside which a blade skips it */
+const GRASS_PUSH = { value: Array.from({length:8}, ()=> new THREE.Vector4(0, 0, 0, 1)) };
+const GRASS_PUSHB = { value: new THREE.Vector4(0, 0, 0, 0) };
 const SKY = new THREE.Color(0xa9d6f2);          // horizon haze, matched by the dome
 scene.background = SKY;
 scene.fog = new THREE.Fog(0xb4d8ee, 220, 1100); // linear, so the range stays readable
@@ -15482,11 +15487,6 @@ const grassTuftTex = new THREE.CanvasTexture(noiseCanvas(256, 256, (g)=>{
 }));
 
 
-/* what pushes the grass over: the cars where they are now, and where yours was a moment ago (fainter the
-   longer ago, so the grass springs back up behind you): x, z, strength, reach */
-const GRASS_PUSH = { value: Array.from({length:8}, ()=> new THREE.Vector4(0, 0, 0, 1)) };
-// (and one circle round all of them: every blade outside it skips the work, which is nearly all of them)
-const GRASS_PUSHB = { value: new THREE.Vector4(0, 0, 0, 0) };
 function billboardField(tex, cell, pos, scale, uv, tint, colour){
   const base = new THREE.PlaneGeometry(1, 1);
   base.translate(0, 0.5, 0);
