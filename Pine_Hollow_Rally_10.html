@@ -5825,6 +5825,17 @@ function roughY(x, z){
   }
   return (wash - rut + mud)*on;
 }
+/* a flowing river's bed under the tyres: gravel bars and cobbles, lumpy over the riffles and the falls,
+   near smooth in the pools (felt through the springs; the water hides it) */
+function bedRough(x, z){
+  if(!RIVER.flow || FROZEN) return 0;
+  const B = RIVER.box; if(x < B[0] || x > B[1] || z < B[2] || z > B[3]) return 0;
+  const r = riverAt(x, z); if(!r || r[0] > RIVER_BED) return 0;
+  const q = RIVER.S[r[3]], amp = [0.03, 0.06, 0.11, 0.12][q[6]] || 0;
+  // (lumps a few metres across that each wheel meets on its own, so the body pitches and rocks, and grit on top)
+  const n = Math.sin(x*0.95 + Math.sin(z*0.7)*1.4)*Math.sin(z*1.1 + Math.sin(x*0.6)*1.7) + 0.35*Math.sin(x*2.7 + Math.sin(z*2.1)) + 0.15*Math.sin(x*6.1 + z*5.3);
+  return amp*n*(1 - smoothstep(RIVER_BED - 2.5, RIVER_BED, r[0]));
+}
 function softAt(x, z){ const c = cellAt(x, z); return c >= 0 && GP[c] >= 0 ? GMR[c] : 0; }
 function pavedAt(x, z){ const c = cellAt(x, z); return c >= 0 && GP[c] >= 0 ? GPV[c] : 0; }
 function surfaceInfo(x, z){
@@ -7412,6 +7423,112 @@ function lavaMaterial(flow){
       "  col = mix(col, fogColor, smoothstep(fogNear, fogFar, fd)*0.55);",
       "  gl_FragColor = vec4(col, 1.0);",
       "}"].join("\n")
+  });
+  waterMats.push(m);
+  return m;
+}
+/* ---- flowing water: a river's own surface, moving ----
+   The sheet is shaped in the vertex shader, every frame, from what the river is doing there:
+   STANDING WAVES fixed in place over the fast water (their wavelength set by its speed, 2πv²/g, the way a
+   real riffle's train of waves sits still while the water races through it), CHOP carried down at the water's
+   own speed (its v coordinate is travel time, so anything scrolled through it moves with the flow), a slow
+   SWELL in the pools, and round each car a mound of water pushed up ahead of it, a trough behind and the
+   V of its wake. It is drawn faceted, like everything else in the valley, so the waves catch the sun facet by
+   facet; it is matte and clear, not a mirror: you see the stones through the shallows, foam rides the crests
+   and laces the fast water, and gathers along the edges. */
+const FLOW_CARS = [0, 1, 2, 3].map(()=> new THREE.Vector4(0, 0, 0, 0)), FLOW_CARF = [0, 1, 2, 3].map(()=> new THREE.Vector4(0, 1, 0, 0));
+function flowWaterMaterial(){
+  const m = new THREE.ShaderMaterial({
+    uniforms:{ uTime:{value:0}, tRipple:{value:waterTex}, uSun:{value:SUN_DIR.clone()}, uLight:FX_LIGHT,
+      uCar:{value:FLOW_CARS}, uCarF:{value:FLOW_CARF},
+      fogColor:{value:new THREE.Color(scene.fog.color)}, fogNear:{value:scene.fog.near}, fogFar:{value:scene.fog.far} },
+    vertexShader:[
+      "uniform float uTime; uniform vec4 uCar[4]; uniform vec4 uCarF[4];",
+      "attribute float aDepth; attribute float aFoam; attribute float aVel; attribute float aS; attribute vec2 aDir;",
+      "varying float vDepth; varying float vFoam; varying float vVel; varying float vH; varying float vAmp; varying float vWake;",
+      "varying vec3 vWorld; varying vec2 vUv; varying vec3 vN;",
+      "float lam, aSt, aCh;",
+      // the river's own waves at (across, along, travel time)
+      "float waveH(float u, float s, float T){",
+      "  float st = sin(6.2832*s/lam + sin(u*0.37 + s*0.05)*1.6)*(0.55 + 0.45*sin(u*0.61 + s*0.21));",
+      "  float tt = T + uTime*0.9;",
+      "  float ch = sin(u*1.3 + tt*3.7)*sin(u*0.7 - tt*2.9 + 1.7);",
+      "  float sw = sin(s*0.31 - uTime*0.7 + u*0.17)*0.04 + sin(u*0.53 + s*0.12 + uTime*0.9)*0.025;",
+      "  return st*aSt + ch*aCh + sw;",
+      "}",
+      // the cars: water piled up ahead, a trough behind, the V of the wake fanning out (y: how white it is)
+      "vec2 carH(vec2 p){",
+      "  float h = 0.0, wk = 0.0;",
+      "  for(int i = 0; i < 4; i++){",
+      "    vec4 c = uCar[i]; if(c.w <= 0.001) continue;",
+      "    vec2 d = p - c.xy, f = uCarF[i].xy; float ah = dot(d, f), sd = dot(d, vec2(-f.y, f.x));",
+      "    float bow = exp(-(sd*sd)/2.2 - (ah - 2.3)*(ah - 2.3)/1.3);",
+      "    float flank = exp(-(sd*sd)/4.0 - ah*ah/7.0);",
+      "    float back = exp(-(sd*sd)/2.6 - (ah + 3.6)*(ah + 3.6)/6.0);",
+      "    float bh = max(0.0, -ah), vv = abs(sd) - 1.0 - bh*0.36;",
+      "    float vee = bh > 0.0 ? exp(-vv*vv/0.5)*exp(-bh/16.0) : 0.0;",
+      "    h += c.w*(0.26*bow + 0.1*flank - 0.18*back + 0.16*vee*(0.7 + 0.3*sin(bh*1.7 - uTime*5.0)));",
+      "    wk = max(wk, c.w*max(bow*0.9, vee*0.75));",
+      "  }",
+      "  return vec2(h, wk);",
+      "}",
+      "void main(){",
+      "  vec4 w = modelMatrix*vec4(position, 1.0);",
+      "  float u = uv.x, T = uv.y, s = aS, edge = smoothstep(0.03, 0.32, aDepth);",
+      // standing waves: still in place, the water racing through them, their length set by its speed
+      "  lam = clamp(aVel*aVel*0.64, 2.2, 7.5);",
+      "  aSt = (0.06 + 0.3*aFoam)*smoothstep(0.9, 3.0, aVel);",
+      "  aCh = 0.04 + 0.08*smoothstep(1.0, 4.0, aVel);",
+      "  vec2 t = aDir, n = vec2(-aDir.y, aDir.x);",
+      "  const float E = 0.25;",
+      "  vec2 c0 = carH(w.xz);",
+      "  float h = (waveH(u, s, T) + c0.x)*edge;",
+      // the slope, by finite differences, for a smooth normal
+      "  float hu = (waveH(u + E, s, T) + carH(w.xz + n*E).x)*edge;",
+      "  float hs = (waveH(u, s + E, T + E/max(aVel, 0.3)) + carH(w.xz + t*E).x)*edge;",
+      "  vec3 du = vec3(n.x*E, hu - h, n.y*E), ds = vec3(t.x*E, hs - h, t.y*E);",
+      "  vN = normalize(cross(ds, du)); if(vN.y < 0.0) vN = -vN;",
+      "  w.y += h;",
+      "  vH = h; vAmp = (aSt + aCh + 0.04)*edge; vWake = c0.y*edge;",
+      "  vDepth = aDepth; vFoam = aFoam; vVel = aVel; vUv = uv; vWorld = w.xyz;",
+      "  gl_Position = projectionMatrix*viewMatrix*w;",
+      "}"].join("\n"),
+    fragmentShader:[
+      "uniform float uTime, fogNear, fogFar; uniform sampler2D tRipple; uniform vec3 uSun, fogColor, uLight;",
+      "varying float vDepth; varying float vFoam; varying float vVel; varying float vH; varying float vAmp; varying float vWake;",
+      "varying vec3 vWorld; varying vec2 vUv; varying vec3 vN;",
+      "void main(){",
+      "  if(vDepth <= 0.0) discard;",
+      "  vec3 N = normalize(vN);",
+      "  vec3 V = normalize(cameraPosition - vWorld);",
+      "  float deep = smoothstep(0.08, 0.9, vDepth);",
+      "  vec3 col = mix(vec3(0.38, 0.58, 0.47), vec3(0.06, 0.26, 0.28), deep);",
+      // each facet lit by the sun, so the shape of the water reads
+      "  float dif = clamp(dot(N, uSun), 0.0, 1.0);",
+      // (a facet tipped toward the sun is bright, one tipped away dark: the wave's shape, drawn the valley's way)
+      "  float tip = clamp(dot(N.xz, normalize(uSun.xz))*3.2, -0.4, 0.45);",
+      "  col *= 0.95 + tip;",
+      "  float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);",
+      "  col = mix(col, vec3(0.62, 0.76, 0.84), fres*0.4);",
+      "  col += vec3(1.0, 0.95, 0.85)*pow(max(dot(reflect(-uSun, N), V), 0.0), 40.0)*0.3;",
+      // foam: carried down at the water's speed, riding the crests, lacing the fast water, along the edges
+      "  float T = vUv.y;",
+      "  float f1 = texture2D(tRipple, vec2(vUv.x*0.21, T*0.5 + uTime*0.45)).r;",
+      "  float f2 = texture2D(tRipple, vec2(vUv.x*0.47 + 0.3, T*0.9 + uTime*0.81)).r;",
+      "  float crest = smoothstep(0.3, 0.95, vH/max(vAmp, 0.02));",
+      "  float lace = smoothstep(0.61, 0.76, f1)*0.7 + smoothstep(0.63, 0.78, f2)*0.6;",
+      "  float foam = vFoam*(0.2 + 0.8*crest)*(0.55 + lace) + lace*0.3*smoothstep(1.6, 4.5, vVel);",
+      "  foam = max(foam, (1.0 - smoothstep(0.0, 0.12, vDepth))*smoothstep(0.58, 0.7, f2 + 0.08));",
+      "  foam = clamp(max(foam, vWake*(0.4 + 0.6*smoothstep(0.58, 0.7, f1 + 0.1))), 0.0, 1.0);",
+      "  col = mix(col, vec3(0.9, 0.95, 0.97)*(0.78 + 0.28*dif), foam);",
+      "  col *= uLight;",
+      "  float a = mix(0.4, 0.86, deep);",
+      "  a = max(a, fres*0.5); a = max(a, foam*0.95);",
+      "  a *= smoothstep(0.0, 0.05, vDepth);",
+      "  col = mix(col, fogColor, smoothstep(fogNear, fogFar, length(cameraPosition - vWorld)));",
+      "  gl_FragColor = vec4(col, a);",
+      "}"].join("\n"),
+    transparent:true, depthWrite:false
   });
   waterMats.push(m);
   return m;
@@ -9230,8 +9347,69 @@ if(GORGE.depth > 0.5){
  * ------------------------------------------------------------------ */
 /* the creek: one sheet laid along its whole line, each row at the water
    level there, so the rapids slope from pool to pool and foam as they go */
+/* a flowing river's sheet: two rows to every sample of its line and a vertex every 0.75m across, fine enough
+   for its waves; each vertex carries the water's depth there, its speed, its foam, how far along the river
+   it is (for the standing waves, which stay put) and its travel time (for everything the flow carries) */
+const FLOW_SHEET = { mesh:null, k:[0, 0, 0, 0] };
+function buildFlowSheet(S, ACROSS){
+  const SUB = 2, STEPF = 0.75, cols = Math.ceil(ACROSS*2/STEPF) + 1;
+  const sA = new Float32Array(S.length), TT = new Float32Array(S.length);
+  for(let j=1;j<S.length;j++){ const L = Math.hypot(S[j][0] - S[j-1][0], S[j][1] - S[j-1][1]); sA[j] = sA[j-1] + L; TT[j] = TT[j-1] + L/Math.max(0.3, (S[j][4] + S[j-1][4])*0.5); }
+  const pos = [], uv = [], dep = [], fo = [], ve = [], sa = [], di = [], idx = [];
+  let rows = 0;
+  for(let j=0;j<S.length;j++) for(let q=0;q<(j < S.length - 1 ? SUB : 1);q++){
+    const f = q/SUB, A = S[j], B = S[Math.min(S.length - 1, j + 1)], L = (a, b)=> a + (b - a)*f;
+    const P0 = S[Math.max(0, j - 1)], P1 = S[Math.min(S.length - 1, j + 2)];
+    let tx = P1[0] - P0[0], tz = P1[1] - P0[1]; const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl;
+    const nx = -tz, nz = tx, cx = L(A[0], B[0]), cz = L(A[1], B[1]), lev = L(A[2], B[2]);
+    const vel = L(A[4], B[4]), fm = L(A[5], B[5]), sv = L(sA[j], sA[Math.min(S.length - 1, j + 1)]), tv = L(TT[j], TT[Math.min(S.length - 1, j + 1)]);
+    for(let c=0;c<cols;c++){
+      const u = -ACROSS + c*STEPF, x = cx + nx*u, z = cz + nz*u;
+      pos.push(x, lev, z); uv.push(u, tv);
+      let dr = lev - surfaceY(x, z);
+      if(Math.abs(u) > RIVER_BANK*0.8 || dr > 3.2) dr = Math.min(dr, -0.5);
+      dep.push(Math.max(-1, Math.min(3, dr)));
+      // (whitest mid-stream, where it runs fastest; slower and calmer toward the banks)
+      const side = 1 - 0.5*smoothstep(RIVER_BED*0.5, RIVER_BED*1.1, Math.abs(u));
+      fo.push(fm*side); ve.push(vel*(0.55 + 0.45*side)); sa.push(sv); di.push(tx, tz);       // (aDir: the way s runs, upstream; across it, the way u runs)
+    }
+    rows++;
+  }
+  for(let r=0;r<rows-1;r++) for(let c=0;c<cols-1;c++){
+    const a = r*cols + c, b = a + 1, d2 = a + cols, e = d2 + 1;
+    if(dep[a] <= 0 && dep[b] <= 0 && dep[d2] <= 0 && dep[e] <= 0) continue;
+    idx.push(a, e, d2, a, b, e);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute("aDepth", new THREE.Float32BufferAttribute(dep, 1));
+  g.setAttribute("aFoam", new THREE.Float32BufferAttribute(fo, 1));
+  g.setAttribute("aVel", new THREE.Float32BufferAttribute(ve, 1));
+  g.setAttribute("aS", new THREE.Float32BufferAttribute(sa, 1));
+  g.setAttribute("aDir", new THREE.Float32BufferAttribute(di, 2));
+  g.setIndex(idx);
+  const m = new THREE.Mesh(g, flowWaterMaterial());
+  m.renderOrder = 3; m.frustumCulled = false; scene.add(m);
+  FLOW_SHEET.mesh = m;
+}
+/* each car in the water pushes its wake into the sheet (up to four: yours and the nearest) */
+function stepFlowWake(dt, cars){
+  if(!FLOW_SHEET.mesh) return;
+  let n = 0;
+  const list = cars.slice().sort((p, q)=> (q[7] ? 1 : 0) - (p[7] ? 1 : 0) || ((p[0] - pose.x)**2 + (p[1] - pose.z)**2) - ((q[0] - pose.x)**2 + (q[1] - pose.z)**2));
+  for(let i = 0; i < 4; i++){
+    const c = list[i];
+    let want = 0;
+    if(c && !c[8]){ const r = riverAt(c[0], c[1]); if(r && r[0] < RIVER_BED + 1 && Math.abs(c[2] - r[1]) < 1.6) want = Math.min(1, c[5]/18); }
+    FLOW_SHEET.k[i] += (want - FLOW_SHEET.k[i])*Math.min(1, dt*4);
+    if(c){ FLOW_CARS[i].set(c[0], c[1], 0, FLOW_SHEET.k[i]); FLOW_CARF[i].set(Math.sin(c[6]), Math.cos(c[6]), 0, 0); }
+    else FLOW_CARS[i].w = 0;
+  }
+}
 if(RIVER.on){
   const S = RIVER.S, ACROSS = RIVER_BANK + 5, STEP = 1.1, CASC = RIVER.flow, JS = CASC ? 1 : 2;   // (a flowing river's falls need every sample)
+  if(CASC) buildFlowSheet(S, ACROSS);
   const cols = Math.ceil(ACROSS*2/STEP) + 1;
   const pos=[], uv=[], dep=[], foam=[], idx=[];
   let rows = 0;
@@ -9240,7 +9418,7 @@ if(RIVER.on){
      racing over the riffles and drifting in the pools, and draw out long where it is fast */
   const TT = new Float32Array(S.length);
   if(CASC) for(let j=1;j<S.length;j++) TT[j] = TT[j-1] + Math.hypot(S[j][0] - S[j-1][0], S[j][1] - S[j-1][1])/Math.max(0.3, (S[j][4] + S[j-1][4])*0.5);
-  for(let j=0;j<S.length;j+=JS){
+  for(let j=0;j<S.length && !CASC;j+=JS){
     const A = S[Math.max(0, j-JS)], B = S[Math.min(S.length-1, j+JS)];
     let tx = B[0]-A[0], tz = B[1]-A[1]; const tl = Math.hypot(tx, tz) || 1; tx/=tl; tz/=tl;
     const nx = -tz, nz = tx, lev = S[j][2];
@@ -9268,11 +9446,12 @@ if(RIVER.on){
   g.setAttribute("aDepth", new THREE.Float32BufferAttribute(dep,1));
   g.setAttribute("aFoam", new THREE.Float32BufferAttribute(foam,1));
   g.setIndex(idx);
+  if(!CASC){
   const m = new THREE.Mesh(g, waterMaterial());
   if(TRACK.river.rush) m.material.uniforms.uRush.value = 1;
-  if(CASC) m.material.uniforms.uCasc.value = 1;
   m.renderOrder = 3; m.frustumCulled = false;
   scene.add(m);
+  }
   /* The icefall at the head of the creek: the water comes over a rock step
      and has frozen where it fell, in pillars and curtains of blue ice
      hanging off the lip down onto the creek. */
@@ -9321,6 +9500,7 @@ if(RIVER.on){
       return [A[0] + (B[0] - A[0])*f, A[1] + (B[1] - A[1])*f]; };
     const add = (x, z, y, yaw, pitch, roll, sx, sy, sz)=> rk[Math.floor(rnd()*3)].push([x, y, z, yaw, pitch, roll, sx, sy, sz]);
     const onRoad = (x, z)=> nearest(x, z).dist < 6.3;
+    RIVER.bedStones = [];                // (the ones on the road, for the wheels to ride over: registered with the stones below)
     /* a riffle: the stream runs shallow over a bar of cobbles, laid flat where the road crosses them and
        breaking the surface either side, with the odd boulder out in it that the water piles up against */
     RIVER.riffles.forEach(L=>{
@@ -9330,7 +9510,8 @@ if(RIVER.on){
       const cnt = Math.round(len*1.6);
       for(let k = 0; k < cnt; k++){
         const f = rnd(), u = (rnd()*2 - 1)*(RIVER_BED + 1.5), x = F[0] + tx*len*f + nx*u, z = F[1] + tz*len*f + nz*u, y = gradedY(x, z);
-        if(onRoad(x, z)) add(x, z, y - 0.09, yaw + rnd()*6.3, 0, 0, 0.35 + rnd()*0.4, 0.13, 0.3 + rnd()*0.35);
+        if(onRoad(x, z)){ const sx = 0.35 + rnd()*0.4, sz = 0.3 + rnd()*0.35; add(x, z, y - 0.03, yaw + rnd()*6.3, 0, 0, sx, 0.13, sz);
+          RIVER.bedStones.push([x, z, 0.07, Math.min(sx, sz)*0.55]); }
         else { const sc = 0.3 + rnd()*0.45; add(x, z, y + sc*0.12, rnd()*6.3, rnd()*0.4, rnd()*0.4, sc*(1 + rnd()*0.3), sc*0.7, sc); }
       }
       for(let k = 0; k < 2; k++){ const sd = rnd() < 0.5 ? -1 : 1, u = sd*(7 + rnd()*(RIVER_BED - 6)), f = rnd(), x = F[0] + tx*len*f + nx*u, z = F[1] + tz*len*f + nz*u;
@@ -9345,13 +9526,15 @@ if(RIVER.on){
       // the face: two or three rows of slabs up it
       for(const f of [0.2, 0.5, 0.8]) for(let u = -W + rnd()*0.8; u < W; u += 1.1 + rnd()*0.7){
         const q = pt(f + (rnd() - 0.5)*0.12, u), y = gradedY(q[0], q[1]), road = onRoad(q[0], q[1]);
-        if(road) add(q[0], q[1], y - 0.13, yaw + (rnd() - 0.5)*0.5, -slope*0.9, (rnd() - 0.5)*0.08, 0.8 + rnd()*0.5, 0.22, 0.75 + rnd()*0.45);
+        if(road){ const sx = 0.8 + rnd()*0.5, sz = 0.75 + rnd()*0.45; add(q[0], q[1], y - 0.08, yaw + (rnd() - 0.5)*0.5, -slope*0.9, (rnd() - 0.5)*0.08, sx, 0.22, sz);
+          RIVER.bedStones.push([q[0], q[1], 0.08, Math.min(sx, sz)*0.6]); }
         else { const sc = 0.5 + rnd()*0.7; add(q[0], q[1], y + sc*0.12, rnd()*6.3, rnd()*0.4, rnd()*0.4, sc*(1 + rnd()*0.4), sc*0.75, sc); }
       }
       // the lip: stones along the top, low across the road, standing up either side of it
       for(let u = -W - 1 + rnd(); u < W + 1; u += 0.9 + rnd()*0.8){
         const q = pt(1.0 + rnd()*0.1, u), y = gradedY(q[0], q[1]), road = onRoad(q[0], q[1]);
-        if(road){ if(rnd() < 0.55) add(q[0], q[1], y - 0.1, yaw + (rnd() - 0.5)*0.6, 0, 0, 0.6 + rnd()*0.4, 0.18, 0.5 + rnd()*0.3); }
+        if(road){ if(rnd() < 0.55){ const sx = 0.6 + rnd()*0.4, sz = 0.5 + rnd()*0.3; add(q[0], q[1], y - 0.04, yaw + (rnd() - 0.5)*0.6, 0, 0, sx, 0.18, sz);
+          RIVER.bedStones.push([q[0], q[1], 0.09, Math.min(sx, sz)*0.6]); } }
         else { const sc = 0.45 + rnd()*0.65; add(q[0], q[1], y + sc*0.2, rnd()*6.3, rnd()*0.5, rnd()*0.5, sc, sc*(0.7 + rnd()*0.4), sc); }
       }
       // the shelf above: flat stones sunk in the bed
@@ -9547,6 +9730,9 @@ const clearOf = (x, z, m)=>{ const n = nearest(x, z); return n.dist > n.half + m
    the whole road. Lone stones lie in the wheel tracks of the plain gravel. */
 const STONES = new Map();
 function stoneKey(a, b){ return a*4099 + b; }
+// the cobbles and ledge slabs on a flowing river's bed, where the road climbs it: every tyre feels them
+if(RIVER.bedStones) RIVER.bedStones.forEach(st=>{ const key = stoneKey(Math.floor(st[0]/4), Math.floor(st[1]/4));
+  if(!STONES.has(key)) STONES.set(key, []); STONES.get(key).push(st); });
 /* how far a tyre standing at x,z is lifted by the stones: a wheel of
    radius 0.36m rolling up onto a rounded stone, not a step */
 function stoneY(x, z){
@@ -21092,15 +21278,12 @@ function stepCarInner(dt){
 
   // resistance sets top speed instead of a hard clamp
   const sgn = Math.sign(along || 1);
-  const wetK = creekR && creekR[0] < RIVER_BANK ? 0.4 : 1;          // (the rushing creek is shallow and fast: it splashes more than it drags)
+  const wetK = (creekR && creekR[0] < RIVER_BANK) || (RIVER.flow && (pose.riverDep || 0) > 0) ? 0.4 : 1;          // (the rushing creek is shallow and fast: it splashes more than it drags)
   a -= sgn * (0.0006*along*along*GG.dragK() + (deepOff ? 1.9 : offRoad ? 1.0 : 0.30 + wetAmt*0.34*wetK));
   a -= along * (deepOff ? 0.15 : offRoad ? 0.09 : 0.02 + wetAmt*0.035*wetK - tarAmt*0.006);
   if(offRoad && poolIn > 0) a -= along*0.1*poolIn;          // out in the water off the road it drags hard: no short cut across a lake
   /* and the faster you push through water the harder it pushes back: the car is shoving a bow wave
      along in front of it, so it is a thing you feel, not a slightly slower bit of road */
-  // (deeper water, more of it to push: a pool drags at the car, a riffle over the gravel hardly does)
-  const depK = pose.riverDep ? Math.max(0.45, Math.min(1.9, pose.riverDep/0.34)) : 1;
-  if(!pose.air) a -= sgn*wetAmt*wetK*0.0005*depK*along*along;
   /* The mountain's mud is thick. It holds the car harder the faster it tries
      to go (the tyres and the body are pushing a bow wave of it), so in a
      bog you plough along with the engine screaming and the wheels flinging
@@ -21204,17 +21387,21 @@ function stepCarInner(dt){
       // (a flowing river pushes with its own speed: a nudge in the pools, a shove over the riffles and falls)
       const push = (RIVER.flow ? Sj[4]*0.8 : 1.0 + Math.min(1, fall*3.5)*3.2)*(1 - smoothstep(RIVER_BED - 2, RIVER_BED + 1, r[0]))*smoothstep(0, 12, r[2]);
       pose.riverDep = RIVER.flow ? Sj[3] : 0;
-      pose.vx += dx*push*dt; pose.vz += dz*push*dt;
+      /* (it carries you if you are going with it and pushes you across if you cross it, but it never
+         holds you back: driving up the creek it is the bumps and the spray you fight, not your speed) */
+      const fx0 = Math.sin(pose.h), fz0 = Math.cos(pose.h), with_ = dx*fx0 + dz*fz0;
+      const px = dx - fx0*with_, pz = dz - fz0*with_, keep = Math.max(0, with_);
+      pose.vx += (px + fx0*keep)*push*dt; pose.vz += (pz + fz0*keep)*push*dt;
       pose.current = push;
+      // fast broken water over the gravel: the whole car buzzes with it
+      if(RIVER.flow && Sj[6] >= 2) GAME.shake = Math.max(GAME.shake || 0, 0.035*Math.min(1, Math.hypot(pose.vx, pose.vz)/25)*(Sj[6] === 3 ? 1.6 : 1));
     } else { pose.current = 0; pose.riverDep = 0; }
   }
-  /* Hitting water fast: it grabs the car (a jolt, some of your speed gone at once) and goes up in a sheet
-     off both front wheels; landing in it off a jump the same, harder */
+  /* Hitting water fast: a jolt, and it goes up in a sheet off both front wheels; landing in it off a jump the same */
   {
     const spN = Math.hypot(pose.vx, pose.vz), landed = !pose.air && (pose.airW || 0) > 0.25;
     if(!pose.air && wetAmt > 0.45 && spN > 12 && (!pose.inW || landed) && LIFE.ok){
-      const k0 = Math.min(1, (spN - 12)/22), lose = (landed ? 0.025 : 0.04)*k0;
-      pose.vx *= 1 - lose; pose.vz *= 1 - lose;
+      const k0 = Math.min(1, (spN - 12)/22);
       GAME.shake = Math.max(GAME.shake || 0, 0.12 + 0.18*k0);
       const fx = pose.vx/spN, fz = pose.vz/spN, rx = fz, rz = -fx;
       for(const sd of [1, -1]) wheelSplash(pose.x + fx*1.6 + rx*sd*0.85, pose.y, pose.z + fz*1.6 + rz*sd*0.85, pose.vx, pose.vz, spN*(1 + 0.4*k0), rx*sd, rz*sd, sd > 0);
@@ -21582,7 +21769,7 @@ function stepCarInner(dt){
     const plane = pose.y - o[0]*sP + wX[wi]*sR;      // where the chassis puts this hub
     const wx = pose.x + vfx*o[0] - vfz*o[1], wz = pose.z + vfz*o[0] + vfx*o[1];
     const target = pose.air ? -0.17
-      : Math.max(-0.20, Math.min(0.26, cG[wi] + cRgh[wi] + stoneY(wx, wz) - plane));
+      : Math.max(-0.20, Math.min(0.26, cG[wi] + cRgh[wi] + stoneY(wx, wz) + bedRough(wx, wz) - plane));
     const up = target > w.sy;
     w.sv += ((up ? -1500 : -260)*(w.sy - target) - (up ? 60 : 20)*w.sv)*dt;
     w.sy += w.sv*dt;
@@ -26729,7 +26916,7 @@ function stepLife(dt){
   if(!LIFE.ok) return;
   LIFE.t += dt;
   const cars = lifeCars(), racing = state.phase === "racing" || state.phase === "done" || state.phase === "countdown";
-  stepRipples(dt); stepSheets(dt); stepCascades(dt);
+  stepRipples(dt); stepSheets(dt); stepCascades(dt); stepFlowWake(dt, cars);
   COND_U.uTime.value = LIFE.t;
   // the grass: pushed by each car, and where yours was in the last half second
   { const P = GRASS_PUSH.value; LIFE_PUSH.t -= dt;
