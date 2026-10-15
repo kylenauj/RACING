@@ -26507,9 +26507,10 @@ const SHEETS = [];
   }
 }
 let sheetHead = 0;
-function splashSheet(x, y, z, sx, sz, vx, vz, k){
+function splashSheet(x, y, z, sx, sz, vx, vz, k, ride){
   const S = SHEETS[sheetHead = (sheetHead + 1)%SHEETS.length];
-  S.t = 0; S.life = 0.45 + k*0.15; S.k = k; S.vx = vx*0.25; S.vz = vz*0.25;
+  // (ride: one thrown off a moving wheel goes along with it, short-lived, instead of standing where it was thrown)
+  S.t = 0; S.life = ride ? 0.24 + k*0.06 : 0.45 + k*0.15; S.k = k; S.vx = vx*(ride || 0.25); S.vz = vz*(ride || 0.25);
   S.m.position.set(x, y, z); S.m.rotation.set(0, Math.atan2(sx, sz), 0); S.m.visible = true;          // (the fan opens out to that side)
 }
 function stepSheets(dt){
@@ -26847,25 +26848,28 @@ function roost(kind, x, y, z, fx, fz, sx, sz, cvx, cvz, sp, k){
   const n = Math.round(Math.min(9, 1.5 + sp*0.26)*k + Math.random()*0.6);
   const water = kind === "water";
   // and a curtain of it standing up behind the wheel, a fresh one every few frames
-  if(water && sp > 6 && Math.random() < 0.35*k) splashSheet(x - fx*0.4, y, z - fz*0.4, -fx*0.85 + sx*0.5, -fz*0.85 + sz*0.5, cvx*0.6, cvz*0.6, 0.55 + Math.min(1, sp/30)*0.7);
+  if(water && sp > 6 && Math.random() < 0.45*k) splashSheet(x - fx*0.5, y, z - fz*0.5, -fx*0.85 + sx*0.5, -fz*0.85 + sz*0.5, cvx, cvz, 0.5 + Math.min(1, sp/30)*0.6, 0.94);
   for(let q = 0; q < n; q++){
-    const keep = lr(0.12, 0.42), out = lr(-0.3, 1.6), up = (water ? lr(2.6, 5.2) + sp*0.11 : lr(1.6, 3.4) + sp*0.07), back = sp*lr(0.05, 0.25);
+    /* water: thrown up and back off the tread fast and falling fast, a plume that stays on the wheel it comes
+       off (it goes on at most of the car's speed, so it opens out a few metres behind, never a trail left hanging) */
+    const keep = water ? lr(0.62, 0.86) : lr(0.12, 0.42), out = water ? lr(-0.2, 1.1) : lr(-0.3, 1.6);
+    const up = water ? lr(3.2, 5.6) + sp*0.06 : lr(1.6, 3.4) + sp*0.07, back = water ? lr(1.5, 3.5) + sp*0.06 : sp*lr(0.05, 0.25);
     const vx = cvx*keep - fx*back + sx*out, vz = cvz*keep - fz*back + sz*out;
     const px = x + lr(-0.25, 0.25), pz = z + lr(-0.25, 0.25);
-    if(water){ spawnFx(px, y + 0.25, pz, vx, up, vz, 3, lr(0.6, 1.2), lr(0.6, 1.0), 11, 0.5, ROOST_W, 0, 0.95);
-      if(Math.random() < 0.3) spawnFx(px, y + 0.25, pz, vx*1.1, up*1.15, vz*1.1, 2, lr(0.22, 0.38), lr(0.6, 0.9), 11, 0.05, ROOST_W, 0, 1); }
+    if(water){ spawnFx(px, y + 0.3, pz, vx, up, vz, Math.random() < 0.55 ? 3 : 2, lr(0.35, 0.75), lr(0.32, 0.52), 17, 0.25, ROOST_W, 0, 0.95); }
     else if(Math.random() < 0.6){ const g = lr(0.7, 1.15); spawnFx(px, y + 0.25, pz, vx, up, vz, 4, lr(0.9, 1.7), lr(0.75, 1.1), 15, 0.05, [ROOST_M[0]*g, ROOST_M[1]*g, ROOST_M[2]*g], lr(-12, 12), 1); }
     else spawnFx(px, y + 0.25, pz, vx*0.8, up*0.8, vz*0.8, 3, lr(0.8, 1.4), lr(0.4, 0.6), 12, 0.6, ROOST_MS, 0, 0.8);
   }
   // the fine spray that hangs over the tail
-  if(Math.random() < (water ? 0.6 : 0.25)*k) spawnFx(x - fx*0.8, y + 0.9, z - fz*0.8, cvx*0.3 + sx*0.5, lr(0.4, 1.2), cvz*0.3 + sz*0.5, 7, water ? lr(2.6, 4) : lr(1.6, 2.4), lr(0.5, 0.8), -0.2, water ? 3.2 : 2,
-    water ? [0.86, 0.9, 0.94] : [0.5, 0.4, 0.3], 0, water ? 0.55 : 0.12);
+  // (water: a puff of it right at the wheel, gone in a moment; mud: a brown haze)
+  if(water){ if(Math.random() < 0.4*k) spawnFx(x - fx*0.6, y + 0.6, z - fz*0.6, cvx*0.8 + sx*0.6, lr(0.6, 1.4), cvz*0.8 + sz*0.6, 7, lr(1.2, 1.8), lr(0.22, 0.32), 0, 2.5, [0.86, 0.9, 0.94], 0, 0.4); }
+  else if(Math.random() < 0.25*k) spawnFx(x - fx*0.8, y + 0.9, z - fz*0.8, cvx*0.3 + sx*0.5, lr(0.4, 1.2), cvz*0.3 + sz*0.5, 7, lr(1.6, 2.4), lr(0.5, 0.8), -0.2, 2, [0.5, 0.4, 0.3], 0, 0.12);
 }
 /* a front wheel ploughing in: water pushed out sideways in a low curling wave */
 function bowWave(x, y, z, fx, fz, sx, sz, cvx, cvz, sp, k){
   const n = Math.round(Math.min(4, sp*0.12)*k + Math.random()*0.5);
-  for(let q = 0; q < n; q++){ const out = lr(2, 4.5), fw = lr(0.25, 0.55);
-    spawnFx(x + lr(-0.2, 0.2), y + 0.15, z + lr(-0.2, 0.2), cvx*fw + sx*out, lr(1, 2.6), cvz*fw + sz*out, 3, lr(0.8, 1.4), lr(0.45, 0.7), 11, 0.9, ROOST_W, 0, 0.85); }
+  for(let q = 0; q < n; q++){ const out = lr(2, 4.5), fw = lr(0.7, 0.9);
+    spawnFx(x + lr(-0.2, 0.2), y + 0.15, z + lr(-0.2, 0.2), cvx*fw + sx*out, lr(1, 2.6), cvz*fw + sz*out, 3, lr(0.6, 1.1), lr(0.28, 0.42), 15, 0.6, ROOST_W, 0, 0.85); }
 }
 /* what a car's wheels are in, for the ones the game doesn't already know: water, mud, or nothing to throw */
 function wheelsIn(x, z, y){
